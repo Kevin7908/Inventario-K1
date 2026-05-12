@@ -67,7 +67,7 @@ class DialogoProducto extends StatefulWidget {
 class _DialogoProductoState extends State<DialogoProducto> {
   final _formKey = GlobalKey<FormState>();
 
-  // ── Controllers de texto ──────────────────────────────────────────────────
+  // Controllers de texto
   late final TextEditingController _skuCtrl;
   late final TextEditingController _nombreCtrl;
   late final TextEditingController _descripcionCtrl;
@@ -78,7 +78,7 @@ class _DialogoProductoState extends State<DialogoProducto> {
   late final TextEditingController _stockMinimoCtrl;
   late final TextEditingController _ubicacionCtrl;
 
-  // ── ValueNotifiers — renderizado granular sin setState ────────────────────
+  //  ValueNotifiers — renderizado granular sin setState 
   // Cada notifier actualiza solo su widget suscrito.
   // No hay setState en todo el orquestador tras initState.
   late final ValueNotifier<Categoria?> _categoriaNotifier;
@@ -88,7 +88,7 @@ class _DialogoProductoState extends State<DialogoProducto> {
   late final ValueNotifier<bool> _aplicaIvaNotifier;
   late final ValueNotifier<bool> _activoNotifier;
 
-  // ── initState ─────────────────────────────────────────────────────────────
+  //  initState 
 
   @override
   void initState() {
@@ -154,7 +154,7 @@ class _DialogoProductoState extends State<DialogoProducto> {
     }
   }
 
-  // ── dispose — limpiar TODOS los recursos ──────────────────────────────────
+  //  dispose  limpiar Todos los recursos 
 
   @override
   void dispose() {
@@ -176,7 +176,7 @@ class _DialogoProductoState extends State<DialogoProducto> {
     super.dispose();
   }
 
-  // ── Guardar ────────────────────────────────────────────────────────────────
+  // Guardar 
 
   Future<void> _guardar() async {
     if (!_formKey.currentState!.validate()) return;
@@ -275,7 +275,7 @@ class _DialogoProductoState extends State<DialogoProducto> {
     }
   }
 
-  // ── Build ──────────────────────────────────────────────────────────────────
+  //  Build 
 
   @override
   Widget build(BuildContext context) {
@@ -290,13 +290,13 @@ class _DialogoProductoState extends State<DialogoProducto> {
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            // ── Encabezado estático — nunca se reconstruye ────────────────
+            // Encabezado estático — nunca se reconstruye 
             _Encabezado(
               titulo:
                   widget.esEdicion ? 'Editar Producto' : 'Nuevo Producto',
             ),
 
-            // ── Formulario scrollable compuesto por secciones ─────────────
+            // Formulario scrollable compuesto por secciones 
             Flexible(
               child: SingleChildScrollView(
                 padding: const EdgeInsets.fromLTRB(28, 8, 28, 0),
@@ -349,7 +349,7 @@ class _DialogoProductoState extends State<DialogoProducto> {
               ),
             ),
 
-            // ── Botones fijos ─────────────────────────────────────────────
+            //  Botones fijos 
             _BotonesDialogo(
               esEdicion: widget.esEdicion,
               onGuardar: _guardar,

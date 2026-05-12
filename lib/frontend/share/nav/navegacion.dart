@@ -6,6 +6,7 @@ import 'package:inventario_k1/frontend/share/widgets/placeholder_widget.dart';
 
 import '../../features/categorias/vista/categorias_vistas.dart';
 import '../../features/clientes/vista/cliente_vista.dart';
+import '../../features/motos/vista/motos_vista.dart';
 import '../../features/productos/vista/producto_vista.dart';
 import '../../features/proveedores/vista/proveedores_vista.dart';
 import '../../features/unidades_medida/vista/unidad_medida_vista.dart';
@@ -30,6 +31,7 @@ class _NavegacionState extends State<Navegacion> {
     NavSection.clientes,
     NavSection.proveedores,
     NavSection.unidadesMedida,
+    NavSection.motos,
   ];
 
   @override
@@ -65,6 +67,7 @@ class _NavegacionState extends State<Navegacion> {
                 ClientesVista(),
                 ProveedoresVista(),
                 UnidadesMedidaVista(),
+                MotosVista(),
               ],
             ),
           ),

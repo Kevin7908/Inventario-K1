@@ -1,48 +1,63 @@
 import 'package:flutter/material.dart';
+import 'package:inventario_k1/frontend/features/clientes/view_model/clientes_view_model.dart';
 import 'package:provider/provider.dart';
 
-import '../../../../backend/features/clientes/modelo/cliente.dart';
+import '../../../../backend/features/motos/modelo/moto.dart';
 import '../../../../backend/share/database/locator.dart';
 import '../../../share/temas/colores_app.dart';
 import '../../../share/widgets/input/barra_busqueda_widget.dart';
 import '../../../share/widgets/output/estado_error_widget.dart';
 import '../../../share/widgets/output/estado_vacio_widget.dart';
 import '../../../share/widgets/top_bar_widget.dart';
-import '../view_model/clientes_view_model.dart';
-import '../widget/dialogo_cliente_widget.dart';
-import '../widget/tarjeta_cliente_widget.dart';
+import '../view_model/motos_view_model.dart';
+import '../widgets/dialogo_motos.dart';
+import '../widgets/tarjeta_moto_widget.dart';
 
-class ClientesVista extends StatefulWidget {
-  const ClientesVista({super.key});
+class MotosVista extends StatefulWidget {
+  const MotosVista({super.key});
 
   @override
-  State<ClientesVista> createState() => _ClientesVistaState();
+  State<MotosVista> createState() => _MotosVistaState();
 }
 
-class _ClientesVistaState extends State<ClientesVista> {
-  late final ClientesViewModel _vm;
+class _MotosVistaState extends State<MotosVista> {
+
+  late final MotosViewModel _vm;
+  late final ClientesViewModel _clientesVm;
 
   @override
   void initState() {
     super.initState();
-    _vm = locator<ClientesViewModel>();
+    _vm = locator<MotosViewModel>();
+    _clientesVm = locator<ClientesViewModel>();
   }
 
-  // ── Diálogo crear ─────────────────────────────────────────────────────────
+  //  Diálogo crear
   Future<void> _abrirCrear(BuildContext context) async {
-    await DialogoCliente.mostrar(context, viewModel: _vm);
+    await DialogoMoto.mostrar(
+      context,
+      viewModel: _vm,
+      clientesVm: _clientesVm,
+    );
   }
 
-  // ── Diálogo editar ────────────────────────────────────────────────────────
-  Future<void> _abrirEditar(BuildContext context, Cliente cliente) async {
-    await DialogoCliente.mostrar(context, viewModel: _vm, cliente: cliente);
+  // Diálogo editar 
+  Future<void> _abrirEditar(BuildContext context, Moto moto) async {
+    await DialogoMoto.mostrar(
+      context,
+      viewModel: _vm,
+      clientesVm: _clientesVm,
+      moto: moto,
+    );
   }
 
-  // Confirmación eliminar 
+///////////////////////////////////////////////////////////////////////////////
+/////////////////////////////////////////////////////////////////////////////
+  // Confirmación eliminar (poner mi conformar nuevo)
   Future<void> _confirmarEliminar(
     BuildContext context,
-    Cliente cliente,
-    ClientesViewModel vm,
+    Moto moto,
+    MotosViewModel vm,
   ) async {
     final confirmar = await showDialog<bool>(
       context: context,
@@ -50,25 +65,29 @@ class _ClientesVistaState extends State<ClientesVista> {
         backgroundColor: ColoresApp.bgCard,
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
         title: const Text(
-          '¿Eliminar cliente?',
+          '¿Eliminar moto?',
           style: TextStyle(color: ColoresApp.textDark, fontSize: 17),
         ),
         content: Text(
-          'Se eliminará a ${cliente.nombreCompleto} de forma permanente.',
+          'Se eliminará la ${moto.marca} ${moto.modelo}'
+          '${moto.placa != null ? ' (${moto.placa})' : ''} de forma permanente.',
           style: const TextStyle(color: ColoresApp.textMedium),
         ),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(ctx, false),
-            child: const Text('Cancelar',
-                style: TextStyle(color: ColoresApp.textMedium)),
+            child: const Text(
+              'Cancelar',
+              style: TextStyle(color: ColoresApp.textMedium),
+            ),
           ),
           ElevatedButton(
             style: ElevatedButton.styleFrom(
               backgroundColor: ColoresApp.accentRed,
               foregroundColor: Colors.white,
               shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(10)),
+                borderRadius: BorderRadius.circular(10),
+              ),
             ),
             onPressed: () => Navigator.pop(ctx, true),
             child: const Text('Eliminar'),
@@ -78,7 +97,7 @@ class _ClientesVistaState extends State<ClientesVista> {
     );
 
     if (confirmar == true && context.mounted) {
-      final error = await vm.eliminar(cliente.id);
+      final error = await vm.eliminar(moto.id);
       if (error != null && context.mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
@@ -92,9 +111,9 @@ class _ClientesVistaState extends State<ClientesVista> {
 
   @override
   Widget build(BuildContext context) {
-    return ChangeNotifierProvider<ClientesViewModel>.value(
+    return ChangeNotifierProvider<MotosViewModel>.value(
       value: _vm,
-      child: Consumer<ClientesViewModel>(
+      child: Consumer<MotosViewModel>(
         builder: (context, vm, _) {
           return Scaffold(
             backgroundColor: ColoresApp.bgContent,
@@ -104,7 +123,7 @@ class _ClientesVistaState extends State<ClientesVista> {
                 // Top bar 
                 SliverToBoxAdapter(
                   child: TopBarConBoton(
-                    titulo: 'Clientes',
+                    titulo: 'Motos',
                     etiquetaBoton: 'Agregar',
                     alPresionarBoton: () => _abrirCrear(context),
                   ),
@@ -115,19 +134,20 @@ class _ClientesVistaState extends State<ClientesVista> {
                   child: Padding(
                     padding: const EdgeInsets.fromLTRB(20, 8, 20, 8),
                     child: BarraBusquedaWidget(
-                      placeholder: 'Buscar por nombre, cédula, ciudad…',
+                      placeholder:
+                          'Buscar por marca, modelo, placa, cliente…',
                       alCambiar: vm.buscar,
                     ),
                   ),
                 ),
 
-                // Contador de resultados 
-                if (vm.estado == EstadoClientes.cargado)
+                //  Contador de resultados
+                if (vm.estado == EstadoMotos.cargado)
                   SliverToBoxAdapter(
                     child: Padding(
                       padding: const EdgeInsets.symmetric(horizontal: 20),
                       child: Text(
-                        '${vm.clientes.length} cliente${vm.clientes.length == 1 ? '' : 's'}',
+                        '${vm.motos.length} moto${vm.motos.length == 1 ? '' : 's'}',
                         style: const TextStyle(
                           fontSize: 13,
                           color: ColoresApp.textLight,
@@ -151,9 +171,9 @@ class _ClientesVistaState extends State<ClientesVista> {
     );
   }
 
-  Widget _buildCuerpo(BuildContext context, ClientesViewModel vm) {
+  Widget _buildCuerpo(BuildContext context, MotosViewModel vm) {
     // Estado: Cargando
-    if (vm.estado == EstadoClientes.cargando) {
+    if (vm.estado == EstadoMotos.cargando) {
       return const SliverFillRemaining(
         child: Center(
           child: CircularProgressIndicator(color: ColoresApp.primary),
@@ -162,7 +182,7 @@ class _ClientesVistaState extends State<ClientesVista> {
     }
 
     // Estado: Error
-    if (vm.estado == EstadoClientes.error) {
+    if (vm.estado == EstadoMotos.error) {
       return SliverFillRemaining(
         child: EstadoErrorWidget(
           mensaje: vm.mensajeError ?? 'Error desconocido',
@@ -172,17 +192,17 @@ class _ClientesVistaState extends State<ClientesVista> {
     }
 
     // Estado: Lista vacía
-    if (vm.clientes.isEmpty) {
+    if (vm.motos.isEmpty) {
       return SliverFillRemaining(
         child: EstadoVacioWidget(
           textoCTA: '',
-          icono: Icons.people_outline,
+          icono: Icons.two_wheeler_outlined,
           textoSinDatos: vm.textoBusqueda.isNotEmpty
               ? 'Sin resultados'
-              : 'Sin clientes aún',
+              : 'Sin motos aún',
           textoSinResultados: vm.textoBusqueda.isNotEmpty
               ? 'Prueba con otro término de búsqueda'
-              : 'Agrega tu primer cliente tocando "Agregar"',
+              : 'Agrega tu primera moto tocando "Agregar"',
         ),
       );
     }
@@ -195,19 +215,19 @@ class _ClientesVistaState extends State<ClientesVista> {
           maxCrossAxisExtent: 320,
           mainAxisSpacing: 12,
           crossAxisSpacing: 12,
-          childAspectRatio: 0.82,
+          childAspectRatio: 0.78,
         ),
         delegate: SliverChildBuilderDelegate(
           (context, index) {
-            final cliente = vm.clientes[index];
-            return TarjetaClienteWidget(
-              key: ValueKey(cliente.id),
-              cliente: cliente,
-              alEditar: () => _abrirEditar(context, cliente),
-              alEliminar: () => _confirmarEliminar(context, cliente, vm),
+            final moto = vm.motos[index];
+            return TarjetaMotoWidget(
+              key: ValueKey(moto.id),
+              moto: moto,
+              alEditar: () => _abrirEditar(context, moto),
+              alEliminar: () => _confirmarEliminar(context, moto, vm),
             );
           },
-          childCount: vm.clientes.length,
+          childCount: vm.motos.length,
         ),
       ),
     );

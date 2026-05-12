@@ -75,3 +75,7 @@ app.*.map.json
 *.db-shm
 *.db-wal
 *.sqlite
+
+extract.py
+project_dump.md
+contexto_app.md
