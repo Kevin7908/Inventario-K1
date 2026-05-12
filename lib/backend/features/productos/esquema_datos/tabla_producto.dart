@@ -15,15 +15,12 @@ class TablaProducto extends Table {
 
   TextColumn get descripcion => text().nullable()();
 
-  /// FK → categorias(id)  — nullable
   IntColumn get categoriaId =>
       integer().nullable().references(TablaCategoria, #id)();
 
-  /// FK → unidades_medida(id)  — nullable
   IntColumn get unidadMedidaId =>
       integer().nullable().references(TablaUnidadesMedida, #id)();
 
-  /// FK → proveedores(id)  — nullable
   IntColumn get proveedorId =>
       integer().nullable().references(TablaProveedor, #id)();
 

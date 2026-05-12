@@ -5,6 +5,7 @@ import 'package:inventario_k1/frontend/share/widgets/barra_lateral_widget.dart';
 import 'package:inventario_k1/frontend/share/widgets/placeholder_widget.dart';
 
 import '../../features/categorias/vista/categorias_vistas.dart';
+import '../../features/clientes/vista/cliente_vista.dart';
 import '../../features/productos/vista/producto_vista.dart';
 import '../../features/proveedores/vista/proveedores_vista.dart';
 import '../../features/unidades_medida/vista/unidad_medida_vista.dart';
@@ -61,7 +62,7 @@ class _NavegacionState extends State<Navegacion> {
                 CategoriasVista(),
                 PlaceholderWidget(seccion: NavSection.vender),
                 PlaceholderWidget(seccion: NavSection.deudores),
-                PlaceholderWidget(seccion: NavSection.clientes),
+                ClientesVista(),
                 ProveedoresVista(),
                 UnidadesMedidaVista(),
               ],

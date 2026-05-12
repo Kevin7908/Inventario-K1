@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import 'package:inventario_k1/frontend/features/autenticacion/vista/inicio_sesion_vista.dart';
+import 'package:inventario_k1/frontend/share/nav/navegacion.dart';
 import 'package:inventario_k1/frontend/share/temas/colores_app.dart';
 
 import 'backend/share/database/locator.dart';
@@ -26,7 +26,7 @@ class MainApp extends StatelessWidget {
         scaffoldBackgroundColor: ColoresApp.bgContent,
         useMaterial3: true,
       ),
-      home: const InicioSesionVista(),
+      home: const Navegacion(),
     );
   }
 }

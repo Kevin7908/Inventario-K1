@@ -10,8 +10,6 @@ class TextFieldCustom extends StatelessWidget {
   final FocusNode? focusNode;
   final FocusNode? siguienteFoco;
 
-  /// Si es campo de contraseña, pasar un [ValueNotifier<bool>] externo.
-  /// Así solo se reconstruye el ícono, no el formulario completo.
   final ValueNotifier<bool>? mostrarPasswordNotifier;
 
   final String? Function(String?)? validador;

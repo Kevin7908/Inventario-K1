@@ -440,7 +440,7 @@ class SeccionInventario extends StatelessWidget {
                   Switch(
                     value: activo,
                     onChanged: (v) => activoNotifier.value = v,
-                    activeColor: const Color(0xFF10B981),
+                    activeThumbColor: const Color(0xFF10B981),
                   ),
                   const SizedBox(width: 6),
                   AnimatedSwitcher(
