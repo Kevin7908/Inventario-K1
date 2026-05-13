@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:inventario_k1/frontend/features/tecnicos/vista/tecnico_vista.dart';
 import 'package:inventario_k1/frontend/share/nav/nav_section.dart';
 import 'package:inventario_k1/frontend/share/temas/colores_app.dart';
 import 'package:inventario_k1/frontend/share/widgets/barra_lateral_widget.dart';
@@ -34,6 +35,7 @@ class _NavegacionState extends State<Navegacion> {
     NavSection.unidadesMedida,
     NavSection.motos,
     NavSection.especializaciones,
+    NavSection.tecnicos,
   ];
 
   @override
@@ -71,6 +73,7 @@ class _NavegacionState extends State<Navegacion> {
                 UnidadesMedidaVista(),
                 MotosVista(),
                 EspecializacionesVista(),
+                TecnicosVista(),
               ],
             ),
           ),

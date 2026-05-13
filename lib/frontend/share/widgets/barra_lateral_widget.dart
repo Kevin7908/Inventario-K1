@@ -81,6 +81,11 @@ class BarraLateralWidget extends StatelessWidget {
                   Icons.build_outlined,
                   'Especializaciones',
                 ),
+                _buildNavItem(
+                  NavSection.tecnicos,
+                  Icons.engineering_outlined,
+                  'Técnicos',
+                ),
               ],
             ),
           ),

@@ -9,4 +9,5 @@ enum NavSection {
   unidadesMedida,
   motos,
   especializaciones,
+  tecnicos,
 }

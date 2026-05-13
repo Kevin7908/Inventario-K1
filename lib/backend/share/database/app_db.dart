@@ -10,6 +10,7 @@ import '../../features/clientes/esquema_datos/tabla_cliente.dart';
 import '../../features/especializacion/esquema_datos/tabla_especializacion.dart';
 import '../../features/motos/esquema_datos/tabla_moto.dart';
 import '../../features/productos/esquema_datos/tabla_producto.dart';
+import '../../features/tecnicos/esquema_datos/tabla_tecnico.dart';
 import '../../features/unidades_medida/esquema_datos/tabla_unidades_medida.dart';
 import '../../features/proveedores/esquema_datos/tabla_proveedor.dart';
 
@@ -24,6 +25,7 @@ part 'app_db.g.dart';
     TablaCliente,
     TablaMoto,
     TablaEspecializacion,
+    TablaTecnico,
     ],
 )
 class AppDb extends _$AppDb {
