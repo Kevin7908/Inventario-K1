@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:inventario_k1/frontend/share/nav/navegacion.dart';
 import 'package:inventario_k1/frontend/share/temas/colores_app.dart';
 
@@ -9,7 +10,11 @@ void main() {
 
   // Registra todas las dependencias antes de arrancar la app
   setupLocator();
-  runApp(const MainApp());
+  runApp(
+    const ProviderScope(
+      child: MainApp(),
+    ),
+  );
 }
 
 class MainApp extends StatelessWidget {

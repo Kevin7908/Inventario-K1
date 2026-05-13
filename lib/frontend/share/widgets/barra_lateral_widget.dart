@@ -76,6 +76,11 @@ class BarraLateralWidget extends StatelessWidget {
                   Icons.motorcycle_outlined,
                   'Motos',
                 ),
+                _buildNavItem(
+                  NavSection.especializaciones,
+                  Icons.build_outlined,
+                  'Especializaciones',
+                ),
               ],
             ),
           ),

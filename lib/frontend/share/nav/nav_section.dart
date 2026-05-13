@@ -8,4 +8,5 @@ enum NavSection {
   proveedores,
   unidadesMedida,
   motos,
+  especializaciones,
 }
