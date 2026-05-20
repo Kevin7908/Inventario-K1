@@ -3,7 +3,6 @@ import 'package:drift/drift.dart';
 import '../../especializacion/esquema_datos/tabla_especializacion.dart';
 
 class TablaTecnico extends Table {
-
   IntColumn get id => integer().autoIncrement()();
   TextColumn get cedula => text().nullable().unique()();
   TextColumn get nombres => text()();
@@ -13,8 +12,9 @@ class TablaTecnico extends Table {
   IntColumn get especializacionId =>
       integer().nullable().references(TablaEspecializacion, #id)();
   RealColumn get salarioBase => real().nullable()();
-  BoolColumn get activo =>
-      boolean().withDefault(const Constant(true))();
-  DateTimeColumn get creadoEn =>
-      dateTime().withDefault(currentDateAndTime)();
+  BoolColumn get activo => boolean().withDefault(const Constant(true))();
+  DateTimeColumn get creadoEn => dateTime().withDefault(currentDateAndTime)();
+
+  @override
+  String get tableName => 'tecnicos';
 }
