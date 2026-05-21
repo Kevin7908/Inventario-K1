@@ -195,7 +195,7 @@ class _DialogoCategoriaState extends State<DialogoCategoria> {
               const SizedBox(height: 6),
               TextFormField(
                 controller: _nombreCtrl,
-                decoration: DecoracionInputsWidget.basica(hint: 'Ej: Filtros, Lubricantes...'),
+                decoration: dialogInputDecoration('Ej: Filtros, Lubricantes...'),
                 validator: (v) {
                   if (v == null || v.trim().isEmpty) {
                     return 'El nombre es requerido';
@@ -211,7 +211,7 @@ class _DialogoCategoriaState extends State<DialogoCategoria> {
               TextFormField(
                 controller: _descripcionCtrl,
                 maxLines: 2,
-                decoration: DecoracionInputsWidget.basica(hint: 'Breve descripción de la categoría...',),
+                decoration: dialogInputDecoration('Breve descripción de la categoría...',),
               ),
               const SizedBox(height: 16),
 
