@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:inventario_k1/frontend/features/ventas/ordenes/vista/ordenes_vista.dart';
 
 import '../../../../share/temas/colores_app.dart';
 import '../../servicios/vista/servicio_vista.dart';
@@ -135,7 +136,7 @@ class _VentasVistaState extends ConsumerState<VentasVista>
             child: IndexedStack(
               index: _tabController.index,
               children: const [
-                _PlaceholderTab(label: 'Ordenes'),
+                OrdenesVista(),
                 ServiciosVista(),
                 _PlaceholderTab(label: 'Facturacion'),
               ],
