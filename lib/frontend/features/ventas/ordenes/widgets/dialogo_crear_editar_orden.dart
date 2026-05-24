@@ -172,7 +172,7 @@ class _DialogoCrearEditarOrdenState
                         const SizedBox(height: 6),
                         ValueListenableBuilder<Moto?>(
                           valueListenable: _motoNotifier,
-                          builder: (_, moto, __) => TextFormField(
+                          builder: (context, moto, child) => TextFormField(
                             enabled: false,
                             controller: TextEditingController(
                               text: moto?.nombreCliente ?? '',
@@ -262,7 +262,7 @@ class _DialogoCrearEditarOrdenState
             width: 40,
             height: 40,
             decoration: BoxDecoration(
-              color: ColoresApp.primary.withOpacity(0.10),
+              color: ColoresApp.primary.withValues(alpha: 0.10),
               borderRadius: BorderRadius.circular(10),
             ),
             child: const Icon(Icons.assignment_outlined,

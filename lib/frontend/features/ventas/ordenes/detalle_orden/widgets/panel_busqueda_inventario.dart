@@ -3,9 +3,17 @@ import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../../../../backend/features/productos/modelo/producto.dart';
+import '../../../../../../backend/share/database/locator.dart';
+import '../../../../../share/formateadores/moneda_formateador.dart';
 import '../../../../../share/temas/colores_app.dart';
+import '../../../../../share/widgets/botones/boton_mas_widget.dart';
+import '../../../../../share/widgets/output/precio_cop_widget.dart';
 import '../../../../../share/widgets/output/snack_bar_mensaje.dart';
+import '../../../../categorias/view_model/categorias_view_model.dart';
 import '../../../../productos/provider/productos_provider.dart';
+import '../../../../productos/widgets/dialogo_producto_widget.dart';
+import '../../../../proveedores/view_model/proveedores_view_model.dart';
+import '../../../../unidades_medida/view_model/unidad_medida_view_model.dart';
 import '../../provider/ordenes_provider.dart';
 import 'detalle_shared_widgets.dart';
 
@@ -31,7 +39,7 @@ class _PanelBusquedaInventarioState
 
   @override
   Widget build(BuildContext context) {
-    final todos = ref.watch(productosProvider).productos;
+    final todos = ref.watch(productosProvider).value?.todos ?? const [];
 
     return Container(
       decoration: BoxDecoration(
@@ -55,44 +63,62 @@ class _PanelBusquedaInventarioState
           ),
           Padding(
             padding: const EdgeInsets.fromLTRB(14, 10, 14, 6),
-            child: TextField(
-              controller: _searchCtrl,
-              style: const TextStyle(fontSize: 13.5, color: ColoresApp.textDark),
-              decoration: InputDecoration(
-                hintText: 'Buscar producto del inventario...',
-                hintStyle:
-                    const TextStyle(color: ColoresApp.textLight, fontSize: 13.5),
-                prefixIcon: const Icon(Icons.search_rounded,
-                    color: ColoresApp.textLight, size: 20),
-                suffixIcon: ValueListenableBuilder<TextEditingValue>(
-                  valueListenable: _searchCtrl,
-                  builder: (context, v, child) => v.text.isNotEmpty
-                      ? IconButton(
-                          icon: const Icon(Icons.close_rounded,
-                              size: 18, color: ColoresApp.textLight),
-                          onPressed: () {
-                            _searchCtrl.clear();
-                            setState(() => _itemsVisibles = 100);
-                          },
-                        )
-                      : const SizedBox.shrink(),
+            child: Row(
+              children: [
+                Expanded(
+                  child: TextField(
+                    controller: _searchCtrl,
+                    style: const TextStyle(
+                        fontSize: 13.5, color: ColoresApp.textDark),
+                    decoration: InputDecoration(
+                      hintText: 'Buscar producto del inventario...',
+                      hintStyle: const TextStyle(
+                          color: ColoresApp.textLight, fontSize: 13.5),
+                      prefixIcon: const Icon(Icons.search_rounded,
+                          color: ColoresApp.textLight, size: 20),
+                      suffixIcon: ValueListenableBuilder<TextEditingValue>(
+                        valueListenable: _searchCtrl,
+                        builder: (context, v, child) => v.text.isNotEmpty
+                            ? IconButton(
+                                icon: const Icon(Icons.close_rounded,
+                                    size: 18, color: ColoresApp.textLight),
+                                onPressed: () {
+                                  _searchCtrl.clear();
+                                  setState(() => _itemsVisibles = 100);
+                                },
+                              )
+                            : const SizedBox.shrink(),
+                      ),
+                      filled: true,
+                      fillColor: ColoresApp.bgContent,
+                      contentPadding: const EdgeInsets.symmetric(
+                          horizontal: 14, vertical: 10),
+                      border: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(10),
+                          borderSide:
+                              const BorderSide(color: ColoresApp.border)),
+                      enabledBorder: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(10),
+                          borderSide:
+                              const BorderSide(color: ColoresApp.border)),
+                      focusedBorder: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(10),
+                          borderSide: const BorderSide(
+                              color: ColoresApp.primary, width: 1.5)),
+                    ),
+                    onChanged: (_) => setState(() => _itemsVisibles = 100),
+                  ),
                 ),
-                filled: true,
-                fillColor: ColoresApp.bgContent,
-                contentPadding:
-                    const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
-                border: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(10),
-                    borderSide: const BorderSide(color: ColoresApp.border)),
-                enabledBorder: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(10),
-                    borderSide: const BorderSide(color: ColoresApp.border)),
-                focusedBorder: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(10),
-                    borderSide:
-                        const BorderSide(color: ColoresApp.primary, width: 1.5)),
-              ),
-              onChanged: (_) => setState(() => _itemsVisibles = 100),
+                const SizedBox(width: 8),
+                BotonMasWidget(
+                  onPressed: () => DialogoProducto.mostrar(
+                    context,
+                    categoriasVm: locator<CategoriasViewModel>(),
+                    proveedoresVm: locator<ProveedoresViewModel>(),
+                    unidadesVm: locator<UnidadesMedidaViewModel>(),
+                  ),
+                ),
+              ],
             ),
           ),
           ValueListenableBuilder<TextEditingValue>(
@@ -466,21 +492,47 @@ class _DialogoCantidadRepuestoState
                   ),
                 ),
                 const SizedBox(height: 6),
-                TextFormField(
-                  controller: _precioCtrl,
-                  keyboardType:
-                      const TextInputType.numberWithOptions(decimal: true),
-                  inputFormatters: [
-                    FilteringTextInputFormatter.allow(
-                        RegExp(r'^\d+\.?\d{0,2}')),
-                  ],
-                  decoration: _deco('0'),
-                  validator: (v) {
-                    if (v == null || v.isEmpty) return 'Requerido.';
-                    final n = double.tryParse(v);
-                    if (n == null || n < 0) return 'Valor inválido.';
-                    return null;
-                  },
+                Container(
+                  width: double.infinity,
+                  padding: const EdgeInsets.symmetric(
+                      horizontal: 12, vertical: 11),
+                  decoration: BoxDecoration(
+                    color: ColoresApp.bgContent,
+                    borderRadius: BorderRadius.circular(9),
+                    border: Border.all(color: ColoresApp.border),
+                  ),
+                  child: Row(
+                    children: [
+                      Text(
+                        fmtMoneda(widget.producto.precioVentaTaller ??
+                            widget.producto.precioVenta),
+                        style: const TextStyle(
+                          fontSize: 13.5,
+                          fontWeight: FontWeight.w600,
+                          color: ColoresApp.textDark,
+                        ),
+                      ),
+                      const Spacer(),
+                      const Icon(Icons.lock_outline_rounded,
+                          size: 14, color: ColoresApp.textLight),
+                    ],
+                  ),
+                ),
+                const SizedBox(height: 14),
+                const Text(
+                  'Subtotal',
+                  style: TextStyle(
+                    fontSize: 12.5,
+                    fontWeight: FontWeight.w600,
+                    color: ColoresApp.textDark,
+                  ),
+                ),
+                const SizedBox(height: 4),
+                PrecioCopWidget(
+                  controller: _cantCtrl,
+                  multiplicador: widget.producto.precioVentaTaller ??
+                      widget.producto.precioVenta,
+                  etiqueta: 'Total:',
                 ),
                 const SizedBox(height: 20),
                 Row(

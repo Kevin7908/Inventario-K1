@@ -17,9 +17,9 @@ class BotonMasWidget extends StatelessWidget {
           width: 36,
           height: 44,
           decoration: BoxDecoration(
-            color: ColoresApp.primary.withOpacity(0.08),
+            color: ColoresApp.primary.withValues(alpha: 0.08),
             borderRadius: BorderRadius.circular(8),
-            border: Border.all(color: ColoresApp.primary.withOpacity(0.3)),
+            border: Border.all(color: ColoresApp.primary.withValues(alpha: 0.3)),
           ),
           child: const Icon(
             Icons.add_rounded,

@@ -8,8 +8,6 @@ import '../../../frontend/features/clientes/view_model/clientes_view_model.dart'
 import '../../../frontend/features/motos/view_model/motos_view_model.dart';
 import '../../../frontend/features/proveedores/view_model/proveedores_view_model.dart';
 import '../../../frontend/features/unidades_medida/view_model/unidad_medida_view_model.dart';
-import '../../../frontend/features/productos/view_model/productos_view_model.dart';
-
 import '../../features/autenticacion/repositorio/repositorio_auth.dart';
 import '../../features/autenticacion/repositorio/repositorio_auth_impl.dart'; // ← FALTABA
 import '../../features/categorias/repositorio/repositorio_categorias_impl.dart';
@@ -85,9 +83,6 @@ void setupLocator() {
   );
   locator.registerLazySingleton<ProveedoresViewModel>(
     () => ProveedoresViewModel(locator<RepositorioProveedoresImpl>()),
-  );
-  locator.registerLazySingleton<ProductosViewModel>(
-    () => ProductosViewModel(locator<RepositorioProductosImpl>()),
   );
   locator.registerLazySingleton<ClientesViewModel>(
     () => ClientesViewModel(locator<RepositorioClientes>()),

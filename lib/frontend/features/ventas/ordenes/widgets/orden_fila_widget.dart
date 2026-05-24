@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:inventario_k1/frontend/share/temas/colores_app.dart';
 
 import '../../../../../backend/features/ventas/ordenes/enum/enum_ordenes.dart';
 import '../../../../../backend/features/ventas/ordenes/modelo/orden_resumen.dart';
@@ -37,8 +38,8 @@ class BadgeEstadoOrden extends StatelessWidget {
     final (label, color, textColor) = switch (estado) {
       EstadoOrden.abierta => (
         'Abierta',
-        const Color(0xFFEDE9FE),
-        const Color(0xFF5B21B6),
+        ColoresApp.bgContent,
+        ColoresApp.primary,
       ),
       EstadoOrden.lista => (
         'Lista',

@@ -157,8 +157,9 @@ class RepositorioOrdenesImpl implements RepositorioOrdenes {
       _tablaOrdenes,
     )..where((t) => t.id.equals(id))).write(companion);
 
-    if (updatedCount == 0)
+    if (updatedCount == 0) {
       throw Exception('No se pudo actualizar la orden #$id.');
+    }
     return _obtenerResumenPorId(id);
   }
 
@@ -233,16 +234,36 @@ class RepositorioOrdenesImpl implements RepositorioOrdenes {
     required double cantidad,
     required double precioUnitario,
   }) async {
-    await _db
-        .into(_tablaRepuestos)
-        .insert(
-          OrdenMapper.repuestoCompanionNuevo(
-            ordenId: ordenId,
-            productoId: productoId,
-            cantidad: cantidad,
-            precioUnitario: precioUnitario,
-          ),
-        );
+    // Verificar stock disponible antes de cualquier operación
+    final stockRow = await _db
+        .customSelect(
+          'SELECT stock_actual FROM productos WHERE id = ?',
+          variables: [Variable.withInt(productoId)],
+        )
+        .getSingleOrNull();
+
+    final stockActual = (stockRow?.data['stock_actual'] as num?)?.toDouble() ?? 0;
+    if (stockActual < cantidad) {
+      final disp = stockActual % 1 == 0
+          ? stockActual.toInt().toString()
+          : stockActual.toStringAsFixed(2);
+      throw Exception('Stock insuficiente. Disponible: $disp unidades.');
+    }
+
+    await _db.into(_tablaRepuestos).insert(
+      OrdenMapper.repuestoCompanionNuevo(
+        ordenId: ordenId,
+        productoId: productoId,
+        cantidad: cantidad,
+        precioUnitario: precioUnitario,
+      ),
+    );
+    // Descontar stock
+    await _db.customUpdate(
+      'UPDATE productos SET stock_actual = stock_actual - ? WHERE id = ?',
+      variables: [Variable.withReal(cantidad), Variable.withInt(productoId)],
+      updates: {_db.tablaProducto},
+    );
   }
 
   @override
@@ -251,7 +272,33 @@ class RepositorioOrdenesImpl implements RepositorioOrdenes {
     double? cantidad,
     double? precioUnitario,
   }) async {
-    // DELETE + INSERT para que los triggers de stock actúen en ambas operaciones.
+    final current = await (_db.select(_tablaRepuestos)
+          ..where((t) => t.id.equals(repuestoId)))
+        .getSingleOrNull();
+    if (current == null) return;
+
+    final cantidadNueva = cantidad ?? current.cantidad;
+    final delta = cantidadNueva - current.cantidad;
+
+    // Ajustar stock por la diferencia (positivo = usó más, negativo = devolvió)
+    if (delta != 0) {
+      await _db.customUpdate(
+        'UPDATE productos SET stock_actual = stock_actual - ? WHERE id = ?',
+        variables: [Variable.withReal(delta), Variable.withInt(current.productoId)],
+        updates: {_db.tablaProducto},
+      );
+    }
+
+    await (_db.update(_tablaRepuestos)..where((t) => t.id.equals(repuestoId))).write(
+      TablaOrdenesRepuestoCompanion(
+        cantidad:       Value(cantidadNueva),
+        precioUnitario: Value(precioUnitario ?? current.precioUnitario),
+      ),
+    );
+  }
+
+  @override
+  Future<void> eliminarRepuesto(int repuestoId) async {
     final current = await (_db.select(_tablaRepuestos)
           ..where((t) => t.id.equals(repuestoId)))
         .getSingleOrNull();
@@ -259,21 +306,11 @@ class RepositorioOrdenesImpl implements RepositorioOrdenes {
 
     await (_db.delete(_tablaRepuestos)..where((t) => t.id.equals(repuestoId))).go();
 
-    await _db.into(_tablaRepuestos).insert(
-      TablaOrdenesRepuestoCompanion(
-        ordenId:       Value(current.ordenId),
-        productoId:    Value(current.productoId),
-        cantidad:      Value(cantidad      ?? current.cantidad),
-        precioUnitario: Value(precioUnitario ?? current.precioUnitario),
-        creadoEn:      Value(current.creadoEn),
-      ),
+    // Restaurar el stock al eliminar el repuesto
+    await _db.customUpdate(
+      'UPDATE productos SET stock_actual = stock_actual + ? WHERE id = ?',
+      variables: [Variable.withReal(current.cantidad), Variable.withInt(current.productoId)],
+      updates: {_db.tablaProducto},
     );
-  }
-
-  @override
-  Future<void> eliminarRepuesto(int repuestoId) async {
-    await (_db.delete(
-      _tablaRepuestos,
-    )..where((t) => t.id.equals(repuestoId))).go();
   }
 }

@@ -213,7 +213,7 @@ class _VistaPreviewImagen extends StatelessWidget {
       return Image.network(
         imagenUrl!,
         fit: BoxFit.contain,
-        errorBuilder: (_, __, ___) => const Center(
+        errorBuilder: (context, e, st) => const Center(
           child: Icon(
             Icons.broken_image_outlined,
             size: 40,
@@ -226,7 +226,7 @@ class _VistaPreviewImagen extends StatelessWidget {
     return Image.file(
       File(imagenUrl!),
       fit: BoxFit.contain,
-      errorBuilder: (_, __, ___) => const Center(
+      errorBuilder: (context, e, st) => const Center(
         child: Icon(
           Icons.broken_image_outlined,
           size: 40,
@@ -306,12 +306,12 @@ class _SeccionPrecios extends StatelessWidget {
       padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
       decoration: BoxDecoration(
         color: destaque
-            ? ColoresApp.primary.withOpacity(0.08)
+            ? ColoresApp.primary.withValues(alpha: 0.08)
             : ColoresApp.bgContent,
         borderRadius: BorderRadius.circular(10),
         border: Border.all(
           color: destaque
-              ? ColoresApp.primary.withOpacity(0.3)
+              ? ColoresApp.primary.withValues(alpha: 0.3)
               : ColoresApp.border,
         ),
       ),

@@ -6,6 +6,7 @@ import '../../../../../../share/temas/colores_app.dart';
 import '../../../../../../share/widgets/botones/dialogo_confirmar_eliminar_widget.dart';
 import '../../../../../../share/widgets/output/snack_bar_mensaje.dart';
 import '../../../provider/ordenes_provider.dart';
+import '../../../widgets/dialogo_editar_repuesto.dart';
 import '../../helpers/formateadores.dart';
 import '../detalle_shared_widgets.dart';
 
@@ -56,7 +57,7 @@ class RepuestosListaCard extends ConsumerWidget {
                   SizedBox(width: 60, child: EncabezadoCol('Cant.', center: true)),
                   SizedBox(width: 100, child: EncabezadoCol('P. Unit.', right: true)),
                   SizedBox(width: 100, child: EncabezadoCol('Subtotal', right: true)),
-                  SizedBox(width: 50),
+                  SizedBox(width: 74),
                 ],
               ),
             ),
@@ -141,10 +142,20 @@ class _FilaRepuesto extends ConsumerWidget {
             ),
           ),
           SizedBox(
-            width: 50,
+            width: 74,
             child: Row(
               mainAxisAlignment: MainAxisAlignment.end,
               children: [
+                MiniBoton(
+                  icono: Icons.edit_outlined,
+                  color: ColoresApp.primary,
+                  onTap: () => DialogoEditarRepuesto.mostrar(
+                    context,
+                    ordenId: ordenId,
+                    repuesto: repuesto,
+                  ),
+                ),
+                const SizedBox(width: 4),
                 MiniBoton(
                   icono: Icons.delete_outline_rounded,
                   color: ColoresApp.statusDebt,

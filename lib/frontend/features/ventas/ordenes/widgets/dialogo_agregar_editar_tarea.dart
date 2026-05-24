@@ -7,9 +7,12 @@ import '../../../../../backend/features/ventas/ordenes/modelo/orden_tarea.dart';
 import '../../../../../backend/features/ventas/servicios/modelo/servicio.dart';
 import '../../../../share/temas/colores_app.dart';
 import '../../../../share/widgets/input/app_searc_widget.dart';
+import '../../../../share/widgets/output/precio_cop_widget.dart';
 import '../../../../share/widgets/output/snack_bar_mensaje.dart';
 import '../../../tecnicos/provider/tecnico_provider.dart';
+import '../../../tecnicos/widgets/dialogo_tecnico_widget.dart';
 import '../../../ventas/servicios/provider/servicios_provider.dart';
+import '../../../ventas/servicios/widgets/dialogo_servicios.dart';
 import '../provider/ordenes_provider.dart';
 
 class DialogoAgregarEditarTarea extends ConsumerStatefulWidget {
@@ -156,31 +159,6 @@ class _DialogoAgregarEditarTareaState
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      // Hint informativo
-                      Container(
-                        padding: const EdgeInsets.all(12),
-                        margin: const EdgeInsets.only(bottom: 16),
-                        decoration: BoxDecoration(
-                          color: ColoresApp.statusPendingBg,
-                          borderRadius: BorderRadius.circular(8),
-                          border: Border.all(
-                              color: ColoresApp.statusPending.withOpacity(0.3)),
-                        ),
-                        child: const Row(
-                          children: [
-                            Icon(Icons.info_outline_rounded,
-                                size: 16, color: ColoresApp.statusPending),
-                            SizedBox(width: 8),
-                            Expanded(
-                              child: Text(
-                                'El precio se pacta por cliente, no está fijo en el catálogo.',
-                                style: TextStyle(
-                                    fontSize: 12, color: ColoresApp.statusPending),
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
 
                       _label('Servicio *'),
                       const SizedBox(height: 6),
@@ -191,6 +169,8 @@ class _DialogoAgregarEditarTareaState
                         hint: 'Seleccionar del catálogo...',
                         validator: (v) =>
                             v == null ? 'Selecciona un servicio.' : null,
+                        onAgregar: () =>
+                            DialogoServicio.mostrar(context),
                       ),
                       const SizedBox(height: 16),
 
@@ -203,6 +183,8 @@ class _DialogoAgregarEditarTareaState
                         hint: 'Seleccionar técnico...',
                         validator: (v) =>
                             v == null ? 'Selecciona un técnico.' : null,
+                        onAgregar: () =>
+                            DialogoTecnico.mostrar(context),
                       ),
                       const SizedBox(height: 16),
 
@@ -225,6 +207,11 @@ class _DialogoAgregarEditarTareaState
                           if (n == null || n < 0) return 'Valor inválido.';
                           return null;
                         },
+                      ),
+                      const SizedBox(height: 6),
+                      PrecioCopWidget(
+                        controller: _precioCtrl,
+                        etiqueta: 'Precio:',
                       ),
                       const SizedBox(height: 16),
 
@@ -265,7 +252,7 @@ class _DialogoAgregarEditarTareaState
                               onChanged: _guardando
                                   ? null
                                   : (v) => setState(() => _completado = v),
-                              activeColor: ColoresApp.accentGreen,
+                              activeThumbColor: ColoresApp.accentGreen,
                             ),
                           ],
                         ),
@@ -292,7 +279,7 @@ class _DialogoAgregarEditarTareaState
             width: 40,
             height: 40,
             decoration: BoxDecoration(
-              color: ColoresApp.primary.withOpacity(0.10),
+              color: ColoresApp.primary.withValues(alpha: 0.10),
               borderRadius: BorderRadius.circular(10),
             ),
             child: const Icon(Icons.build_outlined,

@@ -272,7 +272,7 @@ class SeccionClasificacion extends StatelessWidget {
         const SizedBox(height: 8),
         ValueListenableBuilder<String?>(
           valueListenable: imagenRutaNotifier,
-          builder: (_, ruta, __) => SelectorImagenWidget(
+          builder: (context, ruta, child) => SelectorImagenWidget(
             rutaActual: ruta,
             onRutaSeleccionada: (nuevaRuta) =>
                 imagenRutaNotifier.value = nuevaRuta,
@@ -356,12 +356,12 @@ class SeccionPrecios extends StatelessWidget {
                 const SizedBox(height: 6),
                 ValueListenableBuilder<bool>(
                   valueListenable: aplicaIvaNotifier,
-                  builder: (_, value, __) => Row(
+                  builder: (context, value, child) => Row(
                     children: [
                       Switch(
                         value: value,
                         onChanged: (v) => aplicaIvaNotifier.value = v,
-                        activeColor: ColoresApp.primary,
+                        activeThumbColor: ColoresApp.primary,
                       ),
                       const SizedBox(width: 6),
                       Text(
@@ -440,7 +440,7 @@ class SeccionInventario extends StatelessWidget {
             const SizedBox(width: 10),
             ValueListenableBuilder<bool>(
               valueListenable: activoNotifier,
-              builder: (_, activo, __) => Row(
+              builder: (context, activo, child) => Row(
                 children: [
                   Switch(
                     value: activo,
