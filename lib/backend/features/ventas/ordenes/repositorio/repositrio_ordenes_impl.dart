@@ -81,9 +81,9 @@ class RepositorioOrdenesImpl implements RepositorioOrdenes {
     final tareasRows = await _db
         .customSelect(
           '''
-      SELECT ot.*, s.nombre AS servicio_nombre, 
+      SELECT ot.*, s.nombre AS servicio_nombre,
              (t.nombres || ' ' || COALESCE(t.apellidos, '')) AS tecnico_nombre
-      FROM orden_tareas ot
+      FROM ordenes_tareas ot
       JOIN servicios s ON s.id = ot.servicio_id
       JOIN tecnicos  t ON t.id = ot.tecnico_id
       WHERE ot.orden_id = ?
@@ -97,7 +97,7 @@ class RepositorioOrdenesImpl implements RepositorioOrdenes {
         .customSelect(
           '''
       SELECT orp.*, p.nombre AS producto_nombre
-      FROM orden_repuestos orp
+      FROM ordenes_repuestos orp
       JOIN productos p ON p.id = orp.producto_id
       WHERE orp.orden_id = ?
     ''',
@@ -202,6 +202,26 @@ class RepositorioOrdenesImpl implements RepositorioOrdenes {
   }
 
   @override
+  Future<void> actualizarTarea(
+    int tareaId, {
+    int? servicioId,
+    int? tecnicoId,
+    double? precioPactado,
+    String? notas,
+    bool? completado,
+  }) async {
+    await (_db.update(_tablaTareas)..where((t) => t.id.equals(tareaId))).write(
+      TablaOrdenesTareaCompanion(
+        servicioId:   servicioId   != null ? Value(servicioId)   : const Value.absent(),
+        tecnicoId:    tecnicoId    != null ? Value(tecnicoId)    : const Value.absent(),
+        precioPactado: precioPactado != null ? Value(precioPactado) : const Value.absent(),
+        notas:        notas        != null ? Value(notas)        : const Value.absent(),
+        completado:   completado   != null ? Value(completado)   : const Value.absent(),
+      ),
+    );
+  }
+
+  @override
   Future<void> eliminarTarea(int tareaId) async {
     await (_db.delete(_tablaTareas)..where((t) => t.id.equals(tareaId))).go();
   }
@@ -223,6 +243,31 @@ class RepositorioOrdenesImpl implements RepositorioOrdenes {
             precioUnitario: precioUnitario,
           ),
         );
+  }
+
+  @override
+  Future<void> actualizarRepuesto(
+    int repuestoId, {
+    double? cantidad,
+    double? precioUnitario,
+  }) async {
+    // DELETE + INSERT para que los triggers de stock actúen en ambas operaciones.
+    final current = await (_db.select(_tablaRepuestos)
+          ..where((t) => t.id.equals(repuestoId)))
+        .getSingleOrNull();
+    if (current == null) return;
+
+    await (_db.delete(_tablaRepuestos)..where((t) => t.id.equals(repuestoId))).go();
+
+    await _db.into(_tablaRepuestos).insert(
+      TablaOrdenesRepuestoCompanion(
+        ordenId:       Value(current.ordenId),
+        productoId:    Value(current.productoId),
+        cantidad:      Value(cantidad      ?? current.cantidad),
+        precioUnitario: Value(precioUnitario ?? current.precioUnitario),
+        creadoEn:      Value(current.creadoEn),
+      ),
+    );
   }
 
   @override

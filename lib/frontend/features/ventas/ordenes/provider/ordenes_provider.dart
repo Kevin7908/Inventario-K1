@@ -123,6 +123,131 @@ class OrdenesNotifier extends AsyncNotifier<OrdenesState> {
     }
   }
 
+  Future<String?> actualizarOrden(
+    int id, {
+    required EstadoOrden estado,
+    String? diagnostico,
+    String? observaciones,
+  }) async {
+    try {
+      await _repo.actualizar(
+        id: id,
+        estado: estado,
+        diagnostico: diagnostico,
+        observaciones: observaciones,
+      );
+      return null;
+    } catch (e) {
+      return e.toString();
+    }
+  }
+
+  Future<String?> agregarTarea(
+    int ordenId, {
+    required int servicioId,
+    required int tecnicoId,
+    required double precioPactado,
+    String? notas,
+  }) async {
+    try {
+      await _repo.agregarTarea(
+        ordenId: ordenId,
+        servicioId: servicioId,
+        tecnicoId: tecnicoId,
+        precioPactado: precioPactado,
+        notas: notas,
+      );
+      ref.invalidate(ordenDetalleProvider(ordenId));
+      return null;
+    } catch (e) {
+      return e.toString();
+    }
+  }
+
+  Future<String?> actualizarTarea(
+    int tareaId,
+    int ordenId, {
+    int? servicioId,
+    int? tecnicoId,
+    double? precioPactado,
+    String? notas,
+    bool? completado,
+  }) async {
+    try {
+      await _repo.actualizarTarea(
+        tareaId,
+        servicioId: servicioId,
+        tecnicoId: tecnicoId,
+        precioPactado: precioPactado,
+        notas: notas,
+        completado: completado,
+      );
+      ref.invalidate(ordenDetalleProvider(ordenId));
+      return null;
+    } catch (e) {
+      return e.toString();
+    }
+  }
+
+  Future<String?> eliminarTarea(int tareaId, int ordenId) async {
+    try {
+      await _repo.eliminarTarea(tareaId);
+      ref.invalidate(ordenDetalleProvider(ordenId));
+      return null;
+    } catch (e) {
+      return e.toString();
+    }
+  }
+
+  Future<String?> agregarRepuesto(
+    int ordenId, {
+    required int productoId,
+    required double cantidad,
+    required double precioUnitario,
+  }) async {
+    try {
+      await _repo.agregarRepuesto(
+        ordenId: ordenId,
+        productoId: productoId,
+        cantidad: cantidad,
+        precioUnitario: precioUnitario,
+      );
+      ref.invalidate(ordenDetalleProvider(ordenId));
+      return null;
+    } catch (e) {
+      return e.toString();
+    }
+  }
+
+  Future<String?> actualizarRepuesto(
+    int repuestoId,
+    int ordenId, {
+    double? cantidad,
+    double? precioUnitario,
+  }) async {
+    try {
+      await _repo.actualizarRepuesto(
+        repuestoId,
+        cantidad: cantidad,
+        precioUnitario: precioUnitario,
+      );
+      ref.invalidate(ordenDetalleProvider(ordenId));
+      return null;
+    } catch (e) {
+      return e.toString();
+    }
+  }
+
+  Future<String?> eliminarRepuesto(int repuestoId, int ordenId) async {
+    try {
+      await _repo.eliminarRepuesto(repuestoId);
+      ref.invalidate(ordenDetalleProvider(ordenId));
+      return null;
+    } catch (e) {
+      return e.toString();
+    }
+  }
+
   Future<String?> eliminar(int id) async {
     final actual = state.value;
     if (actual == null) return null;

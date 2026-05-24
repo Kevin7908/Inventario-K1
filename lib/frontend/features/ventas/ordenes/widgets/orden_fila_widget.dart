@@ -1,12 +1,31 @@
 import 'package:flutter/material.dart';
-import 'package:intl/intl.dart';
 
 import '../../../../../backend/features/ventas/ordenes/enum/enum_ordenes.dart';
 import '../../../../../backend/features/ventas/ordenes/modelo/orden_resumen.dart';
 import '../../../../share/widgets/botones/accion_boton.dart';
 
-final _fmt = NumberFormat('#,##0', 'es_CO');
-final _fmtFecha = DateFormat('d MMM\nyyyy', 'es_CO');
+String _fmtMoneda(int monto) {
+  String valor = monto.abs().toStringAsFixed(2);
+  List<String> partes = valor.split('.');
+  String entera = partes[0];
+  String decimal = partes[1];
+
+  // Insertar comas en los miles
+  entera = entera.replaceAllMapped(
+    RegExp(r'(\d{1,3})(?=(\d{3})+(?!\d))'), 
+    (Match m) => '${m[1]},'
+  );
+
+  return "${monto < 0 ? '-' : ''}\$ $entera.$decimal";
+}
+String _fmtFecha(DateTime fecha) {
+  // padLeft(2, '0') asegura que si el día es 5, se vea como 05
+  String dia = fecha.day.toString().padLeft(2, '0');
+  String mes = fecha.month.toString().padLeft(2, '0');
+  String anio = fecha.year.toString();
+  
+  return "$dia/$mes/$anio";
+}
 
 class BadgeEstadoOrden extends StatelessWidget {
   const BadgeEstadoOrden({super.key, required this.estado});
@@ -128,7 +147,7 @@ class OrdenFilaWidget extends StatelessWidget {
             SizedBox(
               width: 100,
               child: Text(
-                _fmt.format(orden.kilometrajeEntrada),
+                _fmtMoneda(orden.kilometrajeEntrada),
                 style: theme.textTheme.bodyMedium?.copyWith(
                   color: const Color(0xFF6B7280),
                 ),
@@ -155,7 +174,7 @@ class OrdenFilaWidget extends StatelessWidget {
               width: 80,
               child: Text(
                 orden.fechaIngreso != null
-                    ? _fmtFecha.format(orden.fechaIngreso!)
+                    ? _fmtFecha(orden.fechaIngreso!)
                     : '—',
                 style: theme.textTheme.bodySmall?.copyWith(
                   color: const Color(0xFF9CA3AF),

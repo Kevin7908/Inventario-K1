@@ -12,9 +12,10 @@ import '../../../../share/widgets/output/estado_vacio_widget.dart';
 import '../../../../share/widgets/output/snack_bar_mensaje.dart';
 import '../../../../share/widgets/top_bar_widget.dart';
 import '../provider/ordenes_provider.dart';
+import '../widgets/dialogo_crear_editar_orden.dart';
 import '../widgets/orden_fila_widget.dart';
 import '../widgets/ordenes_resumen_carta_widget.dart';
-import 'orden_detalle_vista.dart';
+import '../detalle_orden/orden_detalle_page.dart';
 
 class OrdenesVista extends ConsumerWidget {
   const OrdenesVista({super.key});
@@ -38,7 +39,7 @@ class OrdenesVista extends ConsumerWidget {
   }
 
   void _abrirNuevaOrden(BuildContext context, WidgetRef ref) {
-    // TODO: showDialog(context: context, builder: (_) => DialogoNuevaOrden());
+    DialogoCrearEditarOrden.mostrar(context);
   }
 }
 

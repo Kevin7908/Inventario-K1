@@ -44,15 +44,31 @@ abstract interface class RepositorioOrdenes {
 
   Future<void> marcarTareaCompletada(int tareaId, {required bool completado});
 
+  Future<void> actualizarTarea(
+    int tareaId, {
+    int? servicioId,
+    int? tecnicoId,
+    double? precioPactado,
+    String? notas,
+    bool? completado,
+  });
+
   Future<void> eliminarTarea(int tareaId);
 
-  // Repuestos 
+  // Repuestos
 
   Future<void> agregarRepuesto({
     required int ordenId,
     required int productoId,
     required double cantidad,
     required double precioUnitario,
+  });
+
+  // Elimina y re-inserta para que los triggers de stock actúen correctamente.
+  Future<void> actualizarRepuesto(
+    int repuestoId, {
+    double? cantidad,
+    double? precioUnitario,
   });
 
   Future<void> eliminarRepuesto(int repuestoId);
