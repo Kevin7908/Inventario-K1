@@ -48,10 +48,6 @@ class ItemsFacturaListaCard extends ConsumerWidget {
                   onTap: onAgregarServicio,
                 ),
                 const SizedBox(width: 6),
-                _BotonAgregar(
-                  label: '+ Producto',
-                  onTap: onAgregarProducto,
-                ),
               ],
             ),
           ),

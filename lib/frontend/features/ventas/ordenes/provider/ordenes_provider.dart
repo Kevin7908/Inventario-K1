@@ -112,10 +112,11 @@ class OrdenesNotifier extends AsyncNotifier<OrdenesState> {
         orElse: () => throw Exception('Orden #$id no encontrada'),
       );
       await _repo.actualizar(
-        id:           id,
-        estado:       nuevoEstado,
-        diagnostico:  orden.diagnostico,
-        observaciones: null,
+        id:                  id,
+        estado:              nuevoEstado,
+        kilometrajeEntrada:  orden.kilometrajeEntrada,
+        diagnostico:         orden.diagnostico,
+        observaciones:       null,
       );
       return null;
     } catch (e) {
@@ -126,16 +127,23 @@ class OrdenesNotifier extends AsyncNotifier<OrdenesState> {
   Future<String?> actualizarOrden(
     int id, {
     required EstadoOrden estado,
+    required int kilometrajeEntrada,
+    int? motoId,
+    int? clienteId,
     String? diagnostico,
     String? observaciones,
   }) async {
     try {
       await _repo.actualizar(
-        id: id,
-        estado: estado,
-        diagnostico: diagnostico,
-        observaciones: observaciones,
+        id:                 id,
+        estado:             estado,
+        kilometrajeEntrada: kilometrajeEntrada,
+        motoId:             motoId,
+        clienteId:          clienteId,
+        diagnostico:        diagnostico,
+        observaciones:      observaciones,
       );
+      ref.invalidate(ordenDetalleProvider(id));
       return null;
     } catch (e) {
       return e.toString();

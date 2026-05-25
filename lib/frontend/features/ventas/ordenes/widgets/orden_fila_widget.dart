@@ -92,11 +92,13 @@ class OrdenFilaWidget extends StatelessWidget {
     super.key,
     required this.orden,
     required this.onTap,
+    required this.onEditar,
     required this.onEliminar,
   });
 
   final OrdenResumen orden;
   final VoidCallback onTap;
+  final VoidCallback onEditar;
   final VoidCallback onEliminar;
 
   @override
@@ -194,9 +196,9 @@ class OrdenFilaWidget extends StatelessWidget {
               children: [
                 const SizedBox(width: 8),
                 AccionBoton(
-                  icono: Icons.visibility_outlined,
-                  tooltip: 'Ver detalle',
-                  alPresionar: onTap,
+                  icono: Icons.edit_outlined,
+                  tooltip: 'Editar orden',
+                  alPresionar: onEditar,
                 ),
                 const SizedBox(width: 6),
                 AccionBoton(

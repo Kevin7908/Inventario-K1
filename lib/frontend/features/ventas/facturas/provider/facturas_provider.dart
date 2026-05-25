@@ -91,6 +91,7 @@ class FacturasNotifier extends AsyncNotifier<FacturasState> {
     required MetodoPago metodoPago,
     required EstadoPago estadoPago,
     double iva = 0,
+    double descuento = 0,
   }) async {
     try {
       await _repo.crear(
@@ -100,6 +101,7 @@ class FacturasNotifier extends AsyncNotifier<FacturasState> {
         metodoPago:  metodoPago,
         estadoPago:  estadoPago,
         iva:         iva,
+        descuento:   descuento,
       );
       return null;
     } catch (e) {
@@ -155,13 +157,19 @@ class FacturasNotifier extends AsyncNotifier<FacturasState> {
     required MetodoPago metodoPago,
     required EstadoPago estadoPago,
     double? iva,
+    double? descuento,
+    bool actualizarCliente = false,
+    int? clienteId,
   }) async {
     try {
       await _repo.actualizar(
-        id:         id,
-        metodoPago: metodoPago,
-        estadoPago: estadoPago,
-        iva:        iva,
+        id:               id,
+        metodoPago:       metodoPago,
+        estadoPago:       estadoPago,
+        iva:              iva,
+        descuento:        descuento,
+        actualizarCliente: actualizarCliente,
+        clienteId:        clienteId,
       );
       ref.invalidate(facturaDetalleProvider(id));
       return null;

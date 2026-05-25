@@ -16,6 +16,7 @@ abstract interface class RepositorioFacturas {
     required MetodoPago metodoPago,
     required EstadoPago estadoPago,
     double iva,
+    double descuento,
   });
 
   Future<FacturaResumen> crearDesdeOrden({
@@ -31,6 +32,9 @@ abstract interface class RepositorioFacturas {
     required MetodoPago metodoPago,
     required EstadoPago estadoPago,
     double? iva,
+    double? descuento,
+    bool actualizarCliente = false,
+    int? clienteId,
   });
 
   Future<void> eliminar(int id);

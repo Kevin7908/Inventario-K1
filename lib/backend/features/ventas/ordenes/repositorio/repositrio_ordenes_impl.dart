@@ -21,7 +21,7 @@ class RepositorioOrdenesImpl implements RepositorioOrdenes {
   static const _sqlSelectResumen = '''
     SELECT
       os.*,
-      m.marca, m.modelo, m.anio,
+      m.marca, m.modelo, m.anio, m.placa,
       (c.nombres || ' ' || COALESCE(c.apellidos, '')) AS cliente_nombre
     FROM ordenes_servicio os
     JOIN motos    m ON m.id = os.moto_id
@@ -138,6 +138,9 @@ class RepositorioOrdenesImpl implements RepositorioOrdenes {
   Future<OrdenResumen> actualizar({
     required int id,
     required EstadoOrden estado,
+    required int kilometrajeEntrada,
+    int? motoId,
+    int? clienteId,
     String? diagnostico,
     String? observaciones,
   }) async {
@@ -148,6 +151,9 @@ class RepositorioOrdenesImpl implements RepositorioOrdenes {
     final companion = OrdenMapper.aCompanionActualizar(
       id: id,
       estado: estado,
+      kilometrajeEntrada: kilometrajeEntrada,
+      motoId: motoId,
+      clienteId: clienteId,
       diagnostico: diagnostico,
       observaciones: observaciones,
       fechaSalida: fechaSalida,

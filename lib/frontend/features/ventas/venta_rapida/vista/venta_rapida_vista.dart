@@ -15,8 +15,8 @@ import '../../../../share/widgets/output/snack_bar_mensaje.dart';
 import '../../../../share/widgets/top_bar_widget.dart';
 import '../../facturas/detalle_factura/factura_detalle_page.dart';
 import '../../facturas/provider/facturas_provider.dart';
+import '../../facturas/widgets/dialogo_crear_factura.dart';
 import '../../facturas/widgets/factura_fila_widget.dart';
-import '../widgets/dialogo_crear_venta_rapida.dart';
 
 class VentaRapidaVista extends ConsumerStatefulWidget {
   const VentaRapidaVista({super.key});
@@ -36,8 +36,7 @@ class _VentaRapidaVistaState extends ConsumerState<VentaRapidaVista> {
           TopBarConBoton(
             titulo: 'Venta Rápida (Mostrador)',
             etiquetaBoton: 'Nueva venta',
-            alPresionarBoton: () =>
-                DialogoCrearVentaRapida.mostrar(context),
+            alPresionarBoton: () => DialogoCrearFactura.mostrar(context, tipoFijo: TipoVenta.mostrador),
           ),
           const Expanded(child: _CuerpoVentaRapida()),
         ],

@@ -21,10 +21,13 @@ abstract interface class RepositorioOrdenes {
     String? observaciones,
   });
 
-  // Actualiza estado, diagnóstico u observaciones.
+  // Actualiza estado, kilometraje, moto y/o diagnóstico.
   Future<OrdenResumen> actualizar({
     required int id,
     required EstadoOrden estado,
+    required int kilometrajeEntrada,
+    int? motoId,
+    int? clienteId,
     String? diagnostico,
     String? observaciones,
   });

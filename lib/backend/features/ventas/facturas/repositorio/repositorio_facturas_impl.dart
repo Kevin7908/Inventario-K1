@@ -85,6 +85,7 @@ class RepositorioFacturasImpl implements RepositorioFacturas {
     required MetodoPago metodoPago,
     required EstadoPago estadoPago,
     double iva = 0,
+    double descuento = 0,
   }) async {
     // Número temporal — se actualiza tras conocer el id
     final id = await _db.into(_tablaVentas).insert(
@@ -96,6 +97,7 @@ class RepositorioFacturasImpl implements RepositorioFacturas {
             metodoPago: metodoPago,
             estadoPago: estadoPago,
             iva: iva,
+            descuento: descuento,
           ),
         );
 
@@ -331,12 +333,17 @@ class RepositorioFacturasImpl implements RepositorioFacturas {
     required MetodoPago metodoPago,
     required EstadoPago estadoPago,
     double? iva,
+    double? descuento,
+    bool actualizarCliente = false,
+    int? clienteId,
   }) async {
     await (_db.update(_tablaVentas)..where((t) => t.id.equals(id))).write(
       TablaVentasCompanion(
-        metodoPago: Value(metodoPago.aTexto),
-        estadoPago: Value(estadoPago.aTexto),
-        iva: iva != null ? Value(iva) : const Value.absent(),
+        metodoPago:    Value(metodoPago.aTexto),
+        estadoPago:    Value(estadoPago.aTexto),
+        iva:           iva != null ? Value(iva) : const Value.absent(),
+        descuento:     descuento != null ? Value(descuento) : const Value.absent(),
+        clienteId:     actualizarCliente ? Value(clienteId) : const Value.absent(),
         actualizadoEn: Value(DateTime.now()),
       ),
     );
@@ -555,9 +562,10 @@ class RepositorioFacturasImpl implements RepositorioFacturas {
           variables: [Variable.withInt(ventaId)],
         )
         .getSingleOrNull();
-    final subtotal = (subtotalRow?.data['sub'] as num? ?? 0).toDouble();
-    final iva = ventaRow.iva;
-    final total = subtotal + iva;
+    final subtotal  = (subtotalRow?.data['sub'] as num? ?? 0).toDouble();
+    final iva       = ventaRow.iva;
+    final descuento = ventaRow.descuento;
+    final total     = subtotal - descuento + iva;
 
     await (_db.update(_tablaVentas)..where((t) => t.id.equals(ventaId))).write(
       TablaVentasCompanion(

@@ -29,6 +29,9 @@ class TablaVentas extends Table {
   RealColumn get iva =>
       real().withDefault(const Constant(0.0))();
 
+  RealColumn get descuento =>
+      real().withDefault(const Constant(0.0))();
+
   RealColumn get total =>
       real().withDefault(const Constant(0.0))();
 

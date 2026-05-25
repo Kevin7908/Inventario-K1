@@ -78,6 +78,12 @@ class _CuerpoOrdenesState extends ConsumerState<_CuerpoOrdenes> {
     );
   }
 
+  Future<void> _editarOrden(OrdenResumen orden) async {
+    final detalle = await ref.read(ordenDetalleProvider(orden.id).future);
+    if (!mounted) return;
+    await DialogoCrearEditarOrden.mostrar(context, ordenAEditar: detalle);
+  }
+
   void _confirmarEliminar(OrdenResumen orden) {
     DialogoConfirmarEliminar.mostrar(
       context: context,
@@ -154,6 +160,7 @@ class _CuerpoOrdenesState extends ConsumerState<_CuerpoOrdenes> {
                             : _ListaOrdenes(
                                 ordenes: lista,
                                 onTap: _irADetalle,
+                                onEditar: _editarOrden,
                                 onEliminar: _confirmarEliminar,
                               ),
                       ),
@@ -285,11 +292,13 @@ class _ListaOrdenes extends StatelessWidget {
   const _ListaOrdenes({
     required this.ordenes,
     required this.onTap,
+    required this.onEditar,
     required this.onEliminar,
   });
 
   final List<OrdenResumen> ordenes;
   final ValueChanged<OrdenResumen> onTap;
+  final ValueChanged<OrdenResumen> onEditar;
   final ValueChanged<OrdenResumen> onEliminar;
 
   @override
@@ -303,6 +312,7 @@ class _ListaOrdenes extends StatelessWidget {
           key: ValueKey(orden.id),
           orden: orden,
           onTap: () => onTap(orden),
+          onEditar: () => onEditar(orden),
           onEliminar: () => onEliminar(orden),
         );
       },

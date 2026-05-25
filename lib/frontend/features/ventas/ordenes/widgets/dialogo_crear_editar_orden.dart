@@ -38,16 +38,21 @@ class _DialogoCrearEditarOrdenState
 
   late final ValueNotifier<Moto?> _motoNotifier;
   late final TextEditingController _kmCtrl;
+  late final TextEditingController _clienteCtrl;
   late final TextEditingController _diagnosticoCtrl;
   late final TextEditingController _observacionesCtrl;
   late EstadoOrden _estado;
 
   bool _guardando = false;
+  bool _motoPreseleccionada = false;
 
   @override
   void initState() {
     super.initState();
     _motoNotifier      = ValueNotifier(null);
+    _clienteCtrl       = TextEditingController(
+      text: widget.ordenAEditar?.clienteNombre ?? '',
+    );
     _kmCtrl            = TextEditingController(
       text: widget.ordenAEditar?.kilometrajeEntrada.toString() ?? '',
     );
@@ -58,12 +63,33 @@ class _DialogoCrearEditarOrdenState
       text: widget.ordenAEditar?.observacionesMecanico ?? '',
     );
     _estado = widget.ordenAEditar?.estado ?? EstadoOrden.abierta;
+    _motoNotifier.addListener(_actualizarCliente);
+  }
+
+  void _actualizarCliente() {
+    final nombre = _motoNotifier.value?.nombreCliente;
+    if (nombre != null) _clienteCtrl.text = nombre;
+  }
+
+  // Se llama desde build() cuando las motos ya están disponibles.
+  void _preseleccionarMoto(List<Moto> motos) {
+    if (_motoPreseleccionada || !widget.esEdicion) return;
+    _motoPreseleccionada = true;
+    final motoId = widget.ordenAEditar!.motoId;
+    final match = motos.where((m) => m.id == motoId);
+    if (match.isNotEmpty) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted) _motoNotifier.value = match.first;
+      });
+    }
   }
 
   @override
   void dispose() {
+    _motoNotifier.removeListener(_actualizarCliente);
     _motoNotifier.dispose();
     _kmCtrl.dispose();
+    _clienteCtrl.dispose();
     _diagnosticoCtrl.dispose();
     _observacionesCtrl.dispose();
     super.dispose();
@@ -71,7 +97,7 @@ class _DialogoCrearEditarOrdenState
 
   Future<void> _guardar() async {
     if (!_formKey.currentState!.validate()) return;
-    if (_motoNotifier.value == null) {
+    if (!widget.esEdicion && _motoNotifier.value == null) {
       SnackBarMensaje.error(context, 'Selecciona una moto.');
       return;
     }
@@ -82,9 +108,14 @@ class _DialogoCrearEditarOrdenState
     String? error;
 
     if (widget.esEdicion) {
+      final motoSeleccionada = _motoNotifier.value;
       error = await notifier.actualizarOrden(
         widget.ordenAEditar!.id,
         estado: _estado,
+        kilometrajeEntrada: int.tryParse(_kmCtrl.text.trim()) ??
+            widget.ordenAEditar!.kilometrajeEntrada,
+        motoId:    motoSeleccionada?.id     ?? widget.ordenAEditar!.motoId,
+        clienteId: motoSeleccionada?.clienteId ?? widget.ordenAEditar!.clienteId,
         diagnostico: _diagnosticoCtrl.text.trim().isEmpty
             ? null
             : _diagnosticoCtrl.text.trim(),
@@ -127,6 +158,8 @@ class _DialogoCrearEditarOrdenState
             .toList(growable: false) ??
         const [];
 
+    if (todasLasMotos.isNotEmpty) _preseleccionarMoto(todasLasMotos);
+
     return Dialog(
       backgroundColor: ColoresApp.bgCard,
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
@@ -149,58 +182,57 @@ class _DialogoCrearEditarOrdenState
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      // Solo en creación: Moto → Cliente (auto)
-                      if (!widget.esEdicion) ...[
-                        _label('Moto *'),
-                        const SizedBox(height: 6),
-                        AppSearch<Moto>(
-                          notifier: _motoNotifier,
-                          items: todasLasMotos,
-                          labelBuilder: (m) =>
-                              '${m.nombreDisplay}${m.nombreCliente != null ? ' · ${m.nombreCliente}' : ''}',
-                          hint: 'Seleccionar moto...',
-                          validator: (v) =>
-                              v == null ? 'Selecciona una moto.' : null,
-                          onAgregar: () => DialogoMoto.mostrar(context),
-                        ),
-                        const SizedBox(height: 16),
-                        _label('Cliente (dueño de la moto)'),
-                        const SizedBox(height: 6),
-                        ValueListenableBuilder<Moto?>(
-                          valueListenable: _motoNotifier,
-                          builder: (context, moto, child) => TextFormField(
-                            enabled: false,
-                            controller: TextEditingController(
-                              text: moto?.nombreCliente ?? '',
-                            ),
-                            decoration: _inputDeco(
-                              'Se completará al seleccionar una moto',
-                            ).copyWith(
-                              prefixIcon: const Icon(
-                                Icons.person_outline,
-                                size: 18,
-                                color: ColoresApp.textLight,
-                              ),
-                            ),
+                      // Moto
+                      _label('Moto *'),
+                      const SizedBox(height: 6),
+                      AppSearch<Moto>(
+                        notifier: _motoNotifier,
+                        items: todasLasMotos,
+                        labelBuilder: (m) =>
+                            '${m.nombreDisplay}${m.nombreCliente != null ? ' · ${m.nombreCliente}' : ''}',
+                        hint: 'Seleccionar moto...',
+                        validator: widget.esEdicion
+                            ? null
+                            : (v) => v == null ? 'Selecciona una moto.' : null,
+                        onAgregar: () => DialogoMoto.mostrar(context),
+                      ),
+                      const SizedBox(height: 16),
+
+                      // Cliente
+                      _label('Cliente (dueño de la moto)'),
+                      const SizedBox(height: 6),
+                      TextFormField(
+                        enabled: false,
+                        controller: _clienteCtrl,
+                        decoration: _inputDeco(
+                          'Se completará al seleccionar una moto',
+                        ).copyWith(
+                          prefixIcon: const Icon(
+                            Icons.person_outline,
+                            size: 18,
+                            color: ColoresApp.textLight,
                           ),
                         ),
-                        const SizedBox(height: 16),
-                      ],
+                      ),
+                      const SizedBox(height: 16),
 
                       // Kilometraje
-                      _label('Km de entrada *'),
+                      _label('Km de entrada'),
                       const SizedBox(height: 6),
                       TextFormField(
                         controller: _kmCtrl,
+                        //enabled: !widget.esEdicion,
                         keyboardType: TextInputType.number,
                         inputFormatters: [FilteringTextInputFormatter.digitsOnly],
                         decoration: _inputDeco('Ej: 15420'),
-                        validator: (v) {
-                          if (v == null || v.trim().isEmpty) return 'Campo requerido.';
-                          final n = int.tryParse(v.trim());
-                          if (n == null || n < 0) return 'Ingresa un número válido.';
-                          return null;
-                        },
+                        validator: widget.esEdicion
+                            ? null
+                            : (v) {
+                                if (v == null || v.trim().isEmpty) return 'Campo requerido.';
+                                final n = int.tryParse(v.trim());
+                                if (n == null || n < 0) return 'Ingresa un número válido.';
+                                return null;
+                              },
                       ),
                       const SizedBox(height: 16),
 

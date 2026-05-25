@@ -22,6 +22,7 @@ abstract final class FacturasMapper {
           : null,
       total: (row['total'] as num? ?? 0).toDouble(),
       iva: (row['iva'] as num? ?? 0).toDouble(),
+      descuento: (row['descuento'] as num? ?? 0).toDouble(),
       estadoPago: EstadoPago.desdeTexto(row['estado_pago'] as String? ?? 'PENDIENTE'),
       metodoPago: MetodoPago.desdeTexto(row['metodo_pago'] as String? ?? 'EFECTIVO'),
       creadoEn: _parseFecha(row['creado_en']),
@@ -52,6 +53,7 @@ abstract final class FacturasMapper {
       clienteNombre: ventaRow['cliente_nombre'] as String? ?? '— Sin cliente —',
       subtotal: (ventaRow['subtotal'] as num? ?? 0).toDouble(),
       iva: (ventaRow['iva'] as num? ?? 0).toDouble(),
+      descuento: (ventaRow['descuento'] as num? ?? 0).toDouble(),
       total: (ventaRow['total'] as num? ?? 0).toDouble(),
       totalPagado: (ventaRow['total_pagado'] as num? ?? 0).toDouble(),
       metodoPago: MetodoPago.desdeTexto(ventaRow['metodo_pago'] as String? ?? 'EFECTIVO'),
@@ -71,6 +73,7 @@ abstract final class FacturasMapper {
     required MetodoPago metodoPago,
     required EstadoPago estadoPago,
     double iva = 0,
+    double descuento = 0,
   }) =>
       TablaVentasCompanion.insert(
         numeroFactura: numeroFactura,
@@ -80,6 +83,7 @@ abstract final class FacturasMapper {
         metodoPago: Value(metodoPago.aTexto),
         estadoPago: Value(estadoPago.aTexto),
         iva: Value(iva),
+        descuento: Value(descuento),
         creadoEn: Value(DateTime.now()),
         actualizadoEn: Value(DateTime.now()),
       );

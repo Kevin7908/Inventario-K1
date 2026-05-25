@@ -8,6 +8,7 @@ class OrdenDetalle extends Equatable {
   const OrdenDetalle({
     required this.id,
     required this.numeroOrden,
+    required this.motoId,
     required this.motoDescripcion,
     required this.motoPlaca,
     required this.clienteId,
@@ -24,6 +25,7 @@ class OrdenDetalle extends Equatable {
 
   final int id;
   final String numeroOrden;
+  final int motoId;
   final String motoDescripcion;
   final String motoPlaca;
   final int clienteId;
@@ -49,6 +51,7 @@ class OrdenDetalle extends Equatable {
   List<Object?> get props => [
         id,
         numeroOrden,
+        motoId,
         motoDescripcion,
         motoPlaca,
         clienteId,

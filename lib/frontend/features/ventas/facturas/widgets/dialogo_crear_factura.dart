@@ -20,12 +20,14 @@ class DialogoCrearFactura extends ConsumerStatefulWidget {
     this.clienteId,
     this.clienteNombre,
     this.facturaExistente,
+    this.tipoFijo,
   });
   final FacturaDetalle? facturaAEditar;
   final int? ordenId;
   final int? clienteId;
   final String? clienteNombre;
   final FacturaResumen? facturaExistente;
+  final TipoVenta? tipoFijo;
 
   bool get esEdicion => facturaAEditar != null;
   bool get esDesdeOrden => ordenId != null;
@@ -37,6 +39,7 @@ class DialogoCrearFactura extends ConsumerStatefulWidget {
     int? clienteId,
     String? clienteNombre,
     FacturaResumen? facturaExistente,
+    TipoVenta? tipoFijo,
   }) {
     return showDialog(
       context: context,
@@ -47,6 +50,7 @@ class DialogoCrearFactura extends ConsumerStatefulWidget {
         clienteId:        clienteId,
         clienteNombre:    clienteNombre,
         facturaExistente: facturaExistente,
+        tipoFijo:         tipoFijo,
       ),
     );
   }
@@ -63,7 +67,9 @@ class _DialogoCrearFacturaState extends ConsumerState<DialogoCrearFactura> {
   late EstadoPago _estadoPago;
   late TipoVenta _tipo;
   late final TextEditingController _ivaCtrl;
+  late final TextEditingController _descuentoCtrl;
   bool _guardando = false;
+  bool _clientePreseleccionado = false;
 
   @override
   void initState() {
@@ -73,13 +79,16 @@ class _DialogoCrearFacturaState extends ConsumerState<DialogoCrearFactura> {
     _clienteNotifier = ValueNotifier(null);
     _metodoPago = f?.metodoPago ?? ex?.metodoPago ?? MetodoPago.efectivo;
     _estadoPago = f?.estadoPago ?? ex?.estadoPago ?? EstadoPago.pendiente;
-    _tipo       = f?.tipo ?? TipoVenta.servicio;
-    _ivaCtrl    = TextEditingController(
+    _tipo       = f?.tipo ?? widget.tipoFijo ?? TipoVenta.servicio;
+    _ivaCtrl = TextEditingController(
       text: f != null
           ? f.iva.toStringAsFixed(0)
           : ex != null
               ? ex.iva.toStringAsFixed(0)
               : '0',
+    );
+    _descuentoCtrl = TextEditingController(
+      text: f != null ? f.descuento.toStringAsFixed(0) : '0',
     );
   }
 
@@ -87,6 +96,7 @@ class _DialogoCrearFacturaState extends ConsumerState<DialogoCrearFactura> {
   void dispose() {
     _clienteNotifier.dispose();
     _ivaCtrl.dispose();
+    _descuentoCtrl.dispose();
     super.dispose();
   }
 
@@ -94,16 +104,20 @@ class _DialogoCrearFacturaState extends ConsumerState<DialogoCrearFactura> {
     if (!_formKey.currentState!.validate()) return;
     setState(() => _guardando = true);
 
-    final notifier = ref.read(facturasProvider.notifier);
-    final iva = double.tryParse(_ivaCtrl.text.trim()) ?? 0;
+    final notifier   = ref.read(facturasProvider.notifier);
+    final iva        = double.tryParse(_ivaCtrl.text.trim()) ?? 0;
+    final descuento  = double.tryParse(_descuentoCtrl.text.trim()) ?? 0;
     String? error;
 
     if (widget.esEdicion) {
       error = await notifier.actualizar(
-        id:         widget.facturaAEditar!.id,
-        metodoPago: _metodoPago,
-        estadoPago: _estadoPago,
-        iva:        iva,
+        id:               widget.facturaAEditar!.id,
+        metodoPago:       _metodoPago,
+        estadoPago:       _estadoPago,
+        iva:              iva,
+        descuento:        descuento,
+        actualizarCliente: true,
+        clienteId:        _clienteNotifier.value?.id,
       );
     } else if (widget.esDesdeOrden && widget.facturaExistente != null) {
       error = await notifier.actualizarDesdeOrden(
@@ -128,6 +142,7 @@ class _DialogoCrearFacturaState extends ConsumerState<DialogoCrearFactura> {
         metodoPago: _metodoPago,
         estadoPago: _estadoPago,
         iva:        iva,
+        descuento:  descuento,
       );
     }
 
@@ -148,8 +163,16 @@ class _DialogoCrearFacturaState extends ConsumerState<DialogoCrearFactura> {
 
   @override
   Widget build(BuildContext context) {
-    final clientes =
-        ref.watch(clientesProvider).value?.filtrados ?? const [];
+    final clientes = ref.watch(clientesProvider).value?.filtrados ?? const [];
+
+    if (widget.esEdicion && !_clientePreseleccionado && clientes.isNotEmpty) {
+      final clienteId = widget.facturaAEditar!.clienteId;
+      if (clienteId != null) {
+        final encontrado = clientes.where((c) => c.id == clienteId).firstOrNull;
+        if (encontrado != null) _clienteNotifier.value = encontrado;
+      }
+      _clientePreseleccionado = true;
+    }
 
     return Dialog(
       backgroundColor: ColoresApp.bgCard,
@@ -227,7 +250,7 @@ class _DialogoCrearFacturaState extends ConsumerState<DialogoCrearFactura> {
                         ),
                         const SizedBox(height: 16),
                       ],
-                      if (!widget.esEdicion && !widget.esDesdeOrden) ...[
+                      if (!widget.esEdicion && !widget.esDesdeOrden && widget.tipoFijo == null) ...[
                         _label('Tipo de venta *'),
                         const SizedBox(height: 8),
                         Row(
@@ -269,6 +292,8 @@ class _DialogoCrearFacturaState extends ConsumerState<DialogoCrearFactura> {
                           }).toList(),
                         ),
                         const SizedBox(height: 16),
+                      ],
+                      if (!widget.esDesdeOrden) ...[
                         _label('Cliente (opcional)'),
                         const SizedBox(height: 6),
                         AppSearch<Cliente>(
@@ -305,6 +330,24 @@ class _DialogoCrearFacturaState extends ConsumerState<DialogoCrearFactura> {
                       const SizedBox(height: 6),
                       TextFormField(
                         controller: _ivaCtrl,
+                        keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                        inputFormatters: [
+                          FilteringTextInputFormatter.allow(RegExp(r'^\d+\.?\d{0,2}')),
+                        ],
+                        decoration: _inputDeco('0'),
+                        validator: (v) {
+                          if (v != null && v.isNotEmpty) {
+                            if (double.tryParse(v.trim()) == null) return 'Valor inválido.';
+                          }
+                          return null;
+                        },
+                      ),
+                      const SizedBox(height: 16),
+
+                      _label('Descuento (valor en \$)'),
+                      const SizedBox(height: 6),
+                      TextFormField(
+                        controller: _descuentoCtrl,
                         keyboardType: const TextInputType.numberWithOptions(decimal: true),
                         inputFormatters: [
                           FilteringTextInputFormatter.allow(RegExp(r'^\d+\.?\d{0,2}')),

@@ -12,6 +12,7 @@ class FacturaResumen extends Equatable {
     this.numeroOrden,
     required this.total,
     required this.iva,
+    required this.descuento,
     required this.estadoPago,
     required this.metodoPago,
     this.creadoEn,
@@ -25,6 +26,7 @@ class FacturaResumen extends Equatable {
   final String? numeroOrden;
   final double total;
   final double iva;
+  final double descuento;
   final EstadoPago estadoPago;
   final MetodoPago metodoPago;
   final DateTime? creadoEn;
@@ -39,6 +41,7 @@ class FacturaResumen extends Equatable {
         numeroOrden,
         total,
         iva,
+        descuento,
         estadoPago,
         metodoPago,
         creadoEn,

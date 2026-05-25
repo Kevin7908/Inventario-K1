@@ -43,6 +43,7 @@ abstract final class OrdenMapper {
     return OrdenDetalle(
       id: ordenRow['id'] as int,
       numeroOrden: _formatearNumero(ordenRow['id'] as int),
+      motoId: ordenRow['moto_id'] as int? ?? 0,
       motoDescripcion:
           '${ordenRow['marca'] ?? ''} ${ordenRow['modelo'] ?? ''} ${ordenRow['anio'] ?? ''}'
               .trim(),
@@ -85,12 +86,18 @@ abstract final class OrdenMapper {
   static TablaOrdenesServicioCompanion aCompanionActualizar({
     required int id,
     required EstadoOrden estado,
+    required int kilometrajeEntrada,
+    int? motoId,
+    int? clienteId,
     String? diagnostico,
     String? observaciones,
     DateTime? fechaSalida,
   }) => TablaOrdenesServicioCompanion(
     id: Value(id),
     estado: Value(estado.name.toUpperCase()),
+    kilometrajeEntrada: Value(kilometrajeEntrada),
+    motoId: motoId != null ? Value(motoId) : const Value.absent(),
+    clienteId: clienteId != null ? Value(clienteId) : const Value.absent(),
     diagnostico: Value(diagnostico),
     observaciones: Value(observaciones),
     fechaSalida: Value(fechaSalida),

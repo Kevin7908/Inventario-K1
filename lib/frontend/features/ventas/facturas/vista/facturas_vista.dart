@@ -13,7 +13,6 @@ import '../../../../share/widgets/output/snack_bar_mensaje.dart';
 import '../../../../share/widgets/top_bar_widget.dart';
 import '../detalle_factura/factura_detalle_page.dart';
 import '../provider/facturas_provider.dart';
-import '../widgets/dialogo_crear_factura.dart';
 import '../widgets/factura_fila_widget.dart';
 import '../widgets/facturas_resumen_cartas_widget.dart';
 
@@ -32,11 +31,7 @@ class _FacturasVistaState extends ConsumerState<FacturasVista> {
       body: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          TopBarConBoton(
-            titulo: 'Facturación',
-            etiquetaBoton: 'Nueva factura',
-            alPresionarBoton: () => DialogoCrearFactura.mostrar(context),
-          ),
+          TopBarWidget(titulo: 'Facturación'),
           const Expanded(child: _CuerpoFacturas()),
         ],
       ),

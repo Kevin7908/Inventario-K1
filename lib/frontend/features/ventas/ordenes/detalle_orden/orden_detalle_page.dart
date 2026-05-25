@@ -50,9 +50,10 @@ class _ContenidoDetalle extends ConsumerWidget {
 
     final error = await ref.read(ordenesProvider.notifier).actualizarOrden(
           detalle.id,
-          estado:        nuevo,
-          diagnostico:   detalle.diagnosticoCliente,
-          observaciones: detalle.observacionesMecanico,
+          estado:              nuevo,
+          kilometrajeEntrada:  detalle.kilometrajeEntrada,
+          diagnostico:         detalle.diagnosticoCliente,
+          observaciones:       detalle.observacionesMecanico,
         );
 
     if (!context.mounted) return;

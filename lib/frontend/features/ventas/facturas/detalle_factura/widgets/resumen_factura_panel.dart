@@ -62,6 +62,11 @@ class ResumenFacturaPanel extends ConsumerWidget {
             child: Column(
               children: [
                 _FilaTotal('Subtotal', detalle.subtotal, false),
+                if (detalle.descuento > 0) ...[
+                  const SizedBox(height: 6),
+                  _FilaTotal('Descuento', -detalle.descuento, false,
+                      color: ColoresApp.accentGreen),
+                ],
                 if (detalle.iva > 0) ...[
                   const SizedBox(height: 6),
                   _FilaTotal('IVA', detalle.iva, false),
