@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:inventario_k1/frontend/features/productos/widgets/componentes_formulario_widget.dart';
 import 'package:provider/provider.dart';
 
@@ -11,20 +12,18 @@ import '../../../share/widgets/output/snack_bar_mensaje.dart';
 import '../../categorias/view_model/categorias_view_model.dart';
 import '../../proveedores/view_model/proveedores_view_model.dart';
 import '../../unidades_medida/view_model/unidad_medida_view_model.dart';
-import '../view_model/productos_view_model.dart';
+import '../provider/productos_provider.dart';
 
-class DialogoProducto extends StatefulWidget {
+class DialogoProducto extends ConsumerStatefulWidget {
   const DialogoProducto({
     super.key,
     this.productoAEditar,
-    required this.viewModel,
     required this.categoriasVm,
     required this.proveedoresVm,
     required this.unidadesVm,
   });
 
   final Producto? productoAEditar;
-  final ProductosViewModel viewModel;
   final CategoriasViewModel categoriasVm;
   final ProveedoresViewModel proveedoresVm;
   final UnidadesMedidaViewModel unidadesVm;
@@ -33,7 +32,6 @@ class DialogoProducto extends StatefulWidget {
 
   static Future<void> mostrar(
     BuildContext context, {
-    required ProductosViewModel viewModel,
     required CategoriasViewModel categoriasVm,
     required ProveedoresViewModel proveedoresVm,
     required UnidadesMedidaViewModel unidadesVm,
@@ -44,30 +42,29 @@ class DialogoProducto extends StatefulWidget {
       barrierDismissible: false,
       builder: (_) => MultiProvider(
         providers: [
-          ChangeNotifierProvider<ProductosViewModel>.value(value: viewModel),
           ChangeNotifierProvider<CategoriasViewModel>.value(value: categoriasVm),
           ChangeNotifierProvider<ProveedoresViewModel>.value(value: proveedoresVm),
           ChangeNotifierProvider<UnidadesMedidaViewModel>.value(value: unidadesVm),
         ],
         child: DialogoProducto(
           productoAEditar: productoAEditar,
-          viewModel: viewModel,
-          categoriasVm: categoriasVm,
-          proveedoresVm: proveedoresVm,
-          unidadesVm: unidadesVm,
+          categoriasVm:    categoriasVm,
+          proveedoresVm:   proveedoresVm,
+          unidadesVm:      unidadesVm,
         ),
       ),
     );
   }
 
   @override
-  State<DialogoProducto> createState() => _DialogoProductoState();
+  ConsumerState<DialogoProducto> createState() => _DialogoProductoState();
 }
 
-class _DialogoProductoState extends State<DialogoProducto> {
+class _DialogoProductoState extends ConsumerState<DialogoProducto> {
   final _formKey = GlobalKey<FormState>();
+  bool _guardando = false;
 
-  // ── Controllers de texto ──────────────────────────────────────────────────
+  // Controllers de texto
   late final TextEditingController _skuCtrl;
   late final TextEditingController _nombreCtrl;
   late final TextEditingController _descripcionCtrl;
@@ -78,65 +75,49 @@ class _DialogoProductoState extends State<DialogoProducto> {
   late final TextEditingController _stockMinimoCtrl;
   late final TextEditingController _ubicacionCtrl;
 
-  // ── ValueNotifiers — renderizado granular sin setState ────────────────────
-  // Cada notifier actualiza solo su widget suscrito.
-  // No hay setState en todo el orquestador tras initState.
+  // ValueNotifiers — granulares para evitar reconstrucciones del formulario completo
   late final ValueNotifier<Categoria?> _categoriaNotifier;
   late final ValueNotifier<Proveedor?> _proveedorNotifier;
   late final ValueNotifier<UnidadMedida?> _unidadNotifier;
   late final ValueNotifier<String?> _imagenRutaNotifier;
-  late final ValueNotifier<bool> _aplicaIvaNotifier;
-  late final ValueNotifier<bool> _activoNotifier;
-
-  // ── initState ─────────────────────────────────────────────────────────────
+  late final ValueNotifier<bool>    _aplicaIvaNotifier;
+  late final ValueNotifier<bool>    _activoNotifier;
 
   @override
   void initState() {
     super.initState();
     final p = widget.productoAEditar;
 
-    // Controllers — un solo alloc, valores del producto o vacío/default
-    _skuCtrl = TextEditingController(text: p?.sku ?? '');
-    _nombreCtrl = TextEditingController(text: p?.nombre ?? '');
-    _descripcionCtrl = TextEditingController(text: p?.descripcion ?? '');
+    _skuCtrl          = TextEditingController(text: p?.sku ?? '');
+    _nombreCtrl       = TextEditingController(text: p?.nombre ?? '');
+    _descripcionCtrl  = TextEditingController(text: p?.descripcion ?? '');
     _precioCompraCtrl = TextEditingController(
-      text: p?.precioCompra.toStringAsFixed(0) ?? '',
-    );
-    _precioVentaCtrl = TextEditingController(
-      text: p?.precioVenta.toStringAsFixed(0) ?? '',
-    );
+        text: p?.precioCompra.toStringAsFixed(0) ?? '');
+    _precioVentaCtrl  = TextEditingController(
+        text: p?.precioVenta.toStringAsFixed(0) ?? '');
     _precioTallerCtrl = TextEditingController(
-      text: p?.precioVentaTaller?.toStringAsFixed(0) ?? '',
-    );
-    _stockCtrl = TextEditingController(
-      text: p?.stockActual.toStringAsFixed(0) ?? '0',
-    );
-    _stockMinimoCtrl = TextEditingController(
-      text: p?.stockMinimo.toStringAsFixed(0) ?? '0',
-    );
-    _ubicacionCtrl = TextEditingController(text: p?.ubicacionBodega ?? '');
+        text: p?.precioVentaTaller?.toStringAsFixed(0) ?? '');
+    _stockCtrl        = TextEditingController(
+        text: p?.stockActual.toStringAsFixed(0) ?? '0');
+    _stockMinimoCtrl  = TextEditingController(
+        text: p?.stockMinimo.toStringAsFixed(0) ?? '0');
+    _ubicacionCtrl    = TextEditingController(text: p?.ubicacionBodega ?? '');
 
-    // Notifiers — null hasta que se resuelva FK; booleanos con defaults
-    _categoriaNotifier = ValueNotifier<Categoria?>(null);
-    _proveedorNotifier = ValueNotifier<Proveedor?>(null);
-    _unidadNotifier = ValueNotifier<UnidadMedida?>(null);
+    _categoriaNotifier  = ValueNotifier<Categoria?>(null);
+    _proveedorNotifier  = ValueNotifier<Proveedor?>(null);
+    _unidadNotifier     = ValueNotifier<UnidadMedida?>(null);
     _imagenRutaNotifier = ValueNotifier<String?>(p?.imagenUrl);
-    _aplicaIvaNotifier = ValueNotifier<bool>(p?.aplicaIva ?? true);
-    _activoNotifier = ValueNotifier<bool>(p?.activo ?? true);
+    _aplicaIvaNotifier  = ValueNotifier<bool>(p?.aplicaIva ?? true);
+    _activoNotifier     = ValueNotifier<bool>(p?.activo ?? true);
 
-    // Pre-selección de FKs en modo edición
-    // Se difiere al siguiente frame para que los ViewModels ya hayan
-    // notificado sus listas. No usa setState — actualiza los notifiers.
     if (p != null) {
-      WidgetsBinding.instance.addPostFrameCallback((_) => _preseleccionarFk(p));
+      WidgetsBinding.instance
+          .addPostFrameCallback((_) => _preseleccionarFk(p));
     }
   }
 
-  /// Resuelve los objetos FK buscando por ID en las listas del ViewModel.
-  /// Actualiza los notifiers directamente → cero reconstrucciones innecesarias.
   void _preseleccionarFk(Producto p) {
     if (!mounted) return;
-
     if (p.categoriaId != null) {
       _categoriaNotifier.value = widget.categoriasVm.categorias
           .where((c) => c.id == p.categoriaId)
@@ -153,8 +134,6 @@ class _DialogoProductoState extends State<DialogoProducto> {
           .firstOrNull;
     }
   }
-
-  // ── dispose — limpiar TODOS los recursos ──────────────────────────────────
 
   @override
   void dispose() {
@@ -176,14 +155,12 @@ class _DialogoProductoState extends State<DialogoProducto> {
     super.dispose();
   }
 
-  // ── Guardar ────────────────────────────────────────────────────────────────
+  // ─── Guardar ──────────────────────────────────────────────────────────────
 
   Future<void> _guardar() async {
     if (!_formKey.currentState!.validate()) return;
+    setState(() => _guardando = true);
 
-    final vm = context.read<ProductosViewModel>();
-
-    // Parseo de valores numéricos — elimina comas si el campo tiene formato
     final precioCompra =
         double.tryParse(_precioCompraCtrl.text.replaceAll(',', '')) ?? 0;
     final precioVenta =
@@ -196,72 +173,46 @@ class _DialogoProductoState extends State<DialogoProducto> {
     final stockMinimo =
         double.tryParse(_stockMinimoCtrl.text.replaceAll(',', '')) ?? 0;
 
-    // Lectura de notifiers — sin setState, sin reconstrucción
     final categoria = _categoriaNotifier.value;
     final proveedor = _proveedorNotifier.value;
-    final unidad = _unidadNotifier.value;
-    final imagenRuta = _imagenRutaNotifier.value;
-    final aplicaIva = _aplicaIvaNotifier.value;
-    final activo = _activoNotifier.value;
+    final unidad    = _unidadNotifier.value;
 
-    final bool exito;
+    final producto = Producto(
+      id: widget.esEdicion ? widget.productoAEditar!.id : null,
+      sku:    _skuCtrl.text.trim(),
+      nombre: _nombreCtrl.text.trim(),
+      descripcion: _descripcionCtrl.text.trim().isEmpty
+          ? null
+          : _descripcionCtrl.text.trim(),
+      categoriaId:       categoria?.id,
+      categoriaNombre:   categoria?.nombre,
+      unidadMedidaId:    unidad?.id,
+      unidadMedidaNombre: unidad?.nombre,
+      proveedorId:        proveedor?.id,
+      proveedorNombre:    proveedor?.nombre,
+      precioCompra:       precioCompra,
+      precioVenta:        precioVenta,
+      precioVentaTaller:  precioTaller,
+      stockActual:        stock,
+      stockMinimo:        stockMinimo,
+      ubicacionBodega: _ubicacionCtrl.text.trim().isEmpty
+          ? null
+          : _ubicacionCtrl.text.trim(),
+      imagenUrl: _imagenRutaNotifier.value,
+      aplicaIva: _aplicaIvaNotifier.value,
+      activo:    _activoNotifier.value,
+    );
 
-    if (widget.esEdicion) {
-      exito = await vm.actualizarProducto(
-        id: widget.productoAEditar!.id!,
-        sku: _skuCtrl.text.trim(),
-        nombre: _nombreCtrl.text.trim(),
-        descripcion: _descripcionCtrl.text.trim().isEmpty
-            ? null
-            : _descripcionCtrl.text.trim(),
-        categoriaId: categoria?.id,
-        categoriaNombre: categoria?.nombre,
-        unidadMedidaId: unidad?.id,
-        unidadMedidaNombre: unidad?.nombre,
-        proveedorId: proveedor?.id,
-        proveedorNombre: proveedor?.nombre,
-        precioCompra: precioCompra,
-        precioVenta: precioVenta,
-        precioVentaTaller: precioTaller,
-        stockActual: stock,
-        stockMinimo: stockMinimo,
-        ubicacionBodega: _ubicacionCtrl.text.trim().isEmpty
-            ? null
-            : _ubicacionCtrl.text.trim(),
-        imagenUrl: imagenRuta,
-        aplicaIva: aplicaIva,
-        activo: activo,
-      );
-    } else {
-      exito = await vm.crearProducto(
-        sku: _skuCtrl.text.trim(),
-        nombre: _nombreCtrl.text.trim(),
-        descripcion: _descripcionCtrl.text.trim().isEmpty
-            ? null
-            : _descripcionCtrl.text.trim(),
-        categoriaId: categoria?.id,
-        categoriaNombre: categoria?.nombre,
-        unidadMedidaId: unidad?.id,
-        unidadMedidaNombre: unidad?.nombre,
-        proveedorId: proveedor?.id,
-        proveedorNombre: proveedor?.nombre,
-        precioCompra: precioCompra,
-        precioVenta: precioVenta,
-        precioVentaTaller: precioTaller,
-        stockActual: stock,
-        stockMinimo: stockMinimo,
-        ubicacionBodega: _ubicacionCtrl.text.trim().isEmpty
-            ? null
-            : _ubicacionCtrl.text.trim(),
-        imagenUrl: imagenRuta,
-        aplicaIva: aplicaIva,
-        activo: activo,
-      );
-    }
+    final error = widget.esEdicion
+        ? await ref.read(productosProvider.notifier).actualizar(producto)
+        : await ref.read(productosProvider.notifier).crear(producto);
 
     if (!mounted) return;
 
-    if (exito) {
+    if (error != null) {
+      SnackBarMensaje.error(context, error);
+      setState(() => _guardando = false);
+    } else {
       Navigator.of(context).pop();
       SnackBarMensaje.success(
         context,
@@ -269,34 +220,24 @@ class _DialogoProductoState extends State<DialogoProducto> {
             ? 'Producto actualizado correctamente'
             : 'Producto creado correctamente',
       );
-    } else if (vm.mensajeError != null) {
-      SnackBarMensaje.error(context, vm.mensajeError!);
-      vm.limpiarError();
     }
   }
 
-  // ── Build ──────────────────────────────────────────────────────────────────
+  // ─── Build ────────────────────────────────────────────────────────────────
 
   @override
   Widget build(BuildContext context) {
     return Dialog(
       backgroundColor: ColoresApp.bgCard,
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-      child: Container(
+      child: SizedBox(
         width: 580,
-        constraints: BoxConstraints(
-          maxHeight: MediaQuery.of(context).size.height * 0.90,
-        ),
+        height: MediaQuery.of(context).size.height * 0.90,
         child: Column(
-          mainAxisSize: MainAxisSize.min,
           children: [
-            // ── Encabezado estático — nunca se reconstruye ────────────────
             _Encabezado(
-              titulo:
-                  widget.esEdicion ? 'Editar Producto' : 'Nuevo Producto',
+              titulo: widget.esEdicion ? 'Editar Producto' : 'Nuevo Producto',
             ),
-
-            // ── Formulario scrollable compuesto por secciones ─────────────
             Flexible(
               child: SingleChildScrollView(
                 padding: const EdgeInsets.fromLTRB(28, 8, 28, 0),
@@ -305,53 +246,41 @@ class _DialogoProductoState extends State<DialogoProducto> {
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      // 1. Información básica
                       SeccionBasica(
-                        skuCtrl: _skuCtrl,
-                        nombreCtrl: _nombreCtrl,
-                        descripcionCtrl: _descripcionCtrl,
+                        skuCtrl:          _skuCtrl,
+                        nombreCtrl:       _nombreCtrl,
+                        descripcionCtrl:  _descripcionCtrl,
                       ),
-
                       const SizedBox(height: 20),
-
-                      // 2. Clasificación (categoría, proveedor, unidad, ubi, imagen)
                       SeccionClasificacion(
                         categoriaNotifier: _categoriaNotifier,
                         proveedorNotifier: _proveedorNotifier,
-                        unidadNotifier: _unidadNotifier,
-                        ubicacionCtrl: _ubicacionCtrl,
+                        unidadNotifier:    _unidadNotifier,
+                        ubicacionCtrl:     _ubicacionCtrl,
                         imagenRutaNotifier: _imagenRutaNotifier,
                       ),
-
                       const SizedBox(height: 20),
-
-                      // 3. Precios + IVA
                       SeccionPrecios(
                         precioCompraCtrl: _precioCompraCtrl,
-                        precioVentaCtrl: _precioVentaCtrl,
+                        precioVentaCtrl:  _precioVentaCtrl,
                         precioTallerCtrl: _precioTallerCtrl,
                         aplicaIvaNotifier: _aplicaIvaNotifier,
                       ),
-
                       const SizedBox(height: 20),
-
-                      // 4. Inventario + Estado
                       SeccionInventario(
-                        stockCtrl: _stockCtrl,
+                        stockCtrl:       _stockCtrl,
                         stockMinimoCtrl: _stockMinimoCtrl,
-                        activoNotifier: _activoNotifier,
+                        activoNotifier:  _activoNotifier,
                       ),
-
                       const SizedBox(height: 8),
                     ],
                   ),
                 ),
               ),
             ),
-
-            // ── Botones fijos ─────────────────────────────────────────────
             _BotonesDialogo(
               esEdicion: widget.esEdicion,
+              guardando: _guardando,
               onGuardar: _guardar,
             ),
           ],
@@ -360,6 +289,8 @@ class _DialogoProductoState extends State<DialogoProducto> {
     );
   }
 }
+
+// ─── Sub-widgets estáticos ────────────────────────────────────────────────────
 
 class _Encabezado extends StatelessWidget {
   const _Encabezado({required this.titulo});
@@ -386,8 +317,7 @@ class _Encabezado extends StatelessWidget {
             style: IconButton.styleFrom(
               backgroundColor: ColoresApp.bgContent,
               shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(8),
-              ),
+                  borderRadius: BorderRadius.circular(8)),
             ),
           ),
         ],
@@ -399,10 +329,12 @@ class _Encabezado extends StatelessWidget {
 class _BotonesDialogo extends StatelessWidget {
   const _BotonesDialogo({
     required this.esEdicion,
+    required this.guardando,
     required this.onGuardar,
   });
 
   final bool esEdicion;
+  final bool guardando;
   final VoidCallback onGuardar;
 
   @override
@@ -419,39 +351,31 @@ class _BotonesDialogo extends StatelessWidget {
                 side: const BorderSide(color: ColoresApp.border),
                 padding: const EdgeInsets.symmetric(vertical: 13),
                 shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(10),
-                ),
+                    borderRadius: BorderRadius.circular(10)),
               ),
               child: const Text('Cancelar'),
             ),
           ),
           const SizedBox(width: 12),
           Expanded(
-            // Consumer confinado — solo este botón se reconstruye al cambiar
-            // estaCargando. El resto del formulario no se toca.
-            child: Consumer<ProductosViewModel>(
-              builder: (_, vm, __) => ElevatedButton(
-                onPressed: vm.estaCargando ? null : onGuardar,
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: ColoresApp.primary,
-                  foregroundColor: Colors.white,
-                  padding: const EdgeInsets.symmetric(vertical: 13),
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(10),
-                  ),
-                  elevation: 0,
-                ),
-                child: vm.estaCargando
-                    ? const SizedBox(
-                        width: 18,
-                        height: 18,
-                        child: CircularProgressIndicator(
-                          strokeWidth: 2,
-                          color: Colors.white,
-                        ),
-                      )
-                    : Text(esEdicion ? 'Guardar cambios' : 'Crear producto'),
+            child: ElevatedButton(
+              onPressed: guardando ? null : onGuardar,
+              style: ElevatedButton.styleFrom(
+                backgroundColor: ColoresApp.primary,
+                foregroundColor: Colors.white,
+                padding: const EdgeInsets.symmetric(vertical: 13),
+                shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(10)),
+                elevation: 0,
               ),
+              child: guardando
+                  ? const SizedBox(
+                      width: 18,
+                      height: 18,
+                      child: CircularProgressIndicator(
+                          strokeWidth: 2, color: Colors.white),
+                    )
+                  : Text(esEdicion ? 'Guardar cambios' : 'Crear producto'),
             ),
           ),
         ],

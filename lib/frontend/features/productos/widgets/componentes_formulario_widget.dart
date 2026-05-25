@@ -16,54 +16,51 @@ import '../../unidades_medida/widgets/dialogo_unidad_medida_widget.dart';
 import 'selector_imagen_widget.dart';
 
 Widget _etiqueta(String texto) => Text(
-      texto,
-      style: const TextStyle(
-        color: ColoresApp.textDark,
-        fontSize: 13,
-        fontWeight: FontWeight.w600,
-      ),
-    );
+  texto,
+  style: const TextStyle(
+    color: ColoresApp.textDark,
+    fontSize: 13,
+    fontWeight: FontWeight.w600,
+  ),
+);
 
 Widget _campo({required String label, required Widget child}) => Expanded(
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [_etiqueta(label), const SizedBox(height: 6), child],
-      ),
-    );
+  child: Column(
+    crossAxisAlignment: CrossAxisAlignment.start,
+    children: [_etiqueta(label), const SizedBox(height: 6), child],
+  ),
+);
 
 Widget _fila(List<Widget> children) => Row(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [children[0], const SizedBox(width: 12), children[1]],
-    );
+  crossAxisAlignment: CrossAxisAlignment.start,
+  children: [children[0], const SizedBox(width: 12), children[1]],
+);
 
 InputDecoration _deco(String hint) => InputDecoration(
-      hintText: hint,
-      hintStyle: const TextStyle(color: ColoresApp.textLight, fontSize: 13.5),
-      filled: true,
-      fillColor: ColoresApp.bgContent,
-      contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
-      border: OutlineInputBorder(
-        borderRadius: BorderRadius.circular(10),
-        borderSide: const BorderSide(color: ColoresApp.border),
-      ),
-      enabledBorder: OutlineInputBorder(
-        borderRadius: BorderRadius.circular(10),
-        borderSide: const BorderSide(color: ColoresApp.border),
-      ),
-      focusedBorder: OutlineInputBorder(
-        borderRadius: BorderRadius.circular(10),
-        borderSide: const BorderSide(color: ColoresApp.primary, width: 1.5),
-      ),
-      errorBorder: OutlineInputBorder(
-        borderRadius: BorderRadius.circular(10),
-        borderSide: const BorderSide(color: ColoresApp.statusDebt),
-      ),
-    );
+  hintText: hint,
+  hintStyle: const TextStyle(color: ColoresApp.textLight, fontSize: 13.5),
+  filled: true,
+  fillColor: ColoresApp.bgContent,
+  contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+  border: OutlineInputBorder(
+    borderRadius: BorderRadius.circular(10),
+    borderSide: const BorderSide(color: ColoresApp.border),
+  ),
+  enabledBorder: OutlineInputBorder(
+    borderRadius: BorderRadius.circular(10),
+    borderSide: const BorderSide(color: ColoresApp.border),
+  ),
+  focusedBorder: OutlineInputBorder(
+    borderRadius: BorderRadius.circular(10),
+    borderSide: const BorderSide(color: ColoresApp.primary, width: 1.5),
+  ),
+  errorBorder: OutlineInputBorder(
+    borderRadius: BorderRadius.circular(10),
+    borderSide: const BorderSide(color: ColoresApp.statusDebt),
+  ),
+);
 
-// ─────────────────────────────────────────────────────────────────────────────
 // _SeccionTitulo — Separador visual entre secciones
-// ─────────────────────────────────────────────────────────────────────────────
-
 class SeccionTitulo extends StatelessWidget {
   const SeccionTitulo({super.key, required this.titulo, required this.icono});
 
@@ -95,10 +92,7 @@ class SeccionTitulo extends StatelessWidget {
   }
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
 // _SeccionBasica — SKU, Nombre, Descripción
-// ─────────────────────────────────────────────────────────────────────────────
-
 class SeccionBasica extends StatelessWidget {
   const SeccionBasica({
     super.key,
@@ -155,13 +149,14 @@ class SeccionBasica extends StatelessWidget {
         TextFormField(
           controller: descripcionCtrl,
           maxLines: 2,
-          decoration: _deco('Características, especificaciones, referencia cruzada...'),
+          decoration: _deco(
+            'Características, especificaciones, referencia cruzada...',
+          ),
         ),
       ],
     );
   }
 }
-
 
 class SeccionClasificacion extends StatelessWidget {
   const SeccionClasificacion({
@@ -193,35 +188,47 @@ class SeccionClasificacion extends StatelessWidget {
         _fila([
           _campo(
             label: 'Categoría',
-            // Agregamos Consumer para que escuche cambios en tiempo real
-            child: Consumer<CategoriasViewModel>(
-              builder: (context, vm, _) => AppSearch<Categoria>(
-                notifier: categoriaNotifier,
-                items: vm.categorias, // Ahora usa la lista actualizada del VM
-                labelBuilder: (c) => c.nombre,
-                hint: 'Seleccionar categoría',
-                onAgregar: () => DialogoCategoria.mostrar(
-                  context,
-                  viewModel: vm,
-                ),
-              ),
+            child: Selector<CategoriasViewModel, List<Categoria>>(
+              // 1. El selector extrae solo la lista de categorías.
+              // Flutter comparará la lista anterior con la nueva y solo si son distintas
+              // ejecutará el builder.
+              selector: (_, vm) => vm.categorias,
+
+              builder: (context, listaCategorias, _) {
+                // Usamos context.read aquí para el botón agregar, ya que onAgregar
+                // no necesita "escuchar" cambios, solo disparar una acción.
+                final vm = context.read<CategoriasViewModel>();
+
+                return AppSearch<Categoria>(
+                  notifier: categoriaNotifier,
+                  items:
+                      listaCategorias, // Usamos la lista que viene del selector
+                  labelBuilder: (c) => c.nombre,
+                  hint: 'Seleccionar categoría',
+                  onAgregar: () =>
+                      DialogoCategoria.mostrar(context, viewModel: vm),
+                );
+              },
             ),
           ),
           _campo(
             label: 'Proveedor',
-            // Agregamos Consumer para Proveedores
-            child: Consumer<ProveedoresViewModel>(
-              builder: (context, vm, _) => AppSearch<Proveedor>(
-                notifier: proveedorNotifier,
-                items: vm.proveedores,
-                labelBuilder: (p) => p.nombre,
-                hint: 'Seleccionar proveedor',
-                onAgregar: () => DialogoProveedor.mostrar(
-                  context,
-                  viewModel: vm,
-                ),
-              ),
+            child: Selector<ProveedoresViewModel, List<Proveedor>>(
+              selector: (_, vm) => vm.proveedores,
+              builder: (context, listaProveedores, _) {
+                final vm = context.read<ProveedoresViewModel>();
+
+                return AppSearch<Proveedor>(
+                  notifier: proveedorNotifier,
+                  items: listaProveedores,
+                  labelBuilder: (p) => p.nombre,
+                  hint: 'Seleccionar proveedor',
+                  onAgregar: () =>
+                      DialogoProveedor.mostrar(context, viewModel: vm),
+                );
+              },
             ),
+            
           ),
         ]),
 
@@ -232,17 +239,20 @@ class SeccionClasificacion extends StatelessWidget {
           _campo(
             label: 'Unidad de medida',
             // Agregamos Consumer para Unidades de Medida
-            child: Consumer<UnidadesMedidaViewModel>(
-              builder: (context, vm, _) => AppSearch<UnidadMedida>(
-                notifier: unidadNotifier,
-                items: vm.unidades,
-                labelBuilder: (u) => '${u.nombre} (${u.abreviatura})',
-                hint: 'Seleccionar unidad',
-                onAgregar: () => DialogoUnidadMedida.mostrar(
-                  context,
-                  viewModel: vm,
-                ),
-              ),
+            child: Selector<UnidadesMedidaViewModel, List<UnidadMedida>>(
+              selector: (_, vm) => vm.unidades,
+              builder: (context, listaUnidades, _) {
+                final vm = context.read<UnidadesMedidaViewModel>();
+
+                return AppSearch<UnidadMedida>(
+                  notifier: unidadNotifier,
+                  items: listaUnidades,
+                  labelBuilder: (u) => '${u.nombre} (${u.abreviatura})',
+                  hint: 'Seleccionar unidad',
+                  onAgregar: () =>
+                      DialogoUnidadMedida.mostrar(context, viewModel: vm),
+                );
+              },
             ),
           ),
           _campo(
@@ -262,7 +272,7 @@ class SeccionClasificacion extends StatelessWidget {
         const SizedBox(height: 8),
         ValueListenableBuilder<String?>(
           valueListenable: imagenRutaNotifier,
-          builder: (_, ruta, __) => SelectorImagenWidget(
+          builder: (context, ruta, child) => SelectorImagenWidget(
             rutaActual: ruta,
             onRutaSeleccionada: (nuevaRuta) =>
                 imagenRutaNotifier.value = nuevaRuta,
@@ -272,10 +282,8 @@ class SeccionClasificacion extends StatelessWidget {
     );
   }
 }
-// ─────────────────────────────────────────────────────────────────────────────
-// _SeccionPrecios — Precio compra, venta, taller y aplica IVA
-// ─────────────────────────────────────────────────────────────────────────────
 
+// _SeccionPrecios — Precio compra, venta, taller y aplica IVA
 class SeccionPrecios extends StatelessWidget {
   const SeccionPrecios({
     super.key,
@@ -348,12 +356,12 @@ class SeccionPrecios extends StatelessWidget {
                 const SizedBox(height: 6),
                 ValueListenableBuilder<bool>(
                   valueListenable: aplicaIvaNotifier,
-                  builder: (_, value, __) => Row(
+                  builder: (context, value, child) => Row(
                     children: [
                       Switch(
                         value: value,
                         onChanged: (v) => aplicaIvaNotifier.value = v,
-                        activeColor: ColoresApp.primary,
+                        activeThumbColor: ColoresApp.primary,
                       ),
                       const SizedBox(width: 6),
                       Text(
@@ -378,10 +386,7 @@ class SeccionPrecios extends StatelessWidget {
   }
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
 // _SeccionInventario — Stock actual, stock mínimo y estado activo
-// ─────────────────────────────────────────────────────────────────────────────
-
 class SeccionInventario extends StatelessWidget {
   const SeccionInventario({
     super.key,
@@ -435,12 +440,12 @@ class SeccionInventario extends StatelessWidget {
             const SizedBox(width: 10),
             ValueListenableBuilder<bool>(
               valueListenable: activoNotifier,
-              builder: (_, activo, __) => Row(
+              builder: (context, activo, child) => Row(
                 children: [
                   Switch(
                     value: activo,
                     onChanged: (v) => activoNotifier.value = v,
-                    activeColor: const Color(0xFF10B981),
+                    activeThumbColor: const Color(0xFF10B981),
                   ),
                   const SizedBox(width: 6),
                   AnimatedSwitcher(

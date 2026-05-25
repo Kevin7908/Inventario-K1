@@ -54,7 +54,7 @@ class _TarjetaProductoWidgetState extends State<TarjetaProductoWidget> {
               borderRadius: BorderRadius.circular(16),
               border: Border.all(
                 color: _hovering
-                    ? ColoresApp.primary.withOpacity(0.55)
+                    ? ColoresApp.primary.withValues(alpha: 0.55)
                     : ColoresApp.border,
                 width: _hovering ? 1.5 : 1.0,
               ),
@@ -222,7 +222,7 @@ class _ImagenConBadge extends StatelessWidget {
         fit: BoxFit.cover,
         // Para imágenes de red también limitamos el cache en memoria
         cacheWidth: 250,
-        errorBuilder: (_, __, ___) => const Center(
+        errorBuilder: (context, e, st) => const Center(
           child: Icon(
             Icons.broken_image_outlined,
             size: 28,
@@ -236,7 +236,7 @@ class _ImagenConBadge extends StatelessWidget {
       File(ruta),
       fit: BoxFit.cover,
       cacheWidth: 300,
-      errorBuilder: (_, __, ___) => const Center(
+      errorBuilder: (context, e, st) => const Center(
         child: Icon(
           Icons.broken_image_outlined,
           size: 28,

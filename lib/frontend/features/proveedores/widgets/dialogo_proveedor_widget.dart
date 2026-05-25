@@ -354,7 +354,7 @@ class _DialogoProveedorState extends State<DialogoProveedor> {
                           Switch(
                             value: _activo,
                             onChanged: (v) => setState(() => _activo = v),
-                            activeColor: const Color(0xFF10B981),
+                            activeThumbColor: const Color(0xFF10B981),
                           ),
                           const SizedBox(width: 6),
                           Text(
@@ -476,7 +476,7 @@ class _DialogoProveedorState extends State<DialogoProveedor> {
                   const SizedBox(width: 12),
                   Expanded(
                     child: Consumer<ProveedoresViewModel>(
-                      builder: (_, vm, __) => ElevatedButton(
+                      builder: (_, vm, _) => ElevatedButton(
                         onPressed: vm.estaCargando ? null : _guardar,
                         style: ElevatedButton.styleFrom(
                           backgroundColor: ColoresApp.primary,

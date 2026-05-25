@@ -7,4 +7,7 @@ enum NavSection {
   clientes,
   proveedores,
   unidadesMedida,
+  motos,
+  especializaciones,
+  tecnicos,
 }

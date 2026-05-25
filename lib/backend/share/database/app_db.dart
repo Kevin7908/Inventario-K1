@@ -6,17 +6,43 @@ import 'package:path_provider/path_provider.dart';
 
 import '../../features/autenticacion/esquema_datos/tabla_usuario.dart';
 import '../../features/categorias/esquema_datos/tabla_categoria.dart';
+import '../../features/clientes/esquema_datos/tabla_cliente.dart';
+import '../../features/especializacion/esquema_datos/tabla_especializacion.dart';
+import '../../features/motos/esquema_datos/tabla_moto.dart';
 import '../../features/productos/esquema_datos/tabla_producto.dart';
+import '../../features/tecnicos/esquema_datos/tabla_tecnico.dart';
 import '../../features/unidades_medida/esquema_datos/tabla_unidades_medida.dart';
 import '../../features/proveedores/esquema_datos/tabla_proveedor.dart';
+import '../../features/ventas/facturas/esquema_datos/tabla_venta_detalles.dart';
+import '../../features/ventas/facturas/esquema_datos/tabla_ventas.dart';
+import '../../features/ventas/ordenes/esquema_datos/tabla_ordenes_repuesto.dart';
+import '../../features/ventas/ordenes/esquema_datos/tabla_ordenes_servicio.dart';
+import '../../features/ventas/ordenes/esquema_datos/tabla_ordenes_tarea.dart';
+import '../../features/ventas/servicios/esquema_datos/tabla_servicio.dart';
 
 part 'app_db.g.dart';
 
 @DriftDatabase(
-  tables: [TablaCategoria, TablaUnidadesMedida, TablaProveedor, TablaProducto, TablaUsuario],
+  tables: [
+    TablaCategoria,
+    TablaUnidadesMedida,
+    TablaProveedor, 
+    TablaProducto,
+    TablaUsuario,
+    TablaCliente,
+    TablaMoto,
+    TablaEspecializacion,
+    TablaTecnico,
+    TablaServicio,
+    TablaOrdenesServicio,
+    TablaOrdenesTarea,
+    TablaOrdenesRepuesto,
+    TablaVentas,
+    TablaVentaDetalles,
+  ],
 )
 class AppDb extends _$AppDb {
-  AppDb() : super(_openConnection());
+  AppDb([QueryExecutor? e]) : super(e ?? _openConnection());
 
   @override
   int get schemaVersion => 1;

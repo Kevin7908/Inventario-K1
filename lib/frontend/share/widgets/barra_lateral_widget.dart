@@ -71,6 +71,21 @@ class BarraLateralWidget extends StatelessWidget {
                   Icons.straighten_outlined,
                   'Unidades Medida',
                 ),
+                _buildNavItem(
+                  NavSection.motos,
+                  Icons.motorcycle_outlined,
+                  'Motos',
+                ),
+                _buildNavItem(
+                  NavSection.especializaciones,
+                  Icons.build_outlined,
+                  'Especializaciones',
+                ),
+                _buildNavItem(
+                  NavSection.tecnicos,
+                  Icons.engineering_outlined,
+                  'Técnicos',
+                ),
               ],
             ),
           ),
