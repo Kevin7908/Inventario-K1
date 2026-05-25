@@ -1,19 +1,23 @@
 import 'package:equatable/equatable.dart';
 
 class OrdenTarea extends Equatable {
-  
+
   final int id;
   final int ordenId;
+  final int servicioId;
+  final int tecnicoId;
   final String servicioNombre;
   final String tecnicoNombre;
   final double precioPactado;
   final String? notas;
   final bool completado;
-  final DateTime? creadoEn;       
+  final DateTime? creadoEn;
 
   const OrdenTarea({
     required this.id,
     required this.ordenId,
+    required this.servicioId,
+    required this.tecnicoId,
     required this.servicioNombre,
     required this.tecnicoNombre,
     required this.precioPactado,
@@ -24,5 +28,5 @@ class OrdenTarea extends Equatable {
 
   @override
   List<Object?> get props =>
-      [id, ordenId, servicioNombre, tecnicoNombre, precioPactado, notas, completado];
+      [id, ordenId, servicioId, tecnicoId, servicioNombre, tecnicoNombre, precioPactado, notas, completado];
 }

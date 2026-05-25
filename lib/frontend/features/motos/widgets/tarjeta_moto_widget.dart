@@ -42,14 +42,14 @@ class _TarjetaMotoWidgetState extends State<TarjetaMotoWidget> {
             borderRadius: BorderRadius.circular(16),
             border: Border.all(
               color: _hovering
-                  ? ColoresApp.primary.withOpacity(0.55)
+                  ? ColoresApp.primary.withValues(alpha: 0.55)
                   : ColoresApp.border,
               width: _hovering ? 1.5 : 1.0,
             ),
             boxShadow: _hovering
                 ? [
                     BoxShadow(
-                      color: ColoresApp.primary.withOpacity(0.08),
+                      color: ColoresApp.primary.withValues(alpha: 0.08),
                       blurRadius: 14,
                       offset: const Offset(0, 4),
                     ),

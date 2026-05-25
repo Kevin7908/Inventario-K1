@@ -8,7 +8,6 @@ import '../../../../../backend/features/ventas/ordenes/modelo/orden_detalle.dart
 import '../../../../share/temas/colores_app.dart';
 import '../../../../share/widgets/input/app_searc_widget.dart';
 import '../../../../share/widgets/output/snack_bar_mensaje.dart';
-import '../../../clientes/provider/cliente_provider.dart';
 import '../../../motos/provider/motos_provider.dart';
 import '../../../motos/widgets/dialogo_motos.dart';
 import '../provider/ordenes_provider.dart';
@@ -123,9 +122,10 @@ class _DialogoCrearEditarOrdenState
 
   @override
   Widget build(BuildContext context) {
-    final todasLasMotos = ref.watch(motosProvider).motos
-        .where((m) => m.activo)
-        .toList(growable: false);
+    final todasLasMotos = ref.watch(motosProvider).value?.motos
+            .where((m) => m.activo)
+            .toList(growable: false) ??
+        const [];
 
     return Dialog(
       backgroundColor: ColoresApp.bgCard,
@@ -161,11 +161,7 @@ class _DialogoCrearEditarOrdenState
                           hint: 'Seleccionar moto...',
                           validator: (v) =>
                               v == null ? 'Selecciona una moto.' : null,
-                          onAgregar: () => DialogoMoto.mostrar(
-                            context,
-                            viewModel: ref.read(motosProvider),
-                            clientesVm: ref.read(clientesProvider),
-                          ),
+                          onAgregar: () => DialogoMoto.mostrar(context),
                         ),
                         const SizedBox(height: 16),
                         _label('Cliente (dueño de la moto)'),

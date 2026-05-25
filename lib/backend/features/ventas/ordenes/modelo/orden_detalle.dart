@@ -10,6 +10,7 @@ class OrdenDetalle extends Equatable {
     required this.numeroOrden,
     required this.motoDescripcion,
     required this.motoPlaca,
+    required this.clienteId,
     required this.clienteNombre,
     required this.kilometrajeEntrada,
     required this.diagnosticoCliente,
@@ -25,6 +26,7 @@ class OrdenDetalle extends Equatable {
   final String numeroOrden;
   final String motoDescripcion;
   final String motoPlaca;
+  final int clienteId;
   final String clienteNombre;
   final int kilometrajeEntrada;
   final String? diagnosticoCliente;
@@ -49,6 +51,7 @@ class OrdenDetalle extends Equatable {
         numeroOrden,
         motoDescripcion,
         motoPlaca,
+        clienteId,
         clienteNombre,
         kilometrajeEntrada,
         diagnosticoCliente,

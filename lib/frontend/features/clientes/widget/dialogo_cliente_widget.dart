@@ -1,46 +1,30 @@
 import 'package:flutter/material.dart';
-import 'package:provider/provider.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../../backend/features/clientes/modelo/cliente.dart';
 import '../../../share/temas/colores_app.dart';
 import '../../../share/widgets/output/snack_bar_mensaje.dart';
-import '../view_model/clientes_view_model.dart';
+import '../provider/cliente_provider.dart';
 
-class DialogoCliente extends StatefulWidget {
+class DialogoCliente extends ConsumerStatefulWidget {
+  const DialogoCliente({super.key, this.cliente});
   final Cliente? cliente;
-  final ClientesViewModel viewModel;
-
-  const DialogoCliente({
-    super.key,
-    this.cliente,
-    required this.viewModel,
-  });
 
   bool get esEdicion => cliente != null;
 
-  static Future<void> mostrar(
-    BuildContext context, {
-    required ClientesViewModel viewModel,
-    Cliente? cliente,
-  }) {
+  static Future<void> mostrar(BuildContext context, {Cliente? cliente}) {
     return showDialog(
       context: context,
       barrierDismissible: false,
-      builder: (_) => ChangeNotifierProvider<ClientesViewModel>.value(
-        value: viewModel,
-        child: DialogoCliente(
-          viewModel: viewModel,
-          cliente: cliente,
-        ),
-      ),
+      builder: (_) => DialogoCliente(cliente: cliente),
     );
   }
 
   @override
-  State<DialogoCliente> createState() => _DialogoClienteState();
+  ConsumerState<DialogoCliente> createState() => _DialogoClienteState();
 }
 
-class _DialogoClienteState extends State<DialogoCliente> {
+class _DialogoClienteState extends ConsumerState<DialogoCliente> {
   final _formKey = GlobalKey<FormState>();
 
   late final TextEditingController _nombresCtrl;
@@ -53,21 +37,22 @@ class _DialogoClienteState extends State<DialogoCliente> {
   late final TextEditingController _ciudadCtrl;
   late final TextEditingController _notasCtrl;
   late bool _activo;
+  bool _guardando = false;
 
   @override
   void initState() {
     super.initState();
     final c = widget.cliente;
-    _nombresCtrl        = TextEditingController(text: c?.nombres ?? '');
-    _apellidosCtrl      = TextEditingController(text: c?.apellidos ?? '');
-    _cedulaCtrl         = TextEditingController(text: c?.cedula ?? '');
+    _nombresCtrl         = TextEditingController(text: c?.nombres ?? '');
+    _apellidosCtrl       = TextEditingController(text: c?.apellidos ?? '');
+    _cedulaCtrl          = TextEditingController(text: c?.cedula ?? '');
     _fechaNacimientoCtrl = TextEditingController(text: c?.fechaNacimiento ?? '');
-    _telefonoCtrl       = TextEditingController(text: c?.telefono ?? '');
-    _emailCtrl          = TextEditingController(text: c?.email ?? '');
-    _direccionCtrl      = TextEditingController(text: c?.direccion ?? '');
-    _ciudadCtrl         = TextEditingController(text: c?.ciudad ?? '');
-    _notasCtrl          = TextEditingController(text: c?.notas ?? '');
-    _activo             = c?.activo ?? true;
+    _telefonoCtrl        = TextEditingController(text: c?.telefono ?? '');
+    _emailCtrl           = TextEditingController(text: c?.email ?? '');
+    _direccionCtrl       = TextEditingController(text: c?.direccion ?? '');
+    _ciudadCtrl          = TextEditingController(text: c?.ciudad ?? '');
+    _notasCtrl           = TextEditingController(text: c?.notas ?? '');
+    _activo              = c?.activo ?? true;
   }
 
   @override
@@ -86,26 +71,38 @@ class _DialogoClienteState extends State<DialogoCliente> {
 
   Future<void> _guardar() async {
     if (!_formKey.currentState!.validate()) return;
-
-    final vm = context.read<ClientesViewModel>();
+    setState(() => _guardando = true);
 
     final cliente = Cliente(
       id: widget.cliente?.id ?? 0,
       nombres: _nombresCtrl.text.trim(),
-      apellidos: _apellidosCtrl.text.trim().isEmpty ? null : _apellidosCtrl.text.trim(),
-      cedula: _cedulaCtrl.text.trim().isEmpty ? null : _cedulaCtrl.text.trim(),
-      fechaNacimiento: _fechaNacimientoCtrl.text.trim().isEmpty ? null : _fechaNacimientoCtrl.text.trim(),
-      telefono: _telefonoCtrl.text.trim().isEmpty ? null : _telefonoCtrl.text.trim(),
-      email: _emailCtrl.text.trim().isEmpty ? null : _emailCtrl.text.trim(),
-      direccion: _direccionCtrl.text.trim().isEmpty ? null : _direccionCtrl.text.trim(),
-      ciudad: _ciudadCtrl.text.trim().isEmpty ? null : _ciudadCtrl.text.trim(),
-      notas: _notasCtrl.text.trim().isEmpty ? null : _notasCtrl.text.trim(),
+      apellidos: _apellidosCtrl.text.trim().isEmpty
+          ? null
+          : _apellidosCtrl.text.trim(),
+      cedula:
+          _cedulaCtrl.text.trim().isEmpty ? null : _cedulaCtrl.text.trim(),
+      fechaNacimiento: _fechaNacimientoCtrl.text.trim().isEmpty
+          ? null
+          : _fechaNacimientoCtrl.text.trim(),
+      telefono: _telefonoCtrl.text.trim().isEmpty
+          ? null
+          : _telefonoCtrl.text.trim(),
+      email:
+          _emailCtrl.text.trim().isEmpty ? null : _emailCtrl.text.trim(),
+      direccion: _direccionCtrl.text.trim().isEmpty
+          ? null
+          : _direccionCtrl.text.trim(),
+      ciudad:
+          _ciudadCtrl.text.trim().isEmpty ? null : _ciudadCtrl.text.trim(),
+      notas:
+          _notasCtrl.text.trim().isEmpty ? null : _notasCtrl.text.trim(),
       activo: _activo,
     );
 
+    final notifier = ref.read(clientesProvider.notifier);
     final String? error = widget.esEdicion
-        ? await vm.actualizar(cliente)
-        : await vm.crear(cliente);
+        ? await notifier.actualizar(cliente)
+        : await notifier.crear(cliente);
 
     if (!mounted) return;
 
@@ -119,6 +116,7 @@ class _DialogoClienteState extends State<DialogoCliente> {
       );
     } else {
       SnackBarMensaje.error(context, error);
+      setState(() => _guardando = false);
     }
   }
 
@@ -135,7 +133,6 @@ class _DialogoClienteState extends State<DialogoCliente> {
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            // ── Encabezado ────────────────────────────────────────────────
             Padding(
               padding: const EdgeInsets.fromLTRB(28, 28, 28, 0),
               child: Row(
@@ -150,7 +147,8 @@ class _DialogoClienteState extends State<DialogoCliente> {
                     ),
                   ),
                   IconButton(
-                    onPressed: () => Navigator.of(context).pop(),
+                    onPressed:
+                        _guardando ? null : () => Navigator.of(context).pop(),
                     icon: const Icon(Icons.close, color: ColoresApp.textMedium),
                     style: IconButton.styleFrom(
                       backgroundColor: ColoresApp.bgContent,
@@ -162,8 +160,6 @@ class _DialogoClienteState extends State<DialogoCliente> {
                 ],
               ),
             ),
-
-            // ── Formulario scrollable ─────────────────────────────────────
             Flexible(
               child: SingleChildScrollView(
                 padding: const EdgeInsets.all(28),
@@ -172,7 +168,6 @@ class _DialogoClienteState extends State<DialogoCliente> {
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      // Nombres (obligatorio)
                       _etiqueta('Nombres *'),
                       const SizedBox(height: 6),
                       TextFormField(
@@ -182,15 +177,11 @@ class _DialogoClienteState extends State<DialogoCliente> {
                           if (v == null || v.trim().isEmpty) {
                             return 'El nombre es requerido';
                           }
-                          if (v.trim().length < 2) {
-                            return 'Mínimo 2 caracteres';
-                          }
+                          if (v.trim().length < 2) return 'Mínimo 2 caracteres';
                           return null;
                         },
                       ),
                       const SizedBox(height: 14),
-
-                      // Apellidos
                       _etiqueta('Apellidos'),
                       const SizedBox(height: 6),
                       TextFormField(
@@ -198,8 +189,6 @@ class _DialogoClienteState extends State<DialogoCliente> {
                         decoration: _inputDeco('Ej: Ramírez Gómez'),
                       ),
                       const SizedBox(height: 14),
-
-                      // Cédula + Fecha nacimiento (en fila)
                       Row(
                         children: [
                           Expanded(
@@ -234,8 +223,6 @@ class _DialogoClienteState extends State<DialogoCliente> {
                         ],
                       ),
                       const SizedBox(height: 14),
-
-                      // Teléfono + Email (en fila)
                       Row(
                         children: [
                           Expanded(
@@ -261,7 +248,8 @@ class _DialogoClienteState extends State<DialogoCliente> {
                                 const SizedBox(height: 6),
                                 TextFormField(
                                   controller: _emailCtrl,
-                                  decoration: _inputDeco('Ej: cliente@email.com'),
+                                  decoration:
+                                      _inputDeco('Ej: cliente@email.com'),
                                   keyboardType: TextInputType.emailAddress,
                                 ),
                               ],
@@ -270,8 +258,6 @@ class _DialogoClienteState extends State<DialogoCliente> {
                         ],
                       ),
                       const SizedBox(height: 14),
-
-                      // Dirección + Ciudad (en fila)
                       Row(
                         children: [
                           Expanded(
@@ -304,8 +290,6 @@ class _DialogoClienteState extends State<DialogoCliente> {
                         ],
                       ),
                       const SizedBox(height: 14),
-
-                      // Notas
                       _etiqueta('Notas (opcional)'),
                       const SizedBox(height: 6),
                       TextFormField(
@@ -316,8 +300,6 @@ class _DialogoClienteState extends State<DialogoCliente> {
                         ),
                       ),
                       const SizedBox(height: 16),
-
-                      // Estado activo
                       Row(
                         children: [
                           _etiqueta('Estado'),
@@ -345,15 +327,15 @@ class _DialogoClienteState extends State<DialogoCliente> {
                 ),
               ),
             ),
-
-            // ── Botones fijos en la parte inferior ───────────────────────
             Padding(
               padding: const EdgeInsets.fromLTRB(28, 0, 28, 28),
               child: Row(
                 children: [
                   Expanded(
                     child: OutlinedButton(
-                      onPressed: () => Navigator.of(context).pop(),
+                      onPressed: _guardando
+                          ? null
+                          : () => Navigator.of(context).pop(),
                       style: OutlinedButton.styleFrom(
                         foregroundColor: ColoresApp.textMedium,
                         side: const BorderSide(color: ColoresApp.border),
@@ -367,33 +349,31 @@ class _DialogoClienteState extends State<DialogoCliente> {
                   ),
                   const SizedBox(width: 12),
                   Expanded(
-                    child: Consumer<ClientesViewModel>(
-                      builder: (_, vm, _) => ElevatedButton(
-                        onPressed: vm.procesando ? null : _guardar,
-                        style: ElevatedButton.styleFrom(
-                          backgroundColor: ColoresApp.primary,
-                          foregroundColor: Colors.white,
-                          padding: const EdgeInsets.symmetric(vertical: 13),
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(10),
-                          ),
-                          elevation: 0,
+                    child: ElevatedButton(
+                      onPressed: _guardando ? null : _guardar,
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: ColoresApp.primary,
+                        foregroundColor: Colors.white,
+                        padding: const EdgeInsets.symmetric(vertical: 13),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(10),
                         ),
-                        child: vm.procesando
-                            ? const SizedBox(
-                                width: 18,
-                                height: 18,
-                                child: CircularProgressIndicator(
-                                  strokeWidth: 2,
-                                  color: Colors.white,
-                                ),
-                              )
-                            : Text(
-                                widget.esEdicion
-                                    ? 'Guardar cambios'
-                                    : 'Crear cliente',
-                              ),
+                        elevation: 0,
                       ),
+                      child: _guardando
+                          ? const SizedBox(
+                              width: 18,
+                              height: 18,
+                              child: CircularProgressIndicator(
+                                strokeWidth: 2,
+                                color: Colors.white,
+                              ),
+                            )
+                          : Text(
+                              widget.esEdicion
+                                  ? 'Guardar cambios'
+                                  : 'Crear cliente',
+                            ),
                     ),
                   ),
                 ],
@@ -405,40 +385,38 @@ class _DialogoClienteState extends State<DialogoCliente> {
     );
   }
 
-  Widget _etiqueta(String texto) {
-    return Text(
-      texto,
-      style: const TextStyle(
-        color: ColoresApp.textDark,
-        fontSize: 13,
-        fontWeight: FontWeight.w600,
-      ),
-    );
-  }
+  Widget _etiqueta(String texto) => Text(
+        texto,
+        style: const TextStyle(
+          color: ColoresApp.textDark,
+          fontSize: 13,
+          fontWeight: FontWeight.w600,
+        ),
+      );
 
-  InputDecoration _inputDeco(String hint) {
-    return InputDecoration(
-      hintText: hint,
-      hintStyle: const TextStyle(color: ColoresApp.textLight, fontSize: 13.5),
-      filled: true,
-      fillColor: ColoresApp.bgContent,
-      contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
-      border: OutlineInputBorder(
-        borderRadius: BorderRadius.circular(10),
-        borderSide: const BorderSide(color: ColoresApp.border),
-      ),
-      enabledBorder: OutlineInputBorder(
-        borderRadius: BorderRadius.circular(10),
-        borderSide: const BorderSide(color: ColoresApp.border),
-      ),
-      focusedBorder: OutlineInputBorder(
-        borderRadius: BorderRadius.circular(10),
-        borderSide: const BorderSide(color: ColoresApp.primary, width: 1.5),
-      ),
-      errorBorder: OutlineInputBorder(
-        borderRadius: BorderRadius.circular(10),
-        borderSide: const BorderSide(color: ColoresApp.statusDebt),
-      ),
-    );
-  }
+  InputDecoration _inputDeco(String hint) => InputDecoration(
+        hintText: hint,
+        hintStyle:
+            const TextStyle(color: ColoresApp.textLight, fontSize: 13.5),
+        filled: true,
+        fillColor: ColoresApp.bgContent,
+        contentPadding:
+            const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+        border: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(10),
+          borderSide: const BorderSide(color: ColoresApp.border),
+        ),
+        enabledBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(10),
+          borderSide: const BorderSide(color: ColoresApp.border),
+        ),
+        focusedBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(10),
+          borderSide: const BorderSide(color: ColoresApp.primary, width: 1.5),
+        ),
+        errorBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(10),
+          borderSide: const BorderSide(color: ColoresApp.statusDebt),
+        ),
+      );
 }

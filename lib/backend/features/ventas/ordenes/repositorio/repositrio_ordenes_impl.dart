@@ -96,7 +96,7 @@ class RepositorioOrdenesImpl implements RepositorioOrdenes {
     final repuestosRows = await _db
         .customSelect(
           '''
-      SELECT orp.*, p.nombre AS producto_nombre
+      SELECT orp.*, p.nombre AS producto_nombre, p.precio_compra
       FROM ordenes_repuestos orp
       JOIN productos p ON p.id = orp.producto_id
       WHERE orp.orden_id = ?

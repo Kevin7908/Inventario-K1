@@ -13,6 +13,8 @@ import '../../features/productos/esquema_datos/tabla_producto.dart';
 import '../../features/tecnicos/esquema_datos/tabla_tecnico.dart';
 import '../../features/unidades_medida/esquema_datos/tabla_unidades_medida.dart';
 import '../../features/proveedores/esquema_datos/tabla_proveedor.dart';
+import '../../features/ventas/facturas/esquema_datos/tabla_venta_detalles.dart';
+import '../../features/ventas/facturas/esquema_datos/tabla_ventas.dart';
 import '../../features/ventas/ordenes/esquema_datos/tabla_ordenes_repuesto.dart';
 import '../../features/ventas/ordenes/esquema_datos/tabla_ordenes_servicio.dart';
 import '../../features/ventas/ordenes/esquema_datos/tabla_ordenes_tarea.dart';
@@ -22,9 +24,10 @@ part 'app_db.g.dart';
 
 @DriftDatabase(
   tables: [
-    TablaCategoria, 
-    TablaUnidadesMedida, 
-    TablaProveedor, TablaProducto, 
+    TablaCategoria,
+    TablaUnidadesMedida,
+    TablaProveedor, 
+    TablaProducto,
     TablaUsuario,
     TablaCliente,
     TablaMoto,
@@ -34,7 +37,9 @@ part 'app_db.g.dart';
     TablaOrdenesServicio,
     TablaOrdenesTarea,
     TablaOrdenesRepuesto,
-    ],
+    TablaVentas,
+    TablaVentaDetalles,
+  ],
 )
 class AppDb extends _$AppDb {
   AppDb([QueryExecutor? e]) : super(e ?? _openConnection());

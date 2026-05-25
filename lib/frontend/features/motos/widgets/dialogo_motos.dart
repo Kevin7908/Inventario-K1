@@ -1,58 +1,38 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
-import 'package:provider/provider.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../../backend/features/clientes/modelo/cliente.dart';
 import '../../../../backend/features/motos/modelo/moto.dart';
 import '../../../share/temas/colores_app.dart';
 import '../../../share/widgets/input/app_searc_widget.dart';
 import '../../../share/widgets/output/snack_bar_mensaje.dart';
-import '../../clientes/view_model/clientes_view_model.dart';
+import '../../clientes/provider/cliente_provider.dart';
 import '../../clientes/widget/dialogo_cliente_widget.dart';
-import '../view_model/motos_view_model.dart';
+import '../provider/motos_provider.dart';
 
-class DialogoMoto extends StatefulWidget {
+class DialogoMoto extends ConsumerStatefulWidget {
+  const DialogoMoto({super.key, this.moto});
   final Moto? moto;
-  final MotosViewModel viewModel;
-
-  const DialogoMoto({super.key, this.moto, required this.viewModel});
 
   bool get esEdicion => moto != null;
 
-  static Future<void> mostrar(
-    BuildContext context, {
-    required MotosViewModel viewModel,
-    required ClientesViewModel clientesVm, // <-- Recibir el VM de clientes
-    Moto? moto,
-  }) {
+  static Future<void> mostrar(BuildContext context, {Moto? moto}) {
     return showDialog(
       context: context,
       barrierDismissible: false,
-      builder: (_) => MultiProvider(
-        providers: [
-          ChangeNotifierProvider<MotosViewModel>.value(value: viewModel),
-          ChangeNotifierProvider<ClientesViewModel>.value(value: clientesVm),
-        ],
-        child: DialogoMoto(
-          viewModel: viewModel,
-          moto: moto,
-          // Eliminamos la lista 'clientes' del constructor
-        ),
-      ),
+      builder: (_) => DialogoMoto(moto: moto),
     );
   }
 
   @override
-  State<DialogoMoto> createState() => _DialogoMotoState();
+  ConsumerState<DialogoMoto> createState() => _DialogoMotoState();
 }
 
-class _DialogoMotoState extends State<DialogoMoto> {
+class _DialogoMotoState extends ConsumerState<DialogoMoto> {
   final _formKey = GlobalKey<FormState>();
-
-  // Notifier para AppSearch
   late final ValueNotifier<Cliente?> _clienteNotifier;
 
-  // Controladores de texto
   late final TextEditingController _placaCtrl;
   late final TextEditingController _marcaCtrl;
   late final TextEditingController _modeloCtrl;
@@ -64,21 +44,20 @@ class _DialogoMotoState extends State<DialogoMoto> {
   late final TextEditingController _kilometrajeCtrl;
   late final TextEditingController _notasCtrl;
   late bool _activo;
+  bool _guardando = false;
 
   @override
   void initState() {
     super.initState();
     final m = widget.moto;
 
-    // Obtenemos el cliente inicial buscando en el ViewModel
-    final clientesActuales = context.read<ClientesViewModel>().clientes;
-
+    final clientesActuales =
+        ref.read(clientesProvider).value?.clientes ?? [];
     final clienteInicial = m != null
         ? clientesActuales.where((c) => c.id == m.clienteId).firstOrNull
         : null;
 
     _clienteNotifier = ValueNotifier<Cliente?>(clienteInicial);
-
     _placaCtrl = TextEditingController(text: m?.placa ?? '');
     _marcaCtrl = TextEditingController(text: m?.marca ?? '');
     _modeloCtrl = TextEditingController(text: m?.modelo ?? '');
@@ -118,8 +97,11 @@ class _DialogoMotoState extends State<DialogoMoto> {
 
   Future<void> _guardar() async {
     if (!_formKey.currentState!.validate()) return;
-
-    final vm = context.read<MotosViewModel>();
+    if (_clienteNotifier.value == null) {
+      SnackBarMensaje.error(context, 'Selecciona un cliente.');
+      return;
+    }
+    setState(() => _guardando = true);
 
     final moto = Moto(
       id: widget.moto?.id ?? 0,
@@ -145,9 +127,10 @@ class _DialogoMotoState extends State<DialogoMoto> {
       actualizadoEn: DateTime.now(),
     );
 
+    final notifier = ref.read(motosProvider.notifier);
     final String? error = widget.esEdicion
-        ? await vm.actualizar(moto)
-        : await vm.crear(moto);
+        ? await notifier.actualizar(moto)
+        : await notifier.crear(moto);
 
     if (!mounted) return;
 
@@ -161,11 +144,15 @@ class _DialogoMotoState extends State<DialogoMoto> {
       );
     } else {
       SnackBarMensaje.error(context, error);
+      setState(() => _guardando = false);
     }
   }
 
   @override
   Widget build(BuildContext context) {
+    final clientes =
+        ref.watch(clientesProvider).value?.clientes ?? const [];
+
     return Dialog(
       backgroundColor: ColoresApp.bgCard,
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
@@ -177,7 +164,6 @@ class _DialogoMotoState extends State<DialogoMoto> {
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            // Encabezado
             Padding(
               padding: const EdgeInsets.fromLTRB(28, 28, 28, 0),
               child: Row(
@@ -192,8 +178,11 @@ class _DialogoMotoState extends State<DialogoMoto> {
                     ),
                   ),
                   IconButton(
-                    onPressed: () => Navigator.of(context).pop(),
-                    icon: const Icon(Icons.close, color: ColoresApp.textMedium),
+                    onPressed: _guardando
+                        ? null
+                        : () => Navigator.of(context).pop(),
+                    icon:
+                        const Icon(Icons.close, color: ColoresApp.textMedium),
                     style: IconButton.styleFrom(
                       backgroundColor: ColoresApp.bgContent,
                       shape: RoundedRectangleBorder(
@@ -204,8 +193,6 @@ class _DialogoMotoState extends State<DialogoMoto> {
                 ],
               ),
             ),
-
-            // Formulario scrollable
             Flexible(
               child: SingleChildScrollView(
                 padding: const EdgeInsets.all(28),
@@ -214,33 +201,18 @@ class _DialogoMotoState extends State<DialogoMoto> {
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      // Cliente (AppSearch)
                       _etiqueta('Cliente *'),
                       const SizedBox(height: 6),
-                      Selector<ClientesViewModel, List<Cliente>>(
-                        // Solo se reconstruye si la lista de clientes cambia
-                        selector: (_, vm) => vm.clientes,
-                        builder: (context, listaClientes, _) {
-                          // Obtenemos el VM de clientes para poder usarlo en el onAgregar
-                          final cvm = context.read<ClientesViewModel>();
-
-                          return AppSearch<Cliente>(
-                            notifier: _clienteNotifier,
-                            items: listaClientes, // Lista fresca del ViewModel
-                            labelBuilder: (c) => c.nombreCompleto,
-                            hint: 'Seleccionar cliente',
-                            validator: (v) =>
-                                v == null ? 'Selecciona un cliente' : null,
-
-                            // Agregar nuevo cliente desde aquí
-                            onAgregar: () =>
-                                DialogoCliente.mostrar(context, viewModel: cvm),
-                          );
-                        },
+                      AppSearch<Cliente>(
+                        notifier: _clienteNotifier,
+                        items: clientes,
+                        labelBuilder: (c) => c.nombreCompleto,
+                        hint: 'Seleccionar cliente',
+                        validator: (v) =>
+                            v == null ? 'Selecciona un cliente' : null,
+                        onAgregar: () => DialogoCliente.mostrar(context),
                       ),
                       const SizedBox(height: 14),
-
-                      // Marca + Modelo
                       Row(
                         children: [
                           Expanded(
@@ -252,13 +224,12 @@ class _DialogoMotoState extends State<DialogoMoto> {
                                 TextFormField(
                                   controller: _marcaCtrl,
                                   decoration: _inputDeco('Ej: Honda'),
-                                  textCapitalization: TextCapitalization.words,
-                                  validator: (v) {
-                                    if (v == null || v.trim().isEmpty) {
-                                      return 'La marca es requerida';
-                                    }
-                                    return null;
-                                  },
+                                  textCapitalization:
+                                      TextCapitalization.words,
+                                  validator: (v) =>
+                                      v == null || v.trim().isEmpty
+                                          ? 'La marca es requerida'
+                                          : null,
                                 ),
                               ],
                             ),
@@ -275,12 +246,10 @@ class _DialogoMotoState extends State<DialogoMoto> {
                                   decoration: _inputDeco('Ej: CB 190R'),
                                   textCapitalization:
                                       TextCapitalization.characters,
-                                  validator: (v) {
-                                    if (v == null || v.trim().isEmpty) {
-                                      return 'El modelo es requerido';
-                                    }
-                                    return null;
-                                  },
+                                  validator: (v) =>
+                                      v == null || v.trim().isEmpty
+                                          ? 'El modelo es requerido'
+                                          : null,
                                 ),
                               ],
                             ),
@@ -288,8 +257,6 @@ class _DialogoMotoState extends State<DialogoMoto> {
                         ],
                       ),
                       const SizedBox(height: 14),
-
-                      // Placa
                       _etiqueta('Placa'),
                       const SizedBox(height: 6),
                       TextFormField(
@@ -298,14 +265,11 @@ class _DialogoMotoState extends State<DialogoMoto> {
                         textCapitalization: TextCapitalization.characters,
                         inputFormatters: [
                           FilteringTextInputFormatter.allow(
-                            RegExp(r'[a-zA-Z0-9]'),
-                          ),
+                              RegExp(r'[a-zA-Z0-9]')),
                           LengthLimitingTextInputFormatter(7),
                         ],
                       ),
                       const SizedBox(height: 14),
-
-                      //  Año + Cilindraje
                       Row(
                         children: [
                           Expanded(
@@ -359,8 +323,6 @@ class _DialogoMotoState extends State<DialogoMoto> {
                         ],
                       ),
                       const SizedBox(height: 14),
-
-                      //  Color + Km iniciales
                       Row(
                         children: [
                           Expanded(
@@ -399,8 +361,6 @@ class _DialogoMotoState extends State<DialogoMoto> {
                         ],
                       ),
                       const SizedBox(height: 14),
-
-                      //  VIN / Chasis
                       _etiqueta('VIN / Nº Chasis'),
                       const SizedBox(height: 6),
                       TextFormField(
@@ -409,8 +369,6 @@ class _DialogoMotoState extends State<DialogoMoto> {
                         textCapitalization: TextCapitalization.characters,
                       ),
                       const SizedBox(height: 14),
-
-                      // Número de motor
                       _etiqueta('Número de motor'),
                       const SizedBox(height: 6),
                       TextFormField(
@@ -419,8 +377,6 @@ class _DialogoMotoState extends State<DialogoMoto> {
                         textCapitalization: TextCapitalization.characters,
                       ),
                       const SizedBox(height: 14),
-
-                      //  Notas
                       _etiqueta('Notas (opcional)'),
                       const SizedBox(height: 6),
                       TextFormField(
@@ -431,8 +387,6 @@ class _DialogoMotoState extends State<DialogoMoto> {
                         ),
                       ),
                       const SizedBox(height: 16),
-
-                      // Estado activo
                       Row(
                         children: [
                           _etiqueta('Estado'),
@@ -460,15 +414,15 @@ class _DialogoMotoState extends State<DialogoMoto> {
                 ),
               ),
             ),
-
-            // Botones fijos
             Padding(
               padding: const EdgeInsets.fromLTRB(28, 0, 28, 28),
               child: Row(
                 children: [
                   Expanded(
                     child: OutlinedButton(
-                      onPressed: () => Navigator.of(context).pop(),
+                      onPressed: _guardando
+                          ? null
+                          : () => Navigator.of(context).pop(),
                       style: OutlinedButton.styleFrom(
                         foregroundColor: ColoresApp.textMedium,
                         side: const BorderSide(color: ColoresApp.border),
@@ -482,33 +436,31 @@ class _DialogoMotoState extends State<DialogoMoto> {
                   ),
                   const SizedBox(width: 12),
                   Expanded(
-                    child: Consumer<MotosViewModel>(
-                      builder: (_, vm, _) => ElevatedButton(
-                        onPressed: vm.procesando ? null : _guardar,
-                        style: ElevatedButton.styleFrom(
-                          backgroundColor: ColoresApp.primary,
-                          foregroundColor: Colors.white,
-                          padding: const EdgeInsets.symmetric(vertical: 13),
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(10),
-                          ),
-                          elevation: 0,
+                    child: ElevatedButton(
+                      onPressed: _guardando ? null : _guardar,
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: ColoresApp.primary,
+                        foregroundColor: Colors.white,
+                        padding: const EdgeInsets.symmetric(vertical: 13),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(10),
                         ),
-                        child: vm.procesando
-                            ? const SizedBox(
-                                width: 18,
-                                height: 18,
-                                child: CircularProgressIndicator(
-                                  strokeWidth: 2,
-                                  color: Colors.white,
-                                ),
-                              )
-                            : Text(
-                                widget.esEdicion
-                                    ? 'Guardar cambios'
-                                    : 'Registrar moto',
-                              ),
+                        elevation: 0,
                       ),
+                      child: _guardando
+                          ? const SizedBox(
+                              width: 18,
+                              height: 18,
+                              child: CircularProgressIndicator(
+                                strokeWidth: 2,
+                                color: Colors.white,
+                              ),
+                            )
+                          : Text(
+                              widget.esEdicion
+                                  ? 'Guardar cambios'
+                                  : 'Registrar moto',
+                            ),
                     ),
                   ),
                 ],
@@ -521,35 +473,37 @@ class _DialogoMotoState extends State<DialogoMoto> {
   }
 
   Widget _etiqueta(String texto) => Text(
-    texto,
-    style: const TextStyle(
-      color: ColoresApp.textDark,
-      fontSize: 13,
-      fontWeight: FontWeight.w600,
-    ),
-  );
+        texto,
+        style: const TextStyle(
+          color: ColoresApp.textDark,
+          fontSize: 13,
+          fontWeight: FontWeight.w600,
+        ),
+      );
 
   InputDecoration _inputDeco(String hint) => InputDecoration(
-    hintText: hint,
-    hintStyle: const TextStyle(color: ColoresApp.textLight, fontSize: 13.5),
-    filled: true,
-    fillColor: ColoresApp.bgContent,
-    contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
-    border: OutlineInputBorder(
-      borderRadius: BorderRadius.circular(10),
-      borderSide: const BorderSide(color: ColoresApp.border),
-    ),
-    enabledBorder: OutlineInputBorder(
-      borderRadius: BorderRadius.circular(10),
-      borderSide: const BorderSide(color: ColoresApp.border),
-    ),
-    focusedBorder: OutlineInputBorder(
-      borderRadius: BorderRadius.circular(10),
-      borderSide: const BorderSide(color: ColoresApp.primary, width: 1.5),
-    ),
-    errorBorder: OutlineInputBorder(
-      borderRadius: BorderRadius.circular(10),
-      borderSide: const BorderSide(color: ColoresApp.statusDebt),
-    ),
-  );
+        hintText: hint,
+        hintStyle:
+            const TextStyle(color: ColoresApp.textLight, fontSize: 13.5),
+        filled: true,
+        fillColor: ColoresApp.bgContent,
+        contentPadding:
+            const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+        border: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(10),
+          borderSide: const BorderSide(color: ColoresApp.border),
+        ),
+        enabledBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(10),
+          borderSide: const BorderSide(color: ColoresApp.border),
+        ),
+        focusedBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(10),
+          borderSide: const BorderSide(color: ColoresApp.primary, width: 1.5),
+        ),
+        errorBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(10),
+          borderSide: const BorderSide(color: ColoresApp.statusDebt),
+        ),
+      );
 }

@@ -47,6 +47,7 @@ abstract final class OrdenMapper {
           '${ordenRow['marca'] ?? ''} ${ordenRow['modelo'] ?? ''} ${ordenRow['anio'] ?? ''}'
               .trim(),
       motoPlaca: ordenRow['placa'] as String? ?? 'SIN PLACA',
+      clienteId: ordenRow['cliente_id'] as int? ?? 0,
       clienteNombre: ordenRow['cliente_nombre'] as String? ?? 'Sin Cliente',
       kilometrajeEntrada: ordenRow['kilometraje_entrada'] as int? ?? 0,
       diagnosticoCliente: ordenRow['diagnostico'] as String?,
@@ -137,6 +138,8 @@ abstract final class OrdenMapper {
     return OrdenTarea(
       id: row['id'] as int,
       ordenId: row['orden_id'] as int,
+      servicioId: row['servicio_id'] as int? ?? 0,
+      tecnicoId: row['tecnico_id'] as int? ?? 0,
       servicioNombre:
           row['servicio_nombre'] as String? ?? 'Servicio desconocido',
       tecnicoNombre: row['tecnico_nombre'] as String? ?? 'Sin asignar',
@@ -151,10 +154,12 @@ abstract final class OrdenMapper {
       OrdenRepuesto(
         id: row['id'] as int,
         ordenId: row['orden_id'] as int,
+        productoId: row['producto_id'] as int? ?? 0,
         productoNombre:
             row['producto_nombre'] as String? ?? 'Producto desconocido',
         cantidad: (row['cantidad'] as num? ?? 0.0).toDouble(),
         precioUnitario: (row['precio_unitario'] as num? ?? 0.0).toDouble(),
+        costoUnitario: (row['precio_compra'] as num? ?? 0.0).toDouble(),
         creadoEn: _parseFecha(row['creado_en']),
       );
 

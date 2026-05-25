@@ -4,17 +4,11 @@ import 'package:inventario_k1/backend/share/database/app_db.dart';
 import '../../../frontend/features/autenticacion/view_model/auth_view_model.dart';
 import '../../../frontend/features/autenticacion/view_model/registro_view_model.dart';
 import '../../../frontend/features/categorias/view_model/categorias_view_model.dart';
-import '../../../frontend/features/clientes/view_model/clientes_view_model.dart';
-import '../../../frontend/features/motos/view_model/motos_view_model.dart';
 import '../../../frontend/features/proveedores/view_model/proveedores_view_model.dart';
 import '../../../frontend/features/unidades_medida/view_model/unidad_medida_view_model.dart';
 import '../../features/autenticacion/repositorio/repositorio_auth.dart';
-import '../../features/autenticacion/repositorio/repositorio_auth_impl.dart'; // ← FALTABA
+import '../../features/autenticacion/repositorio/repositorio_auth_impl.dart';
 import '../../features/categorias/repositorio/repositorio_categorias_impl.dart';
-import '../../features/clientes/repositorio/repositorio_cliente.dart';
-import '../../features/clientes/repositorio/repositorio_cliente_impl.dart';
-import '../../features/motos/repositorio/repositorio_moto_impl.dart';
-import '../../features/motos/repositorio/repositorio_motos.dart';
 import '../../features/productos/repositorio/repositorio_producto_impl.dart';
 import '../../features/proveedores/repositorio/repositorio_proveedor_impl.dart';
 import '../../features/unidades_medida/repositorio/repositorio_unidades_medida_impl.dart';
@@ -55,13 +49,6 @@ void setupLocator() {
   locator.registerLazySingleton<RepositorioProductosImpl>(
     () => RepositorioProductosImpl(locator<AppDb>()),
   );
-  locator.registerLazySingleton<RepositorioClientes>(
-    () => RepositorioClientesImpl(locator<AppDb>()),
-  );
-  locator.registerLazySingleton<RepositorioMotos>(
-    () => RepositorioMotosImpl(locator<AppDb>()),
-  );
-
   // ViewModels de Auth (dependen de Repositorios + Servicios)
   locator.registerLazySingleton<AuthViewModel>(
     () => AuthViewModel(locator<RepositorioAuth>(), locator<ServicioEmail>()),
@@ -83,11 +70,5 @@ void setupLocator() {
   );
   locator.registerLazySingleton<ProveedoresViewModel>(
     () => ProveedoresViewModel(locator<RepositorioProveedoresImpl>()),
-  );
-  locator.registerLazySingleton<ClientesViewModel>(
-    () => ClientesViewModel(locator<RepositorioClientes>()),
-  );
-  locator.registerLazySingleton<MotosViewModel>(
-    () => MotosViewModel(locator<RepositorioMotos>()),
   );
 }

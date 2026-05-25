@@ -3,7 +3,9 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:inventario_k1/frontend/features/ventas/ordenes/vista/ordenes_vista.dart';
 
 import '../../../../share/temas/colores_app.dart';
+import '../../facturas/vista/facturas_vista.dart';
 import '../../servicios/vista/servicio_vista.dart';
+import '../../venta_rapida/vista/venta_rapida_vista.dart';
 
 class VentasVista extends ConsumerStatefulWidget {
   const VentasVista({super.key});
@@ -19,13 +21,14 @@ class _VentasVistaState extends ConsumerState<VentasVista>
   static const _tabs = [
     _TabDef(label: 'Ordenes', icono: Icons.receipt_long_outlined),
     _TabDef(label: 'Servicios', icono: Icons.home_repair_service_outlined),
-    _TabDef(label: 'Facturacion', icono: Icons.request_quote_outlined),
+    _TabDef(label: 'Facturación', icono: Icons.request_quote_outlined),
+    _TabDef(label: 'Venta Rápida', icono: Icons.point_of_sale_outlined),
   ];
 
   @override
   void initState() {
     super.initState();
-    _tabController = TabController(length: _tabs.length, vsync: this);
+    _tabController = TabController(length: _tabs.length, vsync: this); // 4 tabs
     // Escuchamos el cambio de índice para actualizar el color de los botones
     _tabController.addListener(() {
       if (!_tabController.indexIsChanging) setState(() {});
@@ -138,7 +141,8 @@ class _VentasVistaState extends ConsumerState<VentasVista>
               children: const [
                 OrdenesVista(),
                 ServiciosVista(),
-                _PlaceholderTab(label: 'Facturacion'),
+                FacturasVista(),
+                VentaRapidaVista(),
               ],
             ),
           ),
@@ -154,38 +158,3 @@ class _TabDef {
   const _TabDef({required this.label, required this.icono});
 }
 
-// Placeholder hasta que existan las otras vistas
-class _PlaceholderTab extends StatelessWidget {
-  final String label;
-  const _PlaceholderTab({required this.label});
-
-  @override
-  Widget build(BuildContext context) {
-    return Center(
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          const Icon(
-            Icons.construction_outlined,
-            size: 40,
-            color: ColoresApp.textLight,
-          ),
-          const SizedBox(height: 12),
-          Text(
-            label,
-            style: const TextStyle(
-              color: ColoresApp.textMedium,
-              fontSize: 15,
-              fontWeight: FontWeight.w600,
-            ),
-          ),
-          const SizedBox(height: 4),
-          const Text(
-            'Proximamente',
-            style: TextStyle(color: ColoresApp.textLight, fontSize: 12),
-          ),
-        ],
-      ),
-    );
-  }
-}
