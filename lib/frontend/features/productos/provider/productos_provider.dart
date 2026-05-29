@@ -7,18 +7,18 @@ import '../../../../backend/features/productos/repositorio/repositorio_producto.
 import '../../../../backend/features/productos/repositorio/repositorio_producto_impl.dart';
 import '../../../../backend/share/database/app_db_provider.dart';
 
-// ─── Repositorio ──────────────────────────────────────────────────────────────
+// Repositorio
 
 final repositorioProductosProvider = Provider<RepositorioProducto>(
   name: 'repositorioProductosProvider',
   (ref) => RepositorioProductosImpl(ref.watch(appDatabaseProvider)),
 );
 
-// ─── Enums públicos ───────────────────────────────────────────────────────────
+// Enums públicos
 
 enum FiltroStock { todos, enStock, stockBajo, sinStock }
 
-// ─── Estado ───────────────────────────────────────────────────────────────────
+// Estado
 
 final class ProductosState {
   const ProductosState({
@@ -74,7 +74,7 @@ final class ProductosState {
       );
 }
 
-// ─── Notifier ─────────────────────────────────────────────────────────────────
+// Notifier
 
 class ProductosNotifier extends AsyncNotifier<ProductosState> {
   late final RepositorioProducto _repo;
@@ -99,7 +99,7 @@ class ProductosNotifier extends AsyncNotifier<ProductosState> {
     return ProductosState(todos: await _repo.obtenerTodos());
   }
 
-  // ─── Filtros ────────────────────────────────────────────────────────────────
+  // Filtros
 
   void buscar(String query) {
     final actual = state.value;
@@ -115,7 +115,7 @@ class ProductosNotifier extends AsyncNotifier<ProductosState> {
     state = AsyncData(actual.copyWith(filtroStock: filtro));
   }
 
-  // ─── Mutaciones — retornan null en éxito o mensaje de error ─────────────────
+  // Mutaciones — retornan null en éxito o mensaje de error
 
   Future<String?> crear(Producto producto) async {
     if (await _repo.existeSku(producto.sku)) {
@@ -151,7 +151,7 @@ class ProductosNotifier extends AsyncNotifier<ProductosState> {
   }
 }
 
-// ─── Providers públicos ───────────────────────────────────────────────────────
+// Providers públicos
 
 final productosProvider =
     AsyncNotifierProvider<ProductosNotifier, ProductosState>(

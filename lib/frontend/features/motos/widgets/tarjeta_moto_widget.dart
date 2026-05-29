@@ -227,7 +227,7 @@ class _SeccionDetalles extends StatelessWidget {
   }
 }
 
-// ─── Fila de dato genérica ────────────────────────────────────────────────────
+// Fila de dato genérica
 
 class _FilaDato extends StatelessWidget {
   const _FilaDato({required this.icono, required this.texto});
@@ -259,7 +259,7 @@ class _FilaDato extends StatelessWidget {
   }
 }
 
-// ─── Botones de acción ────────────────────────────────────────────────────────
+// Botones de acción
 
 class _BotonesAccion extends StatelessWidget {
   const _BotonesAccion({this.alEditar, this.alEliminar});

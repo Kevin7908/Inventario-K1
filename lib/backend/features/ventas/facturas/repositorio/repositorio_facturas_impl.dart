@@ -386,7 +386,7 @@ class RepositorioFacturasImpl implements RepositorioFacturas {
     });
   }
 
-  // ── Items ────────────────────────────────────────────────────────────────
+  // Items
 
   @override
   Future<void> agregarItem({
@@ -548,7 +548,7 @@ class RepositorioFacturasImpl implements RepositorioFacturas {
     await _recalcularTotales(current.ventaId);
   }
 
-  // ── Helpers ──────────────────────────────────────────────────────────────
+  // Helpers
 
   Future<void> _recalcularTotales(int ventaId) async {
     final ventaRow = await (_db.select(_tablaVentas)

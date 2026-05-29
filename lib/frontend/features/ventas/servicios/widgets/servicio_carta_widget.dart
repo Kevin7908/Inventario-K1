@@ -4,7 +4,7 @@ import 'package:inventario_k1/frontend/features/ventas/servicios/widgets/dialogo
 
 import '../../../../../backend/features/ventas/servicios/modelo/servicio.dart';
 import '../../../../share/temas/colores_app.dart';
-import '../../../../share/widgets/botones/dialogo_confirmar_eliminar_widget.dart';
+import '../../../../share/widgets/dialogos/dialogo_confirmar_eliminar_widget.dart';
 import '../../../../share/widgets/output/badge_estado.dart';
 import '../../../../share/widgets/output/snack_bar_mensaje.dart';
 import '../provider/servicios_provider.dart';

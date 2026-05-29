@@ -155,7 +155,7 @@ class _DialogoProductoState extends ConsumerState<DialogoProducto> {
     super.dispose();
   }
 
-  // ─── Guardar ──────────────────────────────────────────────────────────────
+  // Guardar
 
   Future<void> _guardar() async {
     if (!_formKey.currentState!.validate()) return;
@@ -223,7 +223,7 @@ class _DialogoProductoState extends ConsumerState<DialogoProducto> {
     }
   }
 
-  // ─── Build ────────────────────────────────────────────────────────────────
+  // Build
 
   @override
   Widget build(BuildContext context) {
@@ -290,7 +290,7 @@ class _DialogoProductoState extends ConsumerState<DialogoProducto> {
   }
 }
 
-// ─── Sub-widgets estáticos ────────────────────────────────────────────────────
+// Sub-widgets estáticos
 
 class _Encabezado extends StatelessWidget {
   const _Encabezado({required this.titulo});

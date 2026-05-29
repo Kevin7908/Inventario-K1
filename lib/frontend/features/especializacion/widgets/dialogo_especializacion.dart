@@ -18,7 +18,7 @@ class DialogoEspecializacion extends ConsumerStatefulWidget {
 
   bool get esEdicion => especializacionAEditar != null;
 
-  // ── Factory helper ────────────────────────────────────────────────────────
+  // Factory helper
   static Future<void> mostrar(
     BuildContext context, {
     Especializacion? especializacionAEditar,
@@ -60,7 +60,7 @@ class _DialogoEspecializacionState
     super.dispose();
   }
 
-  // ── Validación asíncrona de nombre único ──────────────────────────────────
+  // Validación asíncrona de nombre único
   Future<String?> _validarNombreUnico(String nombre) async {
     if (nombre.trim().length < 2) return null; // ya capturado por validación síncrona
 
@@ -73,7 +73,7 @@ class _DialogoEspecializacionState
     return null;
   }
 
-  // ── Guardar ───────────────────────────────────────────────────────────────
+  // Guardar
   Future<void> _guardar() async {
     // 1. Validación síncrona del formulario
     if (!_formKey.currentState!.validate()) return;
@@ -126,7 +126,7 @@ class _DialogoEspecializacionState
     }
   }
 
-  // ── UI ────────────────────────────────────────────────────────────────────
+  // UI
   @override
   Widget build(BuildContext context) {
     return Dialog(
@@ -140,7 +140,7 @@ class _DialogoEspecializacionState
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            // ── Encabezado ─────────────────────────────────────────────────
+            // Encabezado
             Padding(
               padding: const EdgeInsets.fromLTRB(28, 28, 20, 0),
               child: Row(
@@ -190,7 +190,7 @@ class _DialogoEspecializacionState
               ),
             ),
 
-            // ── Formulario scrollable ──────────────────────────────────────
+            // Formulario scrollable
             Flexible(
               child: SingleChildScrollView(
                 padding: const EdgeInsets.all(28),
@@ -248,7 +248,7 @@ class _DialogoEspecializacionState
               ),
             ),
 
-            // ── Botones fijos ─────────────────────────────────────────────
+            // Botones fijos
             Padding(
               padding: const EdgeInsets.fromLTRB(28, 0, 28, 28),
               child: Row(
@@ -307,7 +307,7 @@ class _DialogoEspecializacionState
     );
   }
 
-  // ── Helpers de estilo ─────────────────────────────────────────────────────
+  // Helpers de estilo
   Widget _Etiqueta(String texto) {
     return Text(
       texto,

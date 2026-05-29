@@ -100,7 +100,7 @@ class _DialogoTecnicoState extends ConsumerState<DialogoTecnico> {
     super.dispose();
   }
 
-  // ── Validación asíncrona de cédula ────────────────────────────────────
+  // Validación asíncrona de cédula
 
   Future<void> _validarCedula(String cedula) async {
     if (cedula.trim().isEmpty) {
@@ -121,7 +121,7 @@ class _DialogoTecnicoState extends ConsumerState<DialogoTecnico> {
     });
   }
 
-  // ── Guardar ───────────────────────────────────────────────────────────
+  // Guardar
 
   Future<void> _guardar() async {
     await _validarCedula(_cedulaCtrl.text);
@@ -185,7 +185,7 @@ class _DialogoTecnicoState extends ConsumerState<DialogoTecnico> {
     }
   }
 
-  // ── Build ─────────────────────────────────────────────────────────────
+  // Build
 
   @override
   Widget build(BuildContext context) {
@@ -207,7 +207,7 @@ class _DialogoTecnicoState extends ConsumerState<DialogoTecnico> {
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            // ── Encabezado ────────────────────────────────────────────────
+            // Encabezado
             Padding(
               padding: const EdgeInsets.fromLTRB(28, 28, 28, 0),
               child: Row(
@@ -235,7 +235,7 @@ class _DialogoTecnicoState extends ConsumerState<DialogoTecnico> {
               ),
             ),
 
-            // ── Formulario scrollable ─────────────────────────────────────
+            // Formulario scrollable
             Flexible(
               child: SingleChildScrollView(
                 padding: const EdgeInsets.all(28),
@@ -244,7 +244,7 @@ class _DialogoTecnicoState extends ConsumerState<DialogoTecnico> {
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      // ── Nombres + Apellidos ───────────────────────────
+                      // Nombres + Apellidos
                       Row(
                         children: [
                           Expanded(
@@ -285,7 +285,7 @@ class _DialogoTecnicoState extends ConsumerState<DialogoTecnico> {
                       ),
                       const SizedBox(height: 14),
 
-                      // ── Cédula ────────────────────────────────────────
+                      // Cédula
                       _etiqueta('Cédula'),
                       const SizedBox(height: 6),
                       TextFormField(
@@ -318,7 +318,7 @@ class _DialogoTecnicoState extends ConsumerState<DialogoTecnico> {
                       ),
                       const SizedBox(height: 14),
 
-                      // ── Especialización — AppSearch ───────────────────
+                      // Especialización — AppSearch
                       _etiqueta('Especialización'),
                       const SizedBox(height: 6),
                       asyncEspec.when(
@@ -342,7 +342,7 @@ class _DialogoTecnicoState extends ConsumerState<DialogoTecnico> {
                       ),
                       const SizedBox(height: 14),
 
-                      // ── Teléfono + Email ──────────────────────────────
+                      // Teléfono + Email
                       Row(
                         children: [
                           Expanded(
@@ -389,7 +389,7 @@ class _DialogoTecnicoState extends ConsumerState<DialogoTecnico> {
                       ),
                       const SizedBox(height: 14),
 
-                      // ── Salario base ──────────────────────────────────
+                      // Salario base
                       _etiqueta('Correo electrónico'),
                       const SizedBox(height: 6),
                       TextFormField(

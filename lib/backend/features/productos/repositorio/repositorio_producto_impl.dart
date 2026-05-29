@@ -10,7 +10,7 @@ class RepositorioProductosImpl implements RepositorioProducto {
 
   RepositorioProductosImpl(this._db);
 
-  // ─── Helper: JOIN base ────────────────────────────────────────────────────
+  // Helper: JOIN base
 
   JoinedSelectStatement<HasResultSet, dynamic> _queryConJoin() {
     return _db.select(_db.tablaProducto).join([
@@ -32,7 +32,7 @@ class RepositorioProductosImpl implements RepositorioProducto {
   List<Producto> _mapear(List<TypedResult> filas) =>
       filas.map((r) => ProductoMapper.filaJoinAModelo(r, _db)).toList();
 
-  // ─── Streams reactivos ────────────────────────────────────────────────────
+  // Streams reactivos
 
   @override
   Stream<List<Producto>> observarTodos() =>
@@ -46,7 +46,7 @@ class RepositorioProductosImpl implements RepositorioProducto {
           .watch()
           .map(_mapear);
 
-  // ─── Consultas únicas ─────────────────────────────────────────────────────
+  // Consultas únicas
 
   @override
   Future<List<Producto>> obtenerTodos() async =>
@@ -112,7 +112,7 @@ class RepositorioProductosImpl implements RepositorioProducto {
             .get(),
       );
 
-  // ─── Escrituras ────────────────────────────────────────────────────────────
+  // Escrituras
 
   @override
   Future<Producto> crear(Producto producto) async {
@@ -154,7 +154,7 @@ class RepositorioProductosImpl implements RepositorioProducto {
     await (_db.delete(_db.tablaProducto)..where((t) => t.id.equals(id))).go();
   }
 
-  // ─── Validaciones ─────────────────────────────────────────────────────────
+  // Validaciones
 
   @override
   Future<bool> existeNombre(String nombre, {int? excludirId}) async {
@@ -176,7 +176,7 @@ class RepositorioProductosImpl implements RepositorioProducto {
     return await query.getSingleOrNull() != null;
   }
 
-  // ─── Conteos — COUNT(*) real, no fetch-all ────────────────────────────────
+  // Conteos — COUNT(*) real, no fetch-all
 
   @override
   Future<int> contarActivos() async {

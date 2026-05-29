@@ -6,7 +6,7 @@ import 'package:provider/provider.dart';
 import '../../../../backend/features/unidades_medida/modelo/unidad_medida.dart';
 import '../../../../backend/share/database/locator.dart';
 import '../../../share/temas/colores_app.dart';
-import '../../../share/widgets/botones/dialogo_confirmar_eliminar_widget.dart';
+import '../../../share/widgets/dialogos/dialogo_confirmar_eliminar_widget.dart';
 import '../../../share/widgets/output/estado_error_widget.dart';
 import '../../../share/widgets/output/estado_vacio_widget.dart';
 import '../../../share/widgets/input/barra_busqueda_dropdown.dart';
@@ -18,7 +18,6 @@ import '../widgets/fila_unidad_medida_widget.dart';
 /// Vista de Unidades de Medida — misma estructura que CategoriasVista.
 ///
 /// Patrón aplicado:
-/// ─────────────────
 /// - Consumer aislado en _CuerpoLista (no rebuilds en Scaffold).
 /// - CustomScrollView + SliverList.separated (lazy, sin shrinkWrap).
 /// - SliverToBoxAdapter para el encabezado (búsqueda + dropdown + contador).

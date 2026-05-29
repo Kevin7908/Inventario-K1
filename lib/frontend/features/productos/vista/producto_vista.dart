@@ -5,7 +5,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../../backend/share/database/locator.dart';
 import '../../../share/temas/colores_app.dart';
-import '../../../share/widgets/botones/dialogo_confirmar_eliminar_widget.dart';
+import '../../../share/widgets/dialogos/dialogo_confirmar_eliminar_widget.dart';
 import '../../../share/widgets/input/barra_busqueda_widget.dart';
 import '../../../share/widgets/output/chip_filtro_widget.dart';
 import '../../../share/widgets/output/estado_error_widget.dart';
@@ -94,9 +94,7 @@ class _ProductosVistaState extends ConsumerState<ProductosVista> {
   }
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
 // Cuerpo — maneja los estados async del provider
-// ─────────────────────────────────────────────────────────────────────────────
 
 class _CuerpoProductos extends ConsumerWidget {
   const _CuerpoProductos({
@@ -165,9 +163,7 @@ class _CuerpoProductos extends ConsumerWidget {
   }
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
 // Chips de filtro — StatelessWidget puro, recibe datos por props
-// ─────────────────────────────────────────────────────────────────────────────
 
 class _ChipsFiltroStock extends StatelessWidget {
   const _ChipsFiltroStock({
@@ -229,10 +225,8 @@ class _ContadorProductos extends StatelessWidget {
   }
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
 // Grid de productos — ConsumerWidget que lee productosFiltradosProvider
 // Solo se reconstruye cuando la lista filtrada cambia, no el estado completo.
-// ─────────────────────────────────────────────────────────────────────────────
 
 class _SliverGrillaProductos extends ConsumerWidget {
   const _SliverGrillaProductos({

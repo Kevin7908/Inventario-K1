@@ -27,7 +27,7 @@ class ProveedoresViewModel extends ChangeNotifier {
     );
   }
 
-  // ── Estado ────────────────────────────────────────────────────────────────
+  // Estado
 
   EstadoProveedores _estado = EstadoProveedores.inicial;
   EstadoProveedores get estado => _estado;
@@ -37,7 +37,7 @@ class ProveedoresViewModel extends ChangeNotifier {
 
   bool get estaCargando => _estado == EstadoProveedores.cargando;
 
-  // ── Datos ─────────────────────────────────────────────────────────────────
+  // Datos
 
   List<Proveedor> _proveedores = [];
 

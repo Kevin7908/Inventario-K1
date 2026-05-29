@@ -5,7 +5,7 @@ import '../../../share/temas/colores_app.dart';
 import '../../../share/widgets/botones/accion_boton.dart';
 import '../../../share/widgets/output/badge_estado.dart';
 
-// ─── Mapa de íconos (top-level const — instancia única en toda la app) ────────
+// Mapa de íconos (top-level const — instancia única en toda la app)
 const Map<String, IconData> _iconosProveedorMapa = {
   'store': Icons.store_outlined,
   'local_shipping': Icons.local_shipping_outlined,
@@ -87,7 +87,7 @@ class _TarjetaProveedorWidgetState extends State<TarjetaProveedorWidget> {
               crossAxisAlignment: CrossAxisAlignment.start,
               mainAxisSize: MainAxisSize.min,
               children: [
-                // ── Cabecera ────────
+                // Cabecera
                 _Cabecera(
                   nombre: p.nombre,
                   nitCedula: p.nitCedula,

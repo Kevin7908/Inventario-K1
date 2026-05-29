@@ -14,7 +14,7 @@ class UnidadesMedidaViewModel extends ChangeNotifier {
     cargarUnidades();
   }
 
-  // ── Estado ──────────────────────────────────────────────────────────────
+  // Estado
   EstadoUnidadesMedida _estado = EstadoUnidadesMedida.inicial;
   EstadoUnidadesMedida get estado => _estado;
 
@@ -23,7 +23,7 @@ class UnidadesMedidaViewModel extends ChangeNotifier {
 
   bool get estaCargando => _estado == EstadoUnidadesMedida.cargando;
 
-  // ── Datos ────────────────────────────────────────────────────────────────
+  // Datos
   List<UnidadMedida> _unidades = [];
 
   String _consultaBusqueda = '';
@@ -55,7 +55,7 @@ class UnidadesMedidaViewModel extends ChangeNotifier {
   UnidadMedida? _unidadSeleccionada;
   UnidadMedida? get unidadSeleccionada => _unidadSeleccionada;
 
-  // ── Acciones ─────────────────────────────────────────────────────────────
+  // Acciones
 
   Future<void> cargarUnidades() async {
     _cambiarEstado(EstadoUnidadesMedida.cargando);
@@ -178,7 +178,7 @@ class UnidadesMedidaViewModel extends ChangeNotifier {
     notifyListeners();
   }
 
-  // ── Privados ──────────────────────────────────────────────────────────────
+  // Privados
 
   void _cambiarEstado(EstadoUnidadesMedida nuevoEstado) {
     _estado = nuevoEstado;

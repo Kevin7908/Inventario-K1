@@ -5,7 +5,7 @@ import 'package:provider/provider.dart';
 
 import '../../../../backend/share/database/locator.dart';
 import '../../../share/temas/colores_app.dart';
-import '../../../share/widgets/botones/dialogo_confirmar_eliminar_widget.dart';
+import '../../../share/widgets/dialogos/dialogo_confirmar_eliminar_widget.dart';
 import '../../../share/widgets/input/barra_busqueda_widget.dart';
 import '../../../share/widgets/output/estado_error_widget.dart';
 import '../../../share/widgets/output/estado_vacio_widget.dart';
@@ -14,26 +14,6 @@ import '../view_model/categorias_view_model.dart';
 import '../widgets/dialogo_categorias_widget.dart';
 import '../widgets/fila_categoria_widget.dart';
 
-/// Vista de Categorías — rediseñada y optimizada.
-///
-/// Cambios respecto a la versión anterior:
-/// ─────────────────────────────────────────
-/// 1. **GridView → ListView.builder**: elimina el double-layout-pass que
-///    causaba `shrinkWrap: true` + `NeverScrollableScrollPhysics` dentro de
-///    un `SingleChildScrollView`. El `ListView.builder` solo construye los
-///    ítems visibles (lazy) y no necesita calcular el tamaño total.
-///
-/// 2. **CustomScrollView + SliverList**: el encabezado (barra de búsqueda +
-///    contador) se integra como `SliverToBoxAdapter`, permitiendo que TODO el
-///    contenido comparta un único `Scrollable`. Antes había dos Scrollables
-///    anidados, lo que duplicaba el trabajo del engine.
-///
-/// 3. **Separador reutilizable const**: `SizedBox` con altura fija en vez de
-///    `Divider` para separar ítems, evitando un widget extra con pintura propia.
-///
-/// 4. **Estado local aislado**: el ViewModel sigue en `initState`/`dispose`
-///    (patrón correcto con get_it factory). El `ChangeNotifierProvider.value`
-///    no re-crea el provider en cada rebuild del padre.
 class CategoriasVista extends StatefulWidget {
   const CategoriasVista({super.key});
 
@@ -95,10 +75,10 @@ class _CategoriasVistaState extends State<CategoriasVista> {
   }
 }
 
-// ─── Cuerpo principal (Consumer único) ───────────────────────────────────────
+// Cuerpo principal (Consumer único) 
 
-/// Separa el Consumer en su propio widget para que los rebuilds por el
-/// ViewModel no afecten a [CategoriasVista] ni al [Scaffold].
+// Separa el Consumer en su propio widget para que los rebuilds por el
+// ViewModel no afecten a [CategoriasVista] ni al [Scaffold].
 class _CuerpoLista extends StatelessWidget {
   const _CuerpoLista();
 
@@ -106,14 +86,14 @@ class _CuerpoLista extends StatelessWidget {
   Widget build(BuildContext context) {
     return Consumer<CategoriasViewModel>(
       builder: (context, vm, _) {
-        // ── Carga ────────────────────────────────────────────────────────
+        // Carga 
         if (vm.estaCargando) {
           return const Center(
             child: CircularProgressIndicator(color: ColoresApp.primary),
           );
         }
 
-        // ── Error ────────────────────────────────────────────────────────
+        //  Error 
         if (vm.estado == EstadoCategorias.error) {
           return EstadoErrorWidget(
             mensaje: vm.mensajeError ?? 'Error desconocido',
@@ -121,7 +101,7 @@ class _CuerpoLista extends StatelessWidget {
           );
         }
 
-        // ── Vacío ────────────────────────────────────────────────────────
+        // Vacío 
         if (vm.categorias.isEmpty) {
           return EstadoVacioWidget(
             icono: Icons.category_outlined,
@@ -132,7 +112,7 @@ class _CuerpoLista extends StatelessWidget {
           );
         }
 
-        // ── Lista ────────────────────────────────────────────────────────
+        //  Lista 
         return CustomScrollView(
           slivers: [
             // Barra de búsqueda + contador sticky al tope

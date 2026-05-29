@@ -41,7 +41,7 @@ class DialogoDetalleProductoWidget extends StatelessWidget {
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            // ── Encabezado ─────────────────────────────────────────────────
+            // Encabezado
             Padding(
               padding: const EdgeInsets.fromLTRB(24, 24, 24, 0),
               child: Row(
@@ -89,7 +89,7 @@ class DialogoDetalleProductoWidget extends StatelessWidget {
               ),
             ),
 
-            // ── Cuerpo scrollable ──────────────────────────────────────────
+            // Cuerpo scrollable
             Flexible(
               child: SingleChildScrollView(
                 padding: const EdgeInsets.all(24),
@@ -139,7 +139,7 @@ class DialogoDetalleProductoWidget extends StatelessWidget {
               ),
             ),
 
-            // ── Pie: botón cerrar ──────────────────────────────────────────
+            // Pie: botón cerrar
             Padding(
               padding: const EdgeInsets.fromLTRB(24, 0, 24, 24),
               child: SizedBox(
@@ -165,7 +165,7 @@ class DialogoDetalleProductoWidget extends StatelessWidget {
   }
 }
 
-// ─────────────────────────── Subwidgets internos ─────────────────────────────
+// Subwidgets internos
 
 class _VistaPreviewImagen extends StatelessWidget {
   const _VistaPreviewImagen({this.imagenUrl});
@@ -237,7 +237,6 @@ class _VistaPreviewImagen extends StatelessWidget {
   }
 }
 
-// ──
 
 class _SeccionPrecios extends StatelessWidget {
   const _SeccionPrecios({
@@ -341,7 +340,6 @@ class _SeccionPrecios extends StatelessWidget {
   }
 }
 
-// ──
 
 class _SeccionStock extends StatelessWidget {
   const _SeccionStock({required this.producto});
@@ -402,7 +400,6 @@ class _SeccionStock extends StatelessWidget {
   }
 }
 
-// ──
 
 class _SeccionGeneral extends StatelessWidget {
   const _SeccionGeneral({required this.producto});
@@ -462,7 +459,7 @@ class _SeccionGeneral extends StatelessWidget {
   }
 }
 
-// ── Helpers compartidos entre subwidgets ──────────────────────────────────────
+// Helpers compartidos entre subwidgets
 
 Widget _etiquetaSeccion(String texto) {
   return Text(

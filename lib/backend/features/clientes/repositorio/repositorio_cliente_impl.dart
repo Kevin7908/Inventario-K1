@@ -50,7 +50,7 @@ class RepositorioClientesImpl implements RepositorioClientes {
     return filas.map(ClienteMapper.filaAModelo).toList();
   }
 
-  // ─── Escritura ───────────────────────────────────────────────────────────────
+  // Escritura
 
   @override
   Future<int> crear(Cliente cliente) async {

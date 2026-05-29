@@ -7,7 +7,7 @@ import '../modelo/factura_resumen.dart';
 import '../modelo/venta_item.dart';
 
 abstract final class FacturasMapper {
-  // ── Resumen (lista) ──────────────────────────────────────────────────────
+  // Resumen (lista)
 
   static FacturaResumen resumenDesdeMap(Map<String, dynamic> row) {
     final ordenId = row['orden_id'] as int?;
@@ -34,7 +34,7 @@ abstract final class FacturasMapper {
   ) =>
       rows.map(resumenDesdeMap).toList(growable: false);
 
-  // ── Detalle ──────────────────────────────────────────────────────────────
+  // Detalle
 
   static FacturaDetalle detalleDesdeMapas({
     required Map<String, dynamic> ventaRow,
@@ -63,7 +63,7 @@ abstract final class FacturasMapper {
     );
   }
 
-  // ── Companions (escritura) ───────────────────────────────────────────────
+  // Companions (escritura)
 
   static TablaVentasCompanion companionNuevo({
     required String numeroFactura,
@@ -112,7 +112,7 @@ abstract final class FacturasMapper {
         subtotal: cantidad * precioUnitario,
       );
 
-  // ── Helpers privados ─────────────────────────────────────────────────────
+  // Helpers privados
 
   static VentaItem _itemDesdeMap(Map<String, dynamic> row) => VentaItem(
         id: row['id'] as int,

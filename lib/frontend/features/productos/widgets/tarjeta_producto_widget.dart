@@ -175,7 +175,7 @@ class _TarjetaProductoWidgetState extends State<TarjetaProductoWidget> {
   }
 }
 
-// ── Subwidget: imagen con badge de stock ──────────────────────────────────────
+// Subwidget: imagen con badge de stock
 
 class _ImagenConBadge extends StatelessWidget {
   const _ImagenConBadge({required this.producto});

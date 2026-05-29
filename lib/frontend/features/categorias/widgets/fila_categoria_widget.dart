@@ -4,7 +4,7 @@ import '../../../../backend/features/categorias/modelo/categoria.dart';
 import '../../../share/temas/colores_app.dart';
 import '../../../share/widgets/botones/accion_boton.dart';
 
-// ─── Mapa de íconos (top-level const para no recrearlo) ──────────────────────
+// Mapa de íconos (top-level const para no recrearlo)
 const Map<String, IconData> _iconosMapa = {
   'category': Icons.category_outlined,
   'oil_barrel': Icons.oil_barrel_outlined,
@@ -84,7 +84,7 @@ class _FilaCategoriaWidgetState extends State<FilaCategoriaWidget> {
             padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
             child: Row(
               children: [
-                // ── Ícono con fondo tintado ───────────────────────────────
+                // Ícono con fondo tintado
                 _IconoBadge(
                   icono: _iconoDesdeNombre(widget.categoria.icono),
                   color: _color,
@@ -92,7 +92,7 @@ class _FilaCategoriaWidgetState extends State<FilaCategoriaWidget> {
                 ),
                 const SizedBox(width: 14),
 
-                // ── Textos ───────────────────────────────────────────────
+                // Textos
                 Expanded(
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
@@ -129,11 +129,11 @@ class _FilaCategoriaWidgetState extends State<FilaCategoriaWidget> {
                 ),
                 const SizedBox(width: 12),
 
-                // ── Badge de productos ────────────────────────────────────
+                // Badge de productos
                 _BadgeProductos(total: widget.categoria.totalProductos),
                 const SizedBox(width: 10),
 
-                // ── Acciones (visibles siempre; en móvil compacto) ────────
+                // Acciones (visibles siempre; en móvil compacto)
                 _BotonesAccion(
                   alEditar: widget.alEditar,
                   alEliminar: widget.alEliminar,
@@ -147,7 +147,7 @@ class _FilaCategoriaWidgetState extends State<FilaCategoriaWidget> {
   }
 }
 
-// ─── Sub-widgets privados ─────────────────────────────────────────────────────
+// Sub-widgets privados
 
 class _IconoBadge extends StatelessWidget {
   const _IconoBadge({

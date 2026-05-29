@@ -123,9 +123,7 @@ class TopBarConBoton extends StatelessWidget {
   }
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
 // Widgets internos
-// ─────────────────────────────────────────────────────────────────────────────
 
 class _BotonVolver extends StatelessWidget {
   final VoidCallback? alPresionar;

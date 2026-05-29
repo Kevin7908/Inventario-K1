@@ -315,9 +315,7 @@ class _StockBadge extends StatelessWidget {
   }
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
 // Diálogo para confirmar cantidad y precio al agregar desde búsqueda
-// ─────────────────────────────────────────────────────────────────────────────
 class DialogoCantidadRepuesto extends ConsumerStatefulWidget {
   const DialogoCantidadRepuesto({
     super.key,

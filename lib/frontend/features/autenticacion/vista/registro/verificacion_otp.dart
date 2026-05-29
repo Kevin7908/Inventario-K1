@@ -108,7 +108,7 @@ class _PasoVerificacionOtpState extends State<PasoVerificacionOtp> {
       builder: (_, vm, __) => Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // ── 6 cajitas OTP ──
+          // 6 cajitas OTP
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: List.generate(
@@ -126,7 +126,7 @@ class _PasoVerificacionOtpState extends State<PasoVerificacionOtp> {
           ),
           const SizedBox(height: 16),
 
-          // ── Contador + Reenviar ──
+          // Contador + Reenviar
           Row(
             children: [
               Icon(
