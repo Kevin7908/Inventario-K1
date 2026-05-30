@@ -12,9 +12,7 @@ import '../../../share/widgets/output/estado_error_widget.dart';
 import '../../../share/widgets/output/estado_vacio_widget.dart';
 import '../../../share/widgets/output/snack_bar_mensaje.dart';
 import '../../../share/widgets/top_bar_widget.dart';
-import '../../categorias/view_model/categorias_view_model.dart';
 import '../../proveedores/view_model/proveedores_view_model.dart';
-import '../../unidades_medida/view_model/unidad_medida_view_model.dart';
 import '../provider/productos_provider.dart';
 import '../widgets/dialogo_detalle_producto_widget.dart';
 import '../widgets/dialogo_producto_widget.dart';
@@ -28,20 +26,14 @@ class ProductosVista extends ConsumerStatefulWidget {
 }
 
 class _ProductosVistaState extends ConsumerState<ProductosVista> {
-  // Los módulos de categorías/proveedores/unidades aún usan GetIt.
-  // Solo se leen una vez en initState — no se recrean en build.
-  late final CategoriasViewModel _categoriasVm;
   late final ProveedoresViewModel _proveedoresVm;
-  late final UnidadesMedidaViewModel _unidadesVm;
 
   Timer? _debounce;
 
   @override
   void initState() {
     super.initState();
-    _categoriasVm = locator<CategoriasViewModel>();
     _proveedoresVm = locator<ProveedoresViewModel>();
-    _unidadesVm   = locator<UnidadesMedidaViewModel>();
   }
 
   @override
@@ -60,9 +52,7 @@ class _ProductosVistaState extends ConsumerState<ProductosVista> {
   void _abrirDialogoAgregar() {
     DialogoProducto.mostrar(
       context,
-      categoriasVm: _categoriasVm,
       proveedoresVm: _proveedoresVm,
-      unidadesVm:   _unidadesVm,
     );
   }
 
@@ -82,11 +72,7 @@ class _ProductosVistaState extends ConsumerState<ProductosVista> {
             alCambiar: _onSearchChanged,
           ),
           Expanded(
-            child: _CuerpoProductos(
-              categoriasVm: _categoriasVm,
-              proveedoresVm: _proveedoresVm,
-              unidadesVm:   _unidadesVm,
-            ),
+            child: _CuerpoProductos(proveedoresVm: _proveedoresVm),
           ),
         ],
       ),
@@ -97,15 +83,9 @@ class _ProductosVistaState extends ConsumerState<ProductosVista> {
 // Cuerpo — maneja los estados async del provider
 
 class _CuerpoProductos extends ConsumerWidget {
-  const _CuerpoProductos({
-    required this.categoriasVm,
-    required this.proveedoresVm,
-    required this.unidadesVm,
-  });
+  const _CuerpoProductos({required this.proveedoresVm});
 
-  final CategoriasViewModel categoriasVm;
   final ProveedoresViewModel proveedoresVm;
-  final UnidadesMedidaViewModel unidadesVm;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -149,11 +129,7 @@ class _CuerpoProductos extends ConsumerWidget {
                   )
                 : CustomScrollView(
                     slivers: [
-                      _SliverGrillaProductos(
-                        categoriasVm: categoriasVm,
-                        proveedoresVm: proveedoresVm,
-                        unidadesVm:   unidadesVm,
-                      ),
+                      _SliverGrillaProductos(proveedoresVm: proveedoresVm),
                     ],
                   ),
           ),
@@ -229,15 +205,9 @@ class _ContadorProductos extends StatelessWidget {
 // Solo se reconstruye cuando la lista filtrada cambia, no el estado completo.
 
 class _SliverGrillaProductos extends ConsumerWidget {
-  const _SliverGrillaProductos({
-    required this.categoriasVm,
-    required this.proveedoresVm,
-    required this.unidadesVm,
-  });
+  const _SliverGrillaProductos({required this.proveedoresVm});
 
-  final CategoriasViewModel categoriasVm;
   final ProveedoresViewModel proveedoresVm;
-  final UnidadesMedidaViewModel unidadesVm;
 
   static const double _maxAncho  = 250.0;
   static const double _espaciado = 16.0;
@@ -267,9 +237,7 @@ class _SliverGrillaProductos extends ConsumerWidget {
               alEditar: () => DialogoProducto.mostrar(
                 context,
                 productoAEditar: producto,
-                categoriasVm:    categoriasVm,
-                proveedoresVm:   proveedoresVm,
-                unidadesVm:      unidadesVm,
+                proveedoresVm: proveedoresVm,
               ),
               alEliminar: () => DialogoConfirmarEliminar.mostrar(
                 context: context,

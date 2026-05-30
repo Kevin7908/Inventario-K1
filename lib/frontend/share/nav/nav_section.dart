@@ -1,13 +1,18 @@
 enum NavSection {
   dashboard,
+  // INVENTARIO
   productos,
   categorias,
+  unidadesMedida,
+  // VENTAS
   vender,
+  cotizaciones,
   deudores,
+  // GESTIÓN
   clientes,
   proveedores,
-  unidadesMedida,
   motos,
-  especializaciones,
+  // TALLER
   tecnicos,
+  especializaciones,
 }

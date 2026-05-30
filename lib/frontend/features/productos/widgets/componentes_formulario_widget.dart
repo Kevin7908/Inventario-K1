@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:provider/provider.dart';
 
 import '../../../../backend/features/categorias/modelo/categoria.dart';
@@ -7,11 +8,11 @@ import '../../../../backend/features/proveedores/modelo/proveedor.dart';
 import '../../../../backend/features/unidades_medida/modelo/unidad_medida.dart';
 import '../../../share/temas/colores_app.dart';
 import '../../../share/widgets/input/app_searc_widget.dart';
-import '../../categorias/view_model/categorias_view_model.dart';
+import '../../categorias/provider/categorias_provider.dart';
 import '../../categorias/widgets/dialogo_categorias_widget.dart';
 import '../../proveedores/view_model/proveedores_view_model.dart';
 import '../../proveedores/widgets/dialogo_proveedor_widget.dart';
-import '../../unidades_medida/view_model/unidad_medida_view_model.dart';
+import '../../unidades_medida/provider/unidades_medida_provider.dart';
 import '../../unidades_medida/widgets/dialogo_unidad_medida_widget.dart';
 import 'selector_imagen_widget.dart';
 
@@ -158,7 +159,7 @@ class SeccionBasica extends StatelessWidget {
   }
 }
 
-class SeccionClasificacion extends StatelessWidget {
+class SeccionClasificacion extends ConsumerWidget {
   const SeccionClasificacion({
     super.key,
     required this.categoriaNotifier,
@@ -175,7 +176,12 @@ class SeccionClasificacion extends StatelessWidget {
   final ValueNotifier<String?> imagenRutaNotifier;
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
+    final categorias =
+        ref.watch(categoriasProvider).value?.categorias ?? const [];
+    final unidades =
+        ref.watch(unidadesMedidaProvider).value?.unidades ?? const [];
+
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -188,27 +194,12 @@ class SeccionClasificacion extends StatelessWidget {
         _fila([
           _campo(
             label: 'Categoría',
-            child: Selector<CategoriasViewModel, List<Categoria>>(
-              // 1. El selector extrae solo la lista de categorías.
-              // Flutter comparará la lista anterior con la nueva y solo si son distintas
-              // ejecutará el builder.
-              selector: (_, vm) => vm.categorias,
-
-              builder: (context, listaCategorias, _) {
-                // Usamos context.read aquí para el botón agregar, ya que onAgregar
-                // no necesita "escuchar" cambios, solo disparar una acción.
-                final vm = context.read<CategoriasViewModel>();
-
-                return AppSearch<Categoria>(
-                  notifier: categoriaNotifier,
-                  items:
-                      listaCategorias, // Usamos la lista que viene del selector
-                  labelBuilder: (c) => c.nombre,
-                  hint: 'Seleccionar categoría',
-                  onAgregar: () =>
-                      DialogoCategoria.mostrar(context, viewModel: vm),
-                );
-              },
+            child: AppSearch<Categoria>(
+              notifier: categoriaNotifier,
+              items: categorias,
+              labelBuilder: (c) => c.nombre,
+              hint: 'Seleccionar categoría',
+              onAgregar: () => DialogoCategoria.mostrar(context),
             ),
           ),
           _campo(
@@ -217,7 +208,6 @@ class SeccionClasificacion extends StatelessWidget {
               selector: (_, vm) => vm.proveedores,
               builder: (context, listaProveedores, _) {
                 final vm = context.read<ProveedoresViewModel>();
-
                 return AppSearch<Proveedor>(
                   notifier: proveedorNotifier,
                   items: listaProveedores,
@@ -228,7 +218,6 @@ class SeccionClasificacion extends StatelessWidget {
                 );
               },
             ),
-            
           ),
         ]),
 
@@ -238,21 +227,12 @@ class SeccionClasificacion extends StatelessWidget {
         _fila([
           _campo(
             label: 'Unidad de medida',
-            // Agregamos Consumer para Unidades de Medida
-            child: Selector<UnidadesMedidaViewModel, List<UnidadMedida>>(
-              selector: (_, vm) => vm.unidades,
-              builder: (context, listaUnidades, _) {
-                final vm = context.read<UnidadesMedidaViewModel>();
-
-                return AppSearch<UnidadMedida>(
-                  notifier: unidadNotifier,
-                  items: listaUnidades,
-                  labelBuilder: (u) => '${u.nombre} (${u.abreviatura})',
-                  hint: 'Seleccionar unidad',
-                  onAgregar: () =>
-                      DialogoUnidadMedida.mostrar(context, viewModel: vm),
-                );
-              },
+            child: AppSearch<UnidadMedida>(
+              notifier: unidadNotifier,
+              items: unidades,
+              labelBuilder: (u) => '${u.nombre} (${u.abreviatura})',
+              hint: 'Seleccionar unidad',
+              onAgregar: () => DialogoUnidadMedida.mostrar(context),
             ),
           ),
           _campo(
@@ -267,7 +247,6 @@ class SeccionClasificacion extends StatelessWidget {
 
         const SizedBox(height: 12),
 
-        // Imagen del producto (esta ya estaba bien porque usa ValueListenableBuilder)
         _etiqueta('Imagen del producto'),
         const SizedBox(height: 8),
         ValueListenableBuilder<String?>(

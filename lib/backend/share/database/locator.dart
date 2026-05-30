@@ -3,15 +3,11 @@ import 'package:inventario_k1/backend/share/database/app_db.dart';
 
 import '../../../frontend/features/autenticacion/view_model/auth_view_model.dart';
 import '../../../frontend/features/autenticacion/view_model/registro_view_model.dart';
-import '../../../frontend/features/categorias/view_model/categorias_view_model.dart';
 import '../../../frontend/features/proveedores/view_model/proveedores_view_model.dart';
-import '../../../frontend/features/unidades_medida/view_model/unidad_medida_view_model.dart';
 import '../../features/autenticacion/repositorio/repositorio_auth.dart';
 import '../../features/autenticacion/repositorio/repositorio_auth_impl.dart';
-import '../../features/categorias/repositorio/repositorio_categorias_impl.dart';
 import '../../features/productos/repositorio/repositorio_producto_impl.dart';
 import '../../features/proveedores/repositorio/repositorio_proveedor_impl.dart';
-import '../../features/unidades_medida/repositorio/repositorio_unidades_medida_impl.dart';
 
 import '../servicios/servicio_email.dart';
 import '../servicios/servicio_verificacion.dart';
@@ -22,7 +18,7 @@ void setupLocator() {
   // Base de datos
   locator.registerLazySingleton<AppDb>(() => AppDb());
 
-  // Servicios (no dependen de nada)
+  // Servicios
   locator.registerLazySingleton<ServicioVerificacion>(
     () => ServicioVerificacion(),
   );
@@ -33,15 +29,9 @@ void setupLocator() {
     ),
   );
 
-  // Repositorios (dependen de AppDb)
+  // Repositorios
   locator.registerLazySingleton<RepositorioAuth>(
     () => RepositorioAuthImpl(locator<AppDb>()),
-  );
-  locator.registerLazySingleton<RepositorioCategoriasImpl>(
-    () => RepositorioCategoriasImpl(locator<AppDb>()),
-  );
-  locator.registerLazySingleton<RepositorioUnidadesMedidaImpl>(
-    () => RepositorioUnidadesMedidaImpl(locator<AppDb>()),
   );
   locator.registerLazySingleton<RepositorioProveedoresImpl>(
     () => RepositorioProveedoresImpl(locator<AppDb>()),
@@ -49,7 +39,8 @@ void setupLocator() {
   locator.registerLazySingleton<RepositorioProductosImpl>(
     () => RepositorioProductosImpl(locator<AppDb>()),
   );
-  // ViewModels de Auth (dependen de Repositorios + Servicios)
+
+  // ViewModels de Auth
   locator.registerLazySingleton<AuthViewModel>(
     () => AuthViewModel(locator<RepositorioAuth>(), locator<ServicioEmail>()),
   );
@@ -61,13 +52,7 @@ void setupLocator() {
     ),
   );
 
-  // ViewModels del resto de la app
-  locator.registerLazySingleton<CategoriasViewModel>(
-    () => CategoriasViewModel(locator<RepositorioCategoriasImpl>()),
-  );
-  locator.registerFactory<UnidadesMedidaViewModel>(
-    () => UnidadesMedidaViewModel(locator<RepositorioUnidadesMedidaImpl>()),
-  );
+  // ViewModels (Riverpod gestiona categorías y unidades de medida)
   locator.registerLazySingleton<ProveedoresViewModel>(
     () => ProveedoresViewModel(locator<RepositorioProveedoresImpl>()),
   );
