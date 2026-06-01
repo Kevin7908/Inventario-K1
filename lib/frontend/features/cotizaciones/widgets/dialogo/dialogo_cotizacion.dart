@@ -11,8 +11,6 @@ import 'package:inventario_k1/frontend/share/widgets/output/snack_bar_mensaje.da
 import 'package:inventario_k1/backend/features/cotizaciones/enum/enum_cotizacion.dart';
 import 'package:inventario_k1/backend/features/cotizaciones/modelo/cotizacion_detalle.dart';
 import 'package:inventario_k1/backend/features/cotizaciones/modelo/cotizacion_resumen.dart';
-import 'package:inventario_k1/backend/features/productos/modelo/producto.dart'
-    show kTasaIva;
 import 'package:inventario_k1/frontend/features/cotizaciones/provider/cotizaciones_provider.dart';
 import 'package:inventario_k1/frontend/features/motos/widgets/dialogo_motos.dart';
 import 'package:inventario_k1/frontend/features/productos/widgets/dialogo_producto_widget.dart';
@@ -241,7 +239,7 @@ class _DialogoCotizacionState extends ConsumerState<DialogoCotizacion> {
     });
   }
 
-  void _agregarProducto() {
+  void _agregarProducto(List<Producto> producto) {
     final productos =
         ref.read(productosParaCotizacionProvider).value ?? <Producto>[];
     _seleccionarItem<Producto>(
@@ -324,6 +322,7 @@ class _DialogoCotizacionState extends ConsumerState<DialogoCotizacion> {
   @override
   Widget build(BuildContext context) {
     final motos = ref.watch(motosParaCotizacionProvider).value ?? <Moto>[];
+    final productos = ref.watch(productosParaCotizacionProvider).value ?? <Producto>[];
 
     return Dialog(
       backgroundColor: ColoresApp.bgCard,
@@ -335,7 +334,7 @@ class _DialogoCotizacionState extends ConsumerState<DialogoCotizacion> {
           mainAxisSize: MainAxisSize.min,
           children: [
             DialogoCotHeader(esEditar: _esEditar),
-            Flexible(child: _CuerpoDialogo(state: this, motos: motos)),
+            Flexible(child: _CuerpoDialogo(state: this, motos: motos, productos: productos)),
             DialogoCotFooter(
               cargando: _cargando,
               esEditar: _esEditar,
@@ -352,10 +351,11 @@ class _DialogoCotizacionState extends ConsumerState<DialogoCotizacion> {
 // ── Cuerpo del diálogo ────────────────────────────────────────────────────────
 
 class _CuerpoDialogo extends StatelessWidget {
-  const _CuerpoDialogo({required this.state, required this.motos});
+  const _CuerpoDialogo({required this.state, required this.motos, required this.productos});
 
   final _DialogoCotizacionState state;
   final List<Moto> motos;
+  final List<Producto> productos;
 
   @override
   Widget build(BuildContext context) {
@@ -513,7 +513,7 @@ class _CuerpoDialogo extends StatelessWidget {
           ],
           CotBtnAgregar(
             label: '+ Agregar Producto',
-            onTap: state._agregarProducto,
+            onTap:() => state._agregarProducto(productos),
           ),
           const SizedBox(height: 20),
           CotTotalesResumen(
