@@ -144,9 +144,7 @@ class AppSearch<T> extends StatelessWidget {
   }
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
 // _PickerDialog — Diálogo interno de búsqueda. Solo vive mientras está abierto.
-// ─────────────────────────────────────────────────────────────────────────────
 
 class _PickerDialog<T> extends StatefulWidget {
   const _PickerDialog({
@@ -221,7 +219,7 @@ class _PickerDialogState<T> extends State<_PickerDialog<T>> {
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            // ── Barra de búsqueda ─────────────────────────────────────────
+            // Barra de búsqueda
             Padding(
               padding: const EdgeInsets.fromLTRB(16, 16, 16, 10),
               child: TextField(
@@ -276,10 +274,10 @@ class _PickerDialogState<T> extends State<_PickerDialog<T>> {
               ),
             ),
 
-            // ── Divider ───────────────────────────────────────────────────
+            // Divider
             const Divider(height: 1, color: ColoresApp.border),
 
-            // ── Lista de resultados ───────────────────────────────────────
+            // Lista de resultados
             Flexible(
               child: ListView.builder(
                 padding: const EdgeInsets.symmetric(vertical: 6),
@@ -330,9 +328,7 @@ class _PickerDialogState<T> extends State<_PickerDialog<T>> {
   }
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
 // Subwidgets del diálogo — StatelessWidget para rendimiento
-// ─────────────────────────────────────────────────────────────────────────────
 
 class _FilaAgregar extends StatelessWidget {
   const _FilaAgregar({required this.onTap});

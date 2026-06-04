@@ -189,7 +189,7 @@ class _DialogoProveedorState extends State<DialogoProveedor> {
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            // ── Encabezado ────────────────────────────────────────────────
+            // Encabezado
             Padding(
               padding: const EdgeInsets.fromLTRB(28, 28, 28, 0),
               child: Row(
@@ -217,7 +217,7 @@ class _DialogoProveedorState extends State<DialogoProveedor> {
               ),
             ),
 
-            // ── Formulario scrollable ─────────────────────────────────────
+            // Formulario scrollable
             Flexible(
               child: SingleChildScrollView(
                 padding: const EdgeInsets.all(28),
@@ -454,7 +454,7 @@ class _DialogoProveedorState extends State<DialogoProveedor> {
               ),
             ),
 
-            // ── Botones fijos en la parte inferior ───────────────────────
+            // Botones fijos en la parte inferior
             Padding(
               padding: const EdgeInsets.fromLTRB(28, 0, 28, 28),
               child: Row(

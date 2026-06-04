@@ -7,7 +7,7 @@ import '../../../../../backend/features/ventas/facturas/enum/enum_facturas.dart'
 import '../../../../../backend/features/ventas/facturas/modelo/factura_resumen.dart';
 import '../../../../share/formateadores/moneda_formateador.dart';
 import '../../../../share/temas/colores_app.dart';
-import '../../../../share/widgets/botones/dialogo_confirmar_eliminar_widget.dart';
+import '../../../../share/widgets/dialogos/dialogo_confirmar_eliminar_widget.dart';
 import '../../../../share/widgets/input/barra_busqueda_widget.dart';
 import '../../../../share/widgets/output/estado_error_widget.dart';
 import '../../../../share/widgets/output/estado_vacio_widget.dart';

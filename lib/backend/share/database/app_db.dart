@@ -7,6 +7,8 @@ import 'package:path_provider/path_provider.dart';
 import '../../features/autenticacion/esquema_datos/tabla_usuario.dart';
 import '../../features/categorias/esquema_datos/tabla_categoria.dart';
 import '../../features/clientes/esquema_datos/tabla_cliente.dart';
+import '../../features/cotizaciones/esquema_datos/tabla_cotizacion.dart';
+import '../../features/cotizaciones/esquema_datos/tabla_cotizacion_item.dart';
 import '../../features/especializacion/esquema_datos/tabla_especializacion.dart';
 import '../../features/motos/esquema_datos/tabla_moto.dart';
 import '../../features/productos/esquema_datos/tabla_producto.dart';
@@ -39,6 +41,8 @@ part 'app_db.g.dart';
     TablaOrdenesRepuesto,
     TablaVentas,
     TablaVentaDetalles,
+    TablaCotizacion,
+    TablaCotizacionItem
   ],
 )
 class AppDb extends _$AppDb {

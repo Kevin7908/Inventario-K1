@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../../../backend/features/ventas/ordenes/enum/enum_ordenes.dart';
-import '../../../../share/widgets/botones/dialogo_confirmar_eliminar_widget.dart';
+import '../../../../share/widgets/dialogos/dialogo_confirmar_eliminar_widget.dart';
 import '../../../../share/widgets/output/estado_error_widget.dart';
 import '../../../../share/widgets/output/snack_bar_mensaje.dart';
 import '../provider/ordenes_provider.dart';

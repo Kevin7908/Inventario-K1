@@ -24,14 +24,19 @@ class BarraLateralWidget extends StatelessWidget {
           _buildLogo(),
           Expanded(
             child: ListView(
-              padding: EdgeInsets.zero,
+              padding: const EdgeInsets.only(bottom: 12),
               children: [
+                // ── PRINCIPAL ──────────────────────────────────
                 _buildSectionLabel('PRINCIPAL'),
                 _buildNavItem(
                   NavSection.dashboard,
                   Icons.grid_view_rounded,
                   'Dashboard',
                 ),
+
+                // ── INVENTARIO ─────────────────────────────────
+                const SizedBox(height: 4),
+                _buildSectionLabel('INVENTARIO'),
                 _buildNavItem(
                   NavSection.productos,
                   Icons.inventory_2_outlined,
@@ -42,19 +47,33 @@ class BarraLateralWidget extends StatelessWidget {
                   Icons.layers_outlined,
                   'Categorías',
                 ),
-                const SizedBox(height: 8),
-                _buildSectionLabel('COMERCIAL'),
+                _buildNavItem(
+                  NavSection.unidadesMedida,
+                  Icons.straighten_outlined,
+                  'Unidades Medida',
+                ),
+
+                // ── VENTAS ─────────────────────────────────────
+                const SizedBox(height: 4),
+                _buildSectionLabel('VENTAS'),
                 _buildNavItem(
                   NavSection.vender,
                   Icons.shopping_cart_outlined,
                   'Vender',
                 ),
                 _buildNavItem(
+                  NavSection.cotizaciones,
+                  Icons.request_quote_outlined,
+                  'Cotizaciones',
+                ),
+                _buildNavItem(
                   NavSection.deudores,
                   Icons.attach_money_rounded,
                   'Deudores',
                 ),
-                const SizedBox(height: 8),
+
+                // ── GESTIÓN ────────────────────────────────────
+                const SizedBox(height: 4),
                 _buildSectionLabel('GESTIÓN'),
                 _buildNavItem(
                   NavSection.clientes,
@@ -67,24 +86,23 @@ class BarraLateralWidget extends StatelessWidget {
                   'Proveedores',
                 ),
                 _buildNavItem(
-                  NavSection.unidadesMedida,
-                  Icons.straighten_outlined,
-                  'Unidades Medida',
-                ),
-                _buildNavItem(
                   NavSection.motos,
                   Icons.motorcycle_outlined,
                   'Motos',
+                ),
+
+                // ── TALLER ─────────────────────────────────────
+                const SizedBox(height: 4),
+                _buildSectionLabel('TALLER'),
+                _buildNavItem(
+                  NavSection.tecnicos,
+                  Icons.engineering_outlined,
+                  'Técnicos',
                 ),
                 _buildNavItem(
                   NavSection.especializaciones,
                   Icons.build_outlined,
                   'Especializaciones',
-                ),
-                _buildNavItem(
-                  NavSection.tecnicos,
-                  Icons.engineering_outlined,
-                  'Técnicos',
                 ),
               ],
             ),
@@ -118,7 +136,7 @@ class BarraLateralWidget extends StatelessWidget {
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Text(
-                'MotoStock',
+                'InventarioK1',
                 style: TextStyle(
                   color: ColoresApp.textWhite,
                   fontSize: 15,
@@ -174,7 +192,8 @@ class BarraLateralWidget extends StatelessWidget {
               Icon(
                 icon,
                 size: 18,
-                color: isActive ? ColoresApp.textWhite : ColoresApp.textSidebar,
+                color:
+                    isActive ? ColoresApp.textWhite : ColoresApp.textSidebar,
               ),
               const SizedBox(width: 10),
               Text(
@@ -184,7 +203,8 @@ class BarraLateralWidget extends StatelessWidget {
                       ? ColoresApp.textWhite
                       : ColoresApp.textSidebar,
                   fontSize: 13.5,
-                  fontWeight: isActive ? FontWeight.w600 : FontWeight.w400,
+                  fontWeight:
+                      isActive ? FontWeight.w600 : FontWeight.w400,
                 ),
               ),
             ],

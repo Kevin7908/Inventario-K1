@@ -9,48 +9,36 @@ import '../../../../backend/features/proveedores/modelo/proveedor.dart';
 import '../../../../backend/features/unidades_medida/modelo/unidad_medida.dart';
 import '../../../share/temas/colores_app.dart';
 import '../../../share/widgets/output/snack_bar_mensaje.dart';
-import '../../categorias/view_model/categorias_view_model.dart';
+import '../../categorias/provider/categorias_provider.dart';
 import '../../proveedores/view_model/proveedores_view_model.dart';
-import '../../unidades_medida/view_model/unidad_medida_view_model.dart';
+import '../../unidades_medida/provider/unidades_medida_provider.dart';
 import '../provider/productos_provider.dart';
 
 class DialogoProducto extends ConsumerStatefulWidget {
   const DialogoProducto({
     super.key,
     this.productoAEditar,
-    required this.categoriasVm,
     required this.proveedoresVm,
-    required this.unidadesVm,
   });
 
   final Producto? productoAEditar;
-  final CategoriasViewModel categoriasVm;
   final ProveedoresViewModel proveedoresVm;
-  final UnidadesMedidaViewModel unidadesVm;
 
   bool get esEdicion => productoAEditar != null;
 
   static Future<void> mostrar(
     BuildContext context, {
-    required CategoriasViewModel categoriasVm,
     required ProveedoresViewModel proveedoresVm,
-    required UnidadesMedidaViewModel unidadesVm,
     Producto? productoAEditar,
   }) {
     return showDialog(
       context: context,
       barrierDismissible: false,
-      builder: (_) => MultiProvider(
-        providers: [
-          ChangeNotifierProvider<CategoriasViewModel>.value(value: categoriasVm),
-          ChangeNotifierProvider<ProveedoresViewModel>.value(value: proveedoresVm),
-          ChangeNotifierProvider<UnidadesMedidaViewModel>.value(value: unidadesVm),
-        ],
+      builder: (_) => ChangeNotifierProvider<ProveedoresViewModel>.value(
+        value: proveedoresVm,
         child: DialogoProducto(
           productoAEditar: productoAEditar,
-          categoriasVm:    categoriasVm,
-          proveedoresVm:   proveedoresVm,
-          unidadesVm:      unidadesVm,
+          proveedoresVm: proveedoresVm,
         ),
       ),
     );
@@ -107,7 +95,7 @@ class _DialogoProductoState extends ConsumerState<DialogoProducto> {
     _proveedorNotifier  = ValueNotifier<Proveedor?>(null);
     _unidadNotifier     = ValueNotifier<UnidadMedida?>(null);
     _imagenRutaNotifier = ValueNotifier<String?>(p?.imagenUrl);
-    _aplicaIvaNotifier  = ValueNotifier<bool>(p?.aplicaIva ?? true);
+    _aplicaIvaNotifier  = ValueNotifier<bool>(p?.aplicaIva ?? false);
     _activoNotifier     = ValueNotifier<bool>(p?.activo ?? true);
 
     if (p != null) {
@@ -118,10 +106,12 @@ class _DialogoProductoState extends ConsumerState<DialogoProducto> {
 
   void _preseleccionarFk(Producto p) {
     if (!mounted) return;
+    final categorias = ref.read(categoriasProvider).value?.categorias ?? [];
+    final unidades = ref.read(unidadesMedidaProvider).value?.unidades ?? [];
+
     if (p.categoriaId != null) {
-      _categoriaNotifier.value = widget.categoriasVm.categorias
-          .where((c) => c.id == p.categoriaId)
-          .firstOrNull;
+      _categoriaNotifier.value =
+          categorias.where((c) => c.id == p.categoriaId).firstOrNull;
     }
     if (p.proveedorId != null) {
       _proveedorNotifier.value = widget.proveedoresVm.proveedores
@@ -129,9 +119,8 @@ class _DialogoProductoState extends ConsumerState<DialogoProducto> {
           .firstOrNull;
     }
     if (p.unidadMedidaId != null) {
-      _unidadNotifier.value = widget.unidadesVm.unidades
-          .where((u) => u.id == p.unidadMedidaId)
-          .firstOrNull;
+      _unidadNotifier.value =
+          unidades.where((u) => u.id == p.unidadMedidaId).firstOrNull;
     }
   }
 
@@ -155,7 +144,14 @@ class _DialogoProductoState extends ConsumerState<DialogoProducto> {
     super.dispose();
   }
 
-  // ─── Guardar ──────────────────────────────────────────────────────────────
+  // Genera y asigna el SKU cuando se selecciona una categoría (solo en creación)
+  void _onCategoriaChanged(Categoria? cat) {
+    if (cat == null) return;
+    final sku = ref.read(productosProvider.notifier).generarSku(cat.nombre);
+    _skuCtrl.text = sku;
+  }
+
+  // Guardar
 
   Future<void> _guardar() async {
     if (!_formKey.currentState!.validate()) return;
@@ -223,7 +219,7 @@ class _DialogoProductoState extends ConsumerState<DialogoProducto> {
     }
   }
 
-  // ─── Build ────────────────────────────────────────────────────────────────
+  // Build
 
   @override
   Widget build(BuildContext context) {
@@ -247,17 +243,18 @@ class _DialogoProductoState extends ConsumerState<DialogoProducto> {
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       SeccionBasica(
-                        skuCtrl:          _skuCtrl,
-                        nombreCtrl:       _nombreCtrl,
-                        descripcionCtrl:  _descripcionCtrl,
+                        skuCtrl:         _skuCtrl,
+                        nombreCtrl:      _nombreCtrl,
+                        descripcionCtrl: _descripcionCtrl,
                       ),
                       const SizedBox(height: 20),
                       SeccionClasificacion(
-                        categoriaNotifier: _categoriaNotifier,
-                        proveedorNotifier: _proveedorNotifier,
-                        unidadNotifier:    _unidadNotifier,
-                        ubicacionCtrl:     _ubicacionCtrl,
-                        imagenRutaNotifier: _imagenRutaNotifier,
+                        categoriaNotifier:   _categoriaNotifier,
+                        proveedorNotifier:   _proveedorNotifier,
+                        unidadNotifier:      _unidadNotifier,
+                        ubicacionCtrl:       _ubicacionCtrl,
+                        imagenRutaNotifier:  _imagenRutaNotifier,
+                        onCategoriaChanged:  _onCategoriaChanged,
                       ),
                       const SizedBox(height: 20),
                       SeccionPrecios(
@@ -290,7 +287,7 @@ class _DialogoProductoState extends ConsumerState<DialogoProducto> {
   }
 }
 
-// ─── Sub-widgets estáticos ────────────────────────────────────────────────────
+// Sub-widgets estáticos
 
 class _Encabezado extends StatelessWidget {
   const _Encabezado({required this.titulo});

@@ -1,50 +1,41 @@
 import 'package:flutter/material.dart';
-import 'package:provider/provider.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:inventario_k1/frontend/share/temas/colores_app.dart';
 
 import '../../../../backend/features/unidades_medida/modelo/unidad_medida.dart';
-import '../view_model/unidad_medida_view_model.dart';
+import '../../../share/widgets/output/snack_bar_mensaje.dart';
+import '../provider/unidades_medida_provider.dart';
 
-class DialogoUnidadMedida extends StatefulWidget {
+class DialogoUnidadMedida extends ConsumerStatefulWidget {
   final UnidadMedida? unidadAEditar;
-  final UnidadesMedidaViewModel viewModel;
 
-  const DialogoUnidadMedida({
-    super.key,
-    this.unidadAEditar,
-    required this.viewModel,
-  });
+  const DialogoUnidadMedida({super.key, this.unidadAEditar});
 
   bool get esEdicion => unidadAEditar != null;
 
   static Future<void> mostrar(
     BuildContext context, {
-    required UnidadesMedidaViewModel viewModel,
     UnidadMedida? unidadAEditar,
   }) {
     return showDialog(
       context: context,
       barrierDismissible: false,
-      builder: (_) => ChangeNotifierProvider<UnidadesMedidaViewModel>.value(
-        value: viewModel, // Inyectarlo en la nueva ruta del diálogo
-        child: DialogoUnidadMedida(
-          viewModel: viewModel,
-          unidadAEditar: unidadAEditar,
-        ),
-      ),
+      builder: (_) => DialogoUnidadMedida(unidadAEditar: unidadAEditar),
     );
   }
 
   @override
-  State<DialogoUnidadMedida> createState() => _DialogoUnidadMedidaState();
+  ConsumerState<DialogoUnidadMedida> createState() =>
+      _DialogoUnidadMedidaState();
 }
 
-class _DialogoUnidadMedidaState extends State<DialogoUnidadMedida> {
+class _DialogoUnidadMedidaState extends ConsumerState<DialogoUnidadMedida> {
   final _formKey = GlobalKey<FormState>();
   late final TextEditingController _nombreCtrl;
   late final TextEditingController _abreviaturaCtrl;
   late final TextEditingController _descripcionCtrl;
   late String _tipoSeleccionado;
+  bool _guardando = false;
 
   @override
   void initState() {
@@ -71,61 +62,45 @@ class _DialogoUnidadMedidaState extends State<DialogoUnidadMedida> {
 
   Future<void> _guardar() async {
     if (!_formKey.currentState!.validate()) return;
+    setState(() => _guardando = true);
 
-    final vm = context.read<UnidadesMedidaViewModel>();
-    bool exito;
+    final notifier = ref.read(unidadesMedidaProvider.notifier);
+    String? error;
 
     if (widget.esEdicion) {
-      exito = await vm.actualizarUnidad(
+      error = await notifier.actualizar(
         id: widget.unidadAEditar!.id!,
         nombre: _nombreCtrl.text,
         abreviatura: _abreviaturaCtrl.text,
         tipo: _tipoSeleccionado,
         descripcion: _descripcionCtrl.text.isEmpty
-            ? "Sin descripción"
+            ? 'Sin descripción'
             : _descripcionCtrl.text,
       );
     } else {
-      exito = await vm.crearUnidad(
+      error = await notifier.crear(
         nombre: _nombreCtrl.text,
         abreviatura: _abreviaturaCtrl.text,
         tipo: _tipoSeleccionado,
         descripcion: _descripcionCtrl.text.isEmpty
-            ? "Sin descripción"
+            ? 'Sin descripción'
             : _descripcionCtrl.text,
       );
     }
 
     if (!mounted) return;
+    setState(() => _guardando = false);
 
-    if (exito) {
+    if (error == null) {
       Navigator.of(context).pop();
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(
-            widget.esEdicion
-                ? 'Unidad actualizada correctamente'
-                : 'Unidad creada correctamente',
-          ),
-          backgroundColor: ColoresApp.statusPaid,
-          behavior: SnackBarBehavior.floating,
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(10),
-          ),
-        ),
+      SnackBarMensaje.success(
+        context,
+        widget.esEdicion
+            ? 'Unidad actualizada correctamente'
+            : 'Unidad creada correctamente',
       );
-    } else if (vm.mensajeError != null) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(vm.mensajeError!),
-          backgroundColor: ColoresApp.statusDebt,
-          behavior: SnackBarBehavior.floating,
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(10),
-          ),
-        ),
-      );
-      vm.limpiarError();
+    } else {
+      SnackBarMensaje.error(context, error);
     }
   }
 
@@ -143,7 +118,6 @@ class _DialogoUnidadMedidaState extends State<DialogoUnidadMedida> {
             mainAxisSize: MainAxisSize.min,
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              // Encabezado
               Row(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
@@ -157,7 +131,6 @@ class _DialogoUnidadMedidaState extends State<DialogoUnidadMedida> {
                       fontWeight: FontWeight.w700,
                     ),
                   ),
-                  // Icono para cerrar el diálogo
                   IconButton(
                     onPressed: () => Navigator.of(context).pop(),
                     icon: const Icon(Icons.close, color: ColoresApp.textMedium),
@@ -172,7 +145,6 @@ class _DialogoUnidadMedidaState extends State<DialogoUnidadMedida> {
               ),
               const SizedBox(height: 24),
 
-              // Nombre y Abreviatura en fila
               Row(
                 children: [
                   Expanded(
@@ -220,7 +192,6 @@ class _DialogoUnidadMedidaState extends State<DialogoUnidadMedida> {
               ),
               const SizedBox(height: 16),
 
-              // Tipo
               _etiqueta('Tipo'),
               const SizedBox(height: 6),
               Container(
@@ -246,7 +217,9 @@ class _DialogoUnidadMedidaState extends State<DialogoUnidadMedida> {
                         .map(
                           (t) => DropdownMenuItem(
                             value: t,
-                            child: Text(t[0].toUpperCase() + t.substring(1)),
+                            child: Text(
+                              t[0].toUpperCase() + t.substring(1),
+                            ),
                           ),
                         )
                         .toList(),
@@ -257,7 +230,6 @@ class _DialogoUnidadMedidaState extends State<DialogoUnidadMedida> {
               ),
               const SizedBox(height: 16),
 
-              // Descripción
               _etiqueta('Descripción (opcional)'),
               const SizedBox(height: 6),
               TextFormField(
@@ -267,7 +239,6 @@ class _DialogoUnidadMedidaState extends State<DialogoUnidadMedida> {
               ),
               const SizedBox(height: 28),
 
-              // Botones
               Row(
                 children: [
                   Expanded(
@@ -286,33 +257,31 @@ class _DialogoUnidadMedidaState extends State<DialogoUnidadMedida> {
                   ),
                   const SizedBox(width: 12),
                   Expanded(
-                    child: Consumer<UnidadesMedidaViewModel>(
-                      builder: (_, vm, __) => ElevatedButton(
-                        onPressed: vm.estaCargando ? null : _guardar,
-                        style: ElevatedButton.styleFrom(
-                          backgroundColor: ColoresApp.primary,
-                          foregroundColor: Colors.white,
-                          padding: const EdgeInsets.symmetric(vertical: 13),
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(10),
-                          ),
-                          elevation: 0,
+                    child: ElevatedButton(
+                      onPressed: _guardando ? null : _guardar,
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: ColoresApp.primary,
+                        foregroundColor: Colors.white,
+                        padding: const EdgeInsets.symmetric(vertical: 13),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(10),
                         ),
-                        child: vm.estaCargando
-                            ? const SizedBox(
-                                width: 18,
-                                height: 18,
-                                child: CircularProgressIndicator(
-                                  strokeWidth: 2,
-                                  color: Colors.white,
-                                ),
-                              )
-                            : Text(
-                                widget.esEdicion
-                                    ? 'Guardar cambios'
-                                    : 'Crear unidad',
-                              ),
+                        elevation: 0,
                       ),
+                      child: _guardando
+                          ? const SizedBox(
+                              width: 18,
+                              height: 18,
+                              child: CircularProgressIndicator(
+                                strokeWidth: 2,
+                                color: Colors.white,
+                              ),
+                            )
+                          : Text(
+                              widget.esEdicion
+                                  ? 'Guardar cambios'
+                                  : 'Crear unidad',
+                            ),
                     ),
                   ),
                 ],
@@ -325,35 +294,36 @@ class _DialogoUnidadMedidaState extends State<DialogoUnidadMedida> {
   }
 
   Widget _etiqueta(String texto) => Text(
-    texto,
-    style: const TextStyle(
-      color: ColoresApp.textDark,
-      fontSize: 13,
-      fontWeight: FontWeight.w600,
-    ),
-  );
+        texto,
+        style: const TextStyle(
+          color: ColoresApp.textDark,
+          fontSize: 13,
+          fontWeight: FontWeight.w600,
+        ),
+      );
 
   InputDecoration _deco(String hint) => InputDecoration(
-    hintText: hint,
-    hintStyle: const TextStyle(color: ColoresApp.textLight, fontSize: 13.5),
-    filled: true,
-    fillColor: ColoresApp.bgContent,
-    contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
-    border: OutlineInputBorder(
-      borderRadius: BorderRadius.circular(10),
-      borderSide: const BorderSide(color: ColoresApp.border),
-    ),
-    enabledBorder: OutlineInputBorder(
-      borderRadius: BorderRadius.circular(10),
-      borderSide: const BorderSide(color: ColoresApp.border),
-    ),
-    focusedBorder: OutlineInputBorder(
-      borderRadius: BorderRadius.circular(10),
-      borderSide: const BorderSide(color: ColoresApp.primary, width: 1.5),
-    ),
-    errorBorder: OutlineInputBorder(
-      borderRadius: BorderRadius.circular(10),
-      borderSide: const BorderSide(color: ColoresApp.statusDebt),
-    ),
-  );
+        hintText: hint,
+        hintStyle: const TextStyle(color: ColoresApp.textLight, fontSize: 13.5),
+        filled: true,
+        fillColor: ColoresApp.bgContent,
+        contentPadding:
+            const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+        border: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(10),
+          borderSide: const BorderSide(color: ColoresApp.border),
+        ),
+        enabledBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(10),
+          borderSide: const BorderSide(color: ColoresApp.border),
+        ),
+        focusedBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(10),
+          borderSide: const BorderSide(color: ColoresApp.primary, width: 1.5),
+        ),
+        errorBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(10),
+          borderSide: const BorderSide(color: ColoresApp.statusDebt),
+        ),
+      );
 }

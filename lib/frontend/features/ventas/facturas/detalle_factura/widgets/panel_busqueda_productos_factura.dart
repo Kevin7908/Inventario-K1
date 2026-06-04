@@ -10,11 +10,9 @@ import '../../../../../share/temas/colores_app.dart';
 import '../../../../../share/widgets/botones/boton_mas_widget.dart';
 import '../../../../../share/widgets/output/precio_cop_widget.dart';
 import '../../../../../share/widgets/output/snack_bar_mensaje.dart';
-import '../../../../categorias/view_model/categorias_view_model.dart';
 import '../../../../productos/provider/productos_provider.dart';
 import '../../../../productos/widgets/dialogo_producto_widget.dart';
 import '../../../../proveedores/view_model/proveedores_view_model.dart';
-import '../../../../unidades_medida/view_model/unidad_medida_view_model.dart';
 import '../../provider/facturas_provider.dart';
 
 class PanelBusquedaProductosFactura extends ConsumerStatefulWidget {
@@ -138,9 +136,7 @@ class _PanelBusquedaProductosFacturaState
                 BotonMasWidget(
                   onPressed: () => DialogoProducto.mostrar(
                     context,
-                    categoriasVm: locator<CategoriasViewModel>(),
                     proveedoresVm: locator<ProveedoresViewModel>(),
-                    unidadesVm: locator<UnidadesMedidaViewModel>(),
                   ),
                 ),
               ],

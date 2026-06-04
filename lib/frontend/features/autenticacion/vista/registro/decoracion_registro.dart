@@ -3,7 +3,7 @@ import 'package:flutter/material.dart';
 import '../../../../share/temas/colores_app.dart';
 import '../../view_model/registro_view_model.dart';
 
-// ─── Banner de error ──────────────────────────────────────────────────────────
+// Banner de error
 
 class BannerError extends StatelessWidget {
   final String mensaje;
@@ -35,7 +35,7 @@ class BannerError extends StatelessWidget {
   }
 }
 
-// ─── Encabezado dinámico ──────────────────────────────────────────────────────
+// Encabezado dinámico
 
 class EncabezadoRegistro extends StatelessWidget {
   final RegistroViewModel vm;
@@ -119,7 +119,7 @@ class _LinkIniciarSesion extends StatelessWidget {
   }
 }
 
-// ─── Indicador de 3 pasos ─────────────────────────────────────────────────────
+// Indicador de 3 pasos
 
 class IndicadorPasos extends StatelessWidget {
   final PasoRegistro pasoActual;

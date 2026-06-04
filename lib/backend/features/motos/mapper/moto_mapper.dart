@@ -6,7 +6,7 @@ import '../modelo/moto.dart';
 class MotoMapper {
   MotoMapper._();
 
-  // ─── Fila Drift → Modelo de dominio ────────────────────────────────────────
+  // Fila Drift → Modelo de dominio
   static Moto filaAModelo(TablaMotoData fila, {String? nombreCliente}) {
     return Moto(
       id: fila.id,
@@ -28,7 +28,7 @@ class MotoMapper {
     );
   }
 
-  // ─── Modelo de dominio → Companion Drift ───────────────────────────────────
+  // Modelo de dominio → Companion Drift
   static TablaMotoCompanion modeloACompanion(Moto moto) {
     return TablaMotoCompanion(
       id: moto.id == 0 ? const Value.absent() : Value(moto.id),

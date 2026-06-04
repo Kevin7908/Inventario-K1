@@ -7,7 +7,7 @@ import 'package:provider/provider.dart';
 
 import '../../../../backend/share/database/locator.dart';
 import '../../../share/temas/colores_app.dart';
-import '../../../share/widgets/botones/dialogo_confirmar_eliminar_widget.dart';
+import '../../../share/widgets/dialogos/dialogo_confirmar_eliminar_widget.dart';
 import '../../../share/widgets/input/barra_busqueda_widget.dart';
 import '../../../share/widgets/output/chip_filtro_widget.dart';
 import '../../../share/widgets/output/estado_error_widget.dart';
@@ -56,7 +56,7 @@ class _ProveedoresVistaState extends State<ProveedoresVista> {
         backgroundColor: ColoresApp.bgContent,
         body: Column(
           children: [
-            // ── TopBar: no depende del VM → nunca se reconstruye por datos
+            // TopBar: no depende del VM → nunca se reconstruye por datos
             Consumer<ProveedoresViewModel>(
               builder: (context, vm, _) => TopBarConBoton(
                 titulo: 'Proveedores',
@@ -71,7 +71,7 @@ class _ProveedoresVistaState extends State<ProveedoresVista> {
               alCambiar: _onSearchChanged,
             ),
 
-            // ── El Consumer queda confinado al cuerpo de datos
+            // El Consumer queda confinado al cuerpo de datos
             const Expanded(child: _CuerpoLista()),
           ],
         ),

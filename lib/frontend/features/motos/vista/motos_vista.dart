@@ -3,7 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../../backend/features/motos/modelo/moto.dart';
 import '../../../share/temas/colores_app.dart';
-import '../../../share/widgets/botones/dialogo_confirmar_eliminar_widget.dart';
+import '../../../share/widgets/dialogos/dialogo_confirmar_eliminar_widget.dart';
 import '../../../share/widgets/input/barra_busqueda_widget.dart';
 import '../../../share/widgets/output/estado_error_widget.dart';
 import '../../../share/widgets/output/estado_vacio_widget.dart';

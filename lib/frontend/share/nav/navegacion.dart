@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:inventario_k1/frontend/features/cotizaciones/vista/cotizaciones_vista.dart';
 import 'package:inventario_k1/frontend/features/tecnicos/vista/tecnico_vista.dart';
 import 'package:inventario_k1/frontend/features/ventas/principal/vista/venta_vista.dart';
 import 'package:inventario_k1/frontend/share/nav/nav_section.dart';
@@ -29,14 +30,15 @@ class _NavegacionState extends State<Navegacion> {
     NavSection.dashboard,
     NavSection.productos,
     NavSection.categorias,
+    NavSection.unidadesMedida,
     NavSection.vender,
+    NavSection.cotizaciones,
     NavSection.deudores,
     NavSection.clientes,
     NavSection.proveedores,
-    NavSection.unidadesMedida,
     NavSection.motos,
-    NavSection.especializaciones,
     NavSection.tecnicos,
+    NavSection.especializaciones,
   ];
 
   @override
@@ -44,37 +46,32 @@ class _NavegacionState extends State<Navegacion> {
     return Scaffold(
       body: Row(
         children: [
-          // Menú lateral
           BarraLateralWidget(
             seccionActual: _seccionActual,
             cambioSeccion: (section) =>
                 setState(() => _seccionActual = section),
           ),
-
-          // Separador visual
           const VerticalDivider(
             width: 1,
             thickness: 1,
             color: ColoresApp.borderSidebar,
           ),
-
-          // Contenido principal — IndexedStack mantiene el estado de cada vista
           Expanded(
             child: IndexedStack(
               index: _navOrder.indexOf(_seccionActual),
               children: const [
                 PlaceholderWidget(seccion: NavSection.dashboard),
                 ProductosVista(),
-                // Las vistas reales que ya tienen lógica MVVM:
                 CategoriasVista(),
+                UnidadesMedidaVista(),
                 VentasVista(),
+                CotizacionesVista(),
                 PlaceholderWidget(seccion: NavSection.deudores),
                 ClientesVista(),
                 ProveedoresVista(),
-                UnidadesMedidaVista(),
                 MotosVista(),
-                EspecializacionesVista(),
                 TecnicosVista(),
+                EspecializacionesVista(),
               ],
             ),
           ),

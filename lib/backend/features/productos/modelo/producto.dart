@@ -42,21 +42,21 @@ class Producto extends Equatable {
     required this.sku,
     required this.nombre,
     this.descripcion,
-    // ── FKs (IDs) — se persisten en la tabla
+    // FKs (IDs) — se persisten en la tabla
     this.categoriaId,
     this.unidadMedidaId,
     this.proveedorId,
-    // ── Nombres desnormalizados — hidratados por JOIN, nunca por la UI
+    // Nombres desnormalizados — hidratados por JOIN, nunca por la UI
     this.categoriaNombre,
     this.unidadMedidaNombre,
     this.proveedorNombre,
-    // ── Precios y stock
+    // Precios y stock
     required this.precioCompra,
     required this.precioVenta,
     this.precioVentaTaller,
     required this.stockActual,
     required this.stockMinimo,
-    // ── Metadata
+    // Metadata
     this.ubicacionBodega,
     this.imagenUrl,
     required this.aplicaIva,
@@ -65,7 +65,7 @@ class Producto extends Equatable {
     this.actualizadoEn,
   });
 
-  // ── Equatable ─────────────────────────────────────────────────────────────
+  // Equatable
   // La identidad se define por los campos de negocio clave.
   // Los nombres desnormalizados y las fechas NO participan en la igualdad:
   //   • categoriaNombre/proveedorNombre/unidadMedidaNombre → son cache de lectura
@@ -93,7 +93,7 @@ class Producto extends Equatable {
         activo,
       ];
 
-  // ── copyWith 
+  // copyWith
   // Permite actualizar campos individuales sin mutar la instancia original.
   // Los nombres desnormalizados se incluyen para que el repositorio pueda
   // reemplazar los nombres tras un JOIN sin perder los demás datos.
@@ -145,7 +145,7 @@ class Producto extends Equatable {
     );
   }
 
-  // ── Getters computados ────────────────────────────────────────────────────
+  // Getters computados
   // Lógica de dominio pura — no dependen de Flutter ni de la BD.
 
   /// Estado de stock calculado a partir de stockActual y stockMinimo.

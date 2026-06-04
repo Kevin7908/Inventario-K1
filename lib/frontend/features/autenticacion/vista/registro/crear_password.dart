@@ -123,7 +123,7 @@ class _PasoCrearPasswordState extends State<PasoCrearPassword> {
   }
 }
 
-// ─── Sub-widget estático: se renderiza una sola vez ───────────────────────────
+// Sub-widget estático: se renderiza una sola vez
 
 class _ResumenUsuario extends StatelessWidget {
   final String nombre;

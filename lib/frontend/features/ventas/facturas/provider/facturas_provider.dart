@@ -13,7 +13,7 @@ final repositorioFacturasProvider = Provider<RepositorioFacturas>(
   (ref) => RepositorioFacturasImpl(ref.watch(appDatabaseProvider)),
 );
 
-// ── State ────────────────────────────────────────────────────────────────────
+// State
 
 final class FacturasState {
   const FacturasState({
@@ -42,7 +42,7 @@ final class FacturasState {
   static const Object _sentinel = Object();
 }
 
-// ── Notifier ─────────────────────────────────────────────────────────────────
+// Notifier
 
 class FacturasNotifier extends AsyncNotifier<FacturasState> {
   late final RepositorioFacturas _repo;
@@ -68,7 +68,7 @@ class FacturasNotifier extends AsyncNotifier<FacturasState> {
     return FacturasState(facturas: lista);
   }
 
-  // ── Filtros ───────────────────────────────────────────────────────────────
+  // Filtros
 
   void buscar(String query) {
     final actual = state.value;
@@ -82,7 +82,7 @@ class FacturasNotifier extends AsyncNotifier<FacturasState> {
     state = AsyncData(actual.copyWith(filtroEstadoPago: estado));
   }
 
-  // ── CRUD Factura ──────────────────────────────────────────────────────────
+  // CRUD Factura
 
   Future<String?> crear({
     required TipoVenta tipo,
@@ -197,7 +197,7 @@ class FacturasNotifier extends AsyncNotifier<FacturasState> {
     }
   }
 
-  // ── CRUD Items ────────────────────────────────────────────────────────────
+  // CRUD Items
 
   Future<String?> agregarItem({
     required int ventaId,
@@ -268,7 +268,7 @@ class FacturasNotifier extends AsyncNotifier<FacturasState> {
   }
 }
 
-// ── Providers públicos ────────────────────────────────────────────────────────
+// Providers públicos
 
 final facturasProvider =
     AsyncNotifierProvider<FacturasNotifier, FacturasState>(

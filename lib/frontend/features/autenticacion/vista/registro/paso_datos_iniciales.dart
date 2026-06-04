@@ -67,7 +67,7 @@ class _PasoDatosInicialesState extends State<PasoDatosIniciales> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            // ── Nombre completo ──
+            // Nombre completo
             TextFieldCustom(
               etiqueta: 'Nombre completo',
               hint: 'Juan García',
@@ -83,7 +83,7 @@ class _PasoDatosInicialesState extends State<PasoDatosIniciales> {
             ),
             const SizedBox(height: 16),
 
-            // ── Nombre de usuario ──
+            // Nombre de usuario
             TextFieldCustom(
               etiqueta: 'Nombre de usuario',
               hint: 'juangarcia',
@@ -111,7 +111,7 @@ class _PasoDatosInicialesState extends State<PasoDatosIniciales> {
             ),
             const SizedBox(height: 12),
 
-            // ── Correo electrónico ──
+            // Correo electrónico
             TextFieldCustom(
               etiqueta: 'Correo electrónico',
               hint: 'tu@correo.com',
@@ -153,7 +153,7 @@ class _PasoDatosInicialesState extends State<PasoDatosIniciales> {
   }
 }
 
-// ─── Formatter: fuerza minúsculas y solo permite [a-z0-9_] ──────────────────
+// Formatter: fuerza minúsculas y solo permite [a-z0-9_]
 
 class _UsuarioInputFormatter extends TextInputFormatter {
   static final _permitidos = RegExp(r'[a-z0-9_]');

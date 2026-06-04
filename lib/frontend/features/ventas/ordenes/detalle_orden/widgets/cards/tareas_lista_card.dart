@@ -3,7 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../../../../../backend/features/ventas/ordenes/modelo/orden_tarea.dart';
 import '../../../../../../share/temas/colores_app.dart';
-import '../../../../../../share/widgets/botones/dialogo_confirmar_eliminar_widget.dart';
+import '../../../../../../share/widgets/dialogos/dialogo_confirmar_eliminar_widget.dart';
 import '../../../../../../share/widgets/output/snack_bar_mensaje.dart';
 import '../../../provider/ordenes_provider.dart';
 import '../../../widgets/dialogo_agregar_editar_tarea.dart';

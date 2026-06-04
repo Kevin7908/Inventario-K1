@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:inventario_k1/frontend/share/temas/colores_app.dart';
 
-// ─────────────────────────────────────────────────────────────────────────────
 // EstadoVacioWidget
 //
 // Widget genérico para mostrar un estado vacío en cualquier sección.
@@ -24,7 +23,6 @@ import 'package:inventario_k1/frontend/share/temas/colores_app.dart';
 //     textoCTA: 'Crea tu primera unidad presionando "Agregar".',
 //     hayFiltro: vm.consultaBusqueda.isNotEmpty,
 //   )
-// ─────────────────────────────────────────────────────────────────────────────
 class EstadoVacioWidget extends StatelessWidget {
   final IconData icono;
   final String textoSinDatos;

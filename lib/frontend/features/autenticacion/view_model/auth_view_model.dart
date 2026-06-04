@@ -13,7 +13,7 @@ class AuthViewModel extends ChangeNotifier {
 
   AuthViewModel(this._repositorio, this._servicioEmail);
 
-  // ─── Estado interno ───────────────────────────────────────────────────────
+  // Estado interno
 
   EstadoAuth _estado = EstadoAuth.inicial;
   Usuario? _usuarioActual;
@@ -28,7 +28,7 @@ class AuthViewModel extends ChangeNotifier {
   bool get estaActivo => _usuarioActual?.estaActivo ?? false;
   bool get esAdmin => _usuarioActual?.esAdmin ?? false;
 
-  // ─── Login ────────────────────────────────────────────────────────────────
+  // Login
 
   Future<void> iniciarSesion({
     required String usuario,
@@ -69,7 +69,7 @@ class AuthViewModel extends ChangeNotifier {
     }
   }
 
-  // ─── Registro ─────────────────────────────────────────────────────────────
+  // Registro
 
   Future<bool> registrarUsuario({
     required String nombre,
@@ -117,7 +117,7 @@ class AuthViewModel extends ChangeNotifier {
     }
   }
 
-  // ─── Cambiar estado activo (solo admin) ───────────────────────────────────
+  // Cambiar estado activo (solo admin)
 
   Future<bool> cambiarEstadoUsuario({
     required int usuarioId,
@@ -159,7 +159,7 @@ class AuthViewModel extends ChangeNotifier {
     }
   }
 
-  // ─── Cerrar sesión ────────────────────────────────────────────────────────
+  // Cerrar sesión
 
   Future<void> cerrarSesion() async {
     _usuarioActual = null;
@@ -168,7 +168,7 @@ class AuthViewModel extends ChangeNotifier {
     notifyListeners();
   }
 
-  // ─── Utilidades ──────────────────────────────────────────────────────────
+  // Utilidades
 
   void limpiarError() {
     if (_mensajeError != null) {

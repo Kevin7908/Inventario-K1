@@ -15,12 +15,16 @@ class TarjetaProductoWidget extends StatefulWidget {
     this.alEditar,
     this.alEliminar,
     this.alVerDetalle,
+    this.alTap,
   });
 
   final Producto producto;
   final VoidCallback? alEditar;
   final VoidCallback? alEliminar;
   final VoidCallback? alVerDetalle;
+  /// Si se proporciona, sobrescribe la acción de tap sobre la tarjeta
+  /// (mantiene alVerDetalle solo para el botón de ojo).
+  final VoidCallback? alTap;
 
   @override
   State<TarjetaProductoWidget> createState() => _TarjetaProductoWidgetState();
@@ -40,25 +44,29 @@ class _TarjetaProductoWidgetState extends State<TarjetaProductoWidget> {
     final p = widget.producto;
 
     return RepaintBoundary(
-      child: MouseRegion(
-        cursor: SystemMouseCursors.click,
-        onEnter: (_) => setState(() => _hovering = true),
-        onExit: (_) => setState(() => _hovering = false),
-        child: GestureDetector(
-          onTap: widget.alVerDetalle,
-          child: AnimatedContainer(
-            duration: const Duration(milliseconds: 150),
-            curve: Curves.easeOut,
-            decoration: BoxDecoration(
-              color: ColoresApp.bgCard,
-              borderRadius: BorderRadius.circular(16),
-              border: Border.all(
-                color: _hovering
-                    ? ColoresApp.primary.withValues(alpha: 0.55)
-                    : ColoresApp.border,
-                width: _hovering ? 1.5 : 1.0,
+      child: Opacity(
+        opacity: p.activo ? 1.0 : 0.5,
+        child: MouseRegion(
+          cursor: SystemMouseCursors.click,
+          onEnter: (_) => setState(() => _hovering = true),
+          onExit: (_) => setState(() => _hovering = false),
+          child: GestureDetector(
+            onTap: widget.alTap ?? widget.alVerDetalle,
+            child: AnimatedContainer(
+              duration: const Duration(milliseconds: 150),
+              curve: Curves.easeOut,
+              decoration: BoxDecoration(
+                color: p.activo ? ColoresApp.bgCard : ColoresApp.bgContent,
+                borderRadius: BorderRadius.circular(16),
+                border: Border.all(
+                  color: !p.activo
+                      ? ColoresApp.border
+                      : _hovering
+                          ? ColoresApp.primary.withValues(alpha: 0.55)
+                          : ColoresApp.border,
+                  width: _hovering && p.activo ? 1.5 : 1.0,
+                ),
               ),
-            ),
             child: Padding(
               padding: const EdgeInsets.all(16),
               child: Column(
@@ -171,11 +179,12 @@ class _TarjetaProductoWidgetState extends State<TarjetaProductoWidget> {
           ),
         ),
       ),
-    );
+    ),
+  );
   }
 }
 
-// ── Subwidget: imagen con badge de stock ──────────────────────────────────────
+// Subwidget: imagen con badge de stock
 
 class _ImagenConBadge extends StatelessWidget {
   const _ImagenConBadge({required this.producto});
