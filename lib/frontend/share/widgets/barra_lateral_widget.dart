@@ -136,7 +136,7 @@ class BarraLateralWidget extends StatelessWidget {
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Text(
-                'MotoStock',
+                'InventarioK1',
                 style: TextStyle(
                   color: ColoresApp.textWhite,
                   fontSize: 15,

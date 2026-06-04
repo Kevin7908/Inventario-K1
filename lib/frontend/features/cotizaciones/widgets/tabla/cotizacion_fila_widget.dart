@@ -64,149 +64,142 @@ class _EncabezadoCol extends StatelessWidget {
 
 // ── Fila de cotización ────────────────────────────────────────────────────────
 
-class CotizacionFilaWidget extends StatefulWidget {
+class CotizacionFilaWidget extends StatelessWidget {
   const CotizacionFilaWidget({
     super.key,
     required this.cotizacion,
     required this.seleccionada,
     required this.onTap,
-    required this.onEditar,
     required this.onEliminar,
   });
 
   final CotizacionResumen cotizacion;
   final bool seleccionada;
   final VoidCallback onTap;
-  final VoidCallback onEditar;
   final VoidCallback onEliminar;
 
   @override
-  State<CotizacionFilaWidget> createState() => _CotizacionFilaWidgetState();
-}
-
-class _CotizacionFilaWidgetState extends State<CotizacionFilaWidget> {
-  bool _hovered = false;
-
-  @override
   Widget build(BuildContext context) {
-    final c = widget.cotizacion;
+    final c = cotizacion;
 
-    return MouseRegion(
-      onEnter: (_) => setState(() => _hovered = true),
-      onExit: (_) => setState(() => _hovered = false),
-      child: GestureDetector(
-        onTap: widget.onTap,
-        child: AnimatedContainer(
-          duration: const Duration(milliseconds: 100),
-          color: widget.seleccionada
-              ? ColoresApp.primaryLight
-              : _hovered
-                  ? ColoresApp.bgCardHover
-                  : Colors.transparent,
-          padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 14),
-          child: Row(
-            children: [
-              // Número
-              Expanded(
-                flex: 2,
-                child: Text(
-                  c.numero,
-                  style: const TextStyle(
-                    color: ColoresApp.primary,
-                    fontSize: 13,
-                    fontWeight: FontWeight.w600,
+    return Row(
+      children: [
+        // ── Zona de datos clickable ──────────────────────────────
+        Expanded(
+          flex: 14,
+          child: GestureDetector(
+            behavior: HitTestBehavior.opaque,
+            onTap: onTap,
+            child: Padding(
+              padding: const EdgeInsets.fromLTRB(20, 14, 0, 14),
+              child: Row(
+                children: [
+                  // Número
+                  Expanded(
+                    flex: 2,
+                    child: Text(
+                      c.numero,
+                      style: const TextStyle(
+                        color: ColoresApp.primary,
+                        fontSize: 13,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
                   ),
-                ),
-              ),
 
-              // Cliente
-              Expanded(
-                flex: 3,
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      c.nombreCliente,
+                  // Cliente
+                  Expanded(
+                    flex: 3,
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          c.nombreCliente,
+                          style: const TextStyle(
+                            color: ColoresApp.textDark,
+                            fontSize: 13,
+                            fontWeight: FontWeight.w500,
+                          ),
+                        ),
+                        if (c.telefonoCliente != null)
+                          Text(
+                            c.telefonoCliente!,
+                            style: const TextStyle(
+                              color: ColoresApp.textLight,
+                              fontSize: 11.5,
+                            ),
+                          ),
+                      ],
+                    ),
+                  ),
+
+                  // Moto
+                  Expanded(
+                    flex: 3,
+                    child: Align(
+                      alignment: Alignment.centerLeft,
+                      child: _MotoChip(nombreMoto: c.nombreMoto),
+                    ),
+                  ),
+
+                  // Total
+                  Expanded(
+                    flex: 2,
+                    child: Text(
+                      c.total.toCompactCop(),
                       style: const TextStyle(
                         color: ColoresApp.textDark,
                         fontSize: 13,
                         fontWeight: FontWeight.w500,
                       ),
                     ),
-                    if (c.telefonoCliente != null)
-                      Text(
-                        c.telefonoCliente!,
-                        style: const TextStyle(
-                          color: ColoresApp.textLight,
-                          fontSize: 11.5,
-                        ),
+                  ),
+
+                  // Vigencia
+                  Expanded(
+                    flex: 2,
+                    child: Text(
+                      c.vigenciaHasta,
+                      style: const TextStyle(
+                        color: ColoresApp.textMedium,
+                        fontSize: 13,
                       ),
-                  ],
-                ),
-              ),
-
-              // Moto
-              Expanded(
-                flex: 3,
-                child: _MotoChip(nombreMoto: c.nombreMoto),
-              ),
-
-              // Total — usa toCompactCop() para evitar recálculo en cada build
-              Expanded(
-                flex: 2,
-                child: Text(
-                  c.total.toCompactCop(),
-                  style: const TextStyle(
-                    color: ColoresApp.textDark,
-                    fontSize: 13,
-                    fontWeight: FontWeight.w500,
-                  ),
-                ),
-              ),
-
-              // Vigencia
-              Expanded(
-                flex: 2,
-                child: Text(
-                  c.vigenciaHasta,
-                  style: const TextStyle(
-                    color: ColoresApp.textMedium,
-                    fontSize: 13,
-                  ),
-                ),
-              ),
-
-              // Estado
-              Expanded(
-                flex: 2,
-                child: BadgeEstadoCotizacion(estado: c.estado),
-              ),
-
-              // Acciones
-              Expanded(
-                flex: 2,
-                child: Row(
-                  mainAxisAlignment: MainAxisAlignment.end,
-                  children: [
-                    AccionBoton(
-                      icono: Icons.edit_outlined,
-                      tooltip: 'Editar',
-                      alPresionar: widget.onEditar,
                     ),
-                    const SizedBox(width: 6),
-                    AccionBoton(
-                      icono: Icons.delete_outline_rounded,
-                      tooltip: 'Eliminar',
-                      esDestructivo: true,
-                      alPresionar: widget.onEliminar,
+                  ),
+
+                  // Estado
+                  Expanded(
+                    flex: 2,
+                    child: Align(
+                      alignment: Alignment.centerLeft,
+                      child: BadgeEstadoCotizacion(estado: c.estado),
                     ),
-                  ],
-                ),
+                  ),
+                ],
               ),
-            ],
+            ),
           ),
         ),
-      ),
+
+        // ── Botón eliminar ───────────────────────────────────────
+        Expanded(
+          flex: 2,
+          child: Padding(
+            padding: const EdgeInsets.only(right: 20),
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.end,
+              children: [
+                AccionBoton(
+                  icono: Icons.delete_outline_rounded,
+                  tooltip: 'Eliminar',
+                  esDestructivo: true,
+                  alPresionar: onEliminar,
+                ),
+              ],
+            ),
+          ),
+        ),
+      ],
     );
   }
 }

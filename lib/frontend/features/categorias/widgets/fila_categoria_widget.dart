@@ -8,11 +8,13 @@ class FilaCategoriaWidget extends StatefulWidget {
   const FilaCategoriaWidget({
     super.key,
     required this.categoria,
+    this.alVerDetalle,
     this.alEditar,
     this.alEliminar,
   });
 
   final Categoria categoria;
+  final VoidCallback? alVerDetalle;
   final VoidCallback? alEditar;
   final VoidCallback? alEliminar;
 
@@ -32,7 +34,9 @@ class _FilaCategoriaWidgetState extends State<FilaCategoriaWidget> {
         cursor: SystemMouseCursors.click,
         onEnter: (_) => setState(() => _hovering = true),
         onExit: (_) => setState(() => _hovering = false),
-        child: AnimatedContainer(
+        child: GestureDetector(
+          onTap: widget.alVerDetalle,
+          child: AnimatedContainer(
           duration: const Duration(milliseconds: 140),
           curve: Curves.easeOut,
           decoration: BoxDecoration(
@@ -107,12 +111,7 @@ class _FilaCategoriaWidgetState extends State<FilaCategoriaWidget> {
                     ],
                   ),
                 ),
-                const SizedBox(width: 12),
-
-                // Badge de productos
-                _BadgeProductos(total: widget.categoria.totalProductos),
                 const SizedBox(width: 10),
-
                 // Acciones
                 Row(
                   mainAxisSize: MainAxisSize.min,
@@ -136,31 +135,7 @@ class _FilaCategoriaWidgetState extends State<FilaCategoriaWidget> {
           ),
         ),
       ),
-    );
-  }
-}
-
-class _BadgeProductos extends StatelessWidget {
-  const _BadgeProductos({required this.total});
-
-  final int total;
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
-      decoration: BoxDecoration(
-        color: ColoresApp.bgContent,
-        borderRadius: BorderRadius.circular(20),
-      ),
-      child: Text(
-        '$total producto${total == 1 ? '' : 's'}',
-        style: const TextStyle(
-          color: ColoresApp.textDark,
-          fontSize: 11.5,
-          fontWeight: FontWeight.w500,
-        ),
-      ),
-    );
+    ),
+  );
   }
 }

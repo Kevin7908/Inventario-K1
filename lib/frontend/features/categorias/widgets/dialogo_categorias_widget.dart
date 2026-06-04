@@ -33,36 +33,7 @@ class _DialogoCategoriaState extends ConsumerState<DialogoCategoria> {
   final _formKey = GlobalKey<FormState>();
   late final TextEditingController _nombreCtrl;
   late final TextEditingController _descripcionCtrl;
-  late String _colorSeleccionado;
-  late String _iconoSeleccionado;
   bool _guardando = false;
-
-  static const List<Map<String, dynamic>> _coloresDisponibles = [
-    {'hex': '#3B82F6', 'nombre': 'Azul'},
-    {'hex': '#10B981', 'nombre': 'Verde'},
-    {'hex': '#EF4444', 'nombre': 'Rojo'},
-    {'hex': '#F59E0B', 'nombre': 'Amarillo'},
-    {'hex': '#8B5CF6', 'nombre': 'Morado'},
-    {'hex': '#F97316', 'nombre': 'Naranja'},
-    {'hex': '#14B8A6', 'nombre': 'Teal'},
-    {'hex': '#EC4899', 'nombre': 'Rosa'},
-  ];
-
-  static const List<Map<String, dynamic>> _iconosDisponibles = [
-    {'nombre': 'category', 'icono': Icons.category_outlined},
-    {'nombre': 'oil_barrel', 'icono': Icons.oil_barrel_outlined},
-    {'nombre': 'settings', 'icono': Icons.settings_outlined},
-    {
-      'nombre': 'electrical_services',
-      'icono': Icons.electrical_services_outlined,
-    },
-    {'nombre': 'tire_repair', 'icono': Icons.tire_repair_outlined},
-    {'nombre': 'link', 'icono': Icons.link_outlined},
-    {'nombre': 'car_repair', 'icono': Icons.car_repair_outlined},
-    {'nombre': 'construction', 'icono': Icons.construction_outlined},
-    {'nombre': 'inventory', 'icono': Icons.inventory_2_outlined},
-    {'nombre': 'build', 'icono': Icons.build_outlined},
-  ];
 
   @override
   void initState() {
@@ -73,8 +44,6 @@ class _DialogoCategoriaState extends ConsumerState<DialogoCategoria> {
     _descripcionCtrl = TextEditingController(
       text: widget.categoriaAEditar?.descripcion ?? '',
     );
-    _colorSeleccionado = widget.categoriaAEditar?.colorHex ?? '#3B82F6';
-    _iconoSeleccionado = widget.categoriaAEditar?.icono ?? 'category';
   }
 
   @override
@@ -82,14 +51,6 @@ class _DialogoCategoriaState extends ConsumerState<DialogoCategoria> {
     _nombreCtrl.dispose();
     _descripcionCtrl.dispose();
     super.dispose();
-  }
-
-  Color _hexAColor(String hex) {
-    try {
-      return Color(int.parse('FF${hex.replaceAll('#', '')}', radix: 16));
-    } catch (_) {
-      return ColoresApp.primary;
-    }
   }
 
   Future<void> _guardar() async {
@@ -105,16 +66,12 @@ class _DialogoCategoriaState extends ConsumerState<DialogoCategoria> {
         nombre: _nombreCtrl.text,
         descripcion:
             _descripcionCtrl.text.isEmpty ? null : _descripcionCtrl.text,
-        colorHex: _colorSeleccionado,
-        icono: _iconoSeleccionado,
       );
     } else {
       error = await notifier.crear(
         nombre: _nombreCtrl.text,
         descripcion:
             _descripcionCtrl.text.isEmpty ? null : _descripcionCtrl.text,
-        colorHex: _colorSeleccionado,
-        icono: _iconoSeleccionado,
       );
     }
 
@@ -196,80 +153,6 @@ class _DialogoCategoriaState extends ConsumerState<DialogoCategoria> {
                 decoration: dialogInputDecoration(
                   'Breve descripción de la categoría...',
                 ),
-              ),
-              const SizedBox(height: 16),
-
-              _etiquetaCampo('Color'),
-              const SizedBox(height: 8),
-              Wrap(
-                spacing: 8,
-                children: _coloresDisponibles.map((c) {
-                  final color = _hexAColor(c['hex'] as String);
-                  final seleccionado = _colorSeleccionado == c['hex'];
-                  return GestureDetector(
-                    onTap: () =>
-                        setState(() => _colorSeleccionado = c['hex'] as String),
-                    child: Tooltip(
-                      message: c['nombre'] as String,
-                      child: AnimatedContainer(
-                        duration: const Duration(milliseconds: 150),
-                        width: 30,
-                        height: 30,
-                        decoration: BoxDecoration(
-                          color: color,
-                          shape: BoxShape.circle,
-                        ),
-                        child: seleccionado
-                            ? const Icon(
-                                Icons.check,
-                                color: Colors.white,
-                                size: 16,
-                              )
-                            : null,
-                      ),
-                    ),
-                  );
-                }).toList(),
-              ),
-              const SizedBox(height: 16),
-
-              _etiquetaCampo('Ícono'),
-              const SizedBox(height: 8),
-              Wrap(
-                spacing: 8,
-                runSpacing: 8,
-                children: _iconosDisponibles.map((i) {
-                  final seleccionado = _iconoSeleccionado == i['nombre'];
-                  final colorActual = _hexAColor(_colorSeleccionado);
-                  return GestureDetector(
-                    onTap: () => setState(
-                      () => _iconoSeleccionado = i['nombre'] as String,
-                    ),
-                    child: AnimatedContainer(
-                      duration: const Duration(milliseconds: 150),
-                      width: 40,
-                      height: 40,
-                      decoration: BoxDecoration(
-                        color: seleccionado
-                            ? colorActual.withOpacity(0.1)
-                            : ColoresApp.bgContent,
-                        borderRadius: BorderRadius.circular(10),
-                        border: Border.all(
-                          color: seleccionado
-                              ? colorActual.withOpacity(0.4)
-                              : ColoresApp.border,
-                        ),
-                      ),
-                      child: Icon(
-                        i['icono'] as IconData,
-                        size: 20,
-                        color: seleccionado
-                            ? colorActual
-                            : ColoresApp.textMedium,
-                      ),
-                    ),
-                  );
-                }).toList(),
               ),
               const SizedBox(height: 28),
 

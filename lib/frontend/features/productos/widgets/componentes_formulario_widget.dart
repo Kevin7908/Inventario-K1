@@ -119,11 +119,22 @@ class SeccionBasica extends StatelessWidget {
         // SKU + Nombre
         _fila([
           _campo(
-            label: 'SKU *',
+            label: 'SKU (auto-generado)',
             child: TextFormField(
               controller: skuCtrl,
-              decoration: _deco('Ej: YAM-FA-001'),
-              textCapitalization: TextCapitalization.characters,
+              readOnly: true,
+              style: const TextStyle(
+                color: ColoresApp.textMedium,
+                letterSpacing: 0.5,
+                fontWeight: FontWeight.w600,
+              ),
+              decoration: _deco('Selecciona una categoría').copyWith(
+                suffixIcon: const Icon(
+                  Icons.lock_outline_rounded,
+                  size: 16,
+                  color: ColoresApp.textLight,
+                ),
+              ),
               validator: (v) =>
                   (v == null || v.trim().isEmpty) ? 'Requerido' : null,
             ),
@@ -167,6 +178,7 @@ class SeccionClasificacion extends ConsumerWidget {
     required this.unidadNotifier,
     required this.ubicacionCtrl,
     required this.imagenRutaNotifier,
+    this.onCategoriaChanged,
   });
 
   final ValueNotifier<Categoria?> categoriaNotifier;
@@ -174,6 +186,7 @@ class SeccionClasificacion extends ConsumerWidget {
   final ValueNotifier<UnidadMedida?> unidadNotifier;
   final TextEditingController ubicacionCtrl;
   final ValueNotifier<String?> imagenRutaNotifier;
+  final ValueChanged<Categoria?>? onCategoriaChanged;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -193,13 +206,15 @@ class SeccionClasificacion extends ConsumerWidget {
         // Categoría + Proveedor
         _fila([
           _campo(
-            label: 'Categoría',
+            label: 'Categoría *',
             child: AppSearch<Categoria>(
               notifier: categoriaNotifier,
               items: categorias,
               labelBuilder: (c) => c.nombre,
               hint: 'Seleccionar categoría',
               onAgregar: () => DialogoCategoria.mostrar(context),
+              validator: (c) => c == null ? 'Categoría requerida' : null,
+              onChanged: onCategoriaChanged,
             ),
           ),
           _campo(
@@ -321,7 +336,7 @@ class SeccionPrecios extends StatelessWidget {
             label: 'Precio taller (opcional)',
             child: TextFormField(
               controller: precioTallerCtrl,
-              decoration: _deco('Precio interno / mayorista'),
+              decoration: _deco('0'),
               keyboardType: TextInputType.number,
               inputFormatters: [FilteringTextInputFormatter.digitsOnly],
             ),
@@ -450,3 +465,4 @@ class SeccionInventario extends StatelessWidget {
     );
   }
 }
+

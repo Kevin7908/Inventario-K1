@@ -12,8 +12,7 @@ import 'package:inventario_k1/frontend/share/widgets/top_bar_widget.dart';
 
 import '../../../../backend/features/cotizaciones/modelo/cotizacion_resumen.dart';
 import '../provider/cotizaciones_provider.dart';
-import '../widgets/dialogo/dialogo_cotizacion.dart';
-import '../widgets/panel/panel_detalle_cotizacion.dart';
+import '../cotizaciones_detalle/vista/cotizacion_detalle_vista.dart';
 import '../widgets/tabla/cotizacion_fila_widget.dart';
 import '../widgets/tabla/resumen_cards_cotizacion.dart';
 import '../widgets/tabla/seccion_filtros_cot.dart';
@@ -41,14 +40,22 @@ class _CotizacionesVistaState extends ConsumerState<CotizacionesVista> {
     });
   }
 
-  void _abrirNueva() => DialogoCotizacion.mostrar(context);
+  void _abrirNueva() {
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (_) => const CotizacionDetalleVista(),
+      ),
+    );
+  }
 
-  Future<void> _abrirEditar(CotizacionResumen cot) async {
-    final detalle = await ref
-        .read(repositorioCotizacionesProvider)
-        .obtenerDetalle(cot.id);
-    if (!mounted) return;
-    DialogoCotizacion.mostrar(context, cotizacion: cot, detalle: detalle);
+  void _abrirDetalle(CotizacionResumen cot) {
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (_) => CotizacionDetalleVista(cotizacion: cot),
+      ),
+    );
   }
 
   void _confirmarEliminar(CotizacionResumen cot) {
@@ -64,10 +71,6 @@ class _CotizacionesVistaState extends ConsumerState<CotizacionesVista> {
           SnackBarMensaje.error(context, error);
         } else {
           SnackBarMensaje.success(context, 'Cotización eliminada.');
-          // Si era la seleccionada, cierra el panel
-          if (ref.read(cotSeleccionadaIdProvider) == cot.id) {
-            ref.read(cotSeleccionadaIdProvider.notifier).state = null;
-          }
         }
       },
     );
@@ -75,12 +78,6 @@ class _CotizacionesVistaState extends ConsumerState<CotizacionesVista> {
 
   @override
   Widget build(BuildContext context) {
-    // Derivar la cotización seleccionada desde el provider (sin ValueNotifier)
-    final selId = ref.watch(cotSeleccionadaIdProvider);
-    final selCot = ref.watch(cotizacionesProvider).value?.cotizaciones
-        .where((c) => c.id == selId)
-        .firstOrNull;
-
     return Scaffold(
       backgroundColor: ColoresApp.bgContent,
       body: Column(
@@ -92,40 +89,10 @@ class _CotizacionesVistaState extends ConsumerState<CotizacionesVista> {
             alPresionarBoton: _abrirNueva,
           ),
           Expanded(
-            child: Row(
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              children: [
-                // ── Contenido principal ──────────────────────────────
-                Expanded(
-                  child: _CuerpoCotizaciones(
-                    onBuscar: _onBuscar,
-                    onEditar: _abrirEditar,
-                    onEliminar: _confirmarEliminar,
-                  ),
-                ),
-
-                // ── Panel lateral con OverflowBox para evitar layout jank ──
-                AnimatedContainer(
-                  duration: const Duration(milliseconds: 260),
-                  curve: Curves.easeInOut,
-                  width: selCot != null ? 390.0 : 0.0,
-                  child: OverflowBox(
-                    maxWidth: 390.0,
-                    alignment: Alignment.topLeft,
-                    child: SizedBox(
-                      width: 390.0,
-                      child: selCot != null
-                          ? PanelDetalleCotizacion(
-                              cotizacion: selCot,
-                              onCerrar: () => ref
-                                  .read(cotSeleccionadaIdProvider.notifier)
-                                  .state = null,
-                            )
-                          : const SizedBox.shrink(),
-                    ),
-                  ),
-                ),
-              ],
+            child: _CuerpoCotizaciones(
+              onBuscar:   _onBuscar,
+              onDetalle:  _abrirDetalle,
+              onEliminar: _confirmarEliminar,
             ),
           ),
         ],
@@ -139,18 +106,17 @@ class _CotizacionesVistaState extends ConsumerState<CotizacionesVista> {
 class _CuerpoCotizaciones extends ConsumerWidget {
   const _CuerpoCotizaciones({
     required this.onBuscar,
-    required this.onEditar,
+    required this.onDetalle,
     required this.onEliminar,
   });
 
   final ValueChanged<String> onBuscar;
-  final ValueChanged<CotizacionResumen> onEditar;
+  final ValueChanged<CotizacionResumen> onDetalle;
   final ValueChanged<CotizacionResumen> onEliminar;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final estadoAsync = ref.watch(cotizacionesProvider);
-    final selId = ref.watch(cotSeleccionadaIdProvider);
 
     return estadoAsync.when(
       loading: () => const Center(
@@ -210,7 +176,7 @@ class _CuerpoCotizaciones extends ConsumerWidget {
                               )
                             : ListView.separated(
                                 itemCount: paginadas.length,
-                                separatorBuilder: (_, __) => const Divider(
+                                separatorBuilder: (_, _) => const Divider(
                                   height: 1,
                                   color: ColoresApp.border,
                                 ),
@@ -219,11 +185,8 @@ class _CuerpoCotizaciones extends ConsumerWidget {
                                   return CotizacionFilaWidget(
                                     key: ValueKey(cot.id),
                                     cotizacion: cot,
-                                    seleccionada: selId == cot.id,
-                                    onTap: () => ref
-                                        .read(cotSeleccionadaIdProvider.notifier)
-                                        .state = selId == cot.id ? null : cot.id,
-                                    onEditar: () => onEditar(cot),
+                                    seleccionada: false,
+                                    onTap:      () => onDetalle(cot),
                                     onEliminar: () => onEliminar(cot),
                                   );
                                 },

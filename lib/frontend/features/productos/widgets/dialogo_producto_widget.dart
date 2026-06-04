@@ -95,7 +95,7 @@ class _DialogoProductoState extends ConsumerState<DialogoProducto> {
     _proveedorNotifier  = ValueNotifier<Proveedor?>(null);
     _unidadNotifier     = ValueNotifier<UnidadMedida?>(null);
     _imagenRutaNotifier = ValueNotifier<String?>(p?.imagenUrl);
-    _aplicaIvaNotifier  = ValueNotifier<bool>(p?.aplicaIva ?? true);
+    _aplicaIvaNotifier  = ValueNotifier<bool>(p?.aplicaIva ?? false);
     _activoNotifier     = ValueNotifier<bool>(p?.activo ?? true);
 
     if (p != null) {
@@ -142,6 +142,13 @@ class _DialogoProductoState extends ConsumerState<DialogoProducto> {
     _aplicaIvaNotifier.dispose();
     _activoNotifier.dispose();
     super.dispose();
+  }
+
+  // Genera y asigna el SKU cuando se selecciona una categoría (solo en creación)
+  void _onCategoriaChanged(Categoria? cat) {
+    if (cat == null) return;
+    final sku = ref.read(productosProvider.notifier).generarSku(cat.nombre);
+    _skuCtrl.text = sku;
   }
 
   // Guardar
@@ -236,17 +243,18 @@ class _DialogoProductoState extends ConsumerState<DialogoProducto> {
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       SeccionBasica(
-                        skuCtrl:          _skuCtrl,
-                        nombreCtrl:       _nombreCtrl,
-                        descripcionCtrl:  _descripcionCtrl,
+                        skuCtrl:         _skuCtrl,
+                        nombreCtrl:      _nombreCtrl,
+                        descripcionCtrl: _descripcionCtrl,
                       ),
                       const SizedBox(height: 20),
                       SeccionClasificacion(
-                        categoriaNotifier: _categoriaNotifier,
-                        proveedorNotifier: _proveedorNotifier,
-                        unidadNotifier:    _unidadNotifier,
-                        ubicacionCtrl:     _ubicacionCtrl,
-                        imagenRutaNotifier: _imagenRutaNotifier,
+                        categoriaNotifier:   _categoriaNotifier,
+                        proveedorNotifier:   _proveedorNotifier,
+                        unidadNotifier:      _unidadNotifier,
+                        ubicacionCtrl:       _ubicacionCtrl,
+                        imagenRutaNotifier:  _imagenRutaNotifier,
+                        onCategoriaChanged:  _onCategoriaChanged,
                       ),
                       const SizedBox(height: 20),
                       SeccionPrecios(

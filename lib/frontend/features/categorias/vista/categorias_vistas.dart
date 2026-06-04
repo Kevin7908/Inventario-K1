@@ -9,6 +9,7 @@ import '../../../share/widgets/input/barra_busqueda_widget.dart';
 import '../../../share/widgets/output/estado_error_widget.dart';
 import '../../../share/widgets/output/estado_vacio_widget.dart';
 import '../../../share/widgets/top_bar_widget.dart';
+import '../detalle_categoria/vista/detalle_categoria_vista.dart';
 import '../provider/categorias_provider.dart';
 import '../widgets/dialogo_categorias_widget.dart';
 import '../widgets/fila_categoria_widget.dart';
@@ -113,6 +114,13 @@ class _CuerpoLista extends ConsumerWidget {
                   return FilaCategoriaWidget(
                     key: ValueKey(cat.id),
                     categoria: cat,
+                    alVerDetalle: () => Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (_) =>
+                            DetalleCategoriaVista(categoria: cat),
+                      ),
+                    ),
                     alEditar: () => DialogoCategoria.mostrar(
                       context,
                       categoriaAEditar: cat,
