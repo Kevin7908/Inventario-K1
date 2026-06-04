@@ -64,7 +64,7 @@ class _EncabezadoCol extends StatelessWidget {
 
 // ── Fila de cotización ────────────────────────────────────────────────────────
 
-class CotizacionFilaWidget extends StatelessWidget {
+class CotizacionFilaWidget extends StatefulWidget {
   const CotizacionFilaWidget({
     super.key,
     required this.cotizacion,
@@ -79,127 +79,145 @@ class CotizacionFilaWidget extends StatelessWidget {
   final VoidCallback onEliminar;
 
   @override
+  State<CotizacionFilaWidget> createState() => _CotizacionFilaWidgetState();
+}
+
+class _CotizacionFilaWidgetState extends State<CotizacionFilaWidget> {
+  bool _hovered = false;
+
+  @override
   Widget build(BuildContext context) {
-    final c = cotizacion;
+    final c = widget.cotizacion;
 
-    return Row(
-      children: [
-        // ── Zona de datos clickable ──────────────────────────────
-        Expanded(
-          flex: 14,
-          child: GestureDetector(
-            behavior: HitTestBehavior.opaque,
-            onTap: onTap,
-            child: Padding(
-              padding: const EdgeInsets.fromLTRB(20, 14, 0, 14),
-              child: Row(
-                children: [
-                  // Número
-                  Expanded(
-                    flex: 2,
-                    child: Text(
-                      c.numero,
-                      style: const TextStyle(
-                        color: ColoresApp.primary,
-                        fontSize: 13,
-                        fontWeight: FontWeight.w600,
+    return MouseRegion(
+      cursor: SystemMouseCursors.click,
+      onEnter: (_) => setState(() => _hovered = true),
+      onExit:  (_) => setState(() => _hovered = false),
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 120),
+        color: _hovered
+            ? ColoresApp.primaryLight
+            : ColoresApp.primaryLight.withValues(alpha: 0),
+        child: Row(
+          children: [
+            // ── Zona de datos clickable ──────────────────────────
+            Expanded(
+              flex: 14,
+              child: GestureDetector(
+                behavior: HitTestBehavior.opaque,
+                onTap: widget.onTap,
+                child: Padding(
+                  padding: const EdgeInsets.fromLTRB(20, 14, 0, 14),
+                  child: Row(
+                    children: [
+                      // Número
+                      Expanded(
+                        flex: 2,
+                        child: Text(
+                          c.numero,
+                          style: const TextStyle(
+                            color: ColoresApp.primary,
+                            fontSize: 13,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
                       ),
-                    ),
-                  ),
 
-                  // Cliente
-                  Expanded(
-                    flex: 3,
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          c.nombreCliente,
+                      // Cliente
+                      Expanded(
+                        flex: 3,
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              c.nombreCliente,
+                              style: const TextStyle(
+                                color: ColoresApp.textDark,
+                                fontSize: 13,
+                                fontWeight: FontWeight.w500,
+                              ),
+                            ),
+                            if (c.telefonoCliente != null)
+                              Text(
+                                c.telefonoCliente!,
+                                style: const TextStyle(
+                                  color: ColoresApp.textLight,
+                                  fontSize: 11.5,
+                                ),
+                              ),
+                          ],
+                        ),
+                      ),
+
+                      // Moto
+                      Expanded(
+                        flex: 3,
+                        child: Align(
+                          alignment: Alignment.centerLeft,
+                          child: _MotoChip(nombreMoto: c.nombreMoto),
+                        ),
+                      ),
+
+                      // Total
+                      Expanded(
+                        flex: 2,
+                        child: Text(
+                          c.total.toCopString(),
                           style: const TextStyle(
                             color: ColoresApp.textDark,
                             fontSize: 13,
                             fontWeight: FontWeight.w500,
                           ),
                         ),
-                        if (c.telefonoCliente != null)
-                          Text(
-                            c.telefonoCliente!,
-                            style: const TextStyle(
-                              color: ColoresApp.textLight,
-                              fontSize: 11.5,
-                            ),
+                      ),
+
+                      // Vigencia
+                      Expanded(
+                        flex: 2,
+                        child: Text(
+                          c.vigenciaHasta,
+                          style: const TextStyle(
+                            color: ColoresApp.textMedium,
+                            fontSize: 13,
                           ),
-                      ],
-                    ),
-                  ),
-
-                  // Moto
-                  Expanded(
-                    flex: 3,
-                    child: Align(
-                      alignment: Alignment.centerLeft,
-                      child: _MotoChip(nombreMoto: c.nombreMoto),
-                    ),
-                  ),
-
-                  // Total
-                  Expanded(
-                    flex: 2,
-                    child: Text(
-                      c.total.toCompactCop(),
-                      style: const TextStyle(
-                        color: ColoresApp.textDark,
-                        fontSize: 13,
-                        fontWeight: FontWeight.w500,
+                        ),
                       ),
-                    ),
-                  ),
 
-                  // Vigencia
-                  Expanded(
-                    flex: 2,
-                    child: Text(
-                      c.vigenciaHasta,
-                      style: const TextStyle(
-                        color: ColoresApp.textMedium,
-                        fontSize: 13,
+                      // Estado
+                      Expanded(
+                        flex: 2,
+                        child: Align(
+                          alignment: Alignment.centerLeft,
+                          child: BadgeEstadoCotizacion(estado: c.estado),
+                        ),
                       ),
-                    ),
+                    ],
                   ),
-
-                  // Estado
-                  Expanded(
-                    flex: 2,
-                    child: Align(
-                      alignment: Alignment.centerLeft,
-                      child: BadgeEstadoCotizacion(estado: c.estado),
-                    ),
-                  ),
-                ],
+                ),
               ),
             ),
-          ),
-        ),
 
-        // ── Botón eliminar ───────────────────────────────────────
-        Expanded(
-          flex: 2,
-          child: Padding(
-            padding: const EdgeInsets.only(right: 20),
-            child: Row(
-              mainAxisAlignment: MainAxisAlignment.end,
-              children: [
-                AccionBoton(
-                  icono: Icons.delete_outline_rounded,
-                  tooltip: 'Eliminar',
-                  esDestructivo: true,
-                  alPresionar: onEliminar,
+            // ── Botón eliminar ───────────────────────────────────
+            Expanded(
+              flex: 2,
+              child: Padding(
+                padding: const EdgeInsets.only(right: 20),
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.end,
+                  children: [
+                    AccionBoton(
+                      icono: Icons.delete_outline_rounded,
+                      tooltip: 'Eliminar',
+                      esDestructivo: true,
+                      alPresionar: widget.onEliminar,
+                    ),
+                  ],
                 ),
-              ],
+              ),
             ),
-          ),
+          ],
         ),
-      ],
+      ),
     );
   }
 }
