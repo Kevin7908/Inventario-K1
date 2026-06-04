@@ -61,7 +61,7 @@ class ServicioEmail {
     }
   }
 
-  // ─── Código OTP ───────────────────────────────────────────────────────────
+  // Código OTP
 
   Future<void> enviarCodigoVerificacion({
     required String email,
@@ -129,7 +129,7 @@ class ServicioEmail {
     );
   }
 
-  // ─── Bienvenida ───────────────────────────────────────────────────────────
+  // Bienvenida
 
   Future<void> enviarBienvenida({
     required String email,
@@ -151,7 +151,7 @@ class ServicioEmail {
     );
   }
 
-  // ─── Acceso denegado ──────────────────────────────────────────────────────
+  // Acceso denegado
 
   Future<void> enviarNotificacionAccesoDenegado({
     required String email,
@@ -172,7 +172,7 @@ class ServicioEmail {
     );
   }
 
-  // ─── Estado de cuenta ─────────────────────────────────────────────────────
+  // Estado de cuenta
 
   Future<void> enviarNotificacionEstadoCuenta({
     required String email,

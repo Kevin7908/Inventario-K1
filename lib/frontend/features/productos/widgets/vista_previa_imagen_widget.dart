@@ -63,7 +63,7 @@ class VistaPreviaImagen extends StatelessWidget {
         imagenUrl!,
         fit: BoxFit.contain,
         cacheWidth: cacheWidth,
-        errorBuilder: (_, __, ___) => const _IconoImagenRota(),
+        errorBuilder: (_, _, _) => const _IconoImagenRota(),
       );
     }
 
@@ -74,7 +74,7 @@ class VistaPreviaImagen extends StatelessWidget {
       File(imagenUrl!),
       fit: BoxFit.contain,
       cacheWidth: cacheWidth,
-      errorBuilder: (_, __, ___) => const _IconoImagenRota(),
+      errorBuilder: (_, _, _) => const _IconoImagenRota(),
     );
   }
 }

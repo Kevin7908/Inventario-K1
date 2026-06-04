@@ -1,18 +1,17 @@
 import 'package:drift/drift.dart';
-import 'package:inventario_k1/backend/features/productos/repositorio/repositorio_producto.dart';
 
 import '../../../share/database/app_db.dart';
 import '../mapper/producto_mapper.dart';
 import '../modelo/producto.dart';
+import 'repositorio_producto.dart';
 
 class RepositorioProductosImpl implements RepositorioProducto {
   final AppDb _db;
 
   RepositorioProductosImpl(this._db);
 
-  // Helper: construye el JOIN base 
-  // Centraliza los tres leftOuterJoin para no repetirlos en cada método.
-  // Devuelve un JoinedSelectStatement listo para añadir .where() o .watch().
+  // Helper: JOIN base
+
   JoinedSelectStatement<HasResultSet, dynamic> _queryConJoin() {
     return _db.select(_db.tablaProducto).join([
       leftOuterJoin(
@@ -30,45 +29,31 @@ class RepositorioProductosImpl implements RepositorioProducto {
     ]);
   }
 
-  // Conversión de lista de TypedResult → List<Producto> 
-  List<Producto> _mapearResultados(List<TypedResult> filas) {
-    return filas
-        .map((r) => ProductoMapper.filaJoinAModelo(r, _db))
-        .toList();
-  }
+  List<Producto> _mapear(List<TypedResult> filas) =>
+      filas.map((r) => ProductoMapper.filaJoinAModelo(r, _db)).toList();
 
-  // Streams reactivos 
+  // Streams reactivos
 
   @override
-  Stream<List<Producto>> observarTodos() {
-    return _queryConJoin()
-        .watch()
-        .map(_mapearResultados);
-  }
+  Stream<List<Producto>> observarTodos() =>
+      _queryConJoin().watch().map(_mapear);
 
   @override
-  Stream<List<Producto>> observarConStockBajo() {
-    return (_queryConJoin()
-          ..where(
-            _db.tablaProducto.stockActual
-                .isSmallerOrEqual(_db.tablaProducto.stockMinimo),
-          ))
-        .watch()
-        .map(_mapearResultados);
-  }
+  Stream<List<Producto>> observarConStockBajo() =>
+      (_queryConJoin()
+            ..where(_db.tablaProducto.stockActual
+                .isSmallerOrEqual(_db.tablaProducto.stockMinimo)))
+          .watch()
+          .map(_mapear);
 
-  // Consultas únicas 
+  // Consultas únicas
 
   @override
-  Future<List<Producto>> obtenerTodos() async {
-    final filas = await _queryConJoin().get();
-    return _mapearResultados(filas);
-  }
+  Future<List<Producto>> obtenerTodos() async =>
+      _mapear(await _queryConJoin().get());
 
   @override
   Future<Producto?> obtenerPorId(int id) async {
-    // Lectura simple — no necesita JOIN porque el resultado se usa
-    // internamente (tras crear/actualizar) y la UI ya tiene los nombres.
     final fila = await (_db.select(_db.tablaProducto)
           ..where((t) => t.id.equals(id)))
         .getSingleOrNull();
@@ -86,56 +71,55 @@ class RepositorioProductosImpl implements RepositorioProducto {
   @override
   Future<List<Producto>> buscarPorNombreOSku(String consulta) async {
     final termino = '%$consulta%';
-    final filas = await (_queryConJoin()
-          ..where(
-            _db.tablaProducto.nombre.like(termino) |
-                _db.tablaProducto.sku.like(termino),
-          ))
-        .get();
-    return _mapearResultados(filas);
+    return _mapear(
+      await (_queryConJoin()
+            ..where(_db.tablaProducto.nombre.like(termino) |
+                _db.tablaProducto.sku.like(termino)))
+          .get(),
+    );
   }
 
   @override
-  Future<List<Producto>> obtenerPorCategoria(int categoriaId) async {
-    final filas = await (_queryConJoin()
-          ..where(_db.tablaProducto.categoriaId.equals(categoriaId)))
-        .get();
-    return _mapearResultados(filas);
-  }
+  Future<List<Producto>> obtenerPorCategoria(int categoriaId) async =>
+      _mapear(
+        await (_queryConJoin()
+              ..where(_db.tablaProducto.categoriaId.equals(categoriaId)))
+            .get(),
+      );
 
   @override
-  Future<List<Producto>> obtenerPorProveedor(int proveedorId) async {
-    final filas = await (_queryConJoin()
-          ..where(_db.tablaProducto.proveedorId.equals(proveedorId)))
-        .get();
-    return _mapearResultados(filas);
-  }
+  Future<List<Producto>> obtenerPorProveedor(int proveedorId) async =>
+      _mapear(
+        await (_queryConJoin()
+              ..where(_db.tablaProducto.proveedorId.equals(proveedorId)))
+            .get(),
+      );
 
   @override
-  Future<List<Producto>> obtenerActivos() async {
-    final filas = await (_queryConJoin()
-          ..where(_db.tablaProducto.activo.equals(true)))
-        .get();
-    return _mapearResultados(filas);
-  }
+  Future<List<Producto>> obtenerActivos() async =>
+      _mapear(
+        await (_queryConJoin()
+              ..where(_db.tablaProducto.activo.equals(true)))
+            .get(),
+      );
 
   @override
-  Future<List<Producto>> obtenerConStockBajo() async {
-    final filas = await (_queryConJoin()
-          ..where(
-            _db.tablaProducto.stockActual
-                .isSmallerOrEqual(_db.tablaProducto.stockMinimo),
-          ))
-        .get();
-    return _mapearResultados(filas);
-  }
+  Future<List<Producto>> obtenerConStockBajo() async =>
+      _mapear(
+        await (_queryConJoin()
+              ..where(_db.tablaProducto.stockActual
+                  .isSmallerOrEqual(_db.tablaProducto.stockMinimo)))
+            .get(),
+      );
+
+  // Escrituras
 
   @override
   Future<Producto> crear(Producto producto) async {
     final companion = ProductoMapper.modeloACompanion(producto);
     final id = await _db.into(_db.tablaProducto).insert(companion);
-    final creado = await obtenerPorId(id);
-    return creado!;
+    // No hay SELECT extra: el stream de Drift emite el dato completo.
+    return producto.copyWith(id: id);
   }
 
   @override
@@ -144,31 +128,33 @@ class RepositorioProductosImpl implements RepositorioProducto {
     await (_db.update(_db.tablaProducto)
           ..where((t) => t.id.equals(producto.id!)))
         .write(companion);
-    final actualizado = await obtenerPorId(producto.id!);
-    return actualizado!;
+    // No hay SELECT extra: el stream emite el resultado actualizado.
+    return producto;
   }
 
   @override
   Future<Producto> ajustarStock(int id, double cantidad) async {
-    final producto = await obtenerPorId(id);
-    if (producto == null) {
-      throw Exception('Producto con id $id no encontrado');
-    }
-    final actualizado = producto.copyWith(
-      stockActual: producto.stockActual + cantidad,
-      actualizadoEn: DateTime.now(),
+    // Un solo UPDATE atómico en vez del ciclo read→modify→write.
+    await _db.customUpdate(
+      'UPDATE productos SET stock_actual = stock_actual + ?, '
+      'actualizado_en = ? WHERE id = ?',
+      variables: [
+        Variable.withReal(cantidad),
+        Variable.withDateTime(DateTime.now()),
+        Variable.withInt(id),
+      ],
+      updates: {_db.tablaProducto},
     );
-    return actualizar(actualizado);
+    final actualizado = await obtenerPorId(id);
+    return actualizado!;
   }
 
   @override
   Future<void> eliminar(int id) async {
-    await (_db.delete(_db.tablaProducto)
-          ..where((t) => t.id.equals(id)))
-        .go();
+    await (_db.delete(_db.tablaProducto)..where((t) => t.id.equals(id))).go();
   }
 
-  // Validaciones 
+  // Validaciones
 
   @override
   Future<bool> existeNombre(String nombre, {int? excludirId}) async {
@@ -190,23 +176,26 @@ class RepositorioProductosImpl implements RepositorioProducto {
     return await query.getSingleOrNull() != null;
   }
 
-  // Conteos 
+  // Conteos — COUNT(*) real, no fetch-all
 
   @override
   Future<int> contarActivos() async {
-    final filas = await (_db.select(_db.tablaProducto)
-          ..where((t) => t.activo.equals(true)))
-        .get();
-    return filas.length;
+    final expr = _db.tablaProducto.id.count();
+    final query = _db.selectOnly(_db.tablaProducto)
+      ..where(_db.tablaProducto.activo.equals(true))
+      ..addColumns([expr]);
+    final result = await query.getSingle();
+    return result.read(expr) ?? 0;
   }
 
   @override
   Future<int> contarConStockBajo() async {
-    final filas = await (_db.select(_db.tablaProducto)
-          ..where(
-            (t) => t.stockActual.isSmallerOrEqual(t.stockMinimo),
-          ))
-        .get();
-    return filas.length;
+    final expr = _db.tablaProducto.id.count();
+    final query = _db.selectOnly(_db.tablaProducto)
+      ..where(_db.tablaProducto.stockActual
+          .isSmallerOrEqual(_db.tablaProducto.stockMinimo))
+      ..addColumns([expr]);
+    final result = await query.getSingle();
+    return result.read(expr) ?? 0;
   }
 }

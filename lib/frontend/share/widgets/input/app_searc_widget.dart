@@ -144,9 +144,7 @@ class AppSearch<T> extends StatelessWidget {
   }
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
 // _PickerDialog — Diálogo interno de búsqueda. Solo vive mientras está abierto.
-// ─────────────────────────────────────────────────────────────────────────────
 
 class _PickerDialog<T> extends StatefulWidget {
   const _PickerDialog({
@@ -221,7 +219,7 @@ class _PickerDialogState<T> extends State<_PickerDialog<T>> {
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            // ── Barra de búsqueda ─────────────────────────────────────────
+            // Barra de búsqueda
             Padding(
               padding: const EdgeInsets.fromLTRB(16, 16, 16, 10),
               child: TextField(
@@ -244,7 +242,7 @@ class _PickerDialogState<T> extends State<_PickerDialog<T>> {
                   ),
                   suffixIcon: ValueListenableBuilder<TextEditingValue>(
                     valueListenable: _searchCtrl,
-                    builder: (_, value, __) => value.text.isNotEmpty
+                    builder: (context, value, child) => value.text.isNotEmpty
                         ? IconButton(
                             icon: const Icon(
                               Icons.close_rounded,
@@ -276,42 +274,52 @@ class _PickerDialogState<T> extends State<_PickerDialog<T>> {
               ),
             ),
 
-            // ── Divider ───────────────────────────────────────────────────
+            // Divider
             const Divider(height: 1, color: ColoresApp.border),
 
-            // ── Lista de resultados ───────────────────────────────────────
+            // Lista de resultados
             Flexible(
-              child: totalItems == 0
-                  ? _EmptyState(query: _searchCtrl.text)
-                  : ListView.builder(
-                      padding: const EdgeInsets.symmetric(vertical: 6),
-                      shrinkWrap: true,
-                      itemCount: totalItems,
-                      itemBuilder: (_, index) {
-                        // Fila 0 → botón "Agregar nuevo" (si aplica)
-                        if (tieneAgregar && index == 0) {
-                          return _FilaAgregar(
-                            onTap: () {
+              child: ListView.builder(
+                padding: const EdgeInsets.symmetric(vertical: 6),
+                shrinkWrap: true,
+                itemCount: totalItems == 0 ? 1 : totalItems,
+                itemBuilder: (context, index) {
+                  // Lista vacía: muestra estado vacío (con botón agregar si aplica)
+                  if (totalItems == 0) {
+                    return _EmptyState(
+                      query: _searchCtrl.text,
+                      onAgregar: tieneAgregar
+                          ? () {
                               Navigator.of(context).pop();
                               widget.onAgregar!();
-                            },
-                          );
-                        }
+                            }
+                          : null,
+                    );
+                  }
 
-                        final itemIndex = tieneAgregar ? index - 1 : index;
-                        final item = _filtrados[itemIndex];
-                        final esSeleccionado =
-                            item == widget.seleccionadoActual;
-                        final label = widget.labelBuilder(item);
-
-                        return _FilaItem(
-                          label: label,
-                          esSeleccionado: esSeleccionado,
-                          query: _searchCtrl.text,
-                          onTap: () => Navigator.of(context).pop(item),
-                        );
+                  // Fila 0 → botón "Agregar nuevo" (si aplica)
+                  if (tieneAgregar && index == 0) {
+                    return _FilaAgregar(
+                      onTap: () {
+                        Navigator.of(context).pop();
+                        widget.onAgregar!();
                       },
-                    ),
+                    );
+                  }
+
+                  final itemIndex = tieneAgregar ? index - 1 : index;
+                  final item = _filtrados[itemIndex];
+                  final esSeleccionado = item == widget.seleccionadoActual;
+                  final label = widget.labelBuilder(item);
+
+                  return _FilaItem(
+                    label: label,
+                    esSeleccionado: esSeleccionado,
+                    query: _searchCtrl.text,
+                    onTap: () => Navigator.of(context).pop(item),
+                  );
+                },
+              ),
             ),
           ],
         ),
@@ -320,9 +328,7 @@ class _PickerDialogState<T> extends State<_PickerDialog<T>> {
   }
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
 // Subwidgets del diálogo — StatelessWidget para rendimiento
-// ─────────────────────────────────────────────────────────────────────────────
 
 class _FilaAgregar extends StatelessWidget {
   const _FilaAgregar({required this.onTap});
@@ -340,7 +346,7 @@ class _FilaAgregar extends StatelessWidget {
               width: 28,
               height: 28,
               decoration: BoxDecoration(
-                color: ColoresApp.primary.withOpacity(0.12),
+                color: ColoresApp.primary.withValues(alpha: 0.12),
                 borderRadius: BorderRadius.circular(6),
               ),
               child: const Icon(
@@ -443,7 +449,7 @@ class _FilaItem extends StatelessWidget {
       onTap: onTap,
       child: Container(
         color: esSeleccionado
-            ? ColoresApp.primary.withOpacity(0.07)
+            ? ColoresApp.primary.withValues(alpha: 0.07)
             : Colors.transparent,
         padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 11),
         child: Row(
@@ -465,34 +471,44 @@ class _FilaItem extends StatelessWidget {
 }
 
 class _EmptyState extends StatelessWidget {
-  const _EmptyState({required this.query});
+  const _EmptyState({required this.query, this.onAgregar});
   final String query;
+  final VoidCallback? onAgregar;
 
   @override
   Widget build(BuildContext context) {
-    return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 32, horizontal: 16),
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          const Icon(
-            Icons.search_off_rounded,
-            color: ColoresApp.textLight,
-            size: 36,
+    return Column(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Padding(
+          padding: const EdgeInsets.symmetric(vertical: 24, horizontal: 16),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              const Icon(
+                Icons.search_off_rounded,
+                color: ColoresApp.textLight,
+                size: 36,
+              ),
+              const SizedBox(height: 10),
+              Text(
+                query.isEmpty
+                    ? 'No hay elementos disponibles'
+                    : 'Sin resultados para "$query"',
+                textAlign: TextAlign.center,
+                style: const TextStyle(
+                  color: ColoresApp.textLight,
+                  fontSize: 13.5,
+                ),
+              ),
+            ],
           ),
-          const SizedBox(height: 10),
-          Text(
-            query.isEmpty
-                ? 'No hay elementos disponibles'
-                : 'Sin resultados para "$query"',
-            textAlign: TextAlign.center,
-            style: const TextStyle(
-              color: ColoresApp.textLight,
-              fontSize: 13.5,
-            ),
-          ),
+        ),
+        if (onAgregar != null) ...[
+          const Divider(height: 1, color: ColoresApp.border),
+          _FilaAgregar(onTap: onAgregar!),
         ],
-      ),
+      ],
     );
   }
 }

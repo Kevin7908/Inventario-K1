@@ -41,7 +41,7 @@ class ServicioVerificacion {
 
   final Random _rng = Random.secure();
 
-  // ─── Generar código ────────────────────────────────────────────────────────
+  // Generar código
 
   /// Genera un código OTP de 6 dígitos para el [email] dado.
   /// Si ya existía uno previo, lo sobreescribe (re-envío).
@@ -63,7 +63,7 @@ class ServicioVerificacion {
     return codigo;
   }
 
-  // ─── Validar código ────────────────────────────────────────────────────────
+  // Validar código
 
   /// Valida el [codigoIngresado] para el [email] dado.
   ///
@@ -100,7 +100,7 @@ class ServicioVerificacion {
     return ResultadoValidacion.invalido;
   }
 
-  // ─── Tiempo restante ───────────────────────────────────────────────────────
+  // Tiempo restante
 
   /// Segundos restantes para que expire el código, o 0 si no existe/expiró.
   int segundosRestantes(String email) {
@@ -117,7 +117,7 @@ class ServicioVerificacion {
     return (_maxIntentos - intentos).clamp(0, _maxIntentos);
   }
 
-  // ─── Limpiar ───────────────────────────────────────────────────────────────
+  // Limpiar
 
   void _limpiar(String clave) {
     _codigos.remove(clave);
@@ -130,7 +130,7 @@ class ServicioVerificacion {
   }
 }
 
-// ─── Enum de resultado de validación ─────────────────────────────────────────
+// Enum de resultado de validación
 
 enum ResultadoValidacion {
   valido,

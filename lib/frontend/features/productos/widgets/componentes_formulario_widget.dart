@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:provider/provider.dart';
 
 import '../../../../backend/features/categorias/modelo/categoria.dart';
@@ -7,63 +8,60 @@ import '../../../../backend/features/proveedores/modelo/proveedor.dart';
 import '../../../../backend/features/unidades_medida/modelo/unidad_medida.dart';
 import '../../../share/temas/colores_app.dart';
 import '../../../share/widgets/input/app_searc_widget.dart';
-import '../../categorias/view_model/categorias_view_model.dart';
+import '../../categorias/provider/categorias_provider.dart';
 import '../../categorias/widgets/dialogo_categorias_widget.dart';
 import '../../proveedores/view_model/proveedores_view_model.dart';
 import '../../proveedores/widgets/dialogo_proveedor_widget.dart';
-import '../../unidades_medida/view_model/unidad_medida_view_model.dart';
+import '../../unidades_medida/provider/unidades_medida_provider.dart';
 import '../../unidades_medida/widgets/dialogo_unidad_medida_widget.dart';
 import 'selector_imagen_widget.dart';
 
 Widget _etiqueta(String texto) => Text(
-      texto,
-      style: const TextStyle(
-        color: ColoresApp.textDark,
-        fontSize: 13,
-        fontWeight: FontWeight.w600,
-      ),
-    );
+  texto,
+  style: const TextStyle(
+    color: ColoresApp.textDark,
+    fontSize: 13,
+    fontWeight: FontWeight.w600,
+  ),
+);
 
 Widget _campo({required String label, required Widget child}) => Expanded(
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [_etiqueta(label), const SizedBox(height: 6), child],
-      ),
-    );
+  child: Column(
+    crossAxisAlignment: CrossAxisAlignment.start,
+    children: [_etiqueta(label), const SizedBox(height: 6), child],
+  ),
+);
 
 Widget _fila(List<Widget> children) => Row(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [children[0], const SizedBox(width: 12), children[1]],
-    );
+  crossAxisAlignment: CrossAxisAlignment.start,
+  children: [children[0], const SizedBox(width: 12), children[1]],
+);
 
 InputDecoration _deco(String hint) => InputDecoration(
-      hintText: hint,
-      hintStyle: const TextStyle(color: ColoresApp.textLight, fontSize: 13.5),
-      filled: true,
-      fillColor: ColoresApp.bgContent,
-      contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
-      border: OutlineInputBorder(
-        borderRadius: BorderRadius.circular(10),
-        borderSide: const BorderSide(color: ColoresApp.border),
-      ),
-      enabledBorder: OutlineInputBorder(
-        borderRadius: BorderRadius.circular(10),
-        borderSide: const BorderSide(color: ColoresApp.border),
-      ),
-      focusedBorder: OutlineInputBorder(
-        borderRadius: BorderRadius.circular(10),
-        borderSide: const BorderSide(color: ColoresApp.primary, width: 1.5),
-      ),
-      errorBorder: OutlineInputBorder(
-        borderRadius: BorderRadius.circular(10),
-        borderSide: const BorderSide(color: ColoresApp.statusDebt),
-      ),
-    );
+  hintText: hint,
+  hintStyle: const TextStyle(color: ColoresApp.textLight, fontSize: 13.5),
+  filled: true,
+  fillColor: ColoresApp.bgContent,
+  contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+  border: OutlineInputBorder(
+    borderRadius: BorderRadius.circular(10),
+    borderSide: const BorderSide(color: ColoresApp.border),
+  ),
+  enabledBorder: OutlineInputBorder(
+    borderRadius: BorderRadius.circular(10),
+    borderSide: const BorderSide(color: ColoresApp.border),
+  ),
+  focusedBorder: OutlineInputBorder(
+    borderRadius: BorderRadius.circular(10),
+    borderSide: const BorderSide(color: ColoresApp.primary, width: 1.5),
+  ),
+  errorBorder: OutlineInputBorder(
+    borderRadius: BorderRadius.circular(10),
+    borderSide: const BorderSide(color: ColoresApp.statusDebt),
+  ),
+);
 
-// ─────────────────────────────────────────────────────────────────────────────
 // _SeccionTitulo — Separador visual entre secciones
-// ─────────────────────────────────────────────────────────────────────────────
-
 class SeccionTitulo extends StatelessWidget {
   const SeccionTitulo({super.key, required this.titulo, required this.icono});
 
@@ -95,10 +93,7 @@ class SeccionTitulo extends StatelessWidget {
   }
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
 // _SeccionBasica — SKU, Nombre, Descripción
-// ─────────────────────────────────────────────────────────────────────────────
-
 class SeccionBasica extends StatelessWidget {
   const SeccionBasica({
     super.key,
@@ -124,11 +119,22 @@ class SeccionBasica extends StatelessWidget {
         // SKU + Nombre
         _fila([
           _campo(
-            label: 'SKU *',
+            label: 'SKU (auto-generado)',
             child: TextFormField(
               controller: skuCtrl,
-              decoration: _deco('Ej: YAM-FA-001'),
-              textCapitalization: TextCapitalization.characters,
+              readOnly: true,
+              style: const TextStyle(
+                color: ColoresApp.textMedium,
+                letterSpacing: 0.5,
+                fontWeight: FontWeight.w600,
+              ),
+              decoration: _deco('Selecciona una categoría').copyWith(
+                suffixIcon: const Icon(
+                  Icons.lock_outline_rounded,
+                  size: 16,
+                  color: ColoresApp.textLight,
+                ),
+              ),
               validator: (v) =>
                   (v == null || v.trim().isEmpty) ? 'Requerido' : null,
             ),
@@ -155,15 +161,16 @@ class SeccionBasica extends StatelessWidget {
         TextFormField(
           controller: descripcionCtrl,
           maxLines: 2,
-          decoration: _deco('Características, especificaciones, referencia cruzada...'),
+          decoration: _deco(
+            'Características, especificaciones, referencia cruzada...',
+          ),
         ),
       ],
     );
   }
 }
 
-
-class SeccionClasificacion extends StatelessWidget {
+class SeccionClasificacion extends ConsumerWidget {
   const SeccionClasificacion({
     super.key,
     required this.categoriaNotifier,
@@ -171,6 +178,7 @@ class SeccionClasificacion extends StatelessWidget {
     required this.unidadNotifier,
     required this.ubicacionCtrl,
     required this.imagenRutaNotifier,
+    this.onCategoriaChanged,
   });
 
   final ValueNotifier<Categoria?> categoriaNotifier;
@@ -178,9 +186,15 @@ class SeccionClasificacion extends StatelessWidget {
   final ValueNotifier<UnidadMedida?> unidadNotifier;
   final TextEditingController ubicacionCtrl;
   final ValueNotifier<String?> imagenRutaNotifier;
+  final ValueChanged<Categoria?>? onCategoriaChanged;
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
+    final categorias =
+        ref.watch(categoriasProvider).value?.categorias ?? const [];
+    final unidades =
+        ref.watch(unidadesMedidaProvider).value?.unidades ?? const [];
+
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -192,35 +206,32 @@ class SeccionClasificacion extends StatelessWidget {
         // Categoría + Proveedor
         _fila([
           _campo(
-            label: 'Categoría',
-            // Agregamos Consumer para que escuche cambios en tiempo real
-            child: Consumer<CategoriasViewModel>(
-              builder: (context, vm, _) => AppSearch<Categoria>(
-                notifier: categoriaNotifier,
-                items: vm.categorias, // Ahora usa la lista actualizada del VM
-                labelBuilder: (c) => c.nombre,
-                hint: 'Seleccionar categoría',
-                onAgregar: () => DialogoCategoria.mostrar(
-                  context,
-                  viewModel: vm,
-                ),
-              ),
+            label: 'Categoría *',
+            child: AppSearch<Categoria>(
+              notifier: categoriaNotifier,
+              items: categorias,
+              labelBuilder: (c) => c.nombre,
+              hint: 'Seleccionar categoría',
+              onAgregar: () => DialogoCategoria.mostrar(context),
+              validator: (c) => c == null ? 'Categoría requerida' : null,
+              onChanged: onCategoriaChanged,
             ),
           ),
           _campo(
             label: 'Proveedor',
-            // Agregamos Consumer para Proveedores
-            child: Consumer<ProveedoresViewModel>(
-              builder: (context, vm, _) => AppSearch<Proveedor>(
-                notifier: proveedorNotifier,
-                items: vm.proveedores,
-                labelBuilder: (p) => p.nombre,
-                hint: 'Seleccionar proveedor',
-                onAgregar: () => DialogoProveedor.mostrar(
-                  context,
-                  viewModel: vm,
-                ),
-              ),
+            child: Selector<ProveedoresViewModel, List<Proveedor>>(
+              selector: (_, vm) => vm.proveedores,
+              builder: (context, listaProveedores, _) {
+                final vm = context.read<ProveedoresViewModel>();
+                return AppSearch<Proveedor>(
+                  notifier: proveedorNotifier,
+                  items: listaProveedores,
+                  labelBuilder: (p) => p.nombre,
+                  hint: 'Seleccionar proveedor',
+                  onAgregar: () =>
+                      DialogoProveedor.mostrar(context, viewModel: vm),
+                );
+              },
             ),
           ),
         ]),
@@ -231,18 +242,12 @@ class SeccionClasificacion extends StatelessWidget {
         _fila([
           _campo(
             label: 'Unidad de medida',
-            // Agregamos Consumer para Unidades de Medida
-            child: Consumer<UnidadesMedidaViewModel>(
-              builder: (context, vm, _) => AppSearch<UnidadMedida>(
-                notifier: unidadNotifier,
-                items: vm.unidades,
-                labelBuilder: (u) => '${u.nombre} (${u.abreviatura})',
-                hint: 'Seleccionar unidad',
-                onAgregar: () => DialogoUnidadMedida.mostrar(
-                  context,
-                  viewModel: vm,
-                ),
-              ),
+            child: AppSearch<UnidadMedida>(
+              notifier: unidadNotifier,
+              items: unidades,
+              labelBuilder: (u) => '${u.nombre} (${u.abreviatura})',
+              hint: 'Seleccionar unidad',
+              onAgregar: () => DialogoUnidadMedida.mostrar(context),
             ),
           ),
           _campo(
@@ -257,12 +262,11 @@ class SeccionClasificacion extends StatelessWidget {
 
         const SizedBox(height: 12),
 
-        // Imagen del producto (esta ya estaba bien porque usa ValueListenableBuilder)
         _etiqueta('Imagen del producto'),
         const SizedBox(height: 8),
         ValueListenableBuilder<String?>(
           valueListenable: imagenRutaNotifier,
-          builder: (_, ruta, __) => SelectorImagenWidget(
+          builder: (context, ruta, child) => SelectorImagenWidget(
             rutaActual: ruta,
             onRutaSeleccionada: (nuevaRuta) =>
                 imagenRutaNotifier.value = nuevaRuta,
@@ -272,10 +276,8 @@ class SeccionClasificacion extends StatelessWidget {
     );
   }
 }
-// ─────────────────────────────────────────────────────────────────────────────
-// _SeccionPrecios — Precio compra, venta, taller y aplica IVA
-// ─────────────────────────────────────────────────────────────────────────────
 
+// _SeccionPrecios — Precio compra, venta, taller y aplica IVA
 class SeccionPrecios extends StatelessWidget {
   const SeccionPrecios({
     super.key,
@@ -334,7 +336,7 @@ class SeccionPrecios extends StatelessWidget {
             label: 'Precio taller (opcional)',
             child: TextFormField(
               controller: precioTallerCtrl,
-              decoration: _deco('Precio interno / mayorista'),
+              decoration: _deco('0'),
               keyboardType: TextInputType.number,
               inputFormatters: [FilteringTextInputFormatter.digitsOnly],
             ),
@@ -348,12 +350,12 @@ class SeccionPrecios extends StatelessWidget {
                 const SizedBox(height: 6),
                 ValueListenableBuilder<bool>(
                   valueListenable: aplicaIvaNotifier,
-                  builder: (_, value, __) => Row(
+                  builder: (context, value, child) => Row(
                     children: [
                       Switch(
                         value: value,
                         onChanged: (v) => aplicaIvaNotifier.value = v,
-                        activeColor: ColoresApp.primary,
+                        activeThumbColor: ColoresApp.primary,
                       ),
                       const SizedBox(width: 6),
                       Text(
@@ -378,10 +380,7 @@ class SeccionPrecios extends StatelessWidget {
   }
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
 // _SeccionInventario — Stock actual, stock mínimo y estado activo
-// ─────────────────────────────────────────────────────────────────────────────
-
 class SeccionInventario extends StatelessWidget {
   const SeccionInventario({
     super.key,
@@ -435,12 +434,12 @@ class SeccionInventario extends StatelessWidget {
             const SizedBox(width: 10),
             ValueListenableBuilder<bool>(
               valueListenable: activoNotifier,
-              builder: (_, activo, __) => Row(
+              builder: (context, activo, child) => Row(
                 children: [
                   Switch(
                     value: activo,
                     onChanged: (v) => activoNotifier.value = v,
-                    activeColor: const Color(0xFF10B981),
+                    activeThumbColor: const Color(0xFF10B981),
                   ),
                   const SizedBox(width: 6),
                   AnimatedSwitcher(
@@ -466,3 +465,4 @@ class SeccionInventario extends StatelessWidget {
     );
   }
 }
+

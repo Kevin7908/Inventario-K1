@@ -20,7 +20,7 @@ class InicioSesionVista extends StatefulWidget {
 class _InicioSesionVistaState extends State<InicioSesionVista> {
   late final AuthViewModel _vm;
 
-  // ─── Controladores y focus ────────────────────────────────────────────────
+  // Controladores y focus
   final _formKey = GlobalKey<FormState>();
   final _usuarioCtrl = TextEditingController();
   final _passwordCtrl = TextEditingController();
@@ -53,7 +53,7 @@ class _InicioSesionVistaState extends State<InicioSesionVista> {
     super.dispose();
   }
 
-  // ─── Acción de login ──────────────────────────────────────────────────────
+  // Acción de login
 
   Future<void> _iniciarSesion() async {
     if (!(_formKey.currentState?.validate() ?? false)) return;
@@ -86,7 +86,7 @@ class _InicioSesionVistaState extends State<InicioSesionVista> {
   }
 }
 
-// ─── Cuerpo principal ────────────────────────────────────────────────────────
+// Cuerpo principal
 
 class _CuerpoLogin extends StatelessWidget {
   const _CuerpoLogin();
@@ -105,7 +105,7 @@ class _CuerpoLogin extends StatelessWidget {
   }
 }
 
-// ─── Tarjeta de Login ────────────────────────────────────────────────────────
+// Tarjeta de Login
 
 class _TarjetaLogin extends StatelessWidget {
   const _TarjetaLogin();
@@ -138,7 +138,7 @@ class _TarjetaLogin extends StatelessWidget {
   }
 }
 
-// ─── Encabezado ───────────────────────────────────────────────────────────────
+// Encabezado
 
 class _EncabezadoLogin extends StatelessWidget {
   const _EncabezadoLogin();
@@ -182,7 +182,7 @@ class _EncabezadoLogin extends StatelessWidget {
   }
 }
 
-// ─── Formulario ───────────────────────────────────────────────────────────────
+// Formulario
 
 /// El formulario accede al ViewModel del contexto.
 /// Se separa en widget propio para que [Consumer] solo reconstruya esta parte.
@@ -247,7 +247,7 @@ class _FormularioLoginState extends State<_FormularioLogin> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              // ── Campo Email ──
+              // Campo Email
               TextFieldCustom(
                 etiqueta: 'Usuario',
                 hint: 'juan.garcia',
@@ -262,7 +262,7 @@ class _FormularioLoginState extends State<_FormularioLogin> {
               ),
               const SizedBox(height: 16),
 
-              // ── Campo Contraseña ──
+              // Campo Contraseña
               TextFieldCustom(
                 etiqueta: 'Contraseña',
                 hint: '••••••••',
@@ -283,20 +283,20 @@ class _FormularioLoginState extends State<_FormularioLogin> {
               ),
               const SizedBox(height: 8),
 
-              // ── Hint de accesibilidad ──
+              // Hint de accesibilidad
               Text(
                 'Presiona Enter para iniciar sesión',
                 style: TextStyle(fontSize: 11, color: ColoresApp.textLight),
               ),
               const SizedBox(height: 24),
 
-              // ── Banner de error / acceso denegado ──
+              // Banner de error / acceso denegado
               if (vm.mensajeError != null) ...[
                 _BannerError(mensaje: vm.mensajeError!),
                 const SizedBox(height: 16),
               ],
 
-              // ── Botón de login ──
+              // Botón de login
               BotonCargando(
                 etiqueta: 'Iniciar sesión',
                 estaCargando: vm.estaCargando,
@@ -328,7 +328,7 @@ class _FormularioLoginState extends State<_FormularioLogin> {
   }
 }
 
-// ─── Banner de error ──────────────────────────────────────────────────────────
+// Banner de error
 
 class _BannerError extends StatelessWidget {
   final String mensaje;

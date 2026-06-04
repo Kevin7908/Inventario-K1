@@ -73,7 +73,7 @@ class ProductoMapper {
     );
   }
 
-  // ── Escritura ─────────────────────────────────────────────────────────────
+  // Escritura
   // Convierte el modelo al Companion de Drift para INSERT / UPDATE.
   // Los nombres desnormalizados (categoriaNombre, proveedorNombre,
   // unidadMedidaNombre) se ignoran explícitamente: no existen en la tabla.

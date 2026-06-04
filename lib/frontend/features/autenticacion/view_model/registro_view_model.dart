@@ -5,7 +5,7 @@ import '../../../../backend/features/autenticacion/repositorio/repositorio_auth.
 import '../../../../backend/share/servicios/servicio_email.dart';
 import '../../../../backend/share/servicios/servicio_verificacion.dart';
 
-// ─── Estados del flujo de registro ───────────────────────────────────────────
+// Estados del flujo de registro
 
 enum PasoRegistro {
   datosIniciales,
@@ -27,7 +27,7 @@ class RegistroViewModel extends ChangeNotifier {
     this._servicioVerificacion,
   );
 
-  // ─── Estado interno ───────────────────────────────────────────────────────
+  // Estado interno
 
   PasoRegistro _paso = PasoRegistro.datosIniciales;
   EstadoRegistro _estado = EstadoRegistro.inactivo;
@@ -38,7 +38,7 @@ class RegistroViewModel extends ChangeNotifier {
   String _usuarioGuardado = '';   // ← NUEVO: username único
   String _emailGuardado = '';
 
-  // ─── Getters públicos ─────────────────────────────────────────────────────
+  // Getters públicos
 
   PasoRegistro get paso => _paso;
   EstadoRegistro get estado => _estado;
@@ -55,7 +55,7 @@ class RegistroViewModel extends ChangeNotifier {
   int get intentosRestantes =>
       _servicioVerificacion.intentosRestantes(_emailGuardado);
 
-  // ─── PASO 1: Enviar código OTP ────────────────────────────────────────────
+  // PASO 1: Enviar código OTP
 
   /// Valida unicidad de email Y usuario, genera el OTP y lo envía.
   Future<void> enviarCodigoVerificacion({
@@ -106,7 +106,7 @@ class RegistroViewModel extends ChangeNotifier {
     }
   }
 
-  // ─── PASO 2: Verificar código OTP ────────────────────────────────────────
+  // PASO 2: Verificar código OTP
 
   Future<void> verificarCodigo(String codigo) async {
     if (estaCargando) return;
@@ -127,7 +127,7 @@ class RegistroViewModel extends ChangeNotifier {
     }
   }
 
-  // ─── PASO 2: Reenviar código ──────────────────────────────────────────────
+  // PASO 2: Reenviar código
 
   Future<void> reenviarCodigo() async {
     if (estaCargando || _emailGuardado.isEmpty) return;
@@ -148,7 +148,7 @@ class RegistroViewModel extends ChangeNotifier {
     }
   }
 
-  // ─── PASO 3: Crear usuario ────────────────────────────────────────────────
+  // PASO 3: Crear usuario
 
   /// Crea el usuario con nombre + usuario + email + password.
   Future<bool> crearUsuario({required String password}) async {
@@ -180,7 +180,7 @@ class RegistroViewModel extends ChangeNotifier {
     }
   }
 
-  // ─── Navegación ───────────────────────────────────────────────────────────
+  // Navegación
 
   void volverADatosIniciales() {
     _servicioVerificacion.cancelar(_emailGuardado);
@@ -207,7 +207,7 @@ class RegistroViewModel extends ChangeNotifier {
     }
   }
 
-  // ─── Helpers privados ─────────────────────────────────────────────────────
+  // Helpers privados
 
   void _setEstado(EstadoRegistro nuevoEstado) {
     _estado = nuevoEstado;
