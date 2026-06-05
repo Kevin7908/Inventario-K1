@@ -1,23 +1,17 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:inventario_k1/frontend/share/widgets/input/barra_busqueda_widget.dart';
 
 import 'package:inventario_k1/backend/features/cotizaciones/modelo/cotizacion_resumen.dart';
+import 'package:inventario_k1/frontend/features/cotizaciones/provider/cotizaciones_provider.dart';
 
-class SeccionFiltrosCot extends StatelessWidget {
+class SeccionFiltrosCot extends ConsumerWidget {
   const SeccionFiltrosCot({
     super.key,
-    required this.filtroEstado,
-    required this.filtroMes,
     required this.onBuscar,
-    required this.onFiltroEstado,
-    required this.onFiltroMes,
   });
 
-  final EstadoCotizacion? filtroEstado;
-  final int? filtroMes;
   final ValueChanged<String> onBuscar;
-  final ValueChanged<EstadoCotizacion?> onFiltroEstado;
-  final ValueChanged<int?> onFiltroMes;
 
   static const _meses = [
     'Todos los meses',
@@ -47,9 +41,15 @@ class SeccionFiltrosCot extends StatelessWidget {
       };
 
   @override
-  Widget build(BuildContext context) {
-    final mesActual =
-        filtroMes != null ? _meses[filtroMes!] : _meses[0];
+  Widget build(BuildContext context, WidgetRef ref) {
+    final filtroEstado = ref.watch(
+      cotizacionesProvider.select((s) => s.asData?.value.filtroEstado),
+    );
+    final filtroMes = ref.watch(
+      cotizacionesProvider.select((s) => s.asData?.value.filtroMes),
+    );
+
+    final mesActual = filtroMes != null ? _meses[filtroMes] : _meses[0];
     final estadoActual = _estadoA(filtroEstado);
 
     return Row(
@@ -64,7 +64,9 @@ class SeccionFiltrosCot extends StatelessWidget {
         FiltroDropdownWidget(
           valor: estadoActual,
           opciones: _opcionesEstado,
-          alCambiar: (v) => onFiltroEstado(_estadoDesde(v)),
+          alCambiar: (v) => ref
+              .read(cotizacionesProvider.notifier)
+              .filtrarEstado(_estadoDesde(v)),
         ),
         const SizedBox(width: 12),
         FiltroDropdownWidget(
@@ -72,7 +74,9 @@ class SeccionFiltrosCot extends StatelessWidget {
           opciones: _meses,
           alCambiar: (v) {
             final idx = _meses.indexOf(v ?? _meses[0]);
-            onFiltroMes(idx == 0 ? null : idx);
+            ref
+                .read(cotizacionesProvider.notifier)
+                .filtrarMes(idx == 0 ? null : idx);
           },
         ),
       ],

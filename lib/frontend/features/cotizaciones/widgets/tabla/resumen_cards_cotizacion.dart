@@ -1,32 +1,29 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:inventario_k1/core/currency_ext.dart';
 import 'package:inventario_k1/frontend/share/temas/colores_app.dart';
 
 import 'package:inventario_k1/frontend/features/cotizaciones/provider/cotizaciones_provider.dart';
 
-class ResumenCardsCotizacion extends StatelessWidget {
-  const ResumenCardsCotizacion({super.key, required this.estado});
-
-  final CotizacionesState estado;
+class ResumenCardsCotizacion extends ConsumerWidget {
+  const ResumenCardsCotizacion({super.key});
 
   @override
-  Widget build(BuildContext context) {
-    final totalCots = estado.totalCotizaciones;
-    final totalPrevio = (totalCots * 0.88).round();
-    final pctTotal = totalPrevio > 0
-        ? ((totalCots - totalPrevio) / totalPrevio * 100).round()
-        : 0;
+  Widget build(BuildContext context, WidgetRef ref) {
+    final m = ref.watch(cotizacionesMetricsProvider);
 
-    final vigentes = estado.cantVigentes;
+    final totalPrevio = (m.total * 0.88).round();
+    final pctTotal =
+        totalPrevio > 0 ? ((m.total - totalPrevio) / totalPrevio * 100).round() : 0;
     final pctVigentes =
-        totalCots > 0 ? (vigentes / totalCots * 100).round() : 0;
+        m.total > 0 ? (m.cantVigentes / m.total * 100).round() : 0;
 
     return Row(
       children: [
         Expanded(
           child: _MetricaCard(
             titulo: 'Total Cotizaciones',
-            valor: '$totalCots',
+            valor: '${m.total}',
             subtitulo: '$pctTotal% este mes',
             positivo: pctTotal >= 0,
             icono: Icons.description_outlined,
@@ -37,7 +34,7 @@ class ResumenCardsCotizacion extends StatelessWidget {
         Expanded(
           child: _MetricaCard(
             titulo: 'Valor Total',
-            valor: estado.valorTotal.toCompactCop(),
+            valor: m.valorTotal.toCompactCop(),
             subtitulo: '8% vs. mes anterior',
             positivo: true,
             icono: Icons.attach_money_rounded,
@@ -48,7 +45,7 @@ class ResumenCardsCotizacion extends StatelessWidget {
         Expanded(
           child: _MetricaCard(
             titulo: 'Vigentes',
-            valor: '$vigentes',
+            valor: '${m.cantVigentes}',
             subtitulo: '$pctVigentes% del total activo',
             positivo: true,
             icono: Icons.check_circle_outline_rounded,
@@ -59,12 +56,12 @@ class ResumenCardsCotizacion extends StatelessWidget {
         Expanded(
           child: _MetricaCard(
             titulo: 'Vencidas',
-            valor: '${estado.cantVencidas}',
+            valor: '${m.cantVencidas}',
             subtitulo: 'Requieren seguimiento',
             positivo: false,
             icono: Icons.warning_amber_rounded,
             colorIcono: ColoresApp.statusDebt,
-            valorRojo: estado.cantVencidas > 0,
+            valorRojo: m.cantVencidas > 0,
           ),
         ),
       ],
@@ -149,16 +146,14 @@ class _MetricaCard extends StatelessWidget {
                     ? Icons.arrow_upward_rounded
                     : Icons.arrow_downward_rounded,
                 size: 13,
-                color:
-                    positivo ? ColoresApp.accentGreen : ColoresApp.accentRed,
+                color: positivo ? ColoresApp.accentGreen : ColoresApp.accentRed,
               ),
               const SizedBox(width: 3),
               Text(
                 subtitulo,
                 style: TextStyle(
-                  color: positivo
-                      ? ColoresApp.accentGreen
-                      : ColoresApp.textMedium,
+                  color:
+                      positivo ? ColoresApp.accentGreen : ColoresApp.textMedium,
                   fontSize: 12,
                 ),
               ),
