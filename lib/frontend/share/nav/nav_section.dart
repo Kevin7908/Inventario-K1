@@ -7,6 +7,7 @@ enum NavSection {
   // VENTAS
   vender,
   cotizaciones,
+  reservas,
   deudores,
   // GESTIÓN
   clientes,
