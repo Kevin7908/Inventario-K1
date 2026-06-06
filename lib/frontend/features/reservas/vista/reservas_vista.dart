@@ -329,7 +329,10 @@ class _ContenidoDetalle extends ConsumerWidget {
                   child: Column(
                     children: [
                       if (mostrarFormAbono)
-                        FormAbonoInlineWidget(reservaId: resumen.id),
+                        FormAbonoInlineWidget(
+                          reservaId: resumen.id,
+                          saldo: resumen.saldo,
+                        ),
                       CardInfoGeneralReservaWidget(resumen: resumen),
                       const SizedBox(height: 14),
                       CardProductosReservadosWidget(items: items),
@@ -343,10 +346,7 @@ class _ContenidoDetalle extends ConsumerWidget {
                   width: 260,
                   child: PanelResumenFinancieroWidget(
                     resumen: resumen,
-                    onMarcarCompletada: () => _cambiarEstado(
-                        context, ref, resumen, EstadoReserva.completada),
-                    onCancelar: () => _cambiarEstado(
-                        context, ref, resumen, EstadoReserva.cancelada),
+                    onCancelar: () => _confirmarCancelar(context, ref, resumen),
                   ),
                 ),
               ],
@@ -357,44 +357,41 @@ class _ContenidoDetalle extends ConsumerWidget {
     );
   }
 
-  Future<void> _cambiarEstado(
+  Future<void> _confirmarCancelar(
     BuildContext context,
     WidgetRef ref,
     ReservaResumen r,
-    EstadoReserva estado,
   ) async {
-    final label =
-        estado == EstadoReserva.completada ? 'Completada' : 'Cancelada';
     final confirmar = await showDialog<bool>(
       context: context,
       builder: (_) => AlertDialog(
-        title: Text('Marcar como $label'),
-        content: Text('¿Confirmas cambiar el estado de ${r.numero}?'),
+        title: const Text('Cancelar reserva'),
+        content: Text('¿Confirmas cancelar la reserva ${r.numero}?'),
         actions: [
           TextButton(
-              onPressed: () => Navigator.pop(context, false),
-              child: const Text('Cancelar')),
+            onPressed: () => Navigator.pop(context, false),
+            child: const Text('No'),
+          ),
           ElevatedButton(
             onPressed: () => Navigator.pop(context, true),
             style: ElevatedButton.styleFrom(
-              backgroundColor: estado == EstadoReserva.completada
-                  ? ColoresApp.statusPaid
-                  : ColoresApp.statusDebt,
+              backgroundColor: ColoresApp.statusDebt,
               foregroundColor: Colors.white,
             ),
-            child: Text('Marcar $label'),
+            child: const Text('Cancelar reserva'),
           ),
         ],
       ),
     );
     if (confirmar != true || !context.mounted) return;
-    final error =
-        await ref.read(reservasProvider.notifier).cambiarEstado(r.id, estado);
+    final error = await ref
+        .read(reservasProvider.notifier)
+        .cambiarEstado(r.id, EstadoReserva.cancelada);
     if (!context.mounted) return;
     if (error != null) {
       SnackBarMensaje.error(context, error);
     } else {
-      SnackBarMensaje.success(context, 'Reserva ${r.numero} → $label');
+      SnackBarMensaje.success(context, 'Reserva ${r.numero} cancelada.');
     }
   }
 }

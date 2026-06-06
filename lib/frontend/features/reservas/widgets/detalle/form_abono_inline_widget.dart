@@ -7,9 +7,14 @@ import '../../../../../backend/features/reservas/enum/enum_reserva.dart';
 import '../../provider/reservas_provider.dart';
 
 class FormAbonoInlineWidget extends ConsumerStatefulWidget {
-  const FormAbonoInlineWidget({super.key, required this.reservaId});
+  const FormAbonoInlineWidget({
+    super.key,
+    required this.reservaId,
+    required this.saldo,
+  });
 
   final int reservaId;
+  final int saldo;
 
   @override
   ConsumerState<FormAbonoInlineWidget> createState() =>
@@ -34,6 +39,13 @@ class _FormAbonoInlineWidgetState
     final monto = int.tryParse(_montoCtrl.text.replaceAll('.', '')) ?? 0;
     if (monto <= 0) {
       SnackBarMensaje.error(context, 'Ingresa un monto válido.');
+      return;
+    }
+    if (monto > widget.saldo) {
+      SnackBarMensaje.error(
+        context,
+        'El abono no puede superar el saldo pendiente.',
+      );
       return;
     }
     setState(() => _guardando = true);

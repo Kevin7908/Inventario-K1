@@ -180,6 +180,7 @@ class RepositorioReservasImpl implements RepositorioReservas {
         cotizacionId: Value(cotizacionId),
         fechaLimite: Value(fechaLimite),
         totalReserva: Value(totalReserva),
+        estado: const Value('ACTIVA'),
         actualizadoEn: Value(DateTime.now()),
       ));
 

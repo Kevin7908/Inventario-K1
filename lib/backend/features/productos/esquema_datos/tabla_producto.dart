@@ -38,9 +38,6 @@ class TablaProducto extends Table {
 
   TextColumn get imagenUrl => text().nullable()();
 
-  /// 1 = aplica IVA, 0 = no aplica. Se mapea a bool en el modelo.
-  BoolColumn get aplicaIva => boolean().withDefault(const Constant(true))();
-
   BoolColumn get activo => boolean().withDefault(const Constant(true))();
 
   DateTimeColumn get creadoEn =>

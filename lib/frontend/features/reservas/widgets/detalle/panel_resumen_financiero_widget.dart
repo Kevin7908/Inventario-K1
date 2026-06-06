@@ -9,12 +9,10 @@ class PanelResumenFinancieroWidget extends StatelessWidget {
   const PanelResumenFinancieroWidget({
     super.key,
     required this.resumen,
-    required this.onMarcarCompletada,
     required this.onCancelar,
   });
 
   final ReservaResumen resumen;
-  final VoidCallback onMarcarCompletada;
   final VoidCallback onCancelar;
 
   @override
@@ -25,7 +23,6 @@ class PanelResumenFinancieroWidget extends StatelessWidget {
         const SizedBox(height: 10),
         _AccionesEstado(
           estado: resumen.estado,
-          onMarcarCompletada: onMarcarCompletada,
           onCancelar: onCancelar,
         ),
       ],
@@ -49,7 +46,7 @@ class _TarjetaFinanciera extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.all(14),
       decoration: BoxDecoration(
-        color: ColoresApp.bgContent,
+        color: Colors.white,
         borderRadius: BorderRadius.circular(12),
       ),
       child: Column(
@@ -165,12 +162,10 @@ class _FilaFinanciera extends StatelessWidget {
 class _AccionesEstado extends StatelessWidget {
   const _AccionesEstado({
     required this.estado,
-    required this.onMarcarCompletada,
     required this.onCancelar,
   });
 
   final EstadoReserva estado;
-  final VoidCallback onMarcarCompletada;
   final VoidCallback onCancelar;
 
   @override
@@ -189,22 +184,12 @@ class _AccionesEstado extends StatelessWidget {
       );
     }
 
-    return Column(
-      children: [
-        _BotonAccion(
-          label: 'Marcar completada',
-          icono: Icons.check_circle_outline_rounded,
-          color: ColoresApp.statusPaid,
-          onTap: onMarcarCompletada,
-        ),
-        const SizedBox(height: 8),
-        _BotonAccion(
-          label: 'Cancelar reserva',
-          icono: Icons.cancel_outlined,
-          color: ColoresApp.statusDebt,
-          onTap: onCancelar,
-        ),
-      ],
+    return _BotonAccion(
+      label: 'Cancelar reserva',
+      icono: Icons.cancel_outlined,
+      color: ColoresApp.statusDebt,
+      bgColor: ColoresApp.statusDebtBg,
+      onTap: onCancelar,
     );
   }
 }
@@ -214,12 +199,14 @@ class _BotonAccion extends StatelessWidget {
     required this.label,
     required this.icono,
     required this.color,
+    required this.bgColor,
     required this.onTap,
   });
 
   final String label;
   final IconData icono;
   final Color color;
+  final Color bgColor;
   final VoidCallback onTap;
 
   @override
@@ -231,15 +218,13 @@ class _BotonAccion extends StatelessWidget {
         icon: Icon(icono, size: 16),
         label: Text(label),
         style: OutlinedButton.styleFrom(
-          backgroundColor: Colors.white,
+          backgroundColor: bgColor,
           foregroundColor: color,
           side: BorderSide(color: color, width: 1.5),
           elevation: 0,
           padding: const EdgeInsets.symmetric(vertical: 11),
-          shape:
-              RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
-          textStyle:
-              const TextStyle(fontSize: 12.5, fontWeight: FontWeight.w700),
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+          textStyle: const TextStyle(fontSize: 12.5, fontWeight: FontWeight.w700),
         ),
       ),
     );

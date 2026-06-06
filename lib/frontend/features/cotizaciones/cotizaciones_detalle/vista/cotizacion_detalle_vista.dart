@@ -22,7 +22,9 @@ import '../../../../../../backend/features/cotizaciones/modelo/cotizacion_resume
 import '../../provider/cotizaciones_provider.dart';
 import '../../widgets/dialogo/dialogo_cot_form_fields.dart';
 import '../provider/cotizacion_editor_provider.dart';
+import '../provider/cotizar_a_reserva_provider.dart';
 import '../widgets/dialogo_cantidad_widget.dart';
+import '../widgets/dialogo_reservar_cotizacion_widget.dart';
 import '../widgets/panel_resumen_widget.dart';
 import '../widgets/seccion_datos_cliente_widget.dart';
 
@@ -151,6 +153,44 @@ class _CotizacionDetalleVistaState
     );
   }
 
+  Future<void> _reservar() async {
+    final estado = ref.read(cotizacionEditorProvider);
+
+    if (!estado.esEdicion || estado.cotizacionOriginal == null) {
+      SnackBarMensaje.error(
+          context, 'Guarda la cotización antes de crear una reserva.');
+      return;
+    }
+    if (estado.cotizacionOriginal!.clienteId == null) {
+      SnackBarMensaje.error(context, 'La cotización no tiene cliente asignado.');
+      return;
+    }
+
+    final items = CotizarAReservaUseCase.mapearItems(estado.items);
+    if (items.isEmpty) {
+      SnackBarMensaje.error(
+        context,
+        'No hay productos reservables. Solo los ítems de tipo Producto pueden reservarse.',
+      );
+      return;
+    }
+
+    final creada = await DialogoReservarCotizacion.mostrar(
+      context,
+      cotizacion: estado.cotizacionOriginal!,
+      items: items,
+      totalReserva: estado.total,
+    );
+
+    if (creada && mounted) {
+      SnackBarMensaje.success(
+        context,
+        'Reserva creada exitosamente. Encuéntrala en el módulo Reservas.',
+      );
+      Navigator.pop(context);
+    }
+  }
+
   Future<void> _guardar() async {
     final esNueva = !ref.read(cotizacionEditorProvider).esEdicion;
     final notas =
@@ -277,7 +317,7 @@ class _CotizacionDetalleVistaState
                         ref.read(cotizacionEditorProvider.notifier).eliminarItem(i),
                     onImprimir: () => SnackBarMensaje.success(
                         context, 'Próximamente: Vista previa PDF.'),
-                    onReservar: () {},
+                    onReservar: _reservar,
                   ),
                 ),
               ],
