@@ -1,0 +1,10 @@
+flutter test pruebas-quintero-barrera/02-pruebas-unitarias/src/test/dart/login/login_test.dart --reporter expanded
+flutter test pruebas-quintero-barrera/02-pruebas-unitarias/src/test/dart/productos/productos_test.dart --reporter expanded
+flutter test pruebas-quintero-barrera/02-pruebas-unitarias/src/test/dart/ventas/ventas_test.dart --reporter expanded
+
+# Fase 4 — Repositorio (Drift en memoria)
+flutter test pruebas-quintero-barrera/04-pruebas-repositorio/repositorio_auth_test.dart --reporter expanded
+flutter test pruebas-quintero-barrera/04-pruebas-repositorio/repositorio_productos_test.dart --reporter expanded
+
+# Fase 3 — Funcional (copiar primero a integration_test/ y agregar integration_test al pubspec.yaml)
+flutter test -d linux integration_test/integration_suite.dart

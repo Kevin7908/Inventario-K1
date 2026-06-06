@@ -21,6 +21,8 @@ dependencies:
   bcrypt: ^1.2.0
   mailer: ^6.1.0
   flutter_riverpod: ^3.3.1
+  integration_test:
+    sdk: flutter
 
 dev_dependencies:
   flutter_test:
