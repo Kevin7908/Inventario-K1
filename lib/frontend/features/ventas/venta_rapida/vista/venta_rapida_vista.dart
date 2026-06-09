@@ -1,346 +1,135 @@
-import 'dart:async';
-
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../../../../backend/features/clientes/modelo/cliente.dart';
+import '../../../../../backend/features/productos/modelo/producto.dart';
 import '../../../../../backend/features/ventas/facturas/enum/enum_facturas.dart';
-import '../../../../../backend/features/ventas/facturas/modelo/factura_resumen.dart';
-import '../../../../share/formateadores/moneda_formateador.dart';
+import '../../../../../core/currency_ext.dart';
+import '../../../../../core/iva_app.dart';
+import '../widgets/dialogo_cobro_pos.dart';
+import '../../../../features/clientes/provider/cliente_provider.dart';
+import '../../../../features/productos/widgets/tarjeta_producto_widget.dart';
 import '../../../../share/temas/colores_app.dart';
-import '../../../../share/widgets/dialogos/dialogo_confirmar_eliminar_widget.dart';
+import '../../../../share/widgets/input/app_searc_widget.dart';
 import '../../../../share/widgets/input/barra_busqueda_widget.dart';
-import '../../../../share/widgets/output/estado_error_widget.dart';
-import '../../../../share/widgets/output/estado_vacio_widget.dart';
 import '../../../../share/widgets/output/snack_bar_mensaje.dart';
-import '../../../../share/widgets/top_bar_widget.dart';
-import '../../facturas/detalle_factura/factura_detalle_page.dart';
-import '../../facturas/provider/facturas_provider.dart';
-import '../../facturas/widgets/dialogo_crear_factura.dart';
-import '../../facturas/widgets/factura_fila_widget.dart';
+import '../provider/pos_providers.dart';
+import '../provider/pos_state.dart';
 
-class VentaRapidaVista extends ConsumerStatefulWidget {
+const _kAccent = ColoresApp.primary;
+
+class VentaRapidaVista extends StatelessWidget {
   const VentaRapidaVista({super.key});
 
   @override
-  ConsumerState<VentaRapidaVista> createState() => _VentaRapidaVistaState();
-}
-
-class _VentaRapidaVistaState extends ConsumerState<VentaRapidaVista> {
-  @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      backgroundColor: const Color(0xFFF9FAFB),
-      body: Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          TopBarConBoton(
-            titulo: 'Venta Rápida (Mostrador)',
-            etiquetaBoton: 'Nueva venta',
-            alPresionarBoton: () => DialogoCrearFactura.mostrar(context, tipoFijo: TipoVenta.mostrador),
-          ),
-          const Expanded(child: _CuerpoVentaRapida()),
-        ],
-      ),
-    );
-  }
-}
-
-class _CuerpoVentaRapida extends ConsumerStatefulWidget {
-  const _CuerpoVentaRapida();
-
-  @override
-  ConsumerState<_CuerpoVentaRapida> createState() => _CuerpoVentaRapidaState();
-}
-
-class _CuerpoVentaRapidaState extends ConsumerState<_CuerpoVentaRapida> {
-  final _searchController = TextEditingController();
-  Timer? _debounce;
-
-  @override
-  void dispose() {
-    _debounce?.cancel();
-    _searchController.dispose();
-    super.dispose();
-  }
-
-  void _onBuscar(String valor) {
-    _debounce?.cancel();
-    _debounce = Timer(const Duration(milliseconds: 280), () {
-      ref.read(facturasProvider.notifier).buscar(valor);
-    });
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    final estadoAsync = ref.watch(facturasProvider);
-    final filtroActual = estadoAsync.value?.filtroEstadoPago;
-
-    return estadoAsync.when(
-      loading: () => const Center(child: CircularProgressIndicator()),
-      error: (e, _) => EstadoErrorWidget(
-        mensaje: e.toString(),
-        alReintentar: () => ref.invalidate(facturasProvider),
-      ),
-      data: (estado) {
-        final lista = ref.watch(facturasRapidaFiltradas);
-        final metricas = _calcularMetricas(
-          estado.facturas.where((f) => f.tipo == TipoVenta.mostrador).toList(),
-        );
-
-        return Padding(
-          padding: const EdgeInsets.all(24),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              _CardsMetricas(metricas: metricas),
-              const SizedBox(height: 24),
-              Row(
-                children: [
-                  Expanded(
-                    child: BarraBusquedaWidget(
-                      placeholder: 'Buscar por número de venta...',
-                      alCambiar: _onBuscar,
-                    ),
-                  ),
-                  const SizedBox(width: 12),
-                  _Chip(
-                    label: 'Todas',
-                    seleccionado: filtroActual == null,
-                    color: const Color(0xFF374151),
-                    onTap: () =>
-                        ref.read(facturasProvider.notifier).filtrarEstadoPago(null),
-                  ),
-                  const SizedBox(width: 6),
-                  _Chip(
-                    label: 'Pendientes',
-                    seleccionado: filtroActual == EstadoPago.pendiente,
-                    color: const Color(0xFFF59E0B),
-                    onTap: () => ref.read(facturasProvider.notifier).filtrarEstadoPago(
-                          filtroActual == EstadoPago.pendiente
-                              ? null
-                              : EstadoPago.pendiente,
-                        ),
-                  ),
-                  const SizedBox(width: 6),
-                  _Chip(
-                    label: 'Pagadas',
-                    seleccionado: filtroActual == EstadoPago.pagado,
-                    color: const Color(0xFF10B981),
-                    onTap: () => ref.read(facturasProvider.notifier).filtrarEstadoPago(
-                          filtroActual == EstadoPago.pagado
-                              ? null
-                              : EstadoPago.pagado,
-                        ),
-                  ),
-                ],
-              ),
-              const SizedBox(height: 8),
-              Expanded(
-                child: Container(
-                  decoration: BoxDecoration(
-                    color: Colors.white,
-                    borderRadius: BorderRadius.circular(12),
-                    boxShadow: const [
-                      BoxShadow(
-                          color: Color(0x08000000),
-                          blurRadius: 8,
-                          offset: Offset(0, 2)),
-                    ],
-                  ),
-                  child: Column(
-                    children: [
-                      const FacturaTablaEncabezado(),
-                      Expanded(
-                        child: lista.isEmpty
-                            ? const EstadoVacioWidget(
-                                icono: Icons.point_of_sale_outlined,
-                                textoSinDatos: 'Sin ventas rápidas',
-                                textoSinResultados:
-                                    'Crea una nueva venta con el botón superior.',
-                                textoCTA: '',
-                              )
-                            : ListView.builder(
-                                itemCount: lista.length,
-                                addAutomaticKeepAlives: false,
-                                itemBuilder: (_, i) {
-                                  final f = lista[i];
-                                  return FacturaFilaWidget(
-                                    key: ValueKey(f.id),
-                                    factura: f,
-                                    onTap: () => Navigator.of(context).push(
-                                      MaterialPageRoute(
-                                        builder: (_) =>
-                                            FacturaDetallePage(facturaId: f.id),
-                                      ),
-                                    ),
-                                    onEliminar: () =>
-                                        _confirmarEliminar(context, ref, f),
-                                  );
-                                },
-                              ),
-                      ),
-                    ],
-                  ),
-                ),
-              ),
-            ],
-          ),
-        );
-      },
-    );
-  }
-
-  void _confirmarEliminar(
-      BuildContext context, WidgetRef ref, FacturaResumen f) {
-    DialogoConfirmarEliminar.mostrar(
-      context: context,
-      nombreElemento: f.numeroFactura,
-      tipoElemento: 'venta',
-      onConfirmar: () async {
-        final error =
-            await ref.read(facturasProvider.notifier).eliminar(f.id);
-        if (!context.mounted) return;
-        if (error != null) {
-          SnackBarMensaje.error(context, error);
-        } else {
-          SnackBarMensaje.success(context, 'Venta eliminada.');
-        }
-      },
-    );
-  }
-
-  _Metricas _calcularMetricas(List<FacturaResumen> lista) {
-    final ahora = DateTime.now();
-    double cobrado = 0;
-    int numMes = 0;
-    double pendiente = 0;
-
-    for (final f in lista) {
-      if (f.estadoPago == EstadoPago.pagado &&
-          f.creadoEn != null &&
-          f.creadoEn!.month == ahora.month &&
-          f.creadoEn!.year == ahora.year) {
-        cobrado += f.total;
-        numMes++;
-      }
-      if (f.estadoPago == EstadoPago.pendiente) pendiente += f.total;
-    }
-    return _Metricas(
-        cobradoMes: cobrado, numMes: numMes, pendiente: pendiente, total: lista.length);
-  }
-}
-
-class _Metricas {
-  const _Metricas(
-      {required this.cobradoMes,
-      required this.numMes,
-      required this.pendiente,
-      required this.total});
-  final double cobradoMes;
-  final int numMes;
-  final double pendiente;
-  final int total;
-}
-
-class _CardsMetricas extends StatelessWidget {
-  const _CardsMetricas({required this.metricas});
-  final _Metricas metricas;
-
-  @override
-  Widget build(BuildContext context) {
-    return Row(
+    return const Row(
       children: [
-        Expanded(
-          child: _StatCard(
-            titulo: 'Cobrado este mes',
-            valor: fmtMoneda(metricas.cobradoMes),
-            subtitulo: '${metricas.numMes} ventas',
-            color: const Color(0xFF10B981),
-          ),
+        Expanded(child: _CatalogPanel()),
+        SizedBox(
+          width: 1,
+          child: ColoredBox(color: ColoresApp.border, child: SizedBox.expand()),
         ),
-        const SizedBox(width: 16),
-        Expanded(
-          child: _StatCard(
-            titulo: 'Pendiente de cobro',
-            valor: fmtMoneda(metricas.pendiente),
-            subtitulo: 'Por cobrar',
-            color: const Color(0xFFF59E0B),
-          ),
-        ),
-        const SizedBox(width: 16),
-        Expanded(
-          child: _StatCard(
-            titulo: 'Total ventas',
-            valor: metricas.total.toString(),
-            subtitulo: 'Todas las ventas',
-            color: ColoresApp.accentTeal,
-          ),
-        ),
+        SizedBox(width: 360, child: _CartPanel()),
       ],
     );
   }
 }
 
-class _StatCard extends StatelessWidget {
-  const _StatCard({
-    required this.titulo,
-    required this.valor,
-    required this.subtitulo,
-    required this.color,
-  });
+// ── Panel catálogo ─────────────────────────────────────────────────────────────
 
-  final String titulo;
-  final String valor;
-  final String subtitulo;
-  final Color color;
+class _CatalogPanel extends ConsumerWidget {
+  const _CatalogPanel();
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
+    final catalogo   = ref.watch(posCatalogoProvider);
+    final categorias = ref.watch(posCategoriasProvider);
+    final categoriaActual = ref.watch(posProvider).categoriaFiltro;
+
     return Container(
-      padding: const EdgeInsets.all(20),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(12),
-        border: Border(left: BorderSide(color: color, width: 3)),
-        boxShadow: const [
-          BoxShadow(color: Color(0x08000000), blurRadius: 8, offset: Offset(0, 2)),
-        ],
-      ),
+      color: ColoresApp.bgContent,
       child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
+        crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          Text(titulo,
-              style: const TextStyle(
-                  fontSize: 13,
-                  color: Color(0xFF6B7280),
-                  fontWeight: FontWeight.w500)),
-          const SizedBox(height: 8),
-          Text(valor,
-              style: TextStyle(
-                  fontSize: 26,
-                  fontWeight: FontWeight.w700,
-                  color: color,
-                  height: 1)),
-          const SizedBox(height: 4),
-          Text(subtitulo,
-              style:
-                  const TextStyle(fontSize: 12, color: Color(0xFF9CA3AF))),
+          // ── Búsqueda y categorías ────────────────────────────────────
+          Padding(
+            padding: const EdgeInsets.fromLTRB(16, 14, 16, 0),
+            child: BarraBusquedaWidget(
+              placeholder: 'Buscar producto, SKU…',
+              debounceMs: 280,
+              alCambiar: (q) => ref.read(posProvider.notifier).buscar(q),
+            ),
+          ),
+          if (categorias.isNotEmpty)
+            _CategoriasChips(
+              categorias:    categorias,
+              categoriaActual: categoriaActual,
+              onFiltrar: (c) =>
+                  ref.read(posProvider.notifier).filtrarCategoria(c),
+            ),
+          const Divider(height: 1, color: ColoresApp.border),
+          // ── Grid de productos ─────────────────────────────────────────
+          Expanded(
+            child: catalogo.isEmpty
+                ? const _CatalogEmpty()
+                : _ProductGrid(catalogo: catalogo),
+          ),
         ],
       ),
     );
   }
 }
 
-class _Chip extends StatelessWidget {
-  const _Chip({
+class _CategoriasChips extends StatelessWidget {
+  const _CategoriasChips({
+    required this.categorias,
+    required this.categoriaActual,
+    required this.onFiltrar,
+  });
+
+  final List<String>          categorias;
+  final String?               categoriaActual;
+  final ValueChanged<String?> onFiltrar;
+
+  @override
+  Widget build(BuildContext context) {
+    return SingleChildScrollView(
+      scrollDirection: Axis.horizontal,
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+      child: Row(
+        children: [
+          _CatChip(
+            label: 'Todos',
+            seleccionado: categoriaActual == null,
+            onTap: () => onFiltrar(null),
+          ),
+          ...categorias.map(
+            (c) => Padding(
+              padding: const EdgeInsets.only(left: 5),
+              child: _CatChip(
+                label: c,
+                seleccionado: categoriaActual == c,
+                onTap: () =>
+                    onFiltrar(categoriaActual == c ? null : c),
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _CatChip extends StatelessWidget {
+  const _CatChip({
     required this.label,
     required this.seleccionado,
-    required this.color,
     required this.onTap,
   });
-  final String label;
-  final bool seleccionado;
-  final Color color;
+
+  final String       label;
+  final bool         seleccionado;
   final VoidCallback onTap;
 
   @override
@@ -348,22 +137,636 @@ class _Chip extends StatelessWidget {
     return GestureDetector(
       onTap: onTap,
       child: AnimatedContainer(
-        duration: const Duration(milliseconds: 150),
-        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+        duration: const Duration(milliseconds: 120),
+        padding: const EdgeInsets.symmetric(horizontal: 11, vertical: 5),
         decoration: BoxDecoration(
-          color: seleccionado ? color : Colors.white,
+          color: seleccionado ? _kAccent : Colors.transparent,
           borderRadius: BorderRadius.circular(20),
           border: Border.all(
-              color: seleccionado ? color : const Color(0xFFE5E7EB)),
+            color: seleccionado ? _kAccent : ColoresApp.border,
+          ),
         ),
         child: Text(
           label,
           style: TextStyle(
-            fontSize: 13,
+            fontSize: 11,
             fontWeight: FontWeight.w600,
-            color: seleccionado ? Colors.white : const Color(0xFF6B7280),
+            color: seleccionado ? Colors.white : ColoresApp.textMedium,
           ),
         ),
+      ),
+    );
+  }
+}
+
+class _ProductGrid extends ConsumerWidget {
+  const _ProductGrid({required this.catalogo});
+  final List<Producto> catalogo;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    return GridView.builder(
+      padding: const EdgeInsets.all(14),
+      gridDelegate: const SliverGridDelegateWithMaxCrossAxisExtent(
+        maxCrossAxisExtent: 250,
+        crossAxisSpacing:   12,
+        mainAxisSpacing:    12,
+        mainAxisExtent:     310,
+      ),
+      itemCount: catalogo.length,
+      itemBuilder: (_, i) {
+        final p = catalogo[i];
+        return RepaintBoundary(
+          child: TarjetaProductoWidget(
+            key:   ValueKey(p.id),
+            producto: p,
+            alTap: () => ref.read(posProvider.notifier).agregar(p),
+          ),
+        );
+      },
+    );
+  }
+}
+
+class _CatalogEmpty extends StatelessWidget {
+  const _CatalogEmpty();
+
+  @override
+  Widget build(BuildContext context) {
+    return const Center(
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(Icons.inventory_2_outlined, size: 48, color: ColoresApp.textLight),
+          SizedBox(height: 10),
+          Text(
+            'Sin productos',
+            style: TextStyle(fontSize: 14, fontWeight: FontWeight.w600, color: ColoresApp.textMedium),
+          ),
+          SizedBox(height: 4),
+          Text(
+            'Ajusta el filtro o el texto de búsqueda.',
+            style: TextStyle(fontSize: 12, color: ColoresApp.textLight),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+// ── Panel carrito ─────────────────────────────────────────────────────────────
+
+class _CartPanel extends ConsumerStatefulWidget {
+  const _CartPanel();
+
+  @override
+  ConsumerState<_CartPanel> createState() => _CartPanelState();
+}
+
+class _CartPanelState extends ConsumerState<_CartPanel> {
+  late final ValueNotifier<Cliente?> _clienteNotifier;
+  late final TextEditingController   _descuentoCtrl;
+
+  @override
+  void initState() {
+    super.initState();
+    _clienteNotifier = ValueNotifier(null);
+    _clienteNotifier.addListener(_syncCliente);
+    _descuentoCtrl = TextEditingController(text: '0');
+  }
+
+  void _syncCliente() {
+    final c = _clienteNotifier.value;
+    ref.read(posProvider.notifier).seleccionarCliente(c?.id, c?.nombreCompleto);
+  }
+
+  @override
+  void dispose() {
+    _clienteNotifier
+      ..removeListener(_syncCliente)
+      ..dispose();
+    _descuentoCtrl.dispose();
+    super.dispose();
+  }
+
+  Future<void> _checkout() async {
+    final pos      = ref.read(posProvider);
+    final subtotal = pos.subtotal;
+    final total    = subtotal - pos.descuento + subtotal * kIva;
+
+    final estadoPago = await DialogoCobrarPOS.mostrar(
+      context,
+      total:         total,
+      clienteId:     pos.clienteId,
+      clienteNombre: pos.clienteNombre,
+    );
+    if (estadoPago == null || !mounted) return;
+
+    final error = await ref
+        .read(posProvider.notifier)
+        .procesarVenta(estadoPago: estadoPago);
+    if (!mounted) return;
+    if (error != null) {
+      SnackBarMensaje.error(context, error);
+    } else {
+      _clienteNotifier.value = null;
+      _descuentoCtrl.text    = '0';
+      SnackBarMensaje.success(context, 'Venta procesada correctamente.');
+    }
+  }
+
+  void _vaciar() {
+    ref.read(posProvider.notifier).vaciarCarrito();
+    _descuentoCtrl.text = '0';
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final pos     = ref.watch(posProvider);
+    final clientes = ref.watch(clientesProvider).value?.clientes ?? const [];
+
+    return Container(
+      color: ColoresApp.bgCard,
+      child: Column(
+        children: [
+          // ── Header carrito ──────────────────────────────────────────
+          _CartHeader(
+            total:    pos.totalUnidades,
+            onVaciar: pos.items.isEmpty ? null : _vaciar,
+          ),
+          const Divider(height: 1, color: ColoresApp.border),
+          // ── Items ────────────────────────────────────────────────────
+          Expanded(
+            child: pos.items.isEmpty
+                ? const _CartEmpty()
+                : _CartItemList(items: pos.items),
+          ),
+          const Divider(height: 1, color: ColoresApp.border),
+          // ── Resumen + checkout ────────────────────────────────────────
+          _CartFooter(
+            pos:                pos,
+            descuentoCtrl:      _descuentoCtrl,
+            onDescuentoCambiado: (v) =>
+                ref.read(posProvider.notifier).cambiarDescuento(v),
+            clienteNotifier:    _clienteNotifier,
+            clientes:           clientes,
+            onCheckout:         _checkout,
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _CartHeader extends StatelessWidget {
+  const _CartHeader({required this.total, required this.onVaciar});
+
+  final int         total;
+  final VoidCallback? onVaciar;
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(14, 14, 10, 12),
+      child: Row(
+        children: [
+          const Icon(Icons.shopping_cart_outlined, size: 18, color: _kAccent),
+          const SizedBox(width: 6),
+          Text(
+            'Carrito',
+            style: const TextStyle(
+              fontSize: 14,
+              fontWeight: FontWeight.w700,
+              color: ColoresApp.textDark,
+            ),
+          ),
+          if (total > 0) ...[
+            const SizedBox(width: 6),
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2),
+              decoration: BoxDecoration(
+                color: _kAccent.withValues(alpha: 0.12),
+                borderRadius: BorderRadius.circular(20),
+              ),
+              child: Text(
+                '$total',
+                style: const TextStyle(
+                  fontSize: 11,
+                  fontWeight: FontWeight.w700,
+                  color: _kAccent,
+                ),
+              ),
+            ),
+          ],
+          const Spacer(),
+          if (onVaciar != null)
+            TextButton(
+              onPressed: onVaciar,
+              style: TextButton.styleFrom(
+                foregroundColor: ColoresApp.accentRed,
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                textStyle: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600),
+              ),
+              child: const Text('Vaciar'),
+            ),
+        ],
+      ),
+    );
+  }
+}
+
+class _CartEmpty extends StatelessWidget {
+  const _CartEmpty();
+
+  @override
+  Widget build(BuildContext context) {
+    return const Center(
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(Icons.shopping_cart_outlined, size: 42, color: ColoresApp.textLight),
+          SizedBox(height: 8),
+          Text(
+            'Carrito vacío',
+            style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: ColoresApp.textMedium),
+          ),
+          SizedBox(height: 3),
+          Text(
+            'Toca un producto para agregarlo.',
+            style: TextStyle(fontSize: 11, color: ColoresApp.textLight),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _CartItemList extends ConsumerWidget {
+  const _CartItemList({required this.items});
+  final List<ItemCarrito> items;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    return ListView.builder(
+      itemCount: items.length,
+      addAutomaticKeepAlives: false,
+      itemBuilder: (_, i) {
+        final item = items[i];
+        return _CartItemTile(
+          key:  ValueKey(item.producto.id),
+          item: item,
+          onAdd:    () => ref.read(posProvider.notifier).agregar(item.producto),
+          onReduce: () => ref.read(posProvider.notifier).reducir(item.producto.id!),
+          onRemove: () => ref.read(posProvider.notifier).eliminar(item.producto.id!),
+        );
+      },
+    );
+  }
+}
+
+class _CartItemTile extends StatelessWidget {
+  const _CartItemTile({
+    super.key,
+    required this.item,
+    required this.onAdd,
+    required this.onReduce,
+    required this.onRemove,
+  });
+
+  final ItemCarrito  item;
+  final VoidCallback onAdd;
+  final VoidCallback onReduce;
+  final VoidCallback onRemove;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+      decoration: const BoxDecoration(
+        border: Border(bottom: BorderSide(color: ColoresApp.border)),
+      ),
+      child: Row(
+        children: [
+          // Nombre + precio
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  item.producto.nombre,
+                  style: const TextStyle(
+                    fontSize: 12.5,
+                    fontWeight: FontWeight.w600,
+                    color: ColoresApp.textDark,
+                  ),
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
+                ),
+                const SizedBox(height: 2),
+                Text(
+                  item.producto.precioVenta.toCopString(),
+                  style: const TextStyle(fontSize: 11, color: ColoresApp.textMedium),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(width: 8),
+          // Cantidad controles
+          _QtyControl(
+            cantidad: item.cantidad,
+            onAdd:    onAdd,
+            onReduce: onReduce,
+          ),
+          const SizedBox(width: 8),
+          // Subtotal
+          SizedBox(
+            width: 70,
+            child: Text(
+              item.subtotal.toCopString(),
+              textAlign: TextAlign.right,
+              style: const TextStyle(
+                fontSize: 12,
+                fontWeight: FontWeight.w700,
+                color: ColoresApp.textDark,
+              ),
+            ),
+          ),
+          // Eliminar
+          IconButton(
+            onPressed: onRemove,
+            icon: const Icon(Icons.close_rounded, size: 15),
+            color: ColoresApp.textLight,
+            padding: EdgeInsets.zero,
+            constraints: const BoxConstraints(minWidth: 24, minHeight: 24),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _QtyControl extends StatelessWidget {
+  const _QtyControl({
+    required this.cantidad,
+    required this.onAdd,
+    required this.onReduce,
+  });
+
+  final int          cantidad;
+  final VoidCallback onAdd;
+  final VoidCallback onReduce;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      decoration: BoxDecoration(
+        border: Border.all(color: ColoresApp.border),
+        borderRadius: BorderRadius.circular(8),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          _QtyBtn(icon: Icons.remove_rounded, onTap: onReduce),
+          SizedBox(
+            width: 28,
+            child: Text(
+              '$cantidad',
+              textAlign: TextAlign.center,
+              style: const TextStyle(
+                fontSize: 13,
+                fontWeight: FontWeight.w700,
+                color: ColoresApp.textDark,
+              ),
+            ),
+          ),
+          _QtyBtn(icon: Icons.add_rounded, onTap: onAdd),
+        ],
+      ),
+    );
+  }
+}
+
+class _QtyBtn extends StatelessWidget {
+  const _QtyBtn({required this.icon, required this.onTap});
+  final IconData     icon;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      onTap: onTap,
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 4),
+        child: Icon(icon, size: 14, color: ColoresApp.textMedium),
+      ),
+    );
+  }
+}
+
+// ── Footer del carrito ────────────────────────────────────────────────────────
+
+class _CartFooter extends StatelessWidget {
+  const _CartFooter({
+    required this.pos,
+    required this.descuentoCtrl,
+    required this.onDescuentoCambiado,
+    required this.clienteNotifier,
+    required this.clientes,
+    required this.onCheckout,
+  });
+
+  final PosState                pos;
+  final TextEditingController   descuentoCtrl;
+  final ValueChanged<double>    onDescuentoCambiado;
+  final ValueNotifier<Cliente?> clienteNotifier;
+  final List<Cliente>           clientes;
+  final VoidCallback            onCheckout;
+
+  static const _metodos = MetodoPago.values;
+
+  @override
+  Widget build(BuildContext context) {
+    final subtotal  = pos.subtotal;
+    final descuento = pos.descuento;
+    final iva       = subtotal * kIva;
+    final total     = subtotal - descuento + iva;
+
+    return Padding(
+      padding: const EdgeInsets.all(14),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          // Totales
+          _TotalRow(label: 'Subtotal', valor: subtotal.toCopString()),
+          if (descuento > 0) ...[
+            const SizedBox(height: 3),
+            _TotalRow(
+              label: 'Descuento',
+              valor: '- ${descuento.toCopString()}',
+              color: ColoresApp.accentGreen,
+            ),
+          ],
+          const SizedBox(height: 3),
+          _TotalRow(label: 'IVA (19%)', valor: iva.toCopString()),
+          const Divider(height: 12, color: ColoresApp.border),
+          _TotalRow(
+            label: 'Total',
+            valor: total.toCopString(),
+            bold: true,
+          ),
+          const SizedBox(height: 10),
+          // Descuento
+          TextField(
+            controller: descuentoCtrl,
+            keyboardType: const TextInputType.numberWithOptions(decimal: true),
+            style: const TextStyle(fontSize: 13, color: ColoresApp.textDark),
+            decoration: InputDecoration(
+              labelText: 'Descuento (\$)',
+              labelStyle: const TextStyle(fontSize: 12, color: ColoresApp.textLight),
+              prefixIcon: const Icon(Icons.local_offer_outlined,
+                  size: 16, color: ColoresApp.textLight),
+              filled: true,
+              fillColor: ColoresApp.bgContent,
+              contentPadding:
+                  const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+              border: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(9),
+                borderSide: const BorderSide(color: ColoresApp.border),
+              ),
+              enabledBorder: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(9),
+                borderSide: const BorderSide(color: ColoresApp.border),
+              ),
+              focusedBorder: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(9),
+                borderSide: const BorderSide(color: _kAccent, width: 1.5),
+              ),
+            ),
+            onChanged: (v) =>
+                onDescuentoCambiado(double.tryParse(v.trim()) ?? 0),
+          ),
+          const SizedBox(height: 10),
+          // Cliente
+          AppSearch<Cliente>(
+            notifier:     clienteNotifier,
+            items:        clientes,
+            labelBuilder: (c) => c.nombreCompleto,
+            hint:         'Cliente (opcional)',
+            label:        'Cliente',
+          ),
+          const SizedBox(height: 10),
+          // Método de pago
+          _MetodoSelector(
+            actual:  pos.metodoPago,
+            metodos: _metodos,
+          ),
+          const SizedBox(height: 12),
+          // Checkout
+          ElevatedButton.icon(
+            onPressed: pos.procesando || pos.items.isEmpty ? null : onCheckout,
+            icon: pos.procesando
+                ? const SizedBox(
+                    width: 16,
+                    height: 16,
+                    child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
+                  )
+                : const Icon(Icons.bolt_rounded, size: 16),
+            label: Text(pos.procesando ? 'Procesando…' : 'Cobrar ${total.toCopString()}'),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: _kAccent,
+              foregroundColor: Colors.white,
+              disabledBackgroundColor: ColoresApp.border,
+              padding: const EdgeInsets.symmetric(vertical: 13),
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+              elevation: 0,
+              textStyle: const TextStyle(fontSize: 14, fontWeight: FontWeight.w700),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _TotalRow extends StatelessWidget {
+  const _TotalRow({
+    required this.label,
+    required this.valor,
+    this.bold  = false,
+    this.color,
+  });
+
+  final String label;
+  final String valor;
+  final bool   bold;
+  final Color? color;
+
+  @override
+  Widget build(BuildContext context) {
+    final valorColor = color ?? (bold ? _kAccent : ColoresApp.textDark);
+    return Row(
+      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+      children: [
+        Text(
+          label,
+          style: TextStyle(
+            fontSize: bold ? 13 : 12,
+            fontWeight: bold ? FontWeight.w700 : FontWeight.w500,
+            color: bold ? ColoresApp.textDark : ColoresApp.textMedium,
+          ),
+        ),
+        Text(
+          valor,
+          style: TextStyle(
+            fontSize: bold ? 15 : 12,
+            fontWeight: bold ? FontWeight.w800 : FontWeight.w600,
+            color: valorColor,
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+class _MetodoSelector extends ConsumerWidget {
+  const _MetodoSelector({required this.actual, required this.metodos});
+
+  final MetodoPago        actual;
+  final List<MetodoPago>  metodos;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    return Container(
+      decoration: BoxDecoration(
+        border: Border.all(color: ColoresApp.border),
+        borderRadius: BorderRadius.circular(9),
+      ),
+      child: Row(
+        children: metodos.map((m) {
+          final sel = actual == m;
+          return Expanded(
+            child: GestureDetector(
+              onTap: () => ref.read(posProvider.notifier).cambiarMetodoPago(m),
+              child: AnimatedContainer(
+                duration: const Duration(milliseconds: 120),
+                padding: const EdgeInsets.symmetric(vertical: 7),
+                decoration: BoxDecoration(
+                  color: sel ? _kAccent : Colors.transparent,
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: Text(
+                  m.etiqueta,
+                  textAlign: TextAlign.center,
+                  style: TextStyle(
+                    fontSize: 11,
+                    fontWeight: FontWeight.w600,
+                    color: sel ? Colors.white : ColoresApp.textMedium,
+                  ),
+                ),
+              ),
+            ),
+          );
+        }).toList(growable: false),
       ),
     );
   }

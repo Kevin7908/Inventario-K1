@@ -49,6 +49,7 @@ abstract interface class RepositorioFacturas {
     required MetodoPago metodoPago,
     required EstadoPago estadoPago,
     double iva,
+    double descuento,
   });
 
   // Items (venta_detalles)

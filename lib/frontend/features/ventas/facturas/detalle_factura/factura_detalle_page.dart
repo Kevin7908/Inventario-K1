@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../../../../backend/features/ventas/facturas/enum/enum_facturas.dart';
 import '../../../../share/widgets/dialogos/dialogo_confirmar_eliminar_widget.dart';
 import '../../../../share/widgets/output/estado_error_widget.dart';
 import '../../../../share/widgets/output/snack_bar_mensaje.dart';
@@ -66,10 +67,13 @@ class _ContenidoDetalle extends ConsumerWidget {
     final detalle = ref.watch(facturaDetalleProvider(facturaId)).value;
     if (detalle == null) return const SizedBox.shrink();
 
+    final readOnly = detalle.estadoPago == EstadoPago.pagado;
+
     return Column(
       children: [
         FacturaTopBar(
           facturaId: facturaId,
+          readOnly:  readOnly,
           onVolver: () => Navigator.of(context).pop(),
           onEditar: () async {
             await DialogoCrearFactura.mostrar(context, facturaAEditar: detalle);
@@ -94,18 +98,19 @@ class _ContenidoDetalle extends ConsumerWidget {
                       FacturaInfoCard(facturaId: facturaId),
                       const SizedBox(height: 14),
                       ItemsFacturaListaCard(
-                        facturaId: facturaId,
+                        facturaId:        facturaId,
+                        readOnly:         readOnly,
                         onAgregarServicio: () =>
                             DialogoAgregarItemServicio.mostrar(
                           context,
                           ventaId: facturaId,
                         ),
-                        onAgregarProducto: () {
-                          // Scroll hacia el panel de búsqueda ya está visible abajo
-                        },
+                        onAgregarProducto: () {},
                       ),
-                      const SizedBox(height: 14),
-                      PanelBusquedaProductosFactura(facturaId: facturaId),
+                      if (!readOnly) ...[
+                        const SizedBox(height: 14),
+                        PanelBusquedaProductosFactura(facturaId: facturaId),
+                      ],
                       const SizedBox(height: 20),
                     ],
                   ),

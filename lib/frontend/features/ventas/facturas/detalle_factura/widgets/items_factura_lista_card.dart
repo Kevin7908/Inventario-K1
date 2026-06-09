@@ -13,10 +13,17 @@ import 'dialogo_agregar_item_factura.dart';
 import 'dialogo_editar_item_factura.dart';
 
 class ItemsFacturaListaCard extends ConsumerWidget {
-  const ItemsFacturaListaCard({super.key, required this.facturaId, required this.onAgregarServicio, required this.onAgregarProducto});
+  const ItemsFacturaListaCard({
+    super.key,
+    required this.facturaId,
+    required this.onAgregarServicio,
+    required this.onAgregarProducto,
+    this.readOnly = false,
+  });
   final int facturaId;
   final VoidCallback onAgregarServicio;
   final VoidCallback onAgregarProducto;
+  final bool readOnly;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -40,26 +47,29 @@ class ItemsFacturaListaCard extends ConsumerWidget {
           SeccionHeaderFactura(
             titulo: 'Items facturados',
             icono: Icons.receipt_outlined,
-            accion: Row(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                _BotonAgregar(
-                  label: '+ Servicio',
-                  onTap: onAgregarServicio,
-                ),
-                const SizedBox(width: 6),
-              ],
-            ),
+            accion: readOnly
+                ? null
+                : Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      _BotonAgregar(
+                        label: '+ Servicio',
+                        onTap: onAgregarServicio,
+                      ),
+                      const SizedBox(width: 6),
+                    ],
+                  ),
           ),
           if (detalle.items.isEmpty)
             const EstadoVacioSeccionFactura(mensaje: 'Sin items. Agrega servicios o productos.')
           else ...[
-            _EncabezadoItems(),
+            _EncabezadoItems(readOnly: readOnly),
             ...detalle.items.map(
               (item) => _FilaItem(
                 key: ValueKey(item.id),
                 item: item,
                 facturaId: facturaId,
+                readOnly: readOnly,
               ),
             ),
           ],
@@ -100,6 +110,9 @@ class _BotonAgregar extends StatelessWidget {
 }
 
 class _EncabezadoItems extends StatelessWidget {
+  const _EncabezadoItems({this.readOnly = false});
+  final bool readOnly;
+
   @override
   Widget build(BuildContext context) {
     return Container(
@@ -108,14 +121,14 @@ class _EncabezadoItems extends StatelessWidget {
         color: Color(0xFFF9FAFB),
         border: Border(bottom: BorderSide(color: ColoresApp.border)),
       ),
-      child: const Row(
+      child: Row(
         children: [
-          SizedBox(width: 90, child: EncabezadoColFac('Tipo')),
-          Expanded(child: EncabezadoColFac('Descripción')),
-          SizedBox(width: 60, child: EncabezadoColFac('Cant.', center: true)),
-          SizedBox(width: 90, child: EncabezadoColFac('P. Unit.', right: true)),
-          SizedBox(width: 90, child: EncabezadoColFac('Subtotal', right: true)),
-          SizedBox(width: 60),
+          const SizedBox(width: 90, child: EncabezadoColFac('Tipo')),
+          const Expanded(child: EncabezadoColFac('Descripción')),
+          const SizedBox(width: 60, child: EncabezadoColFac('Cant.', center: true)),
+          const SizedBox(width: 90, child: EncabezadoColFac('P. Unit.', right: true)),
+          const SizedBox(width: 90, child: EncabezadoColFac('Subtotal', right: true)),
+          if (!readOnly) const SizedBox(width: 60),
         ],
       ),
     );
@@ -123,9 +136,15 @@ class _EncabezadoItems extends StatelessWidget {
 }
 
 class _FilaItem extends ConsumerWidget {
-  const _FilaItem({super.key, required this.item, required this.facturaId});
+  const _FilaItem({
+    super.key,
+    required this.item,
+    required this.facturaId,
+    this.readOnly = false,
+  });
   final VentaItem item;
   final int facturaId;
+  final bool readOnly;
 
   void _confirmarEliminar(BuildContext context, WidgetRef ref) {
     DialogoConfirmarEliminar.mostrar(
@@ -196,39 +215,40 @@ class _FilaItem extends ConsumerWidget {
                   color: ColoresApp.textDark),
             ),
           ),
-          SizedBox(
-            width: 60,
-            child: Row(
-              mainAxisAlignment: MainAxisAlignment.end,
-              children: [
-                MiniBotonFac(
-                  icono: Icons.edit_outlined,
-                  color: ColoresApp.primary,
-                  onTap: () {
-                    if (item.tipoItem == TipoItem.servicio) {
-                      DialogoAgregarItemServicio.mostrar(
-                        context,
-                        ventaId: facturaId,
-                        itemAEditar: item,
-                      );
-                    } else {
-                      DialogoEditarItemFactura.mostrar(
-                        context,
-                        ventaId: facturaId,
-                        item: item,
-                      );
-                    }
-                  },
-                ),
-                const SizedBox(width: 4),
-                MiniBotonFac(
-                  icono: Icons.delete_outline_rounded,
-                  color: ColoresApp.statusDebt,
-                  onTap: () => _confirmarEliminar(context, ref),
-                ),
-              ],
+          if (!readOnly)
+            SizedBox(
+              width: 60,
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.end,
+                children: [
+                  MiniBotonFac(
+                    icono: Icons.edit_outlined,
+                    color: ColoresApp.primary,
+                    onTap: () {
+                      if (item.tipoItem == TipoItem.servicio) {
+                        DialogoAgregarItemServicio.mostrar(
+                          context,
+                          ventaId: facturaId,
+                          itemAEditar: item,
+                        );
+                      } else {
+                        DialogoEditarItemFactura.mostrar(
+                          context,
+                          ventaId: facturaId,
+                          item: item,
+                        );
+                      }
+                    },
+                  ),
+                  const SizedBox(width: 4),
+                  MiniBotonFac(
+                    icono: Icons.delete_outline_rounded,
+                    color: ColoresApp.statusDebt,
+                    onTap: () => _confirmarEliminar(context, ref),
+                  ),
+                ],
+              ),
             ),
-          ),
         ],
       ),
     );

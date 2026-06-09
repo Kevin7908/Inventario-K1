@@ -231,7 +231,8 @@ class RepositorioFacturasImpl implements RepositorioFacturas {
     required int ordenId,
     required MetodoPago metodoPago,
     required EstadoPago estadoPago,
-    double iva = 0,
+    double iva       = 0,
+    double descuento = 0,
   }) async {
     return _db.transaction(() async {
       // 1. Validar que la orden tenga al menos un servicio
@@ -246,9 +247,10 @@ class RepositorioFacturasImpl implements RepositorioFacturas {
       // 2. Actualizar cabecera
       await (_db.update(_tablaVentas)..where((t) => t.id.equals(facturaId))).write(
         TablaVentasCompanion(
-          metodoPago:   Value(metodoPago.aTexto),
-          estadoPago:   Value(estadoPago.aTexto),
-          iva:          Value(iva),
+          metodoPago:    Value(metodoPago.aTexto),
+          estadoPago:    Value(estadoPago.aTexto),
+          iva:           Value(iva),
+          descuento:     Value(descuento),
           actualizadoEn: Value(DateTime.now()),
         ),
       );
@@ -337,6 +339,15 @@ class RepositorioFacturasImpl implements RepositorioFacturas {
     bool actualizarCliente = false,
     int? clienteId,
   }) async {
+    // Obtener orden vinculada antes de actualizar (para propagar cliente)
+    int? ordenVinculadaId;
+    if (actualizarCliente && clienteId != null) {
+      final ventaRow = await (_db.select(_tablaVentas)
+            ..where((t) => t.id.equals(id)))
+          .getSingleOrNull();
+      ordenVinculadaId = ventaRow?.ordenId;
+    }
+
     await (_db.update(_tablaVentas)..where((t) => t.id.equals(id))).write(
       TablaVentasCompanion(
         metodoPago:    Value(metodoPago.aTexto),
@@ -347,6 +358,16 @@ class RepositorioFacturasImpl implements RepositorioFacturas {
         actualizadoEn: Value(DateTime.now()),
       ),
     );
+
+    // Propagar cambio de cliente a la orden vinculada (si existe)
+    if (ordenVinculadaId != null) {
+      await _db.customUpdate(
+        'UPDATE ordenes_servicio SET cliente_id = ? WHERE id = ?',
+        variables: [Variable.withInt(clienteId!), Variable.withInt(ordenVinculadaId)],
+        updates: {_db.tablaOrdenesServicio},
+      );
+    }
+
     await _recalcularTotales(id);
     return _obtenerResumenPorId(id);
   }

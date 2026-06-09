@@ -166,6 +166,16 @@ class RepositorioOrdenesImpl implements RepositorioOrdenes {
     if (updatedCount == 0) {
       throw Exception('No se pudo actualizar la orden #$id.');
     }
+
+    // Propagar cambio de cliente a la factura vinculada (si existe)
+    if (clienteId != null) {
+      await _db.customUpdate(
+        "UPDATE ventas SET cliente_id = ?, actualizado_en = datetime('now','localtime') WHERE orden_id = ?",
+        variables: [Variable.withInt(clienteId), Variable.withInt(id)],
+        updates: {_db.tablaVentas},
+      );
+    }
+
     return _obtenerResumenPorId(id);
   }
 

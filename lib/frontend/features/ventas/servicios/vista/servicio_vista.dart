@@ -1,5 +1,3 @@
-import 'dart:async';
-
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
@@ -21,21 +19,6 @@ class ServiciosVista extends ConsumerStatefulWidget {
 }
 
 class _ServiciosVistaState extends ConsumerState<ServiciosVista> {
-  Timer? _debounce;
-
-  @override
-  void dispose() {
-    _debounce?.cancel();
-    super.dispose();
-  }
-
-  void _onSearchChanged(String query) {
-    if (_debounce?.isActive ?? false) _debounce!.cancel();
-    _debounce = Timer(const Duration(milliseconds: 280), () {
-      ref.read(busquedaServiciosProvider.notifier).state = query;
-    });
-  }
-
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -55,7 +38,9 @@ class _ServiciosVistaState extends ConsumerState<ServiciosVista> {
                 Expanded(
                   child: BarraBusquedaWidget(
                     placeholder: 'Buscar servicio...',
-                    alCambiar: _onSearchChanged,
+                    debounceMs: 280,
+                    alCambiar: (q) =>
+                        ref.read(busquedaServiciosProvider.notifier).state = q,
                   ),
                 ),
                 const SizedBox(width: 12),
