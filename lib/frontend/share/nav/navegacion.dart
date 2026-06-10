@@ -6,6 +6,7 @@ import 'package:inventario_k1/frontend/features/ventas/principal/vista/venta_vis
 import 'package:inventario_k1/frontend/share/nav/nav_section.dart';
 import 'package:inventario_k1/frontend/share/temas/colores_app.dart';
 import 'package:inventario_k1/frontend/share/widgets/barra_lateral_widget.dart';
+import 'package:inventario_k1/frontend/features/deudores/vista/deudores_vista.dart';
 import 'package:inventario_k1/frontend/share/widgets/placeholder_widget.dart';
 
 import '../../features/categorias/vista/categorias_vistas.dart';
@@ -69,7 +70,7 @@ class _NavegacionState extends State<Navegacion> {
                 VentasVista(),
                 CotizacionesVista(),
                 ReservasVista(),
-                PlaceholderWidget(seccion: NavSection.deudores),
+                DeudoresVista(),
                 ClientesVista(),
                 ProveedoresVista(),
                 MotosVista(),
