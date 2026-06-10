@@ -104,7 +104,7 @@ class _BarraBusquedaDeudores extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Container(
-      height: 38,
+      height: 40,
       decoration: BoxDecoration(
         color: ColoresApp.bgContent,
         borderRadius: BorderRadius.circular(8),
@@ -112,15 +112,14 @@ class _BarraBusquedaDeudores extends StatelessWidget {
       ),
       child: TextField(
         onChanged: onCambiar,
-        style: const TextStyle(color: ColoresApp.textDark, fontSize: 12.5),
+        style: const TextStyle(color: ColoresApp.textDark, fontSize: 13),
         decoration: const InputDecoration(
           hintText: 'Buscar por cliente, número o concepto…',
-          hintStyle:
-              TextStyle(color: ColoresApp.textLight, fontSize: 12.5),
+          hintStyle: TextStyle(color: ColoresApp.textLight, fontSize: 13),
           prefixIcon: Icon(
             Icons.search_rounded,
             color: ColoresApp.textLight,
-            size: 16,
+            size: 18,
           ),
           border: InputBorder.none,
           contentPadding: EdgeInsets.symmetric(vertical: 10),

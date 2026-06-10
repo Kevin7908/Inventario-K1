@@ -121,7 +121,6 @@ class DeudorEditorNotifier extends Notifier<DeudorEditorState> {
 
   String? _validar() {
     if (state.clienteId == null) return 'Selecciona un cliente.';
-    if (state.concepto.trim().isEmpty) return 'Ingresa el concepto.';
     if (state.montoTotal <= 0) return 'El monto debe ser mayor a 0.';
     return null;
   }

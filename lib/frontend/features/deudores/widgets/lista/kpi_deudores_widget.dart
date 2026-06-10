@@ -16,44 +16,28 @@ class KpiDeudoresWidget extends ConsumerWidget {
       padding: const EdgeInsets.fromLTRB(12, 12, 12, 0),
       child: Column(
         children: [
-          Row(
-            children: [
-              Expanded(
-                child: _KpiCelda(
-                  label: 'Cartera total',
-                  valor: m.carteraTotal.toCompactCop(),
-                  color: ColoresApp.primary,
-                ),
-              ),
-              const SizedBox(width: 8),
-              Expanded(
-                child: _KpiCelda(
-                  label: 'Saldo por cobrar',
-                  valor: m.saldoPorCobrar.toCompactCop(),
-                  color: ColoresApp.statusDebt,
-                ),
-              ),
-            ],
+          _KpiCelda(
+            label: 'Cartera total',
+            valor: m.carteraTotal.toCompactCop(),
+            color: ColoresApp.primary,
           ),
           const SizedBox(height: 8),
-          Row(
-            children: [
-              Expanded(
-                child: _KpiCelda(
-                  label: 'Activas',
-                  valor: '${m.cantActivas}',
-                  color: ColoresApp.statusPaid,
-                ),
-              ),
-              const SizedBox(width: 8),
-              Expanded(
-                child: _KpiCelda(
-                  label: 'Vencidas',
-                  valor: '${m.cantVencidas}',
-                  color: ColoresApp.statusPending,
-                ),
-              ),
-            ],
+          _KpiCelda(
+            label: 'Saldo por cobrar',
+            valor: m.saldoPorCobrar.toCompactCop(),
+            color: ColoresApp.statusDebt,
+          ),
+          const SizedBox(height: 8),
+          _KpiCelda(
+            label: 'Activas',
+            valor: '${m.cantActivas}',
+            color: ColoresApp.statusPaid,
+          ),
+          const SizedBox(height: 8),
+          _KpiCelda(
+            label: 'Vencidas',
+            valor: '${m.cantVencidas}',
+            color: ColoresApp.statusPending,
           ),
         ],
       ),
@@ -75,7 +59,8 @@ class _KpiCelda extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+      width: double.infinity,
+      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
       decoration: BoxDecoration(
         color: ColoresApp.bgContent,
         borderRadius: BorderRadius.circular(10),
@@ -86,20 +71,19 @@ class _KpiCelda extends StatelessWidget {
           Text(
             label.toUpperCase(),
             style: const TextStyle(
-              fontSize: 9,
+              fontSize: 11,
               fontWeight: FontWeight.w700,
               color: ColoresApp.textLight,
               letterSpacing: 0.6,
             ),
           ),
-          const SizedBox(height: 3),
+          const SizedBox(height: 4),
           Text(
             valor,
             style: TextStyle(
-              fontSize: 17,
+              fontSize: 22,
               fontWeight: FontWeight.w800,
               color: color,
-              fontFamily: 'monospace',
             ),
             maxLines: 1,
             overflow: TextOverflow.ellipsis,

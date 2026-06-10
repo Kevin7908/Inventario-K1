@@ -52,41 +52,35 @@ class _TarjetaFinanciera extends StatelessWidget {
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
           Container(
-            padding:
-                const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
             margin: const EdgeInsets.only(bottom: 12),
             decoration: BoxDecoration(
               color: ColoresApp.bgContent,
               borderRadius: BorderRadius.circular(8),
             ),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                const Text(
-                  'RESUMEN',
-                  style: TextStyle(
-                    fontSize: 9,
-                    fontWeight: FontWeight.w700,
-                    color: ColoresApp.textLight,
-                    letterSpacing: 0.7,
-                  ),
-                ),
-              ],
+            child: const Text(
+              'RESUMEN FINANCIERO',
+              style: TextStyle(
+                fontSize: 10,
+                fontWeight: FontWeight.w700,
+                color: ColoresApp.textLight,
+                letterSpacing: 0.7,
+              ),
             ),
           ),
           _FilaFinanciera(
             label: 'Monto total',
             valor: resumen.montoTotal.toCopString(),
           ),
-          const SizedBox(height: 6),
+          const SizedBox(height: 8),
           _FilaFinanciera(
             label: 'Pagado',
             valor: resumen.montoPagado.toCopString(),
             colorValor: ColoresApp.statusPaid,
           ),
-          const SizedBox(height: 8),
+          const SizedBox(height: 10),
           const Divider(height: 1, color: ColoresApp.border),
-          const SizedBox(height: 8),
+          const SizedBox(height: 10),
           ClipRRect(
             borderRadius: BorderRadius.circular(99),
             child: LinearProgressIndicator(
@@ -96,25 +90,24 @@ class _TarjetaFinanciera extends StatelessWidget {
               valueColor: AlwaysStoppedAnimation<Color>(_colorBarra),
             ),
           ),
-          const SizedBox(height: 4),
+          const SizedBox(height: 5),
           Text(
             '${(resumen.porcentajePagado * 100).toStringAsFixed(0)}% pagado',
             style: const TextStyle(
-              fontSize: 10.5,
+              fontSize: 11,
               color: ColoresApp.textMedium,
-              fontFamily: 'monospace',
             ),
           ),
-          const SizedBox(height: 8),
+          const SizedBox(height: 10),
           const Divider(height: 1, color: ColoresApp.border),
-          const SizedBox(height: 6),
+          const SizedBox(height: 8),
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
               const Text(
                 'Saldo',
                 style: TextStyle(
-                  fontSize: 13,
+                  fontSize: 14,
                   fontWeight: FontWeight.w800,
                   color: ColoresApp.textDark,
                 ),
@@ -122,12 +115,11 @@ class _TarjetaFinanciera extends StatelessWidget {
               Text(
                 resumen.saldo.toCopString(),
                 style: TextStyle(
-                  fontSize: 22,
+                  fontSize: 24,
                   fontWeight: FontWeight.w800,
                   color: resumen.saldo > 0
                       ? ColoresApp.primary
                       : ColoresApp.statusPaid,
-                  fontFamily: 'monospace',
                 ),
               ),
             ],
@@ -154,16 +146,16 @@ class _FilaFinanciera extends StatelessWidget {
     return Row(
       mainAxisAlignment: MainAxisAlignment.spaceBetween,
       children: [
-        Text(label,
-            style: const TextStyle(
-                fontSize: 12.5, color: ColoresApp.textMedium)),
+        Text(
+          label,
+          style: const TextStyle(fontSize: 13, color: ColoresApp.textMedium),
+        ),
         Text(
           valor,
           style: TextStyle(
-            fontSize: 12.5,
+            fontSize: 13,
             fontWeight: FontWeight.w600,
             color: colorValor ?? ColoresApp.textDark,
-            fontFamily: 'monospace',
           ),
         ),
       ],
@@ -193,27 +185,6 @@ class _AccionesEstado extends ConsumerWidget {
         children: [
           if (_puedeRegistrarPago) ...[
             _BotonAccion(
-              label: '+ Registrar pago',
-              icono: Icons.payments_outlined,
-              color: Colors.white,
-              bgColor: ColoresApp.primary,
-              onTap: () =>
-                  ref.read(deudoresProvider.notifier).toggleFormPago(),
-            ),
-            const SizedBox(height: 7),
-          ],
-          if (resumen.estado == EstadoDeudor.activa) ...[
-            _BotonAccion(
-              label: 'Marcar vencida',
-              icono: Icons.warning_amber_outlined,
-              color: const Color(0xFF92400E),
-              bgColor: ColoresApp.statusPendingBg,
-              onTap: () => _cambiarEstado(context, ref, EstadoDeudor.vencida),
-            ),
-            const SizedBox(height: 7),
-          ],
-          if (_puedeRegistrarPago) ...[
-            _BotonAccion(
               label: 'Marcar incobrable',
               icono: Icons.block_outlined,
               color: ColoresApp.statusDebt,
@@ -222,12 +193,10 @@ class _AccionesEstado extends ConsumerWidget {
                   _cambiarEstado(context, ref, EstadoDeudor.incobrable),
             ),
           ],
-          if (!_puedeRegistrarPago &&
-              resumen.estado != EstadoDeudor.pagada) ...[
+          if (!_puedeRegistrarPago && resumen.estado != EstadoDeudor.pagada) ...[
             Text(
               'Estado: ${resumen.estado.valor.toLowerCase()}',
-              style: const TextStyle(
-                  fontSize: 12, color: ColoresApp.textLight),
+              style: const TextStyle(fontSize: 13, color: ColoresApp.textLight),
             ),
           ],
         ],
@@ -244,10 +213,8 @@ class _AccionesEstado extends ConsumerWidget {
       context: context,
       builder: (_) => AlertDialog(
         title: Text('Cambiar a ${nuevoEstado.valor.toLowerCase()}'),
-        content: Text(
-          nuevoEstado == EstadoDeudor.vencida
-              ? 'Se marcará esta deuda como vencida.'
-              : 'Se marcará como incobrable. Esta acción es reversible.',
+        content: const Text(
+          'Se marcará como incobrable. Esta acción es reversible.',
         ),
         actions: [
           TextButton(
@@ -257,9 +224,7 @@ class _AccionesEstado extends ConsumerWidget {
           ElevatedButton(
             onPressed: () => Navigator.pop(context, true),
             style: ElevatedButton.styleFrom(
-              backgroundColor: nuevoEstado == EstadoDeudor.vencida
-                  ? ColoresApp.statusPending
-                  : ColoresApp.statusDebt,
+              backgroundColor: ColoresApp.statusDebt,
               foregroundColor: Colors.white,
             ),
             child: const Text('Confirmar'),
@@ -302,17 +267,17 @@ class _BotonAccion extends StatelessWidget {
       width: double.infinity,
       child: ElevatedButton.icon(
         onPressed: onTap,
-        icon: Icon(icono, size: 15),
+        icon: Icon(icono, size: 16),
         label: Text(label),
         style: ElevatedButton.styleFrom(
           backgroundColor: bgColor,
           foregroundColor: color,
           elevation: 0,
-          padding: const EdgeInsets.symmetric(vertical: 10),
-          shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(8)),
+          padding: const EdgeInsets.symmetric(vertical: 11),
+          shape:
+              RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
           textStyle:
-              const TextStyle(fontSize: 12.5, fontWeight: FontWeight.w700),
+              const TextStyle(fontSize: 13, fontWeight: FontWeight.w700),
         ),
       ),
     );

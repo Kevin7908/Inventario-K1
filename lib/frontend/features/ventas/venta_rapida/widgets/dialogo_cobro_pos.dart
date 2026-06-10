@@ -5,7 +5,7 @@ import '../../../../../backend/features/ventas/facturas/enum/enum_facturas.dart'
 import '../../../../../core/currency_ext.dart';
 import '../../../../share/temas/colores_app.dart';
 import '../../../../share/widgets/output/precio_cop_widget.dart';
-import '../../deudores/dialogo_confirmar_deuda.dart';
+import '../../../deudores/dialogo_confirmar_deuda.dart';
 
 const _kBlue  = ColoresApp.primary;
 const _kGreen = ColoresApp.accentGreen;

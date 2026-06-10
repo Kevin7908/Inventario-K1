@@ -25,12 +25,11 @@ class CardInfoGeneralDeudorWidget extends StatelessWidget {
                 ),
                 _InfoField(
                   label: 'Concepto',
-                  valor: resumen.concepto,
+                  valor: resumen.concepto.isEmpty ? '—' : resumen.concepto,
                 ),
                 _InfoField(
                   label: 'Fecha vencimiento',
                   valor: resumen.fechaVencimiento ?? '—',
-                  mono: true,
                   alerta: resumen.estaVencida,
                 ),
                 _InfoField(
@@ -38,7 +37,6 @@ class CardInfoGeneralDeudorWidget extends StatelessWidget {
                   valor: resumen.ventaId != null
                       ? 'FAC-${resumen.ventaId.toString().padLeft(4, '0')}'
                       : 'Sin vínculo',
-                  mono: true,
                 ),
               ],
             ),
@@ -79,7 +77,7 @@ class _GrillaInfo2 extends StatelessWidget {
           ],
         ),
       );
-      if (i + 2 < campos.length) rows.add(const SizedBox(height: 10));
+      if (i + 2 < campos.length) rows.add(const SizedBox(height: 12));
     }
     return Column(crossAxisAlignment: CrossAxisAlignment.start, children: rows);
   }
@@ -89,14 +87,12 @@ class _InfoField extends StatelessWidget {
   const _InfoField({
     required this.label,
     required this.valor,
-    this.mono = false,
     this.italic = false,
     this.alerta = false,
   });
 
   final String label;
   final String valor;
-  final bool mono;
   final bool italic;
   final bool alerta;
 
@@ -108,7 +104,7 @@ class _InfoField extends StatelessWidget {
         Text(
           label.toUpperCase(),
           style: const TextStyle(
-            fontSize: 9,
+            fontSize: 10,
             fontWeight: FontWeight.w700,
             color: ColoresApp.textLight,
             letterSpacing: 0.5,
@@ -118,10 +114,9 @@ class _InfoField extends StatelessWidget {
         Text(
           valor,
           style: TextStyle(
-            fontSize: 12.5,
+            fontSize: 13,
             fontWeight: FontWeight.w500,
             color: alerta ? ColoresApp.statusPending : ColoresApp.textDark,
-            fontFamily: mono ? 'monospace' : null,
             fontStyle: italic ? FontStyle.italic : FontStyle.normal,
           ),
         ),
@@ -156,24 +151,22 @@ class _BarraProgresoDetalle extends StatelessWidget {
             valueColor: AlwaysStoppedAnimation<Color>(_colorBarra),
           ),
         ),
-        const SizedBox(height: 5),
+        const SizedBox(height: 6),
         Row(
           mainAxisAlignment: MainAxisAlignment.spaceBetween,
           children: [
             Text(
               '${resumen.montoPagado.toCopString()} pagado',
               style: const TextStyle(
-                fontSize: 10.5,
+                fontSize: 11,
                 color: ColoresApp.textMedium,
-                fontFamily: 'monospace',
               ),
             ),
             Text(
               '${(pct * 100).toStringAsFixed(0)}% · ${resumen.montoTotal.toCopString()} total',
               style: const TextStyle(
-                fontSize: 10.5,
+                fontSize: 11,
                 color: ColoresApp.textMedium,
-                fontFamily: 'monospace',
               ),
             ),
           ],
@@ -204,7 +197,7 @@ class _CardSeccion extends StatelessWidget {
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
           Container(
-            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 9),
+            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
             decoration: const BoxDecoration(
               color: ColoresApp.primaryLight,
               borderRadius: BorderRadius.vertical(top: Radius.circular(10)),
@@ -214,7 +207,7 @@ class _CardSeccion extends StatelessWidget {
                 Text(
                   titulo.toUpperCase(),
                   style: const TextStyle(
-                    fontSize: 10,
+                    fontSize: 11,
                     fontWeight: FontWeight.w700,
                     color: ColoresApp.primaryDark,
                     letterSpacing: 0.8,

@@ -33,16 +33,16 @@ class TarjetaListaDeudorWidget extends StatelessWidget {
             bottom: const BorderSide(color: ColoresApp.border),
           ),
         ),
-        padding: const EdgeInsets.fromLTRB(11, 11, 12, 11),
+        padding: const EdgeInsets.fromLTRB(11, 12, 12, 12),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             _FilaNumeroSaldo(deudor: deudor, seleccionado: seleccionado),
-            const SizedBox(height: 4),
+            const SizedBox(height: 5),
             _FilaClienteEstado(deudor: deudor),
             const SizedBox(height: 4),
             _ConceptoTruncado(concepto: deudor.concepto),
-            const SizedBox(height: 6),
+            const SizedBox(height: 8),
             _BarraPago(deudor: deudor),
           ],
         ),
@@ -64,27 +64,21 @@ class _FilaNumeroSaldo extends StatelessWidget {
         Text(
           deudor.numero,
           style: TextStyle(
-            fontSize: 11,
+            fontSize: 12,
             fontWeight: FontWeight.w800,
             color: seleccionado ? ColoresApp.primaryDark : ColoresApp.primary,
-            fontFamily: 'monospace',
             letterSpacing: 0.3,
           ),
         ),
         const Spacer(),
-        if (deudor.estaVencida)
-          const Padding(
-            padding: EdgeInsets.only(right: 4),
-            child: Icon(Icons.warning_amber_rounded,
-                size: 12, color: ColoresApp.statusPending),
-          ),
         Text(
           deudor.saldo.toCopString(),
           style: TextStyle(
-            fontSize: 13.5,
+            fontSize: 14,
             fontWeight: FontWeight.w800,
-            color: deudor.saldo > 0 ? ColoresApp.textDark : ColoresApp.statusPaid,
-            fontFamily: 'monospace',
+            color: deudor.saldo > 0
+                ? ColoresApp.textDark
+                : ColoresApp.statusPaid,
           ),
         ),
       ],
@@ -105,7 +99,7 @@ class _FilaClienteEstado extends StatelessWidget {
           child: Text(
             deudor.nombreCliente,
             style: const TextStyle(
-              fontSize: 12.5,
+              fontSize: 13,
               fontWeight: FontWeight.w600,
               color: ColoresApp.textDark,
             ),
@@ -129,7 +123,7 @@ class _ConceptoTruncado extends StatelessWidget {
   Widget build(BuildContext context) {
     return Text(
       concepto,
-      style: const TextStyle(fontSize: 11, color: ColoresApp.textMedium),
+      style: const TextStyle(fontSize: 12, color: ColoresApp.textMedium),
       maxLines: 1,
       overflow: TextOverflow.ellipsis,
     );
@@ -161,25 +155,23 @@ class _BarraPago extends StatelessWidget {
             valueColor: AlwaysStoppedAnimation<Color>(_colorBarra),
           ),
         ),
-        const SizedBox(height: 3),
+        const SizedBox(height: 4),
         Row(
           mainAxisAlignment: MainAxisAlignment.spaceBetween,
           children: [
             Text(
               '${deudor.montoPagado.toCopString()} pagado',
               style: const TextStyle(
-                fontSize: 9.5,
+                fontSize: 11,
                 color: ColoresApp.textLight,
-                fontFamily: 'monospace',
               ),
             ),
             Text(
               '${(pct * 100).toStringAsFixed(0)}% · ${deudor.montoTotal.toCopString()}',
               style: const TextStyle(
-                fontSize: 9.5,
-                fontWeight: FontWeight.w700,
+                fontSize: 11,
+                fontWeight: FontWeight.w600,
                 color: ColoresApp.textLight,
-                fontFamily: 'monospace',
               ),
             ),
           ],

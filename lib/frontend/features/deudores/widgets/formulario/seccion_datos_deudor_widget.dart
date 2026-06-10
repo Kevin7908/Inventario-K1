@@ -1,8 +1,11 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:inventario_k1/backend/features/clientes/modelo/cliente.dart';
 import 'package:inventario_k1/backend/features/deudores/enum/enum_deudor.dart';
+import 'package:inventario_k1/frontend/features/clientes/widget/dialogo_cliente_widget.dart';
 import 'package:inventario_k1/frontend/share/temas/colores_app.dart';
+import 'package:inventario_k1/frontend/share/widgets/input/app_searc_widget.dart';
 
 import '../../provider/deudor_editor_provider.dart';
 import '../../provider/deudores_provider.dart';
@@ -72,7 +75,7 @@ class _SeccionDatosDeudorWidgetState
             ),
             const SizedBox(height: 12),
             _CampoTexto(
-              label: 'Concepto *',
+              label: 'Concepto',
               controller: _conceptoCtrl,
               hint: 'Describe la deuda brevemente…',
               onCambio: notifier.setConcepto,
@@ -115,7 +118,7 @@ class _SeccionDatosDeudorWidgetState
 
 // ── Selector de cliente ───────────────────────────────────────────────────────
 
-class _SelectorCliente extends ConsumerWidget {
+class _SelectorCliente extends ConsumerStatefulWidget {
   const _SelectorCliente({
     required this.clienteId,
     required this.clienteNombre,
@@ -127,7 +130,23 @@ class _SelectorCliente extends ConsumerWidget {
   final void Function(int id, String nombre) onSeleccionado;
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  ConsumerState<_SelectorCliente> createState() => _SelectorClienteState();
+}
+
+class _SelectorClienteState extends ConsumerState<_SelectorCliente> {
+  final _notifier = ValueNotifier<Cliente?>(null);
+
+  @override
+  void dispose() {
+    _notifier.dispose();
+    super.dispose();
+  }
+
+  String _nombreCliente(Cliente c) =>
+      '${c.nombres} ${c.apellidos ?? ''}'.trim();
+
+  @override
+  Widget build(BuildContext context) {
     final clientesAsync = ref.watch(clientesParaDeudorProvider);
 
     return Column(
@@ -139,32 +158,37 @@ class _SelectorCliente extends ConsumerWidget {
           loading: () => const SizedBox(
             height: 42,
             child: Center(
-                child: CircularProgressIndicator(
-                    strokeWidth: 2, color: ColoresApp.primary)),
+              child: CircularProgressIndicator(
+                  strokeWidth: 2, color: ColoresApp.primary),
+            ),
           ),
-          error: (e, _) => Text('Error: $e',
-              style: const TextStyle(
-                  fontSize: 12, color: ColoresApp.statusDebt)),
-          data: (clientes) => DropdownButtonFormField<int>(
-            initialValue: clienteId,
-            hint: const Text('Seleccionar cliente…'),
+          error: (e, _) => Text(
+            'Error: $e',
             style: const TextStyle(
-                fontSize: 13, color: ColoresApp.textDark),
-            decoration: _formDecor(),
-            items: clientes
-                .map((c) => DropdownMenuItem(
-                      value: c.id,
-                      child: Text(
-                          '${c.nombres} ${c.apellidos ?? ''}'.trim()),
-                    ))
-                .toList(),
-            onChanged: (id) {
-              if (id == null) return;
-              final c = clientes.firstWhere((x) => x.id == id);
-              onSeleccionado(
-                  c.id, '${c.nombres} ${c.apellidos ?? ''}'.trim());
-            },
+                fontSize: 12, color: ColoresApp.statusDebt),
           ),
+          data: (clientes) {
+            // Inicializa el notifier cuando se edita y aún no está asignado
+            if (_notifier.value == null && widget.clienteId != null) {
+              final match = clientes
+                  .where((c) => c.id == widget.clienteId);
+              if (match.isNotEmpty) _notifier.value = match.first;
+            }
+            return AppSearch<Cliente>(
+              notifier: _notifier,
+              items: clientes,
+              labelBuilder: _nombreCliente,
+              hint: 'Buscar cliente…',
+              onAgregar: () async {
+                await DialogoCliente.mostrar(context);
+                ref.invalidate(clientesParaDeudorProvider);
+              },
+              onChanged: (cliente) {
+                if (cliente == null) return;
+                widget.onSeleccionado(cliente.id, _nombreCliente(cliente));
+              },
+            );
+          },
         ),
       ],
     );
@@ -350,7 +374,7 @@ class _LabelCampo extends StatelessWidget {
     return Text(
       texto.toUpperCase(),
       style: const TextStyle(
-        fontSize: 9.5,
+        fontSize: 10,
         fontWeight: FontWeight.w700,
         color: ColoresApp.textMedium,
         letterSpacing: 0.5,
@@ -362,13 +386,11 @@ class _LabelCampo extends StatelessWidget {
 InputDecoration _formDecor({String? hint, Widget? suffix}) {
   return InputDecoration(
     hintText: hint,
-    hintStyle:
-        const TextStyle(color: ColoresApp.textLight, fontSize: 13),
+    hintStyle: const TextStyle(color: ColoresApp.textLight, fontSize: 13),
     filled: true,
     fillColor: ColoresApp.bgContent,
     suffixIcon: suffix,
-    contentPadding:
-        const EdgeInsets.symmetric(horizontal: 11, vertical: 10),
+    contentPadding: const EdgeInsets.symmetric(horizontal: 11, vertical: 11),
     border: OutlineInputBorder(
       borderRadius: BorderRadius.circular(8),
       borderSide: const BorderSide(color: ColoresApp.border),
@@ -416,7 +438,7 @@ class _CardFormulario extends StatelessWidget {
             child: Text(
               titulo.toUpperCase(),
               style: const TextStyle(
-                fontSize: 10,
+                fontSize: 11,
                 fontWeight: FontWeight.w700,
                 color: ColoresApp.primaryDark,
                 letterSpacing: 0.8,

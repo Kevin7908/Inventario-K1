@@ -24,7 +24,7 @@ class CardPagosDeudorWidget extends ConsumerWidget {
       titulo: 'Historial de pagos',
       trailing: Text(
         '${pagos.length} registro${pagos.length != 1 ? 's' : ''}',
-        style: const TextStyle(fontSize: 11, color: ColoresApp.textLight),
+        style: const TextStyle(fontSize: 12, color: ColoresApp.textLight),
       ),
       child: Padding(
         padding: const EdgeInsets.all(12),
@@ -32,10 +32,7 @@ class CardPagosDeudorWidget extends ConsumerWidget {
             ? const _SinPagos()
             : Column(
                 children: pagos
-                    .map((p) => _FilaPago(
-                          pago: p,
-                          deudorId: deudorId,
-                        ))
+                    .map((p) => _FilaPago(pago: p, deudorId: deudorId))
                     .toList(),
               ),
       ),
@@ -53,7 +50,7 @@ class _SinPagos extends StatelessWidget {
       child: Center(
         child: Text(
           'Sin pagos registrados aún',
-          style: TextStyle(fontSize: 12, color: ColoresApp.textLight),
+          style: TextStyle(fontSize: 13, color: ColoresApp.textLight),
         ),
       ),
     );
@@ -76,7 +73,7 @@ class _FilaPago extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     return Container(
       margin: const EdgeInsets.only(bottom: 7),
-      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 9),
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 10),
       decoration: BoxDecoration(
         color: ColoresApp.bgContent,
         borderRadius: BorderRadius.circular(8),
@@ -84,15 +81,15 @@ class _FilaPago extends ConsumerWidget {
       child: Row(
         children: [
           Container(
-            width: 32,
-            height: 32,
+            width: 34,
+            height: 34,
             decoration: BoxDecoration(
               color: ColoresApp.statusPaidBg,
               borderRadius: BorderRadius.circular(7),
             ),
             child: const Icon(
               Icons.credit_card_rounded,
-              size: 16,
+              size: 18,
               color: ColoresApp.statusPaid,
             ),
           ),
@@ -104,16 +101,15 @@ class _FilaPago extends ConsumerWidget {
                 Text(
                   _fechaFormateada,
                   style: const TextStyle(
-                    fontSize: 10,
+                    fontSize: 11,
                     color: ColoresApp.textMedium,
-                    fontFamily: 'monospace',
                   ),
                 ),
                 if (pago.notas != null && pago.notas!.isNotEmpty)
                   Text(
                     pago.notas!,
                     style: const TextStyle(
-                      fontSize: 10,
+                      fontSize: 11,
                       color: ColoresApp.textLight,
                     ),
                     maxLines: 1,
@@ -128,16 +124,13 @@ class _FilaPago extends ConsumerWidget {
           Text(
             pago.monto.toCopString(),
             style: const TextStyle(
-              fontSize: 12.5,
+              fontSize: 13,
               fontWeight: FontWeight.w800,
               color: ColoresApp.statusPaid,
-              fontFamily: 'monospace',
             ),
           ),
           const SizedBox(width: 6),
-          _BotonEliminarPago(
-            onTap: () => _confirmarEliminar(context, ref),
-          ),
+          _BotonEliminarPago(onTap: () => _confirmarEliminar(context, ref)),
         ],
       ),
     );
@@ -148,8 +141,8 @@ class _FilaPago extends ConsumerWidget {
       context: context,
       builder: (_) => AlertDialog(
         title: const Text('Eliminar pago'),
-        content:
-            Text('¿Eliminar el pago de ${pago.monto.toCopString()}? El saldo se recalculará.'),
+        content: Text(
+            '¿Eliminar el pago de ${pago.monto.toCopString()}? El saldo se recalculará.'),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context, false),
@@ -188,7 +181,7 @@ class _ChipMetodo extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2),
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
       decoration: BoxDecoration(
         color: ColoresApp.primaryLight,
         borderRadius: BorderRadius.circular(20),
@@ -196,7 +189,7 @@ class _ChipMetodo extends StatelessWidget {
       child: Text(
         metodo,
         style: const TextStyle(
-          fontSize: 10,
+          fontSize: 11,
           fontWeight: FontWeight.w700,
           color: ColoresApp.primary,
         ),
@@ -216,15 +209,15 @@ class _BotonEliminarPago extends StatelessWidget {
       onTap: onTap,
       borderRadius: BorderRadius.circular(6),
       child: Container(
-        width: 26,
-        height: 26,
+        width: 28,
+        height: 28,
         decoration: BoxDecoration(
           color: ColoresApp.statusDebtBg,
           borderRadius: BorderRadius.circular(6),
         ),
         child: const Icon(
           Icons.delete_outline_rounded,
-          size: 14,
+          size: 15,
           color: ColoresApp.statusDebt,
         ),
       ),

@@ -420,7 +420,7 @@ class _CabeceraDetalle extends ConsumerWidget {
                   '${resumen.nombreCliente}  ·  Creada el '
                   '${resumen.creadoEn.year}-${resumen.creadoEn.month.toString().padLeft(2, '0')}-${resumen.creadoEn.day.toString().padLeft(2, '0')}',
                   style: const TextStyle(
-                    fontSize: 11,
+                    fontSize: 12,
                     color: ColoresApp.textMedium,
                   ),
                 ),
@@ -446,11 +446,11 @@ class _CabeceraDetalle extends ConsumerWidget {
                     foregroundColor: Colors.white,
                     elevation: 0,
                     padding: const EdgeInsets.symmetric(
-                        horizontal: 14, vertical: 9),
+                        horizontal: 14, vertical: 10),
                     shape: RoundedRectangleBorder(
                         borderRadius: BorderRadius.circular(8)),
                     textStyle: const TextStyle(
-                        fontSize: 12.5, fontWeight: FontWeight.w700),
+                        fontSize: 13, fontWeight: FontWeight.w700),
                   ),
                 ),
               const SizedBox(width: 10),
@@ -635,7 +635,7 @@ class _CabeceraFormulario extends StatelessWidget {
                       ? 'Modifica los datos y guarda'
                       : 'El número se generará automáticamente',
                   style: const TextStyle(
-                    fontSize: 11,
+                    fontSize: 12,
                     color: ColoresApp.textMedium,
                   ),
                 ),
