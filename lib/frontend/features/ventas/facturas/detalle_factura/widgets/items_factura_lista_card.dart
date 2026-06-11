@@ -16,13 +16,9 @@ class ItemsFacturaListaCard extends ConsumerWidget {
   const ItemsFacturaListaCard({
     super.key,
     required this.facturaId,
-    required this.onAgregarServicio,
-    required this.onAgregarProducto,
     this.readOnly = false,
   });
   final int facturaId;
-  final VoidCallback onAgregarServicio;
-  final VoidCallback onAgregarProducto;
   final bool readOnly;
 
   @override
@@ -47,18 +43,7 @@ class ItemsFacturaListaCard extends ConsumerWidget {
           SeccionHeaderFactura(
             titulo: 'Items facturados',
             icono: Icons.receipt_outlined,
-            accion: readOnly
-                ? null
-                : Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      _BotonAgregar(
-                        label: '+ Servicio',
-                        onTap: onAgregarServicio,
-                      ),
-                      const SizedBox(width: 6),
-                    ],
-                  ),
+            accion: null,
           ),
           if (detalle.items.isEmpty)
             const EstadoVacioSeccionFactura(mensaje: 'Sin items. Agrega servicios o productos.')
@@ -79,35 +64,6 @@ class ItemsFacturaListaCard extends ConsumerWidget {
   }
 }
 
-class _BotonAgregar extends StatelessWidget {
-  const _BotonAgregar({required this.label, required this.onTap});
-  final String label;
-  final VoidCallback onTap;
-
-  @override
-  Widget build(BuildContext context) {
-    return InkWell(
-      onTap: onTap,
-      borderRadius: BorderRadius.circular(6),
-      child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
-        decoration: BoxDecoration(
-          color: ColoresApp.primary.withValues(alpha: 0.08),
-          borderRadius: BorderRadius.circular(6),
-          border: Border.all(color: ColoresApp.primary.withValues(alpha: 0.2)),
-        ),
-        child: Text(
-          label,
-          style: const TextStyle(
-            fontSize: 12,
-            fontWeight: FontWeight.w600,
-            color: ColoresApp.primary,
-          ),
-        ),
-      ),
-    );
-  }
-}
 
 class _EncabezadoItems extends StatelessWidget {
   const _EncabezadoItems({this.readOnly = false});

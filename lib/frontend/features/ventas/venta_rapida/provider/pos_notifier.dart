@@ -74,10 +74,17 @@ class PosNotifier extends Notifier<PosState> {
 
   // ── Checkout ──────────────────────────────────────────────────────────────
 
-  /// Crea la factura con todos los ítems del carrito.
+  /// Crea la factura con todos los ítems del carrito y, si aplica, una deuda.
   /// Retorna null si ok, o el mensaje de error.
   Future<String?> procesarVenta({
-    EstadoPago estadoPago = EstadoPago.pagado,
+    EstadoPago estadoPago    = EstadoPago.pagado,
+    double     totalPagado   = 0,
+    double?    totalFactura,
+    int?       clienteId,
+    String?    concepto,
+    String?    metodoPagoDeuda,
+    String?    fechaVencimiento,
+    String?    notasDeuda,
   }) async {
     if (state.items.isEmpty) return 'El carrito está vacío.';
     state = state.copyWith(procesando: true);
@@ -97,9 +104,9 @@ class PosNotifier extends Notifier<PosState> {
       );
       if (error != null) return error;
 
-      // Obtener el id de la factura recién creada.
-      final facturas   = ref.read(facturasProvider).value?.facturas ?? const [];
-      final nuevaFact  = facturas.isNotEmpty ? facturas.first : null;
+      // Obtener la factura recién creada.
+      final facturas  = ref.read(facturasProvider).value?.facturas ?? const [];
+      final nuevaFact = facturas.isNotEmpty ? facturas.first : null;
       if (nuevaFact == null) return 'No se pudo obtener la factura creada.';
 
       for (final item in state.items) {
@@ -113,6 +120,36 @@ class PosNotifier extends Notifier<PosState> {
           costoUnitario:  item.producto.precioCompra,
         );
         if (errItem != null) return errItem;
+      }
+
+      // Registrar pago parcial y crear deuda si aplica.
+      if (estadoPago == EstadoPago.pendiente &&
+          concepto != null &&
+          clienteId != null &&
+          totalFactura != null) {
+        final facturaTotal = totalFactura > 0 ? totalFactura : subtotal + ivaAmount - state.descuento;
+        final errPago = await notifier.cobrar(
+          id:              nuevaFact.id,
+          totalPagado:     totalPagado,
+          totalFactura:    facturaTotal,
+          estadoPago:      estadoPago,
+          metodoPago:      state.metodoPago,
+          clienteId:       clienteId,
+          concepto:        concepto,
+          metodoPagoDeuda: metodoPagoDeuda,
+          fechaVencimiento: fechaVencimiento,
+          notasDeuda:      notasDeuda,
+        );
+        if (errPago != null) return errPago;
+      } else if (estadoPago == EstadoPago.pagado && totalPagado > 0) {
+        // Pago completo: registrar el totalPagado = total de factura
+        await notifier.cobrar(
+          id:           nuevaFact.id,
+          totalPagado:  totalPagado,
+          totalFactura: totalFactura ?? (subtotal + ivaAmount - state.descuento),
+          estadoPago:   EstadoPago.pagado,
+          metodoPago:   state.metodoPago,
+        );
       }
 
       state = const PosState(); // resetea el carrito

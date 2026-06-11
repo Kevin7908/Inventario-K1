@@ -301,6 +301,21 @@ final clientesParaDeudorProvider = FutureProvider<List<Cliente>>(
       RepositorioClientesImpl(ref.watch(appDatabaseProvider)).obtenerTodos(),
 );
 
+/// Deuda vinculada a una venta/factura específica.
+/// Se actualiza reactivamente cuando cambia la lista de deudores.
+final deudorPorVentaProvider = Provider.family<DeudorResumen?, int>(
+  name: 'deudorPorVentaProvider',
+  (ref, ventaId) {
+    final lista = ref.watch(
+      deudoresProvider.select((s) => s.asData?.value.deudores ?? const []),
+    );
+    for (final d in lista) {
+      if (d.ventaId == ventaId) return d;
+    }
+    return null;
+  },
+);
+
 // ── Modelos derivados ─────────────────────────────────────────────────────────
 
 final class DeudoresMetrics {

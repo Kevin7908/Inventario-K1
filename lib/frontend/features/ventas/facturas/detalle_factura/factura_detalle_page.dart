@@ -10,8 +10,6 @@ import '../widgets/dialogo_crear_factura.dart';
 import 'widgets/factura_info_card.dart';
 import 'widgets/factura_top_bar.dart';
 import 'widgets/items_factura_lista_card.dart';
-import 'widgets/dialogo_agregar_item_factura.dart';
-import 'widgets/panel_busqueda_productos_factura.dart';
 import 'widgets/resumen_factura_panel.dart';
 
 class FacturaDetallePage extends ConsumerWidget {
@@ -98,19 +96,9 @@ class _ContenidoDetalle extends ConsumerWidget {
                       FacturaInfoCard(facturaId: facturaId),
                       const SizedBox(height: 14),
                       ItemsFacturaListaCard(
-                        facturaId:        facturaId,
-                        readOnly:         readOnly,
-                        onAgregarServicio: () =>
-                            DialogoAgregarItemServicio.mostrar(
-                          context,
-                          ventaId: facturaId,
-                        ),
-                        onAgregarProducto: () {},
+                        facturaId: facturaId,
+                        readOnly:  readOnly,
                       ),
-                      if (!readOnly) ...[
-                        const SizedBox(height: 14),
-                        PanelBusquedaProductosFactura(facturaId: facturaId),
-                      ],
                       const SizedBox(height: 20),
                     ],
                   ),

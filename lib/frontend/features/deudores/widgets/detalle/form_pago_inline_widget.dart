@@ -12,10 +12,12 @@ class FormPagoInlineWidget extends ConsumerStatefulWidget {
     super.key,
     required this.deudorId,
     required this.saldo,
+    this.onCancelar,
   });
 
   final int deudorId;
   final int saldo;
+  final VoidCallback? onCancelar;
 
   @override
   ConsumerState<FormPagoInlineWidget> createState() =>
@@ -106,8 +108,9 @@ class _FormPagoInlineWidgetState extends ConsumerState<FormPagoInlineWidget> {
             mainAxisAlignment: MainAxisAlignment.end,
             children: [
               OutlinedButton(
-                onPressed: () =>
-                    ref.read(deudoresProvider.notifier).toggleFormPago(),
+                onPressed: () => widget.onCancelar != null
+                    ? widget.onCancelar!()
+                    : ref.read(deudoresProvider.notifier).toggleFormPago(),
                 style: OutlinedButton.styleFrom(
                   foregroundColor: ColoresApp.textMedium,
                   side: const BorderSide(color: ColoresApp.border),

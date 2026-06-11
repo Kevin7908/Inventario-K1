@@ -7,38 +7,60 @@ import '../../../../share/temas/colores_app.dart';
 import '../../../../share/widgets/output/precio_cop_widget.dart';
 import '../../../deudores/dialogo_confirmar_deuda.dart';
 
+export '../../../deudores/dialogo_confirmar_deuda.dart' show DatosDeuda;
+
 const _kBlue  = ColoresApp.primary;
 const _kGreen = ColoresApp.accentGreen;
 const _kRed   = ColoresApp.accentRed;
 const _kAmber = ColoresApp.accentAmber;
 
+// ── DTO resultado del cobro ───────────────────────────────────────────────────
+
+class ResultadoCobro {
+  const ResultadoCobro({
+    required this.estadoPago,
+    required this.totalPagado,
+    this.datosDeuda,
+  });
+
+  final EstadoPago  estadoPago;
+  final double      totalPagado;
+  final DatosDeuda? datosDeuda;
+}
+
+// ── Diálogo ───────────────────────────────────────────────────────────────────
+
 /// Diálogo de cobro POS.
-/// Retorna [EstadoPago.pagado] si paga completo, [EstadoPago.pendiente] si
-/// queda en deuda, o null si el usuario cancela.
+/// Retorna [ResultadoCobro] con estado pagado/pendiente y datos de deuda si aplica.
+/// Retorna null si el usuario cancela.
 class DialogoCobrarPOS extends StatefulWidget {
   const DialogoCobrarPOS._({
     required this.total,
     required this.clienteId,
     required this.clienteNombre,
+    this.numeroFactura,
   });
 
   final double  total;
   final int?    clienteId;
   final String? clienteNombre;
+  final String? numeroFactura;
 
-  static Future<EstadoPago?> mostrar(
+  static Future<ResultadoCobro?> mostrar(
     BuildContext context, {
-    required double  total,
-    int?             clienteId,
-    String?          clienteNombre,
+    required double total,
+    int?            clienteId,
+    String?         clienteNombre,
+    String?         numeroFactura,
   }) =>
-      showDialog<EstadoPago>(
+      showDialog<ResultadoCobro>(
         context: context,
         barrierDismissible: false,
         builder: (_) => DialogoCobrarPOS._(
-          total:         total,
-          clienteId:     clienteId,
-          clienteNombre: clienteNombre,
+          total:          total,
+          clienteId:      clienteId,
+          clienteNombre:  clienteNombre,
+          numeroFactura:  numeroFactura,
         ),
       );
 
@@ -73,7 +95,10 @@ class _DialogoCobrarPOSState extends State<DialogoCobrarPOS> {
     setState(() => _errorMsg = null);
 
     if (_completo) {
-      Navigator.of(context).pop(EstadoPago.pagado);
+      Navigator.of(context).pop(ResultadoCobro(
+        estadoPago:  EstadoPago.pagado,
+        totalPagado: widget.total,
+      ));
       return;
     }
 
@@ -83,15 +108,25 @@ class _DialogoCobrarPOSState extends State<DialogoCobrarPOS> {
       return;
     }
 
-    final confirm = await DialogoConfirmarDeuda.mostrar(
+    final conceptoInicial = widget.numeroFactura != null
+        ? 'Deuda — ${widget.numeroFactura}'
+        : 'Deuda pendiente';
+
+    final datos = await DialogoConfirmarDeuda.mostrar(
       context,
-      clienteNombre: widget.clienteNombre ?? 'Cliente',
-      total:         widget.total,
-      recibido:      _recibido,
-      faltante:      _faltante,
+      clienteNombre:   widget.clienteNombre ?? 'Cliente',
+      total:           widget.total,
+      recibido:        _recibido,
+      faltante:        _faltante,
+      conceptoInicial: conceptoInicial,
     );
-    if (confirm == true && mounted) {
-      Navigator.of(context).pop(EstadoPago.pendiente);
+
+    if (datos != null && mounted) {
+      Navigator.of(context).pop(ResultadoCobro(
+        estadoPago:  EstadoPago.pendiente,
+        totalPagado: _recibido,
+        datosDeuda:  datos,
+      ));
     }
   }
 
@@ -184,7 +219,8 @@ class _DialogoCobrarPOSState extends State<DialogoCobrarPOS> {
                   FilteringTextInputFormatter.allow(RegExp(r'^\d*\.?\d{0,2}')),
                 ],
                 style: const TextStyle(
-                    fontSize: 15, fontWeight: FontWeight.w600,
+                    fontSize: 15,
+                    fontWeight: FontWeight.w600,
                     color: ColoresApp.textDark),
                 decoration: InputDecoration(
                   prefixText: '\$ ',
@@ -220,7 +256,6 @@ class _DialogoCobrarPOSState extends State<DialogoCobrarPOS> {
               // ── Dos cajas de precio formateado ────────────────────────
               Row(
                 children: [
-                  // Recibido
                   Expanded(
                     child: _CajaPrecio(
                       etiqueta: 'RECIBIDO',
@@ -237,7 +272,6 @@ class _DialogoCobrarPOSState extends State<DialogoCobrarPOS> {
                     ),
                   ),
                   const SizedBox(width: 10),
-                  // Cambio / Falta
                   Expanded(
                     child: _CajaPrecio(
                       etiqueta: resultadoLabel,

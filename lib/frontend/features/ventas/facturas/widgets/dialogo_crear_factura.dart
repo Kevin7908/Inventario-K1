@@ -115,6 +115,7 @@ class _DialogoCrearFacturaState extends ConsumerState<DialogoCrearFactura> {
       error = await notifier.actualizarDesdeOrden(
         facturaId:  widget.facturaExistente!.id,
         ordenId:    widget.ordenId!,
+        clienteId:  _clienteNotifier.value?.id,
         metodoPago: _metodoPago,
         estadoPago: _estadoPago,
         iva:        iva,
@@ -158,13 +159,19 @@ class _DialogoCrearFacturaState extends ConsumerState<DialogoCrearFactura> {
   Widget build(BuildContext context) {
     final clientes = ref.watch(clientesProvider).value?.filtrados ?? const [];
 
-    if (widget.esEdicion && !_clientePreseleccionado && clientes.isNotEmpty) {
-      final clienteId = widget.facturaAEditar!.clienteId;
-      if (clienteId != null) {
-        final encontrado = clientes.where((c) => c.id == clienteId).firstOrNull;
-        if (encontrado != null) _clienteNotifier.value = encontrado;
-      }
+    if (!_clientePreseleccionado && clientes.isNotEmpty) {
       _clientePreseleccionado = true;
+      final targetId = widget.esEdicion
+          ? widget.facturaAEditar!.clienteId
+          : (widget.facturaExistente != null ? widget.clienteId : null);
+      if (targetId != null) {
+        final found = clientes.where((c) => c.id == targetId).firstOrNull;
+        if (found != null) {
+          WidgetsBinding.instance.addPostFrameCallback((_) {
+            if (mounted) _clienteNotifier.value = found;
+          });
+        }
+      }
     }
 
     return Dialog(
@@ -187,7 +194,7 @@ class _DialogoCrearFacturaState extends ConsumerState<DialogoCrearFactura> {
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      if (!widget.esEdicion && widget.esDesdeOrden) ...[
+                      if (!widget.esEdicion && widget.esDesdeOrden && widget.facturaExistente == null) ...[
                         _label('Cliente'),
                         const SizedBox(height: 6),
                         Container(
@@ -286,7 +293,7 @@ class _DialogoCrearFacturaState extends ConsumerState<DialogoCrearFactura> {
                         ),
                         const SizedBox(height: 16),
                       ],
-                      if (!widget.esDesdeOrden) ...[
+                      if (!widget.esDesdeOrden || widget.facturaExistente != null) ...[
                         _label('Cliente (opcional)'),
                         const SizedBox(height: 6),
                         AppSearch<Cliente>(

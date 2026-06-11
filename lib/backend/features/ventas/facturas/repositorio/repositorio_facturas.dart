@@ -46,6 +46,7 @@ abstract interface class RepositorioFacturas {
   Future<FacturaResumen> actualizarDesdeOrden({
     required int facturaId,
     required int ordenId,
+    int? clienteId,
     required MetodoPago metodoPago,
     required EstadoPago estadoPago,
     double iva,
@@ -73,4 +74,11 @@ abstract interface class RepositorioFacturas {
   });
 
   Future<void> eliminarItem(int itemId);
+
+  Future<FacturaResumen> actualizarPago({
+    required int id,
+    required double totalPagado,
+    required EstadoPago estadoPago,
+    required MetodoPago metodoPago,
+  });
 }

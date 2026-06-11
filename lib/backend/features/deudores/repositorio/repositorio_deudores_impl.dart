@@ -225,6 +225,17 @@ class RepositorioDeudoresImpl implements RepositorioDeudores {
       estado: Value(nuevoEstado.valor),
       actualizadoEn: Value(DateTime.now()),
     ));
+
+    // Sincronizar: cuando la deuda queda pagada y está vinculada a una factura,
+    // marcar esa factura como PAGADA también.
+    if (nuevoEstado == EstadoDeudor.pagada && deudor.ventaId != null) {
+      await _db.customUpdate(
+        "UPDATE ventas SET total_pagado = total, estado_pago = 'PAGADO', "
+        "actualizado_en = datetime('now','localtime') WHERE id = ?",
+        variables: [Variable.withInt(deudor.ventaId!)],
+        updates: {_db.tablaVentas},
+      );
+    }
   }
 
   Future<void> _escribirEstado(int id, EstadoDeudor estado) =>

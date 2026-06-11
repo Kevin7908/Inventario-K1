@@ -229,6 +229,7 @@ class RepositorioFacturasImpl implements RepositorioFacturas {
   Future<FacturaResumen> actualizarDesdeOrden({
     required int facturaId,
     required int ordenId,
+    int?         clienteId,
     required MetodoPago metodoPago,
     required EstadoPago estadoPago,
     double iva       = 0,
@@ -251,6 +252,7 @@ class RepositorioFacturasImpl implements RepositorioFacturas {
           estadoPago:    Value(estadoPago.aTexto),
           iva:           Value(iva),
           descuento:     Value(descuento),
+          clienteId:     clienteId != null ? Value(clienteId) : const Value.absent(),
           actualizadoEn: Value(DateTime.now()),
         ),
       );
@@ -567,6 +569,24 @@ class RepositorioFacturasImpl implements RepositorioFacturas {
     }
 
     await _recalcularTotales(current.ventaId);
+  }
+
+  @override
+  Future<FacturaResumen> actualizarPago({
+    required int id,
+    required double totalPagado,
+    required EstadoPago estadoPago,
+    required MetodoPago metodoPago,
+  }) async {
+    await (_db.update(_tablaVentas)..where((t) => t.id.equals(id))).write(
+      TablaVentasCompanion(
+        totalPagado:   Value(totalPagado),
+        estadoPago:    Value(estadoPago.aTexto),
+        metodoPago:    Value(metodoPago.aTexto),
+        actualizadoEn: Value(DateTime.now()),
+      ),
+    );
+    return _obtenerResumenPorId(id);
   }
 
   // Helpers

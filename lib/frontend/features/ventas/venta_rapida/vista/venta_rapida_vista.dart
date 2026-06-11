@@ -254,17 +254,24 @@ class _CartPanelState extends ConsumerState<_CartPanel> {
     final subtotal = pos.subtotal;
     final total    = subtotal - pos.descuento + subtotal * kIva;
 
-    final estadoPago = await DialogoCobrarPOS.mostrar(
+    final resultado = await DialogoCobrarPOS.mostrar(
       context,
       total:         total,
       clienteId:     pos.clienteId,
       clienteNombre: pos.clienteNombre,
     );
-    if (estadoPago == null || !mounted) return;
+    if (resultado == null || !mounted) return;
 
-    final error = await ref
-        .read(posProvider.notifier)
-        .procesarVenta(estadoPago: estadoPago);
+    final error = await ref.read(posProvider.notifier).procesarVenta(
+      estadoPago:      resultado.estadoPago,
+      totalPagado:     resultado.totalPagado,
+      totalFactura:    total,
+      clienteId:       pos.clienteId,
+      concepto:        resultado.datosDeuda?.concepto,
+      metodoPagoDeuda: resultado.datosDeuda?.metodoPago,
+      fechaVencimiento: resultado.datosDeuda?.fechaVencimiento,
+      notasDeuda:       resultado.datosDeuda?.notas,
+    );
     if (!mounted) return;
     if (error != null) {
       SnackBarMensaje.error(context, error);

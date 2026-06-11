@@ -2,6 +2,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../../../backend/features/ventas/facturas/enum/enum_facturas.dart';
 import '../../../../../backend/features/ventas/facturas/repositorio/repositorio_facturas.dart';
+import '../../../deudores/provider/deudores_provider.dart';
 import '../../ordenes/provider/ordenes_providers.dart';
 import 'facturas_providers.dart';
 import 'facturas_state.dart';
@@ -95,6 +96,7 @@ class FacturasNotifier extends AsyncNotifier<FacturasState> {
   Future<String?> actualizarDesdeOrden({
     required int        facturaId,
     required int        ordenId,
+    int?                clienteId,
     required MetodoPago metodoPago,
     required EstadoPago estadoPago,
     double              iva       = 0,
@@ -104,6 +106,7 @@ class FacturasNotifier extends AsyncNotifier<FacturasState> {
       final factura = await _repo.actualizarDesdeOrden(
         facturaId:  facturaId,
         ordenId:    ordenId,
+        clienteId:  clienteId,
         metodoPago: metodoPago,
         estadoPago: estadoPago,
         iva:        iva,
@@ -139,6 +142,55 @@ class FacturasNotifier extends AsyncNotifier<FacturasState> {
       // Si se cambió el cliente y hay una orden vinculada, refrescar su detalle
       if (actualizarCliente && factura.ordenId != null) {
         ref.invalidate(ordenDetalleProvider(factura.ordenId!));
+      }
+      return null;
+    } catch (e) {
+      return e.toString();
+    }
+  }
+
+  /// Registra el cobro de una factura: actualiza [totalPagado] y [estadoPago],
+  /// y si el pago es parcial crea automáticamente una deuda vinculada.
+  Future<String?> cobrar({
+    required int         id,
+    required double      totalPagado,
+    required double      totalFactura,
+    required EstadoPago  estadoPago,
+    required MetodoPago  metodoPago,
+    int?     clienteId,
+    String?  concepto,
+    String?  metodoPagoDeuda,
+    String?  fechaVencimiento,
+    String?  notasDeuda,
+  }) async {
+    try {
+      final factura = await _repo.actualizarPago(
+        id:          id,
+        totalPagado: totalPagado,
+        estadoPago:  estadoPago,
+        metodoPago:  metodoPago,
+      );
+      ref.invalidate(facturaDetalleProvider(id));
+      if (factura.ordenId != null) {
+        ref.invalidate(ordenDetalleProvider(factura.ordenId!));
+      }
+
+      if (estadoPago == EstadoPago.pendiente &&
+          concepto != null &&
+          clienteId != null) {
+        final montoDeuda = (totalFactura - totalPagado).round();
+        if (montoDeuda > 0) {
+          await ref.read(repositorioDeudoresProvider).crear(
+            clienteId:         clienteId,
+            ventaId:           id,
+            concepto:          concepto,
+            montoTotal:        montoDeuda,
+            fechaVencimiento:  fechaVencimiento,
+            notas:             notasDeuda,
+            pagoInicial:       0,
+            metodoPagoInicial: metodoPagoDeuda ?? 'Efectivo',
+          );
+        }
       }
       return null;
     } catch (e) {
