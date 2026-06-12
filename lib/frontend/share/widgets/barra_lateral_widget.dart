@@ -67,6 +67,11 @@ class BarraLateralWidget extends StatelessWidget {
                   'Cotizaciones',
                 ),
                 _buildNavItem(
+                  NavSection.reservas,
+                  Icons.bookmark_outline_rounded,
+                  'Reservas',
+                ),
+                _buildNavItem(
                   NavSection.deudores,
                   Icons.attach_money_rounded,
                   'Deudores',

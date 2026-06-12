@@ -72,71 +72,71 @@ class _TarjetaProductoWidgetState extends State<TarjetaProductoWidget> {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  // Imagen + badge de stock
-                  _ImagenConBadge(producto: p),
-
-                  const SizedBox(height: 12),
-
-                  Row(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Expanded(
-                        child: Text(
-                          p.nombre,
+                  // Sección superior — flexible para absorber espacio variable
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        _ImagenConBadge(producto: p),
+                        const SizedBox(height: 10),
+                        Row(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Expanded(
+                              child: Text(
+                                p.nombre,
+                                style: const TextStyle(
+                                  color: ColoresApp.textDark,
+                                  fontSize: 13.5,
+                                  fontWeight: FontWeight.w700,
+                                  height: 1.25,
+                                ),
+                                maxLines: 2,
+                                overflow: TextOverflow.ellipsis,
+                              ),
+                            ),
+                            const SizedBox(width: 6),
+                            BadgeEstadoStock(estado: p.estadoStock),
+                          ],
+                        ),
+                        Text(
+                          'SKU: ${p.sku}',
                           style: const TextStyle(
-                            color: ColoresApp.textDark,
-                            fontSize: 13.5,
-                            fontWeight: FontWeight.w700,
-                            height: 1.25,
+                            color: ColoresApp.textLight,
+                            fontSize: 11,
                           ),
-                          maxLines: 2,
+                          maxLines: 1,
                           overflow: TextOverflow.ellipsis,
                         ),
-                      ),
-
-                      const SizedBox(width: 8),
-
-                      BadgeEstadoStock(estado: p.estadoStock,),
-                    ],
-                  ),
-
-                  // SKU
-                  Text(
-                    'SKU: ${p.sku}',
-                    style: const TextStyle(
-                      color: ColoresApp.textLight,
-                      fontSize: 11,
+                        if (p.categoriaNombre != null)
+                          Text(
+                            p.categoriaNombre!,
+                            style: const TextStyle(
+                              color: ColoresApp.textLight,
+                              fontSize: 11,
+                            ),
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                      ],
                     ),
                   ),
 
-                  if (p.categoriaNombre != null) ...[
-                    const SizedBox(height: 2),
-                    Text(
-                      p.categoriaNombre!,
-                      style: const TextStyle(
-                        color: ColoresApp.textLight,
-                        fontSize: 11,
-                      ),
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                    ),
-                  ],
-
-                  const Spacer(),
-
+                  // Sección inferior — fija
                   const Divider(height: 1, color: ColoresApp.border),
-                  const SizedBox(height: 10),
-
-                  // Precio + stock
+                  const SizedBox(height: 8),
                   Row(
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
-                      Text(
-                        _fmt.format(p.precioVenta),
-                        style: const TextStyle(
-                          color: ColoresApp.primary,
-                          fontSize: 15,
-                          fontWeight: FontWeight.w700,
+                      Flexible(
+                        child: Text(
+                          _fmt.format(p.precioVenta),
+                          style: const TextStyle(
+                            color: ColoresApp.primary,
+                            fontSize: 15,
+                            fontWeight: FontWeight.w700,
+                          ),
+                          overflow: TextOverflow.ellipsis,
                         ),
                       ),
                       _BadgeUnidades(
@@ -145,12 +145,9 @@ class _TarjetaProductoWidgetState extends State<TarjetaProductoWidget> {
                       ),
                     ],
                   ),
-
-                  const SizedBox(height: 10),
-                  const Divider(height: 1, color: ColoresApp.border),
                   const SizedBox(height: 8),
-
-                  // Botones de acción
+                  const Divider(height: 1, color: ColoresApp.border),
+                  const SizedBox(height: 6),
                   Row(
                     children: [
                       AccionBoton(

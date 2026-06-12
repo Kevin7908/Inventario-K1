@@ -21,6 +21,11 @@ import '../../features/ventas/ordenes/esquema_datos/tabla_ordenes_repuesto.dart'
 import '../../features/ventas/ordenes/esquema_datos/tabla_ordenes_servicio.dart';
 import '../../features/ventas/ordenes/esquema_datos/tabla_ordenes_tarea.dart';
 import '../../features/ventas/servicios/esquema_datos/tabla_servicio.dart';
+import '../../features/reservas/esquema_datos/tabla_reserva.dart';
+import '../../features/reservas/esquema_datos/tabla_reserva_item.dart';
+import '../../features/reservas/esquema_datos/tabla_reserva_abono.dart';
+import '../../features/deudores/esquema_datos/tabla_deudor.dart';
+import '../../features/deudores/esquema_datos/tabla_deudor_pago.dart';
 
 part 'app_db.g.dart';
 
@@ -28,7 +33,7 @@ part 'app_db.g.dart';
   tables: [
     TablaCategoria,
     TablaUnidadesMedida,
-    TablaProveedor, 
+    TablaProveedor,
     TablaProducto,
     TablaUsuario,
     TablaCliente,
@@ -42,7 +47,12 @@ part 'app_db.g.dart';
     TablaVentas,
     TablaVentaDetalles,
     TablaCotizacion,
-    TablaCotizacionItem
+    TablaCotizacionItem,
+    TablaReserva,
+    TablaReservaItem,
+    TablaReservaAbono,
+    TablaDeudor,
+    TablaDeudorPago,
   ],
 )
 class AppDb extends _$AppDb {

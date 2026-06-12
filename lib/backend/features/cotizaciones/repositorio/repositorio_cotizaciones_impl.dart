@@ -104,18 +104,18 @@ class RepositorioCotizacionesImpl implements RepositorioCotizaciones {
       final iva = (subtotal * kTasaIva).round();
       final total = subtotal + iva;
 
-      final companion = CotizacionMapper.nuevaACompanion(
-        numero: numero,
-        clienteId: clienteId,
-        motoId: motoId,
-        subtotal: subtotal,
-        iva: iva,
-        total: total,
-        vigenciaHasta: vigenciaHasta,
-        notas: notas,
-      );
-
-      final id = await _db.into(_db.tablaCotizacion).insert(companion);
+      final id = await _db.into(_db.tablaCotizacion).insert(
+            CotizacionMapper.nuevaACompanion(
+              numero: numero,
+              clienteId: clienteId,
+              motoId: motoId,
+              subtotal: subtotal,
+              iva: iva,
+              total: total,
+              vigenciaHasta: vigenciaHasta,
+              notas: notas,
+            ),
+          );
 
       for (final draft in items) {
         await _db.into(_db.tablaCotizacionItem).insert(
@@ -129,6 +129,11 @@ class RepositorioCotizacionesImpl implements RepositorioCotizaciones {
                 subtotal: draft.subtotal,
               ),
             );
+        // Descontar stock del producto al crear la cotización.
+        if (draft.tipo == TipoItemCotizacion.producto &&
+            draft.referenciaId != null) {
+          await _ajustarStockProducto(draft.referenciaId!, -draft.cantidad);
+        }
       }
       return id;
     });
@@ -144,10 +149,21 @@ class RepositorioCotizacionesImpl implements RepositorioCotizaciones {
     required List<ItemDraft> items,
   }) {
     return _db.transaction(() async {
+      // 1. Restaurar stock de los ítems que había en BD antes de la edición.
+      final anteriores = await (_db.select(_db.tablaCotizacionItem)
+            ..where((t) => t.cotizacionId.equals(id)))
+          .get();
+      for (final item in anteriores) {
+        if (item.referenciaId != null &&
+            item.tipoItem == TipoItemCotizacion.producto.valor) {
+          await _ajustarStockProducto(item.referenciaId!, item.cantidad);
+        }
+      }
+
+      // 2. Actualizar cabecera de la cotización.
       final subtotal = items.fold(0, (s, d) => s + d.subtotal);
       final iva = (subtotal * kTasaIva).round();
       final total = subtotal + iva;
-
       await (_db.update(_db.tablaCotizacion)..where((t) => t.id.equals(id)))
           .write(TablaCotizacionCompanion(
         clienteId: Value(clienteId),
@@ -159,10 +175,10 @@ class RepositorioCotizacionesImpl implements RepositorioCotizaciones {
         notas: Value(notas),
       ));
 
+      // 3. Reemplazar ítems y descontar stock de los nuevos.
       await (_db.delete(_db.tablaCotizacionItem)
             ..where((t) => t.cotizacionId.equals(id)))
           .go();
-
       for (final draft in items) {
         await _db.into(_db.tablaCotizacionItem).insert(
               CotizacionMapper.itemACompanion(
@@ -175,6 +191,10 @@ class RepositorioCotizacionesImpl implements RepositorioCotizaciones {
                 subtotal: draft.subtotal,
               ),
             );
+        if (draft.tipo == TipoItemCotizacion.producto &&
+            draft.referenciaId != null) {
+          await _ajustarStockProducto(draft.referenciaId!, -draft.cantidad);
+        }
       }
     });
   }
@@ -239,6 +259,22 @@ class RepositorioCotizacionesImpl implements RepositorioCotizaciones {
 
     return '$prefix${(maxSeq + 1).toString().padLeft(4, '0')}';
   }
+
+  /// Ajusta `stock_actual` del producto [productoId] sumando [delta]
+  /// (positivo para restaurar, negativo para descontar).
+  /// Debe llamarse siempre dentro de una transacción abierta.
+  Future<void> _ajustarStockProducto(int productoId, double delta) =>
+      _db.customUpdate(
+        'UPDATE productos '
+        'SET stock_actual = stock_actual + ?, actualizado_en = ? '
+        'WHERE id = ?',
+        variables: [
+          Variable.withReal(delta),
+          Variable.withDateTime(DateTime.now()),
+          Variable.withInt(productoId),
+        ],
+        updates: {_db.tablaProducto},
+      );
 
   Future<void> _recalcularTotales(int cotizacionId) async {
     final filas = await (_db.select(_db.tablaCotizacionItem)

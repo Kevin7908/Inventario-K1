@@ -61,53 +61,6 @@ final class CotizacionesState {
 
   static const Object _sentinel = Object();
 
-  // ── Getters computados ──────────────────────────────────────────────────────
-
-  List<CotizacionResumen> get filtradas {
-    var lista = cotizaciones;
-
-    if (filtroEstado != null) {
-      lista = lista.where((c) => c.estado == filtroEstado).toList();
-    }
-
-    if (filtroMes != null) {
-      lista = lista.where((c) => c.creadoEn.month == filtroMes).toList();
-    }
-
-    final q = filtroBusqueda.toLowerCase();
-    if (q.isNotEmpty) {
-      lista = lista.where((c) {
-        return c.numero.toLowerCase().contains(q) ||
-            c.nombreCliente.toLowerCase().contains(q) ||
-            c.nombreMoto.toLowerCase().contains(q);
-      }).toList();
-    }
-
-    return lista;
-  }
-
-  int get totalFiltradas => filtradas.length;
-
-  int get totalPaginas =>
-      (totalFiltradas / itemsPorPagina).ceil().clamp(1, 9999);
-
-  List<CotizacionResumen> get paginadas {
-    final f = filtradas;
-    final inicio = paginaActual * itemsPorPagina;
-    final fin = (inicio + itemsPorPagina).clamp(0, f.length);
-    if (inicio >= f.length) return const [];
-    return f.sublist(inicio, fin);
-  }
-
-  // Métricas para las tarjetas de resumen
-  int get totalCotizaciones => cotizaciones.length;
-  int get valorTotal => cotizaciones.fold(0, (s, c) => s + c.total);
-  int get cantVigentes =>
-      cotizaciones.where((c) => c.estado == EstadoCotizacion.vigente).length;
-  int get cantVencidas =>
-      cotizaciones.where((c) => c.estado == EstadoCotizacion.vencida).length;
-  int get cantPorVencer =>
-      cotizaciones.where((c) => c.estado == EstadoCotizacion.porVencer).length;
 }
 
 // ── Notifier ──────────────────────────────────────────────────────────────────
@@ -300,5 +253,147 @@ final productosParaCotizacionProvider = FutureProvider<List<Producto>>(
   name: 'productosParaCotizacionProvider',
   (ref) =>
       RepositorioProductosImpl(ref.watch(appDatabaseProvider)).obtenerActivos(),
+);
+
+// ── Modelos de valor para providers derivados ─────────────────────────────────
+
+final class CotizacionesMetrics {
+  const CotizacionesMetrics({
+    required this.total,
+    required this.valorTotal,
+    required this.cantVigentes,
+    required this.cantVencidas,
+    required this.cantPorVencer,
+  });
+
+  final int total;
+  final int valorTotal;
+  final int cantVigentes;
+  final int cantVencidas;
+  final int cantPorVencer;
+
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      other is CotizacionesMetrics &&
+          total == other.total &&
+          valorTotal == other.valorTotal &&
+          cantVigentes == other.cantVigentes &&
+          cantVencidas == other.cantVencidas &&
+          cantPorVencer == other.cantPorVencer;
+
+  @override
+  int get hashCode =>
+      Object.hash(total, valorTotal, cantVigentes, cantVencidas, cantPorVencer);
+}
+
+final class PaginacionCotizaciones {
+  const PaginacionCotizaciones({
+    required this.paginadas,
+    required this.paginaActual,
+    required this.totalPaginas,
+    required this.totalFiltradas,
+  });
+
+  final List<CotizacionResumen> paginadas;
+  final int paginaActual;
+  final int totalPaginas;
+  final int totalFiltradas;
+}
+
+// ── Providers derivados ───────────────────────────────────────────────────────
+
+/// Solo recalcula cuando cambia la lista base, sin importar filtros ni página.
+final cotizacionesMetricsProvider = Provider<CotizacionesMetrics>(
+  name: 'cotizacionesMetricsProvider',
+  (ref) {
+    final lista = ref.watch(
+      cotizacionesProvider.select(
+        (s) => s.asData?.value.cotizaciones ?? const [],
+      ),
+    );
+    return CotizacionesMetrics(
+      total: lista.length,
+      valorTotal: lista.fold(0, (acc, c) => acc + c.total),
+      cantVigentes:
+          lista.where((c) => c.estado == EstadoCotizacion.vigente).length,
+      cantVencidas:
+          lista.where((c) => c.estado == EstadoCotizacion.vencida).length,
+      cantPorVencer:
+          lista.where((c) => c.estado == EstadoCotizacion.porVencer).length,
+    );
+  },
+);
+
+/// Solo recalcula cuando cambia la lista base o alguno de los tres filtros.
+/// Cambiar solo la página NO dispara este provider.
+final cotizacionesFiltradasProvider = Provider<List<CotizacionResumen>>(
+  name: 'cotizacionesFiltradasProvider',
+  (ref) {
+    // Dart records tienen igualdad estructural → .select compara campo a campo.
+    final p = ref.watch(cotizacionesProvider.select((s) {
+      final v = s.asData?.value;
+      if (v == null) {
+        return (
+          lista: <CotizacionResumen>[],
+          estado: null as EstadoCotizacion?,
+          mes: null as int?,
+          busqueda: '',
+        );
+      }
+      return (
+        lista: v.cotizaciones,
+        estado: v.filtroEstado,
+        mes: v.filtroMes,
+        busqueda: v.filtroBusqueda,
+      );
+    }));
+
+    var lista = p.lista;
+    if (p.estado != null) {
+      lista = lista.where((c) => c.estado == p.estado).toList();
+    }
+    if (p.mes != null) {
+      lista = lista.where((c) => c.creadoEn.month == p.mes).toList();
+    }
+    final q = p.busqueda.toLowerCase();
+    if (q.isNotEmpty) {
+      lista = lista
+          .where(
+            (c) =>
+                c.numero.toLowerCase().contains(q) ||
+                c.nombreCliente.toLowerCase().contains(q) ||
+                c.nombreMoto.toLowerCase().contains(q),
+          )
+          .toList();
+    }
+    return lista;
+  },
+);
+
+/// Recalcula cuando cambia la lista filtrada O el número de página activa.
+final paginacionProvider = Provider<PaginacionCotizaciones>(
+  name: 'paginacionProvider',
+  (ref) {
+    final filtradas = ref.watch(cotizacionesFiltradasProvider);
+    final paginaActual = ref.watch(
+      cotizacionesProvider.select((s) => s.asData?.value.paginaActual ?? 0),
+    );
+
+    const items = CotizacionesState.itemsPorPagina;
+    final total = filtradas.length;
+    final totalPaginas = (total / items).ceil().clamp(1, 9999);
+    final inicio = paginaActual * items;
+    final fin = (inicio + items).clamp(0, total);
+    final paginadas =
+        inicio >= total ? const <CotizacionResumen>[] : filtradas.sublist(inicio, fin);
+
+    return PaginacionCotizaciones(
+      paginadas: paginadas,
+      paginaActual: paginaActual,
+      totalPaginas: totalPaginas,
+      totalFiltradas: total,
+    );
+  },
 );
 

@@ -1,10 +1,12 @@
 import 'package:flutter/material.dart';
 import 'package:inventario_k1/frontend/features/cotizaciones/vista/cotizaciones_vista.dart';
+import 'package:inventario_k1/frontend/features/reservas/vista/reservas_vista.dart';
 import 'package:inventario_k1/frontend/features/tecnicos/vista/tecnico_vista.dart';
 import 'package:inventario_k1/frontend/features/ventas/principal/vista/venta_vista.dart';
 import 'package:inventario_k1/frontend/share/nav/nav_section.dart';
 import 'package:inventario_k1/frontend/share/temas/colores_app.dart';
 import 'package:inventario_k1/frontend/share/widgets/barra_lateral_widget.dart';
+import 'package:inventario_k1/frontend/features/deudores/vista/deudores_vista.dart';
 import 'package:inventario_k1/frontend/share/widgets/placeholder_widget.dart';
 
 import '../../features/categorias/vista/categorias_vistas.dart';
@@ -33,6 +35,7 @@ class _NavegacionState extends State<Navegacion> {
     NavSection.unidadesMedida,
     NavSection.vender,
     NavSection.cotizaciones,
+    NavSection.reservas,
     NavSection.deudores,
     NavSection.clientes,
     NavSection.proveedores,
@@ -66,7 +69,8 @@ class _NavegacionState extends State<Navegacion> {
                 UnidadesMedidaVista(),
                 VentasVista(),
                 CotizacionesVista(),
-                PlaceholderWidget(seccion: NavSection.deudores),
+                ReservasVista(),
+                DeudoresVista(),
                 ClientesVista(),
                 ProveedoresVista(),
                 MotosVista(),

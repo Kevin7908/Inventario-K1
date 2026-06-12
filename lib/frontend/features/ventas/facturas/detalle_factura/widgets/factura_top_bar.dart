@@ -13,12 +13,14 @@ class FacturaTopBar extends ConsumerWidget {
     required this.onVolver,
     required this.onEditar,
     required this.onEliminar,
+    this.readOnly = false,
   });
 
   final int facturaId;
   final VoidCallback onVolver;
   final VoidCallback onEditar;
   final VoidCallback onEliminar;
+  final bool readOnly;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -87,38 +89,42 @@ class FacturaTopBar extends ConsumerWidget {
           _SelectorEstadoPago(facturaId: facturaId),
           const SizedBox(width: 8),
 
-          // Editar
-          OutlinedButton.icon(
-            onPressed: onEditar,
-            icon: const Icon(Icons.edit_outlined, size: 15),
-            label: const Text('Editar'),
-            style: OutlinedButton.styleFrom(
-              foregroundColor: ColoresApp.primary,
-              side: const BorderSide(color: ColoresApp.primary),
-              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
-              shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(8)),
-              textStyle:
-                  const TextStyle(fontSize: 13, fontWeight: FontWeight.w500),
+          if (!readOnly) ...[
+            // Editar
+            OutlinedButton.icon(
+              onPressed: onEditar,
+              icon: const Icon(Icons.edit_outlined, size: 15),
+              label: const Text('Editar'),
+              style: OutlinedButton.styleFrom(
+                foregroundColor: ColoresApp.primary,
+                side: const BorderSide(color: ColoresApp.primary),
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+                shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(8)),
+                textStyle: const TextStyle(
+                    fontSize: 13, fontWeight: FontWeight.w500),
+              ),
             ),
-          ),
-          const SizedBox(width: 8),
+            const SizedBox(width: 8),
 
-          // Eliminar
-          OutlinedButton.icon(
-            onPressed: onEliminar,
-            icon: const Icon(Icons.delete_outline_rounded, size: 15),
-            label: const Text('Eliminar'),
-            style: OutlinedButton.styleFrom(
-              foregroundColor: ColoresApp.statusDebt,
-              side: const BorderSide(color: ColoresApp.statusDebt),
-              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
-              shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(8)),
-              textStyle:
-                  const TextStyle(fontSize: 13, fontWeight: FontWeight.w500),
+            // Eliminar
+            OutlinedButton.icon(
+              onPressed: onEliminar,
+              icon: const Icon(Icons.delete_outline_rounded, size: 15),
+              label: const Text('Eliminar'),
+              style: OutlinedButton.styleFrom(
+                foregroundColor: ColoresApp.statusDebt,
+                side: const BorderSide(color: ColoresApp.statusDebt),
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+                shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(8)),
+                textStyle: const TextStyle(
+                    fontSize: 13, fontWeight: FontWeight.w500),
+              ),
             ),
-          ),
+          ],
         ],
       ),
     );

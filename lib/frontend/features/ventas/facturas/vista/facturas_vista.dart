@@ -1,73 +1,28 @@
-import 'dart:async';
-
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../../../backend/features/ventas/facturas/enum/enum_facturas.dart';
 import '../../../../../backend/features/ventas/facturas/modelo/factura_resumen.dart';
+import '../../../../../core/currency_ext.dart';
+import '../../../../share/temas/colores_app.dart';
 import '../../../../share/widgets/dialogos/dialogo_confirmar_eliminar_widget.dart';
 import '../../../../share/widgets/input/barra_busqueda_widget.dart';
 import '../../../../share/widgets/output/estado_error_widget.dart';
 import '../../../../share/widgets/output/estado_vacio_widget.dart';
 import '../../../../share/widgets/output/snack_bar_mensaje.dart';
-import '../../../../share/widgets/top_bar_widget.dart';
 import '../detalle_factura/factura_detalle_page.dart';
 import '../provider/facturas_provider.dart';
+import '../widgets/dialogo_crear_factura.dart';
 import '../widgets/factura_fila_widget.dart';
-import '../widgets/facturas_resumen_cartas_widget.dart';
 
-class FacturasVista extends ConsumerStatefulWidget {
+const _kAccent = ColoresApp.accentAmber;
+
+class FacturasVista extends ConsumerWidget {
   const FacturasVista({super.key});
 
   @override
-  ConsumerState<FacturasVista> createState() => _FacturasVistaState();
-}
-
-class _FacturasVistaState extends ConsumerState<FacturasVista> {
-  @override
-  Widget build(BuildContext context) {
-    return Scaffold(
-      backgroundColor: const Color(0xFFF9FAFB),
-      body: Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          TopBarWidget(titulo: 'Facturación'),
-          const Expanded(child: _CuerpoFacturas()),
-        ],
-      ),
-    );
-  }
-}
-
-class _CuerpoFacturas extends ConsumerStatefulWidget {
-  const _CuerpoFacturas();
-
-  @override
-  ConsumerState<_CuerpoFacturas> createState() => _CuerpoFacturasState();
-}
-
-class _CuerpoFacturasState extends ConsumerState<_CuerpoFacturas> {
-  final _searchController = TextEditingController();
-  Timer? _debounce;
-
-  @override
-  void dispose() {
-    _debounce?.cancel();
-    _searchController.dispose();
-    super.dispose();
-  }
-
-  void _onBuscar(String valor) {
-    _debounce?.cancel();
-    _debounce = Timer(const Duration(milliseconds: 280), () {
-      ref.read(facturasProvider.notifier).buscar(valor);
-    });
-  }
-
-  @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
     final estadoAsync = ref.watch(facturasProvider);
-    final filtroActual = estadoAsync.value?.filtroEstadoPago;
 
     return estadoAsync.when(
       loading: () => const Center(child: CircularProgressIndicator()),
@@ -75,84 +30,99 @@ class _CuerpoFacturasState extends ConsumerState<_CuerpoFacturas> {
         mensaje: e.toString(),
         alReintentar: () => ref.invalidate(facturasProvider),
       ),
-      data: (estado) {
-        final lista = ref.watch(facturasServicioFiltradas);
-        final metricas = FacturasMetricas.deFacturas(
-          estado.facturas.where((f) => f.tipo == TipoVenta.servicio).toList(),
-        );
+      data: (_) => const _ContenidoFacturas(),
+    );
+  }
+}
 
-        return Padding(
-          padding: const EdgeInsets.all(24),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              FacturasResumenCartas(metricas: metricas),
-              const SizedBox(height: 24),
-              _BarraFiltros(
-                controller: _searchController,
-                filtroActual: filtroActual,
-                onBuscar: _onBuscar,
-                onFiltroEstado: (e) =>
-                    ref.read(facturasProvider.notifier).filtrarEstadoPago(e),
-              ),
-              const SizedBox(height: 8),
-              Expanded(
-                child: Container(
-                  decoration: BoxDecoration(
-                    color: Colors.white,
-                    borderRadius: BorderRadius.circular(12),
-                    boxShadow: const [
-                      BoxShadow(
-                        color: Color(0x08000000),
-                        blurRadius: 8,
-                        offset: Offset(0, 2),
-                      ),
-                    ],
-                  ),
-                  child: Column(
-                    children: [
-                      const FacturaTablaEncabezado(),
-                      Expanded(
-                        child: lista.isEmpty
-                            ? const EstadoVacioWidget(
-                                icono: Icons.receipt_long_outlined,
-                                textoSinDatos: 'Sin facturas',
-                                textoSinResultados:
-                                    'Crea una nueva factura con el botón superior.',
-                                textoCTA: '',
-                              )
-                            : _ListaFacturas(
-                                facturas: lista,
-                                onTap: (f) => Navigator.of(context).push(
-                                  MaterialPageRoute(
-                                    builder: (_) =>
-                                        FacturaDetallePage(facturaId: f.id),
-                                  ),
-                                ),
-                                onEliminar: (f) =>
-                                    _confirmarEliminarDesde(context, ref, f),
-                              ),
-                      ),
-                    ],
-                  ),
-                ),
-              ),
-            ],
+// ── Cuerpo principal ──────────────────────────────────────────────────────────
+
+class _ContenidoFacturas extends ConsumerWidget {
+  const _ContenidoFacturas();
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final lista      = ref.watch(facturasFiltradas);
+    final estadoPago = ref.watch(facturasProvider).value?.filtroEstadoPago;
+    final hayFiltro  = (ref.watch(facturasProvider).value?.filtroBusqueda.isNotEmpty ?? false) ||
+                       estadoPago != null;
+
+    return Padding(
+      padding: const EdgeInsets.all(24),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          // ── KPI cards ──────────────────────────────────────────────────
+          const _KpiRow(),
+          const SizedBox(height: 20),
+          // ── Barra: búsqueda + chips + botón ────────────────────────────
+          _BarraAcciones(
+            filtroActual: estadoPago,
+            onFiltrar: (e) =>
+                ref.read(facturasProvider.notifier).filtrarEstadoPago(e),
+            onNuevaFactura: () =>
+                DialogoCrearFactura.mostrar(context, tipoFijo: TipoVenta.servicio),
           ),
-        );
-      },
+          const SizedBox(height: 8),
+          // ── Tabla ───────────────────────────────────────────────────────
+          Expanded(
+            child: Container(
+              decoration: BoxDecoration(
+                color: ColoresApp.bgCard,
+                borderRadius: BorderRadius.circular(12),
+                border: Border.all(color: ColoresApp.border),
+                boxShadow: const [
+                  BoxShadow(
+                    color: Color(0x08000000),
+                    blurRadius: 8,
+                    offset: Offset(0, 2),
+                  ),
+                ],
+              ),
+              child: Column(
+                children: [
+                  const FacturaTablaEncabezado(),
+                  Expanded(
+                    child: lista.isEmpty
+                        ? EstadoVacioWidget(
+                            icono: Icons.request_quote_outlined,
+                            textoSinDatos: 'Sin facturas',
+                            textoSinResultados:
+                                'No hay facturas que coincidan.',
+                            textoCTA:
+                                'Crea una nueva factura con el botón de arriba.',
+                            hayFiltro: hayFiltro,
+                          )
+                        : _ListaFacturas(
+                            facturas:  lista,
+                            onTap: (f) => Navigator.of(context).push(
+                              MaterialPageRoute(
+                                builder: (_) =>
+                                    FacturaDetallePage(facturaId: f.id),
+                              ),
+                            ),
+                            onEliminar: (f) =>
+                                _confirmarEliminar(context, ref, f),
+                          ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ],
+      ),
     );
   }
 
-  void _confirmarEliminarDesde(
-      BuildContext context, WidgetRef ref, FacturaResumen factura) {
+  void _confirmarEliminar(
+      BuildContext context, WidgetRef ref, FacturaResumen f) {
     DialogoConfirmarEliminar.mostrar(
       context: context,
-      nombreElemento: factura.numeroFactura,
+      nombreElemento: f.numeroFactura,
       tipoElemento: 'factura',
       onConfirmar: () async {
         final error =
-            await ref.read(facturasProvider.notifier).eliminar(factura.id);
+            await ref.read(facturasProvider.notifier).eliminar(f.id);
         if (!context.mounted) return;
         if (error != null) {
           SnackBarMensaje.error(context, error);
@@ -164,61 +134,40 @@ class _CuerpoFacturasState extends ConsumerState<_CuerpoFacturas> {
   }
 }
 
-class _BarraFiltros extends StatelessWidget {
-  const _BarraFiltros({
-    required this.controller,
-    required this.filtroActual,
-    required this.onBuscar,
-    required this.onFiltroEstado,
-  });
+// ── KPI row ───────────────────────────────────────────────────────────────────
 
-  final TextEditingController controller;
-  final EstadoPago? filtroActual;
-  final ValueChanged<String> onBuscar;
-  final ValueChanged<EstadoPago?> onFiltroEstado;
+class _KpiRow extends ConsumerWidget {
+  const _KpiRow();
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
+    final kpis = ref.watch(facturasKpisProvider);
     return Row(
       children: [
         Expanded(
-          child: BarraBusquedaWidget(
-            placeholder: 'Buscar por factura, cliente...',
-            alCambiar: onBuscar,
+          child: _KpiCard(
+            titulo: 'Cobrado este mes',
+            valor: kpis.totalMes.toCompactCop(),
+            subtitulo: '${kpis.count} facturas en total',
+            acento: ColoresApp.accentGreen,
           ),
         ),
-        const SizedBox(width: 12),
-        _Chip(
-          label: 'Todas',
-          seleccionado: filtroActual == null,
-          color: const Color(0xFF374151),
-          onTap: () => onFiltroEstado(null),
-        ),
-        const SizedBox(width: 6),
-        _Chip(
-          label: 'Pendientes',
-          seleccionado: filtroActual == EstadoPago.pendiente,
-          color: const Color(0xFFF59E0B),
-          onTap: () => onFiltroEstado(
-            filtroActual == EstadoPago.pendiente ? null : EstadoPago.pendiente,
+        const SizedBox(width: 14),
+        Expanded(
+          child: _KpiCard(
+            titulo: 'Saldo pendiente',
+            valor: kpis.pendiente.toCompactCop(),
+            subtitulo: 'Por cobrar',
+            acento: _kAccent,
           ),
         ),
-        const SizedBox(width: 6),
-        _Chip(
-          label: 'Pagadas',
-          seleccionado: filtroActual == EstadoPago.pagado,
-          color: const Color(0xFF10B981),
-          onTap: () => onFiltroEstado(
-            filtroActual == EstadoPago.pagado ? null : EstadoPago.pagado,
-          ),
-        ),
-        const SizedBox(width: 6),
-        _Chip(
-          label: 'Anuladas',
-          seleccionado: filtroActual == EstadoPago.anulada,
-          color: const Color(0xFFEF4444),
-          onTap: () => onFiltroEstado(
-            filtroActual == EstadoPago.anulada ? null : EstadoPago.anulada,
+        const SizedBox(width: 14),
+        Expanded(
+          child: _KpiCard(
+            titulo: 'Total cobrado',
+            valor: kpis.cobrado.toCompactCop(),
+            subtitulo: 'Acumulado',
+            acento: ColoresApp.primary,
           ),
         ),
       ],
@@ -226,17 +175,146 @@ class _BarraFiltros extends StatelessWidget {
   }
 }
 
-class _Chip extends StatelessWidget {
-  const _Chip({
+class _KpiCard extends StatelessWidget {
+  const _KpiCard({
+    required this.titulo,
+    required this.valor,
+    required this.subtitulo,
+    required this.acento,
+  });
+
+  final String titulo;
+  final String valor;
+  final String subtitulo;
+  final Color  acento;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.all(18),
+      decoration: BoxDecoration(
+        color: ColoresApp.bgCard,
+        borderRadius: BorderRadius.circular(12),
+        border: Border(left: BorderSide(color: acento, width: 3)),
+        boxShadow: const [
+          BoxShadow(color: Color(0x08000000), blurRadius: 8, offset: Offset(0, 2)),
+        ],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            titulo,
+            style: const TextStyle(
+              fontSize: 12,
+              color: ColoresApp.textMedium,
+              fontWeight: FontWeight.w500,
+            ),
+          ),
+          const SizedBox(height: 6),
+          Text(
+            valor,
+            style: TextStyle(
+              fontSize: 24,
+              fontWeight: FontWeight.w700,
+              color: acento,
+              height: 1,
+            ),
+          ),
+          const SizedBox(height: 4),
+          Text(
+            subtitulo,
+            style: const TextStyle(fontSize: 11, color: ColoresApp.textLight),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+// ── Barra de acciones ─────────────────────────────────────────────────────────
+
+class _BarraAcciones extends ConsumerWidget {
+  const _BarraAcciones({
+    required this.filtroActual,
+    required this.onFiltrar,
+    required this.onNuevaFactura,
+  });
+
+  final EstadoPago?              filtroActual;
+  final ValueChanged<EstadoPago?> onFiltrar;
+  final VoidCallback             onNuevaFactura;
+
+  static const _chips = <({String label, EstadoPago? estado})>[
+    (label: 'Todas',      estado: null),
+    (label: 'Pendientes', estado: EstadoPago.pendiente),
+    (label: 'Pagadas',    estado: EstadoPago.pagado),
+    (label: 'Anuladas',   estado: EstadoPago.anulada),
+  ];
+
+  static Color _chipColor(EstadoPago? e) => switch (e) {
+        null                 => ColoresApp.textDark,
+        EstadoPago.pendiente => _kAccent,
+        EstadoPago.pagado    => ColoresApp.accentGreen,
+        EstadoPago.anulada   => ColoresApp.accentRed,
+      };
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    return Row(
+      children: [
+        Expanded(
+          child: BarraBusquedaWidget(
+            placeholder: 'Buscar por factura, cliente…',
+            debounceMs: 280,
+            alCambiar: (q) =>
+                ref.read(facturasProvider.notifier).buscar(q),
+          ),
+        ),
+        const SizedBox(width: 10),
+        ..._chips.map((c) {
+          final sel   = filtroActual == c.estado;
+          final color = _chipColor(c.estado);
+          return Padding(
+            padding: const EdgeInsets.only(left: 5),
+            child: _FiltroChip(
+              label:       c.label,
+              seleccionado: sel,
+              color:       color,
+              onTap: () => onFiltrar(sel ? null : c.estado),
+            ),
+          );
+        }),
+        const SizedBox(width: 10),
+        ElevatedButton.icon(
+          onPressed: onNuevaFactura,
+          icon: const Icon(Icons.add_rounded, size: 15),
+          label: const Text('Nueva Factura'),
+          style: ElevatedButton.styleFrom(
+            backgroundColor: _kAccent,
+            foregroundColor: Colors.white,
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 11),
+            shape:   RoundedRectangleBorder(borderRadius: BorderRadius.circular(9)),
+            elevation: 0,
+            textStyle: const TextStyle(fontSize: 13, fontWeight: FontWeight.w700),
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+class _FiltroChip extends StatelessWidget {
+  const _FiltroChip({
     required this.label,
     required this.seleccionado,
     required this.color,
     required this.onTap,
   });
 
-  final String label;
-  final bool seleccionado;
-  final Color color;
+  final String       label;
+  final bool         seleccionado;
+  final Color        color;
   final VoidCallback onTap;
 
   @override
@@ -244,27 +322,29 @@ class _Chip extends StatelessWidget {
     return GestureDetector(
       onTap: onTap,
       child: AnimatedContainer(
-        duration: const Duration(milliseconds: 150),
-        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+        duration: const Duration(milliseconds: 130),
+        padding: const EdgeInsets.symmetric(horizontal: 13, vertical: 7),
         decoration: BoxDecoration(
-          color: seleccionado ? color : Colors.white,
+          color:  seleccionado ? color : Colors.transparent,
           borderRadius: BorderRadius.circular(20),
           border: Border.all(
-            color: seleccionado ? color : const Color(0xFFE5E7EB),
+            color: seleccionado ? color : ColoresApp.border,
           ),
         ),
         child: Text(
           label,
           style: TextStyle(
-            fontSize: 13,
+            fontSize: 12,
             fontWeight: FontWeight.w600,
-            color: seleccionado ? Colors.white : const Color(0xFF6B7280),
+            color: seleccionado ? Colors.white : ColoresApp.textMedium,
           ),
         ),
       ),
     );
   }
 }
+
+// ── Lista de facturas ─────────────────────────────────────────────────────────
 
 class _ListaFacturas extends StatelessWidget {
   const _ListaFacturas({
@@ -273,9 +353,9 @@ class _ListaFacturas extends StatelessWidget {
     required this.onEliminar,
   });
 
-  final List<FacturaResumen> facturas;
-  final ValueChanged<FacturaResumen> onTap;
-  final ValueChanged<FacturaResumen> onEliminar;
+  final List<FacturaResumen>          facturas;
+  final ValueChanged<FacturaResumen>  onTap;
+  final ValueChanged<FacturaResumen>  onEliminar;
 
   @override
   Widget build(BuildContext context) {
@@ -285,9 +365,9 @@ class _ListaFacturas extends StatelessWidget {
       itemBuilder: (_, i) {
         final f = facturas[i];
         return FacturaFilaWidget(
-          key: ValueKey(f.id),
-          factura: f,
-          onTap: () => onTap(f),
+          key:       ValueKey(f.id),
+          factura:   f,
+          onTap:     () => onTap(f),
           onEliminar: () => onEliminar(f),
         );
       },

@@ -1,0 +1,262 @@
+import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:inventario_k1/frontend/share/temas/colores_app.dart';
+import 'package:inventario_k1/frontend/share/widgets/output/snack_bar_mensaje.dart';
+
+import '../../../../../backend/features/reservas/enum/enum_reserva.dart';
+import '../../provider/reservas_provider.dart';
+
+class FormAbonoInlineWidget extends ConsumerStatefulWidget {
+  const FormAbonoInlineWidget({
+    super.key,
+    required this.reservaId,
+    required this.saldo,
+  });
+
+  final int reservaId;
+  final int saldo;
+
+  @override
+  ConsumerState<FormAbonoInlineWidget> createState() =>
+      _FormAbonoInlineWidgetState();
+}
+
+class _FormAbonoInlineWidgetState
+    extends ConsumerState<FormAbonoInlineWidget> {
+  final _montoCtrl = TextEditingController();
+  final _refCtrl = TextEditingController();
+  String _metodoPago = kMetodosPago.first;
+  bool _guardando = false;
+
+  @override
+  void dispose() {
+    _montoCtrl.dispose();
+    _refCtrl.dispose();
+    super.dispose();
+  }
+
+  Future<void> _guardar() async {
+    final monto = int.tryParse(_montoCtrl.text.replaceAll('.', '')) ?? 0;
+    if (monto <= 0) {
+      SnackBarMensaje.error(context, 'Ingresa un monto válido.');
+      return;
+    }
+    if (monto > widget.saldo) {
+      SnackBarMensaje.error(
+        context,
+        'El abono no puede superar el saldo pendiente.',
+      );
+      return;
+    }
+    setState(() => _guardando = true);
+    final error = await ref.read(reservasProvider.notifier).registrarAbono(
+          reservaId: widget.reservaId,
+          monto: monto,
+          metodoPago: _metodoPago,
+          referenciaPago: _refCtrl.text.trim().isEmpty ? null : _refCtrl.text.trim(),
+        );
+    if (!mounted) return;
+    setState(() => _guardando = false);
+    if (error != null) {
+      SnackBarMensaje.error(context, error);
+    } else {
+      SnackBarMensaje.success(context, 'Abono registrado correctamente.');
+      _montoCtrl.clear();
+      _refCtrl.clear();
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return AnimatedContainer(
+      duration: const Duration(milliseconds: 200),
+      margin: const EdgeInsets.only(bottom: 14),
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        color: ColoresApp.primaryLight,
+        borderRadius: BorderRadius.circular(10),
+        border: Border.all(color: ColoresApp.primary.withValues(alpha: 0.4)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Text(
+            'NUEVO ABONO',
+            style: TextStyle(
+              fontSize: 10,
+              fontWeight: FontWeight.w800,
+              color: ColoresApp.primary,
+              letterSpacing: 0.6,
+            ),
+          ),
+          const SizedBox(height: 10),
+          Row(
+            children: [
+              Expanded(child: _CampoMonto(controller: _montoCtrl)),
+              const SizedBox(width: 10),
+              Expanded(child: _SelectorMetodo(
+                valor: _metodoPago,
+                onCambio: (v) => setState(() => _metodoPago = v!),
+              )),
+              const SizedBox(width: 10),
+              Expanded(child: _CampoReferencia(controller: _refCtrl)),
+            ],
+          ),
+          const SizedBox(height: 10),
+          Row(
+            mainAxisAlignment: MainAxisAlignment.end,
+            children: [
+              OutlinedButton(
+                onPressed: () =>
+                    ref.read(reservasProvider.notifier).toggleFormAbono(),
+                style: OutlinedButton.styleFrom(
+                  foregroundColor: ColoresApp.textMedium,
+                  side: const BorderSide(color: ColoresApp.border),
+                  padding: const EdgeInsets.symmetric(
+                      horizontal: 14, vertical: 9),
+                  shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(8)),
+                ),
+                child: const Text('Cancelar',
+                    style: TextStyle(fontSize: 12.5)),
+              ),
+              const SizedBox(width: 8),
+              ElevatedButton.icon(
+                onPressed: _guardando ? null : _guardar,
+                icon: _guardando
+                    ? const SizedBox(
+                        width: 13,
+                        height: 13,
+                        child: CircularProgressIndicator(
+                            strokeWidth: 2, color: Colors.white),
+                      )
+                    : const Icon(Icons.check_circle_outline_rounded, size: 15),
+                label: const Text('Guardar abono',
+                    style: TextStyle(fontSize: 12.5)),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: ColoresApp.statusPaid,
+                  foregroundColor: Colors.white,
+                  elevation: 0,
+                  padding: const EdgeInsets.symmetric(
+                      horizontal: 14, vertical: 9),
+                  shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(8)),
+                ),
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _CampoMonto extends StatelessWidget {
+  const _CampoMonto({required this.controller});
+
+  final TextEditingController controller;
+
+  @override
+  Widget build(BuildContext context) {
+    return _CampoFormAbono(
+      label: 'Monto *',
+      child: TextField(
+        controller: controller,
+        keyboardType: TextInputType.number,
+        style: const TextStyle(fontSize: 13, color: ColoresApp.textDark),
+        decoration: _decor(hint: '0'),
+      ),
+    );
+  }
+}
+
+class _SelectorMetodo extends StatelessWidget {
+  const _SelectorMetodo({required this.valor, required this.onCambio});
+
+  final String valor;
+  final ValueChanged<String?> onCambio;
+
+  @override
+  Widget build(BuildContext context) {
+    return _CampoFormAbono(
+      label: 'Método',
+      child: DropdownButtonFormField<String>(
+        initialValue: valor,
+        onChanged: onCambio,
+        style: const TextStyle(fontSize: 13, color: ColoresApp.textDark),
+        decoration: _decor(),
+        items: kMetodosPago
+            .map((m) => DropdownMenuItem(value: m, child: Text(m)))
+            .toList(),
+      ),
+    );
+  }
+}
+
+class _CampoReferencia extends StatelessWidget {
+  const _CampoReferencia({required this.controller});
+
+  final TextEditingController controller;
+
+  @override
+  Widget build(BuildContext context) {
+    return _CampoFormAbono(
+      label: 'Referencia (opc.)',
+      child: TextField(
+        controller: controller,
+        style: const TextStyle(fontSize: 13, color: ColoresApp.textDark),
+        decoration: _decor(hint: 'Nro. transacción…'),
+      ),
+    );
+  }
+}
+
+class _CampoFormAbono extends StatelessWidget {
+  const _CampoFormAbono({required this.label, required this.child});
+
+  final String label;
+  final Widget child;
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          label.toUpperCase(),
+          style: const TextStyle(
+            fontSize: 9,
+            fontWeight: FontWeight.w700,
+            color: ColoresApp.textMedium,
+            letterSpacing: 0.5,
+          ),
+        ),
+        const SizedBox(height: 4),
+        child,
+      ],
+    );
+  }
+}
+
+InputDecoration _decor({String? hint}) {
+  return InputDecoration(
+    hintText: hint,
+    hintStyle: const TextStyle(color: ColoresApp.textLight, fontSize: 13),
+    filled: true,
+    fillColor: ColoresApp.bgCard,
+    contentPadding:
+        const EdgeInsets.symmetric(horizontal: 10, vertical: 9),
+    border: OutlineInputBorder(
+      borderRadius: BorderRadius.circular(8),
+      borderSide: const BorderSide(color: ColoresApp.border),
+    ),
+    enabledBorder: OutlineInputBorder(
+      borderRadius: BorderRadius.circular(8),
+      borderSide: const BorderSide(color: ColoresApp.border),
+    ),
+    focusedBorder: OutlineInputBorder(
+      borderRadius: BorderRadius.circular(8),
+      borderSide: const BorderSide(color: ColoresApp.primary, width: 1.5),
+    ),
+  );
+}

@@ -66,7 +66,6 @@ class _DialogoCrearFacturaState extends ConsumerState<DialogoCrearFactura> {
   late MetodoPago _metodoPago;
   late EstadoPago _estadoPago;
   late TipoVenta _tipo;
-  late final TextEditingController _ivaCtrl;
   late final TextEditingController _descuentoCtrl;
   bool _guardando = false;
   bool _clientePreseleccionado = false;
@@ -80,22 +79,15 @@ class _DialogoCrearFacturaState extends ConsumerState<DialogoCrearFactura> {
     _metodoPago = f?.metodoPago ?? ex?.metodoPago ?? MetodoPago.efectivo;
     _estadoPago = f?.estadoPago ?? ex?.estadoPago ?? EstadoPago.pendiente;
     _tipo       = f?.tipo ?? widget.tipoFijo ?? TipoVenta.servicio;
-    _ivaCtrl = TextEditingController(
-      text: f != null
-          ? f.iva.toStringAsFixed(0)
-          : ex != null
-              ? ex.iva.toStringAsFixed(0)
-              : '0',
-    );
+    final descuentoInicial = f?.descuento ?? widget.facturaExistente?.descuento ?? 0;
     _descuentoCtrl = TextEditingController(
-      text: f != null ? f.descuento.toStringAsFixed(0) : '0',
+      text: descuentoInicial.toStringAsFixed(0),
     );
   }
 
   @override
   void dispose() {
     _clienteNotifier.dispose();
-    _ivaCtrl.dispose();
     _descuentoCtrl.dispose();
     super.dispose();
   }
@@ -105,7 +97,7 @@ class _DialogoCrearFacturaState extends ConsumerState<DialogoCrearFactura> {
     setState(() => _guardando = true);
 
     final notifier   = ref.read(facturasProvider.notifier);
-    final iva        = double.tryParse(_ivaCtrl.text.trim()) ?? 0;
+    const iva        = 0.0; // IVA se recalcula al agregar ítems en el detalle
     final descuento  = double.tryParse(_descuentoCtrl.text.trim()) ?? 0;
     String? error;
 
@@ -123,9 +115,11 @@ class _DialogoCrearFacturaState extends ConsumerState<DialogoCrearFactura> {
       error = await notifier.actualizarDesdeOrden(
         facturaId:  widget.facturaExistente!.id,
         ordenId:    widget.ordenId!,
+        clienteId:  _clienteNotifier.value?.id,
         metodoPago: _metodoPago,
         estadoPago: _estadoPago,
         iva:        iva,
+        descuento:  descuento,
       );
     } else if (widget.esDesdeOrden) {
       error = await notifier.crearDesdeOrden(
@@ -165,13 +159,19 @@ class _DialogoCrearFacturaState extends ConsumerState<DialogoCrearFactura> {
   Widget build(BuildContext context) {
     final clientes = ref.watch(clientesProvider).value?.filtrados ?? const [];
 
-    if (widget.esEdicion && !_clientePreseleccionado && clientes.isNotEmpty) {
-      final clienteId = widget.facturaAEditar!.clienteId;
-      if (clienteId != null) {
-        final encontrado = clientes.where((c) => c.id == clienteId).firstOrNull;
-        if (encontrado != null) _clienteNotifier.value = encontrado;
-      }
+    if (!_clientePreseleccionado && clientes.isNotEmpty) {
       _clientePreseleccionado = true;
+      final targetId = widget.esEdicion
+          ? widget.facturaAEditar!.clienteId
+          : (widget.facturaExistente != null ? widget.clienteId : null);
+      if (targetId != null) {
+        final found = clientes.where((c) => c.id == targetId).firstOrNull;
+        if (found != null) {
+          WidgetsBinding.instance.addPostFrameCallback((_) {
+            if (mounted) _clienteNotifier.value = found;
+          });
+        }
+      }
     }
 
     return Dialog(
@@ -194,7 +194,7 @@ class _DialogoCrearFacturaState extends ConsumerState<DialogoCrearFactura> {
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      if (!widget.esEdicion && widget.esDesdeOrden) ...[
+                      if (!widget.esEdicion && widget.esDesdeOrden && widget.facturaExistente == null) ...[
                         _label('Cliente'),
                         const SizedBox(height: 6),
                         Container(
@@ -293,7 +293,7 @@ class _DialogoCrearFacturaState extends ConsumerState<DialogoCrearFactura> {
                         ),
                         const SizedBox(height: 16),
                       ],
-                      if (!widget.esDesdeOrden) ...[
+                      if (!widget.esDesdeOrden || widget.facturaExistente != null) ...[
                         _label('Cliente (opcional)'),
                         const SizedBox(height: 6),
                         AppSearch<Cliente>(
@@ -323,24 +323,6 @@ class _DialogoCrearFacturaState extends ConsumerState<DialogoCrearFactura> {
                         seleccionado: _estadoPago,
                         labelOf: (e) => e.etiqueta,
                         onTap: (e) => setState(() => _estadoPago = e),
-                      ),
-                      const SizedBox(height: 16),
-
-                      _label('IVA (valor en \$)'),
-                      const SizedBox(height: 6),
-                      TextFormField(
-                        controller: _ivaCtrl,
-                        keyboardType: const TextInputType.numberWithOptions(decimal: true),
-                        inputFormatters: [
-                          FilteringTextInputFormatter.allow(RegExp(r'^\d+\.?\d{0,2}')),
-                        ],
-                        decoration: _inputDeco('0'),
-                        validator: (v) {
-                          if (v != null && v.isNotEmpty) {
-                            if (double.tryParse(v.trim()) == null) return 'Valor inválido.';
-                          }
-                          return null;
-                        },
                       ),
                       const SizedBox(height: 16),
 

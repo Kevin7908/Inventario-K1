@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../../../backend/features/ventas/ordenes/enum/enum_ordenes.dart';
+import '../../../../share/temas/colores_app.dart';
 import '../../../../share/widgets/dialogos/dialogo_confirmar_eliminar_widget.dart';
 import '../../../../share/widgets/output/estado_error_widget.dart';
 import '../../../../share/widgets/output/snack_bar_mensaje.dart';
@@ -15,33 +16,52 @@ import 'widgets/detalle_top_bar.dart';
 import 'widgets/panel_busqueda_inventario.dart';
 import 'widgets/resumen_orden_panel.dart';
 
-// Punto de entrada público — carga el detalle y gestiona los estados async.
+/// Vista de detalle de una orden.
+///
+/// [onVolver] es opcional:
+/// - Si se provee, se usa en lugar de Navigator.pop (modo inline master-detail).
+/// - Si es null, usa Navigator.pop (modo página completa).
 class OrdenDetalleVista extends ConsumerWidget {
-  const OrdenDetalleVista({super.key, required this.ordenId});
-  final int ordenId;
+  const OrdenDetalleVista({
+    super.key,
+    required this.ordenId,
+    this.onVolver,
+  });
+
+  final int          ordenId;
+  final VoidCallback? onVolver;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final detalleAsync = ref.watch(ordenDetalleProvider(ordenId));
 
-    return Scaffold(
-      backgroundColor: const Color(0xFFF0F2F5),
-      body: detalleAsync.when(
+    return ColoredBox(
+      color: ColoresApp.bgContent,
+      child: detalleAsync.when(
         loading: () => const Center(child: CircularProgressIndicator()),
         error: (e, _) => EstadoErrorWidget(
           mensaje: e.toString(),
           alReintentar: () => ref.invalidate(ordenDetalleProvider(ordenId)),
         ),
-        data: (_) => _ContenidoDetalle(ordenId: ordenId),
+        data: (_) => _ContenidoDetalle(
+          ordenId:  ordenId,
+          onVolver: onVolver ?? () => Navigator.of(context).pop(),
+        ),
       ),
     );
   }
 }
 
-// Layout principal: top-bar + dos columnas. Privado a este archivo.
+// ── Layout principal ──────────────────────────────────────────────────────────
+
 class _ContenidoDetalle extends ConsumerWidget {
-  const _ContenidoDetalle({required this.ordenId});
-  final int ordenId;
+  const _ContenidoDetalle({
+    required this.ordenId,
+    required this.onVolver,
+  });
+
+  final int          ordenId;
+  final VoidCallback onVolver;
 
   Future<void> _cambiarEstado(
       BuildContext context, WidgetRef ref, EstadoOrden nuevo) async {
@@ -50,10 +70,10 @@ class _ContenidoDetalle extends ConsumerWidget {
 
     final error = await ref.read(ordenesProvider.notifier).actualizarOrden(
           detalle.id,
-          estado:              nuevo,
-          kilometrajeEntrada:  detalle.kilometrajeEntrada,
-          diagnostico:         detalle.diagnosticoCliente,
-          observaciones:       detalle.observacionesMecanico,
+          estado:             nuevo,
+          kilometrajeEntrada: detalle.kilometrajeEntrada,
+          diagnostico:        detalle.diagnosticoCliente,
+          observaciones:      detalle.observacionesMecanico,
         );
 
     if (!context.mounted) return;
@@ -79,7 +99,7 @@ class _ContenidoDetalle extends ConsumerWidget {
         if (error != null) {
           SnackBarMensaje.error(context, error);
         } else {
-          Navigator.of(context).pop();
+          onVolver();
           SnackBarMensaje.success(context, 'Orden eliminada.');
         }
       },
@@ -88,7 +108,6 @@ class _ContenidoDetalle extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    // Leemos una sola vez para pasar al diálogo de edición
     final detalle = ref.watch(ordenDetalleProvider(ordenId)).value;
     if (detalle == null) return const SizedBox.shrink();
 
@@ -96,14 +115,11 @@ class _ContenidoDetalle extends ConsumerWidget {
       children: [
         DetalleTopBar(
           ordenId:         ordenId,
-          onVolver:        () => Navigator.of(context).pop(),
+          onVolver:        onVolver,
           onCambiarEstado: (nuevo) => _cambiarEstado(context, ref, nuevo),
           onEditar: () async {
-            await DialogoCrearEditarOrden.mostrar(
-                context, ordenAEditar: detalle);
-            if (context.mounted) {
-              ref.invalidate(ordenDetalleProvider(ordenId));
-            }
+            await DialogoCrearEditarOrden.mostrar(context, ordenAEditar: detalle);
+            if (context.mounted) ref.invalidate(ordenDetalleProvider(ordenId));
           },
           onEliminar: () => _confirmarEliminar(context, ref),
         ),
@@ -111,7 +127,6 @@ class _ContenidoDetalle extends ConsumerWidget {
           child: Row(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              // Columna izquierda — scrollable
               Expanded(
                 child: SingleChildScrollView(
                   padding: const EdgeInsets.all(20),
@@ -132,7 +147,6 @@ class _ContenidoDetalle extends ConsumerWidget {
                   ),
                 ),
               ),
-              // Panel lateral fijo
               SizedBox(
                 width: 320,
                 child: ResumenOrdenPanel(ordenId: ordenId),

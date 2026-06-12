@@ -66,7 +66,7 @@ class ItemSeleccionadoWidget extends StatelessWidget {
                 child: const Icon(
                   Icons.delete_outline_rounded,
                   size: 16,
-                  color: ColoresApp.textLight,
+                  color: ColoresApp.accentRed,
                 ),
               ),
             ],
