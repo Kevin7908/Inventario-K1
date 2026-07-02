@@ -26,7 +26,6 @@ class LayoutPrincipal extends StatefulWidget {
 }
 
 class _LayoutPrincipalState extends State<LayoutPrincipal> {
-  bool _sidebarExpandido = true;
   int _indiceActivo = 0;
 
   // Orden paralelo al IndexedStack — si se agrega una vista, va en ambos lugares
@@ -175,89 +174,30 @@ class _LayoutPrincipalState extends State<LayoutPrincipal> {
       backgroundColor: ColoresApp.bgApp,
       body: Row(
         children: [
-          // ── Sidebar con animación de colapso ──────────────────────────────
-          ClipRect(
-            child: AnimatedContainer(
-              duration: const Duration(milliseconds: 220),
-              curve: Curves.easeInOut,
-              width: _sidebarExpandido ? 240.0 : 0.0,
-              child: OverflowBox(
-                maxWidth: 240,
-                alignment: Alignment.centerLeft,
-                child: SizedBox(
-                  width: 240,
-                  child: BarraLateral(
-                    secciones: _secciones,
-                    itemsInferiores: _itemsInferiores,
-                    rutaActiva: _rutaActiva,
-                  ),
-                ),
-              ),
-            ),
+          BarraLateral(
+            secciones: _secciones,
+            itemsInferiores: _itemsInferiores,
+            rutaActiva: _rutaActiva,
           ),
-
-          // ── Área de contenido ─────────────────────────────────────────────
           Expanded(
-            child: Column(
-              children: [
-                _TopBar(
-                  sidebarExpandido: _sidebarExpandido,
-                  alToggle: () => setState(
-                    () => _sidebarExpandido = !_sidebarExpandido,
-                  ),
-                ),
-                const Divider(height: 1, thickness: 1, color: ColoresApp.border),
-                Expanded(
-                  child: IndexedStack(
-                    index: _indiceActivo,
-                    children: const [
-                      _PlaceholderVista(etiqueta: 'Dashboard'),
-                      VentasVista(),
-                      ProductosVista(),
-                      CategoriasVista(),
-                      UnidadesMedidaVista(),
-                      ProveedoresVista(),
-                      MotosVista(),
-                      CotizacionesVista(),
-                      ReservasVista(),
-                      TecnicosVista(),
-                      EspecializacionesVista(),
-                      ClientesVista(),
-                      DeudoresVista(),
-                    ],
-                  ),
-                ),
+            child: IndexedStack(
+              index: _indiceActivo,
+              children: const [
+                _PlaceholderVista(etiqueta: 'Dashboard'),
+                VentasVista(),
+                ProductosVista(),
+                CategoriasVista(),
+                UnidadesMedidaVista(),
+                ProveedoresVista(),
+                MotosVista(),
+                CotizacionesVista(),
+                ReservasVista(),
+                TecnicosVista(),
+                EspecializacionesVista(),
+                ClientesVista(),
+                DeudoresVista(),
               ],
             ),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-class _TopBar extends StatelessWidget {
-  const _TopBar({required this.sidebarExpandido, required this.alToggle});
-
-  final bool sidebarExpandido;
-  final VoidCallback alToggle;
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      height: 52,
-      color: ColoresApp.bgCard,
-      padding: const EdgeInsets.symmetric(horizontal: 8),
-      child: Row(
-        children: [
-          IconButton(
-            tooltip: sidebarExpandido ? 'Ocultar menú' : 'Mostrar menú',
-            icon: Icon(
-              sidebarExpandido ? Icons.menu_open_rounded : Icons.menu_rounded,
-              size: 20,
-              color: ColoresApp.textSecondary,
-            ),
-            onPressed: alToggle,
           ),
         ],
       ),
