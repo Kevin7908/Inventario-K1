@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:inventario_k1/frontend/share/nav/navegacion.dart';
-import 'package:inventario_k1/frontend/share/temas/colores_app.dart';
+import 'package:inventario_k1/frontend/layout/layout_principal.dart';
+import 'package:inventario_k1/frontend/share2/temas/colores_app.dart';
 
 import 'backend/share/database/locator.dart';
 
@@ -26,12 +26,12 @@ class MainApp extends StatelessWidget {
       title: 'InventarioK1',
       debugShowCheckedModeBanner: false,
       theme: ThemeData(
-        colorScheme: ColorScheme.fromSeed(seedColor: ColoresApp.primary),
-        fontFamily: 'Inter',
-        scaffoldBackgroundColor: ColoresApp.bgContent,
+        colorScheme: ColorScheme.fromSeed(seedColor: ColoresApp.goGreen),
+        fontFamily: 'GeneralSans',
+        scaffoldBackgroundColor: ColoresApp.bgApp,
         useMaterial3: true,
       ),
-      home: const Navegacion(),
+      home: const LayoutPrincipal(),
     );
   }
 }
