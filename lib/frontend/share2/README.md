@@ -74,12 +74,24 @@ share2/
 │   ├── contenedor_modal.dart
 │   └── cards.dart
 │
-└── feedback/                       ← respuesta visual al usuario
-    ├── snackbar_app.dart
-    ├── loader_pantalla.dart
-    ├── dialogo_confirmacion.dart
-    ├── indicador_estado.dart
-    └── feedback.dart
+├── feedback/                       ← respuesta visual al usuario
+│   ├── badge_contador.dart
+│   ├── snackbar_app.dart
+│   ├── loader_pantalla.dart
+│   ├── dialogo_confirmacion.dart
+│   ├── indicador_estado.dart
+│   └── feedback.dart
+│
+└── nav/                            ← navegación principal
+    ├── logo_sidebar.dart
+    ├── seccion_nav.dart
+    ├── item_nav.dart
+    ├── separador_nav.dart
+    ├── barra_lateral.dart
+    ├── item_nav_dato.dart
+    ├── seccion_nav_dato.dart
+    ├── README.md
+    └── nav.dart
 ```
 
 ---
@@ -148,9 +160,24 @@ Widgets para agrupar y presentar información con estilos consistentes.
 | `SnackbarApp` | Notificaciones temporales (éxito, error, advertencia) |
 | `LoaderPantalla` | Overlay de carga mientras una operación está en curso |
 | `DialogoConfirmacion` | Pide confirmación antes de una acción irreversible |
+| `BadgeContador` | Círculo con número para conteos (notificaciones, ítems pendientes) |
 | `IndicadorEstado` | Badge/chip de color para mostrar un estado (Pagado, Pendiente, Anulado) |
 
 Todos los módulos deben usar estos widgets para feedback en lugar de implementar sus propios snackbars o loaders.
+
+---
+
+### `nav/` — Navegación principal
+
+Widgets para el sidebar de navegación de la aplicación. Ver [`nav/README.md`](nav/README.md) para ejemplos de uso completos.
+
+| Widget | Cuándo usarlo |
+|---|---|
+| `BarraLateral` | Sidebar completo con logo, secciones e ítems de pie |
+| `LogoSidebar` | Encabezado del sidebar con símbolo K1 y nombre de empresa |
+| `SeccionNav` | Etiqueta de grupo (PRINCIPAL, INVENTARIO, TALLER…) |
+| `ItemNav` | Fila de navegación: ícono + texto + estado activo + badge |
+| `SeparadorNav` | Línea divisora entre nav principal e ítems de pie |
 
 ---
 
