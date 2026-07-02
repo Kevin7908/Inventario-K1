@@ -1,9 +1,10 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_svg/flutter_svg.dart';
 
 import '../temas/colores_app.dart';
 import '../temas/tipografia_app.dart';
 
-/// Encabezado del sidebar con el símbolo K1, nombre de empresa y subtítulo.
+/// Encabezado del sidebar con el logo SVG de K1, nombre de empresa y subtítulo.
 ///
 /// Parámetros:
 /// - [nombreEmpresa]: nombre principal mostrado en negrita.
@@ -30,7 +31,11 @@ class LogoSidebar extends StatelessWidget {
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 20),
       child: Row(
         children: [
-          _SimboloK1(),
+          SvgPicture.asset(
+            'assets/images/logo-k1.svg',
+            width: 40,
+            height: 40,
+          ),
           const SizedBox(width: 10),
           Column(
             crossAxisAlignment: CrossAxisAlignment.start,
@@ -57,25 +62,3 @@ class LogoSidebar extends StatelessWidget {
   }
 }
 
-class _SimboloK1 extends StatelessWidget {
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      width: 40,
-      height: 40,
-      decoration: BoxDecoration(
-        color: ColoresApp.goGreen,
-        borderRadius: BorderRadius.circular(8),
-      ),
-      alignment: Alignment.center,
-      child: Text(
-        'K1',
-        style: TipografiaApp.cuerpoMedium.copyWith(
-          color: ColoresApp.textOnPrimary,
-          fontWeight: FontWeight.w700,
-          fontSize: 15,
-        ),
-      ),
-    );
-  }
-}
