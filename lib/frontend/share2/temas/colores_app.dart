@@ -1,14 +1,14 @@
 import 'package:flutter/material.dart';
 
 class ColoresApp {
-  static const Color goGreen        = Color(0xFF01B763); // primario – acciones, botones
+  static const Color goGreen        = Color(0xFF00E383); // primario – acciones, botones
   static const Color castletonGreen = Color(0xFF005B31); // primario oscuro – hover, sidebar
   static const Color blackChocolate = Color(0xFF1E4C3C); // fondo oscuro, contraste
 
   static const Color bgApp          = Color(0xFFF4F6FA); // fondo general de la app
   static const Color bgCard         = Color(0xFFFFFFFF); // tarjetas y paneles
   static const Color bgCardHover    = Color(0xFFF8FAF9); // hover sobre tarjeta
-  static const Color bgSidebar      = Color(0xFF1B2B1F); // sidebar – verde oscuro profundo
+  static const Color bgSidebar      = Color(0xFF11221B); // sidebar – verde oscuro profundo
   static const Color bgInput        = Color(0xFFFFFFFF); // fondo de inputs
 
   static const Color textPrimary    = Color(0xFF1E2330); // títulos y cuerpo
