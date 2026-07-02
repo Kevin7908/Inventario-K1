@@ -6,14 +6,36 @@ Widgets para comunicar el resultado de las acciones del usuario. **Todos los mó
 
 ---
 
-## Widgets previstos
+## Widgets
 
 | Widget | Archivo | Estado |
 |---|---|---|
+| `BadgeContador` | `badge_contador.dart` | Implementado |
 | `SnackbarApp` | `snackbar_app.dart` | Pendiente |
 | `LoaderPantalla` | `loader_pantalla.dart` | Pendiente |
 | `DialogoConfirmacion` | `dialogo_confirmacion.dart` | Pendiente |
 | `IndicadorEstado` | `indicador_estado.dart` | Pendiente |
+
+---
+
+## `BadgeContador`
+
+Badge circular con número. Se usa cuando un ítem tiene conteos pendientes visibles (órdenes, notificaciones, mensajes).
+
+```dart
+// Badge rojo por defecto
+BadgeContador(cantidad: 5)
+
+// Badge con color personalizado
+BadgeContador(cantidad: 12, color: ColoresApp.statusWarning)
+
+// No renderiza nada si cantidad es 0
+BadgeContador(cantidad: 0) // → SizedBox.shrink()
+```
+
+Parámetros:
+- `cantidad` (int, requerido) — número a mostrar. Muestra `99+` si supera 99.
+- `color` (Color, opcional) — fondo del badge. Por defecto `ColoresApp.statusDanger`.
 
 ---
 

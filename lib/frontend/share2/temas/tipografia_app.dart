@@ -5,10 +5,8 @@ import 'colores_app.dart';
 /// Fuente: General Sans  (SemiBold · Medium · Regular)
 /// Para que funcione, agrégala en pubspec.yaml bajo flutter > fonts.
 class TipografiaApp {
-  // ─── Familia ────────────────────────────────────────────────────────────────
   static const String _familia = 'GeneralSans';
 
-  // ─── Tamaños base (cambia aquí y aplica en toda la app) ─────────────────────
   static const double _tamHeading1   = 28;
   static const double _tamHeading2   = 22;
   static const double _tamHeading3   = 18;
@@ -16,8 +14,6 @@ class TipografiaApp {
   static const double _tamCuerpo     = 14;
   static const double _tamCaption    = 12;
   static const double _tamOverline   = 11;
-
-  // ─── Estilos de texto ───────────────────────────────────────────────────────
 
   /// Título de pantalla / sección principal
   static const TextStyle heading1 = TextStyle(
@@ -91,8 +87,6 @@ class TipografiaApp {
     letterSpacing:   0.5,
     height:          1.3,
   );
-
-  // ─── Variantes de color ──────────────────────────────────────────────────────
 
   /// Cualquier estilo base sobre fondo primario (sidebar, botones)
   static TextStyle sobrePrimario(TextStyle base) =>
