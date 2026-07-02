@@ -79,3 +79,6 @@ app.*.map.json
 extract.py
 project_dump.md
 contexto_app.md
+
+# Documentación interna (no sube al repo)
+GIT_FLOW.md
