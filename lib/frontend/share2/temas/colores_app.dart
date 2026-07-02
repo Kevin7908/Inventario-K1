@@ -8,7 +8,7 @@ class ColoresApp {
   static const Color bgApp          = Color(0xFFF4F6FA); // fondo general de la app
   static const Color bgCard         = Color(0xFFFFFFFF); // tarjetas y paneles
   static const Color bgCardHover    = Color(0xFFF8FAF9); // hover sobre tarjeta
-  static const Color bgSidebar      = Color(0xFF005B31); // sidebar (castletonGreen)
+  static const Color bgSidebar      = Color(0xFF1B2B1F); // sidebar – verde oscuro profundo
   static const Color bgInput        = Color(0xFFFFFFFF); // fondo de inputs
 
   static const Color textPrimary    = Color(0xFF1E2330); // títulos y cuerpo
@@ -20,7 +20,7 @@ class ColoresApp {
 
   static const Color border         = Color(0xFFE5E7EB);
   static const Color borderFocus    = Color(0xFF01B763); // borde de input enfocado
-  static const Color borderSidebar  = Color(0xFF006B3A);
+  static const Color borderSidebar  = Color(0xFF253B2B); // separador dentro del sidebar
 
   static const Color statusSuccess     = Color(0xFF01B763);
   static const Color statusSuccessBg   = Color(0xFFD1FAE5);
