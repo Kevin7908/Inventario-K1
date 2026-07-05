@@ -45,6 +45,17 @@ share2/
 │   ├── tipografia_app.dart
 │   └── README.md
 │
+├── encabezados/                    ← título y subtítulo de cada pantalla
+│   ├── encabezado_pagina.dart
+│   ├── README.md
+│   └── encabezados.dart
+│
+├── navegacion_secundaria/          ← pestañas dentro de una pantalla
+│   ├── barra_tabs_secundaria.dart
+│   ├── tab_secundaria_dato.dart
+│   ├── README.md
+│   └── navegacion_secundaria.dart
+│
 ├── botones/                        ← acciones del usuario
 │   ├── boton_primario.dart
 │   ├── boton_secundario.dart
@@ -178,6 +189,26 @@ Widgets para el sidebar de navegación de la aplicación. Ver [`nav/README.md`](
 | `SeccionNav` | Etiqueta de grupo (PRINCIPAL, INVENTARIO, TALLER…) |
 | `ItemNav` | Fila de navegación: ícono + texto + estado activo + badge |
 | `SeparadorNav` | Línea divisora entre nav principal e ítems de pie |
+
+---
+
+### `encabezados/` — Encabezados de pantalla
+
+Bloque de título y subtítulo que va en la parte superior de cada pantalla. Ver [`encabezados/README.md`](encabezados/README.md).
+
+| Widget | Cuándo usarlo |
+|---|---|
+| `EncabezadoPagina` | Título + subtítulo de una pantalla (ej. "Configuración" / "Ajustes generales del negocio y catálogos base") |
+
+---
+
+### `navegacion_secundaria/` — Pestañas dentro de una pantalla
+
+Navegación entre secciones de contenido dentro de una misma pantalla (distinta del sidebar). Ver [`navegacion_secundaria/README.md`](navegacion_secundaria/README.md).
+
+| Widget | Cuándo usarlo |
+|---|---|
+| `BarraTabsSecundaria` | Grupo de pestañas para alternar entre bloques de contenido de una pantalla (ej. General / Unidades de medida / Especializaciones / Servicios) |
 
 ---
 
