@@ -10,11 +10,41 @@ Widgets para mostrar listas y colecciones de datos en formato tabular. El widget
 
 | Widget | Archivo | Estado |
 |---|---|---|
-| `TablaGenerica` | `tabla_generica.dart` | Pendiente |
-| `ColumnaTabla` | `columna_tabla.dart` | Pendiente |
-| `FilaTabla` | `fila_tabla.dart` | Pendiente |
+| `TablaGenerica` | `tabla_generica.dart` | Implementado |
+| `ColumnaTabla` | `columna_tabla.dart` | Implementado |
+| `FilaTabla` | `fila_tabla.dart` | Implementado |
 | `PaginacionWidget` | `paginacion_widget.dart` | Pendiente |
 | `EstadoVacioWidget` | `estado_vacio_widget.dart` | Pendiente |
+
+---
+
+## Cómo usar TablaGenerica
+
+```dart
+TablaGenerica<UnidadMedida>(
+  items: unidades,
+  columnas: [
+    ColumnaTabla(
+      titulo: 'Unidad',
+      flex: 2,
+      constructor: (u) => Text(u.nombre, style: TipografiaApp.cuerpoMedium),
+    ),
+    ColumnaTabla(
+      titulo: 'Abreviatura',
+      constructor: (u) => Text(u.abreviatura),
+    ),
+    ColumnaTabla(
+      titulo: 'Uso típico',
+      flex: 3,
+      constructor: (u) => Text(u.descripcion ?? '—'),
+    ),
+  ],
+)
+```
+
+- El encabezado se pinta en `TipografiaApp.overline` sobre `ColoresApp.bgCard`, con un `Divider` de `ColoresApp.border` entre cada fila.
+- `FilaTabla` resalta con `ColoresApp.bgCardHover` en hover y con `ColoresApp.statusSuccessBg` cuando `seleccionada` es `true`.
+- Cada `ColumnaTabla` decide el contenido y el estilo de su celda a través de `constructor`; `TablaGenerica` solo arma la grilla.
 
 ---
 
