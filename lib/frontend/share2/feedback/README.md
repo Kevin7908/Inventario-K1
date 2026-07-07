@@ -11,9 +11,10 @@ Widgets para comunicar el resultado de las acciones del usuario. **Todos los mó
 | Widget | Archivo | Estado |
 |---|---|---|
 | `BadgeContador` | `badge_contador.dart` | Implementado |
+| `IconoNotificaciones` | `icono_notificaciones.dart` | Implementado |
 | `SnackbarApp` | `snackbar_app.dart` | Pendiente |
 | `LoaderPantalla` | `loader_pantalla.dart` | Pendiente |
-| `DialogoConfirmacion` | `dialogo_confirmacion.dart` | Pendiente |
+| `DialogoConfirmacion` | `dialogo_confirmacion.dart` | Implementado |
 | `IndicadorEstado` | `indicador_estado.dart` | Pendiente |
 
 ---
@@ -36,6 +37,46 @@ BadgeContador(cantidad: 0) // → SizedBox.shrink()
 Parámetros:
 - `cantidad` (int, requerido) — número a mostrar. Muestra `99+` si supera 99.
 - `color` (Color, opcional) — fondo del badge. Por defecto `ColoresApp.statusDanger`.
+
+---
+
+## `IconoNotificaciones`
+
+Campana con un punto rojo cuando hay notificaciones sin leer. No muestra cantidad — para eso está `BadgeContador`.
+
+```dart
+// Sin notificaciones pendientes
+IconoNotificaciones(alPresionar: () {})
+
+// Con punto rojo
+IconoNotificaciones(tieneNotificaciones: true, alPresionar: () => controlador.abrirNotificaciones())
+```
+
+Parámetros:
+- `alPresionar` (VoidCallback, requerido) — acción al tocar la campana.
+- `tieneNotificaciones` (bool, opcional) — muestra el punto rojo. Por defecto `false`.
+
+---
+
+## `DialogoConfirmacion`
+
+Pide confirmación antes de una acción irreversible (eliminar, anular). Usa `BotonDestructivo` para el botón de confirmar.
+
+```dart
+final confirmado = await DialogoConfirmacion.mostrar(
+  context,
+  titulo: '¿Eliminar "Litro"?',
+  mensaje: 'Esta acción no se puede deshacer.',
+);
+if (confirmado == true) controlador.eliminar(id);
+```
+
+Parámetros:
+- `titulo` (String, requerido) — pregunta o encabezado del diálogo.
+- `mensaje` (String?, opcional) — texto adicional debajo del título.
+- `textoConfirmar` / `textoCancelar` (String, opcional) — por defecto `'Eliminar'` / `'Cancelar'`.
+
+El método estático `mostrar` devuelve `true` si el usuario confirmó, o `null`/`false` si canceló o cerró el diálogo.
 
 ---
 

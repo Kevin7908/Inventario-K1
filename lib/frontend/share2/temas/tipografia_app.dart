@@ -19,7 +19,7 @@ class TipografiaApp {
   static const TextStyle heading1 = TextStyle(
     fontFamily: _familia,
     fontSize:   _tamHeading1,
-    fontWeight: FontWeight.w600, // SemiBold
+    fontWeight: FontWeight.w700, // Bold
     color:      ColoresApp.textPrimary,
     height:     1.2,
   );
@@ -46,7 +46,7 @@ class TipografiaApp {
   static const TextStyle subtitulo = TextStyle(
     fontFamily: _familia,
     fontSize:   _tamSubtitulo,
-    fontWeight: FontWeight.w500, // Medium
+    fontWeight: FontWeight.w600, // SemiBold
     color:      ColoresApp.textPrimary,
     height:     1.4,
   );
@@ -55,16 +55,16 @@ class TipografiaApp {
   static const TextStyle cuerpo = TextStyle(
     fontFamily: _familia,
     fontSize:   _tamCuerpo,
-    fontWeight: FontWeight.w400, // Regular
+    fontWeight: FontWeight.w500, // Medium
     color:      ColoresApp.textPrimary,
     height:     1.5,
   );
 
-  /// Cuerpo con énfasis (medium)
+  /// Cuerpo con énfasis (semibold)
   static const TextStyle cuerpoMedium = TextStyle(
     fontFamily: _familia,
     fontSize:   _tamCuerpo,
-    fontWeight: FontWeight.w500,
+    fontWeight: FontWeight.w600,
     color:      ColoresApp.textPrimary,
     height:     1.5,
   );
@@ -73,7 +73,7 @@ class TipografiaApp {
   static const TextStyle caption = TextStyle(
     fontFamily: _familia,
     fontSize:   _tamCaption,
-    fontWeight: FontWeight.w400,
+    fontWeight: FontWeight.w500,
     color:      ColoresApp.textSecondary,
     height:     1.4,
   );

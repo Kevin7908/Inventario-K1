@@ -25,7 +25,7 @@ class SeccionNav extends StatelessWidget {
       child: Text(
         titulo.toUpperCase(),
         style: TipografiaApp.overline.copyWith(
-          color: ColoresApp.textSidebar,
+          color: ColoresApp.textSidebarLabel,
           letterSpacing: 1.2,
         ),
       ),

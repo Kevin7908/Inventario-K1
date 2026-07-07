@@ -51,7 +51,7 @@ class LogoSidebar extends StatelessWidget {
               Text(
                 subtitulo,
                 style: TipografiaApp.caption.copyWith(
-                  color: ColoresApp.textSidebar,
+                  color: ColoresApp.textSidebarSecondary,
                 ),
               ),
             ],

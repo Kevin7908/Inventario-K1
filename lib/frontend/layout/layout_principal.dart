@@ -2,15 +2,14 @@ import 'package:flutter/material.dart';
 
 import '../features/categorias/vista/categorias_vistas.dart';
 import '../features/clientes/vista/cliente_vista.dart';
+import '../features/configuracion/vista/configuracion_vista.dart';
 import '../features/cotizaciones/vista/cotizaciones_vista.dart';
 import '../features/deudores/vista/deudores_vista.dart';
-import '../features/especializacion/vista/especializacion_vista.dart';
 import '../features/motos/vista/motos_vista.dart';
 import '../features/productos/vista/producto_vista.dart';
 import '../features/proveedores/vista/proveedores_vista.dart';
 import '../features/reservas/vista/reservas_vista.dart';
 import '../features/tecnicos/vista/tecnico_vista.dart';
-import '../features/unidades_medida/vista/unidad_medida_vista.dart';
 import '../features/ventas/principal/vista/venta_vista.dart';
 import '../share2/nav/barra_lateral.dart';
 import '../share2/nav/item_nav_dato.dart';
@@ -34,15 +33,14 @@ class _LayoutPrincipalState extends State<LayoutPrincipal> {
     '/venta',
     '/productos',
     '/categorias',
-    '/unidades-medida',
     '/proveedores',
     '/motos',
     '/cotizaciones',
     '/reservas',
     '/tecnicos',
-    '/especializaciones',
     '/clientes',
     '/deudores',
+    '/configuracion',
   ];
 
   String get _rutaActiva => _rutas[_indiceActivo];
@@ -86,12 +84,6 @@ class _LayoutPrincipalState extends State<LayoutPrincipal> {
               alPresionar: () => _navegar('/categorias'),
             ),
             ItemNavDato(
-              icono: Icons.straighten_outlined,
-              etiqueta: 'Unidades de medida',
-              ruta: '/unidades-medida',
-              alPresionar: () => _navegar('/unidades-medida'),
-            ),
-            ItemNavDato(
               icono: Icons.local_shipping_outlined,
               etiqueta: 'Proveedores',
               ruta: '/proveedores',
@@ -126,12 +118,6 @@ class _LayoutPrincipalState extends State<LayoutPrincipal> {
               ruta: '/tecnicos',
               alPresionar: () => _navegar('/tecnicos'),
             ),
-            ItemNavDato(
-              icono: Icons.build_outlined,
-              etiqueta: 'Especializaciones',
-              ruta: '/especializaciones',
-              alPresionar: () => _navegar('/especializaciones'),
-            ),
           ],
         ),
         SeccionNavDato(
@@ -158,7 +144,7 @@ class _LayoutPrincipalState extends State<LayoutPrincipal> {
           icono: Icons.settings_outlined,
           etiqueta: 'Configuración',
           ruta: '/configuracion',
-          alPresionar: () {},
+          alPresionar: () => _navegar('/configuracion'),
         ),
         ItemNavDato(
           icono: Icons.logout_outlined,
@@ -187,15 +173,14 @@ class _LayoutPrincipalState extends State<LayoutPrincipal> {
                 VentasVista(),
                 ProductosVista(),
                 CategoriasVista(),
-                UnidadesMedidaVista(),
                 ProveedoresVista(),
                 MotosVista(),
                 CotizacionesVista(),
                 ReservasVista(),
                 TecnicosVista(),
-                EspecializacionesVista(),
                 ClientesVista(),
                 DeudoresVista(),
+                ConfiguracionVista(),
               ],
             ),
           ),

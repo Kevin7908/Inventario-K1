@@ -12,7 +12,8 @@ import '../temas/tipografia_app.dart';
 /// - [icono]: ícono de Material a la izquierda del texto.
 /// - [etiqueta]: texto del ítem.
 /// - [alPresionar]: callback ejecutado al hacer tap.
-/// - [activo]: fondo [ColoresApp.goGreen] con texto e ícono blancos cuando es `true`.
+/// - [activo]: fondo [ColoresApp.goGreen] al 15% de opacidad, con texto e
+///   ícono en [ColoresApp.brightGreen], cuando es `true`.
 /// - [contadorBadge]: muestra un [BadgeContador] si es mayor a 0.
 ///
 /// Ejemplo:
@@ -52,12 +53,14 @@ class ItemNav extends StatelessWidget {
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
       child: Material(
-        color: activo ? ColoresApp.goGreen : Colors.transparent,
+        color: activo
+            ? ColoresApp.goGreen.withValues(alpha: 0.15)
+            : Colors.transparent,
         borderRadius: BorderRadius.circular(8),
         child: InkWell(
           onTap: alPresionar,
           borderRadius: BorderRadius.circular(8),
-          hoverColor: ColoresApp.goGreen.withValues(alpha: 0.15),
+          hoverColor: ColoresApp.goGreen.withValues(alpha: 0.08),
           child: Padding(
             padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
             child: Row(
@@ -65,7 +68,7 @@ class ItemNav extends StatelessWidget {
                 Icon(
                   icono,
                   size: 18,
-                  color: activo ? ColoresApp.textOnPrimary : ColoresApp.textSidebar,
+                  color: activo ? ColoresApp.brightGreen : ColoresApp.textSidebar,
                 ),
                 const SizedBox(width: 10),
                 Expanded(
@@ -73,7 +76,7 @@ class ItemNav extends StatelessWidget {
                     etiqueta,
                     style: activo
                         ? TipografiaApp.cuerpoMedium
-                            .copyWith(color: ColoresApp.textOnPrimary)
+                            .copyWith(color: ColoresApp.brightGreen)
                         : TipografiaApp.cuerpo
                             .copyWith(color: ColoresApp.textSidebar),
                   ),
