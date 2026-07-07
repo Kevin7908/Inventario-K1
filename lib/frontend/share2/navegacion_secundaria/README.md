@@ -12,9 +12,9 @@ Esta carpeta es distinta de [`nav/`](../nav/README.md), que cubre exclusivamente
 
 | Widget | Archivo | Estado |
 |---|---|---|
-| `BarraTabsSecundaria` | `barra_tabs_secundaria.dart` | Pendiente |
+| `BarraTabsSecundaria` | `barra_tabs_secundaria.dart` | Implementado |
 
-## Modelos de datos previstos
+## Modelos de datos
 
 | Clase | Archivo | Descripción |
 |---|---|---|
@@ -22,7 +22,7 @@ Esta carpeta es distinta de [`nav/`](../nav/README.md), que cubre exclusivamente
 
 ---
 
-## Ejemplo de uso (previsto)
+## Ejemplo de uso
 
 ```dart
 BarraTabsSecundaria(

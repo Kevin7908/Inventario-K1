@@ -11,8 +11,30 @@ Widgets para agrupar y presentar información con estilos consistentes. Se usan 
 | Widget | Archivo | Estado |
 |---|---|---|
 | `TarjetaInfo` | `tarjeta_info.dart` | Pendiente |
-| `PanelSeccion` | `panel_seccion.dart` | Pendiente |
+| `PanelSeccion` | `panel_seccion.dart` | Implementado |
 | `ContenedorModal` | `contenedor_modal.dart` | Pendiente |
+
+---
+
+## Cómo usar PanelSeccion
+
+```dart
+PanelSeccion(
+  titulo: 'Datos del negocio',
+  child: Column(
+    children: [
+      CampoTexto(etiqueta: 'Nombre del taller', controlador: _nombreController),
+    ],
+  ),
+)
+
+// Con ícono — secciones de un formulario largo (ej. "Nuevo producto")
+PanelSeccion(
+  titulo: 'Información general',
+  icono: Icons.info_outline,
+  child: Column(children: [...]),
+)
+```
 
 ---
 

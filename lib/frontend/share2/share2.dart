@@ -1,6 +1,11 @@
 export 'botones/botones.dart';
+export 'cards/cards.dart';
+export 'cuenta/cuenta.dart';
+export 'encabezados/encabezados.dart';
 export 'feedback/feedback.dart';
+export 'inputs/inputs.dart';
 export 'nav/nav.dart';
+export 'navegacion_secundaria/navegacion_secundaria.dart';
 export 'tablas/tablas.dart';
 export 'temas/colores_app.dart';
 export 'temas/tipografia_app.dart';

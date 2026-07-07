@@ -93,16 +93,22 @@ share2/
 │   ├── indicador_estado.dart
 │   └── feedback.dart
 │
-└── nav/                            ← navegación principal
-    ├── logo_sidebar.dart
-    ├── seccion_nav.dart
-    ├── item_nav.dart
-    ├── separador_nav.dart
-    ├── barra_lateral.dart
-    ├── item_nav_dato.dart
-    ├── seccion_nav_dato.dart
+├── nav/                            ← navegación principal
+│   ├── logo_sidebar.dart
+│   ├── seccion_nav.dart
+│   ├── item_nav.dart
+│   ├── separador_nav.dart
+│   ├── barra_lateral.dart
+│   ├── item_nav_dato.dart
+│   ├── seccion_nav_dato.dart
+│   ├── README.md
+│   └── nav.dart
+│
+└── cuenta/                         ← sesión del usuario logueado
+    ├── avatar_usuario.dart
+    ├── cuenta_usuario_widget.dart
     ├── README.md
-    └── nav.dart
+    └── cuenta.dart
 ```
 
 ---
@@ -133,6 +139,7 @@ Widgets para formularios y entrada de datos. Aplican el estilo visual del proyec
 | `CampoMoneda` | Entrada de valores numéricos con formato de moneda |
 | `SelectorWidget` | Dropdown de opciones predefinidas |
 | `CheckboxApp` | Selección booleana estilizada |
+| `BarraBusqueda` | Campo de búsqueda con ícono, para filtrar listas o tablas |
 
 ---
 
@@ -189,6 +196,17 @@ Widgets para el sidebar de navegación de la aplicación. Ver [`nav/README.md`](
 | `SeccionNav` | Etiqueta de grupo (PRINCIPAL, INVENTARIO, TALLER…) |
 | `ItemNav` | Fila de navegación: ícono + texto + estado activo + badge |
 | `SeparadorNav` | Línea divisora entre nav principal e ítems de pie |
+
+---
+
+### `cuenta/` — Sesión del usuario logueado
+
+Widgets para mostrar quién está usando la aplicación. Ver [`cuenta/README.md`](cuenta/README.md).
+
+| Widget | Cuándo usarlo |
+|---|---|
+| `CuentaUsuarioWidget` | Avatar + nombre + rol del usuario logueado, típicamente como `acciones` de `EncabezadoPagina` |
+| `AvatarUsuario` | Círculo con iniciales, reutilizable fuera de `CuentaUsuarioWidget` |
 
 ---
 
