@@ -170,49 +170,65 @@ class _UnidadesMedidaVistaState extends ConsumerState<UnidadesMedidaVista> {
           ),
           const SizedBox(height: 20),
           Expanded(
-            child: SingleChildScrollView(
-              child: TablaGenerica<UnidadMedida>(
-                items: itemsPagina,
-                columnas: [
-                  ColumnaTabla(
-                    titulo: 'Unidad',
-                    flex: 2,
-                    constructor: (u) =>
-                        Text(u.nombre, style: TipografiaApp.cuerpoMedium),
-                  ),
-                  ColumnaTabla(
-                    titulo: 'Abreviatura',
-                    flex: 1,
-                    constructor: (u) => Text(
-                      u.abreviatura,
-                      style: TipografiaApp.cuerpoMedium.copyWith(
+            child: TablaGenerica<UnidadMedida>(
+              items: itemsPagina,
+              mensajeVacio: _busquedaController.text.isEmpty
+                  ? 'Aún no hay unidades de medida registradas'
+                  : 'Ninguna unidad coincide con la búsqueda',
+              columnas: [
+                ColumnaTabla(
+                  titulo: 'Unidad',
+                  flex: 2,
+                  constructor: (u) =>
+                      Text(u.nombre, style: TipografiaApp.cuerpoMedium),
+                ),
+                ColumnaTabla(
+                  titulo: 'Abreviatura',
+                  flex: 2,
+                  constructor: (u) => Text(
+                    u.abreviatura,
+                    style: TipografiaApp.monoespaciada(
+                      TipografiaApp.caption.copyWith(
+                        fontWeight: FontWeight.w600,
                         color: ColoresApp.goGreen,
                       ),
                     ),
                   ),
-                  ColumnaTabla(
-                    titulo: 'Acciones',
-                    ancho: 88,
-                    alineacion: Alignment.centerRight,
-                    constructor: (u) => Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        BotonIcono(
-                          icono: Icons.edit_outlined,
-                          tooltip: 'Editar',
-                          alPresionar: () => _abrirFormularioEditar(u),
-                        ),
-                        BotonIcono(
-                          icono: Icons.delete_outline_rounded,
-                          tooltip: 'Eliminar',
-                          color: ColoresApp.statusDanger,
-                          alPresionar: () => _eliminar(u),
-                        ),
-                      ],
-                    ),
+                ),
+                ColumnaTabla(
+                  titulo: 'Uso típico',
+                  flex: 4,
+                  constructor: (u) => Text(
+                    (u.descripcion?.trim().isNotEmpty ?? false)
+                        ? u.descripcion!
+                        : '—',
+                    style: TipografiaApp.caption,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
                   ),
-                ],
-              ),
+                ),
+                ColumnaTabla(
+                  titulo: 'Acciones',
+                  ancho: 88,
+                  alineacion: Alignment.centerRight,
+                  constructor: (u) => Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      BotonIcono(
+                        icono: Icons.edit_outlined,
+                        tooltip: 'Editar',
+                        alPresionar: () => _abrirFormularioEditar(u),
+                      ),
+                      BotonIcono(
+                        icono: Icons.delete_outline_rounded,
+                        tooltip: 'Eliminar',
+                        color: ColoresApp.statusDanger,
+                        alPresionar: () => _eliminar(u),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
             ),
           ),
           PaginacionWidget(

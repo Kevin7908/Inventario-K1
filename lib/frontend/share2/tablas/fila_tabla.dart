@@ -55,7 +55,7 @@ class _FilaTablaState<T> extends State<FilaTabla<T>> {
         onTap: widget.alPresionar,
         child: Container(
           color: fondo,
-          padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 14),
+          padding: const EdgeInsets.symmetric(horizontal: 22, vertical: 14),
           child: Row(
             children: [
               for (final columna in widget.columnas) _celda(columna),
