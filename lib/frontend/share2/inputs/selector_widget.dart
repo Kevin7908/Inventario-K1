@@ -63,8 +63,12 @@ class SelectorWidget<T> extends StatelessWidget {
               ),
               style: TipografiaApp.cuerpo,
               dropdownColor: ColoresApp.bgCard,
+              // `nuevo is T` en vez de `!= null`: con un tipo nulable
+              // (`SelectorWidget<Categoria?>`) la opción "sin selección" es un
+              // valor válido y debe propagarse; con uno no nulable, null se
+              // descarta igual que antes.
               onChanged: (nuevo) {
-                if (nuevo != null) alCambiar(nuevo);
+                if (nuevo is T) alCambiar(nuevo);
               },
               items: [
                 for (final opcion in opciones)
