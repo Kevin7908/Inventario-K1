@@ -1,13 +1,21 @@
-import 'dart:io';
-
 import 'package:flutter/material.dart';
-import 'package:intl/intl.dart';
-import 'package:inventario_k1/frontend/features/productos/widgets/badget_estado_stock_widget.dart';
 
 import '../../../../backend/features/productos/modelo/producto.dart';
-import '../../../share/temas/colores_app.dart';
-import '../../../share/widgets/botones/accion_boton.dart';
+import '../../../share2/share2.dart';
+import '../vista/producto_vista.dart';
+import 'badget_estado_stock_widget.dart';
 
+/// Tarjeta de un producto para grillas.
+///
+/// El catálogo de Productos usa tabla, pero varios módulos siguen mostrando
+/// productos como tarjetas para elegirlos (reservas, cotizaciones, venta
+/// rápida, detalle de categoría), así que esta tarjeta sigue viva.
+///
+/// Parámetros:
+/// - [producto]: datos a mostrar.
+/// - [alTap]: acción al tocar la tarjeta. Si es `null`, cae en [alVerDetalle].
+/// - [alVerDetalle], [alEditar], [alEliminar]: acciones opcionales; cada botón
+///   solo aparece si su callback existe.
 class TarjetaProductoWidget extends StatefulWidget {
   const TarjetaProductoWidget({
     super.key,
@@ -22,6 +30,7 @@ class TarjetaProductoWidget extends StatefulWidget {
   final VoidCallback? alEditar;
   final VoidCallback? alEliminar;
   final VoidCallback? alVerDetalle;
+
   /// Si se proporciona, sobrescribe la acción de tap sobre la tarjeta
   /// (mantiene alVerDetalle solo para el botón de ojo).
   final VoidCallback? alTap;
@@ -31,143 +40,74 @@ class TarjetaProductoWidget extends StatefulWidget {
 }
 
 class _TarjetaProductoWidgetState extends State<TarjetaProductoWidget> {
-  bool _hovering = false;
-
-  static final _fmt = NumberFormat.currency(
-    locale: 'es_CO',
-    symbol: '\$',
-    decimalDigits: 0,
-  );
+  bool _hover = false;
 
   @override
   Widget build(BuildContext context) {
     final p = widget.producto;
+    final hayAcciones = widget.alVerDetalle != null ||
+        widget.alEditar != null ||
+        widget.alEliminar != null;
 
     return RepaintBoundary(
       child: Opacity(
-        opacity: p.activo ? 1.0 : 0.5,
+        opacity: p.activo ? 1 : 0.55,
         child: MouseRegion(
           cursor: SystemMouseCursors.click,
-          onEnter: (_) => setState(() => _hovering = true),
-          onExit: (_) => setState(() => _hovering = false),
+          onEnter: (_) => setState(() => _hover = true),
+          onExit: (_) => setState(() => _hover = false),
           child: GestureDetector(
             onTap: widget.alTap ?? widget.alVerDetalle,
             child: AnimatedContainer(
               duration: const Duration(milliseconds: 150),
               curve: Curves.easeOut,
               decoration: BoxDecoration(
-                color: p.activo ? ColoresApp.bgCard : ColoresApp.bgContent,
-                borderRadius: BorderRadius.circular(16),
+                color: ColoresApp.bgCard,
+                borderRadius: BorderRadius.circular(18),
                 border: Border.all(
-                  color: !p.activo
-                      ? ColoresApp.border
-                      : _hovering
-                          ? ColoresApp.primary.withValues(alpha: 0.55)
-                          : ColoresApp.border,
-                  width: _hovering && p.activo ? 1.5 : 1.0,
+                  color: _hover ? ColoresApp.goGreen : ColoresApp.border,
                 ),
               ),
-            child: Padding(
-              padding: const EdgeInsets.all(16),
+              padding: const EdgeInsets.all(14),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  // Sección superior — flexible para absorber espacio variable
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        _ImagenConBadge(producto: p),
-                        const SizedBox(height: 10),
-                        Row(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Expanded(
-                              child: Text(
-                                p.nombre,
-                                style: const TextStyle(
-                                  color: ColoresApp.textDark,
-                                  fontSize: 13.5,
-                                  fontWeight: FontWeight.w700,
-                                  height: 1.25,
-                                ),
-                                maxLines: 2,
-                                overflow: TextOverflow.ellipsis,
-                              ),
-                            ),
-                            const SizedBox(width: 6),
-                            BadgeEstadoStock(estado: p.estadoStock),
-                          ],
-                        ),
-                        Text(
-                          'SKU: ${p.sku}',
-                          style: const TextStyle(
-                            color: ColoresApp.textLight,
-                            fontSize: 11,
+                  _imagen(p),
+                  const SizedBox(height: 13),
+                  Text(
+                    p.nombre,
+                    style: TipografiaApp.tituloTarjeta,
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                  const SizedBox(height: 3),
+                  Text(
+                    p.stockActual > 0
+                        ? '${_cantidad(p.stockActual)} disponibles'
+                        : 'Agotado',
+                    style: TipografiaApp.caption.copyWith(
+                      fontSize: 12,
+                      color: ColoresApp.textMuted,
+                    ),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                  const Spacer(),
+                  const SizedBox(height: 11),
+                  Row(
+                    children: [
+                      Expanded(
+                        child: Text(
+                          formatearPrecio(p.precioVenta),
+                          style: TipografiaApp.subtitulo.copyWith(
+                            fontSize: 16,
+                            color: ColoresApp.castletonGreen,
                           ),
                           maxLines: 1,
                           overflow: TextOverflow.ellipsis,
                         ),
-                        if (p.categoriaNombre != null)
-                          Text(
-                            p.categoriaNombre!,
-                            style: const TextStyle(
-                              color: ColoresApp.textLight,
-                              fontSize: 11,
-                            ),
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
-                          ),
-                      ],
-                    ),
-                  ),
-
-                  // Sección inferior — fija
-                  const Divider(height: 1, color: ColoresApp.border),
-                  const SizedBox(height: 8),
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    children: [
-                      Flexible(
-                        child: Text(
-                          _fmt.format(p.precioVenta),
-                          style: const TextStyle(
-                            color: ColoresApp.primary,
-                            fontSize: 15,
-                            fontWeight: FontWeight.w700,
-                          ),
-                          overflow: TextOverflow.ellipsis,
-                        ),
                       ),
-                      _BadgeUnidades(
-                        stock: p.stockActual,
-                        unidad: p.unidadMedidaNombre,
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 8),
-                  const Divider(height: 1, color: ColoresApp.border),
-                  const SizedBox(height: 6),
-                  Row(
-                    children: [
-                      AccionBoton(
-                        icono: Icons.visibility_outlined,
-                        alPresionar: widget.alVerDetalle,
-                        tooltip: 'Ver detalle',
-                      ),
-                      const Spacer(),
-                      AccionBoton(
-                        icono: Icons.edit_outlined,
-                        alPresionar: widget.alEditar,
-                        tooltip: 'Editar',
-                      ),
-                      const SizedBox(width: 8),
-                      AccionBoton(
-                        icono: Icons.delete_outline_rounded,
-                        alPresionar: widget.alEliminar,
-                        tooltip: 'Eliminar',
-                        esDestructivo: true,
-                      ),
+                      if (hayAcciones) _acciones(),
                     ],
                   ),
                 ],
@@ -176,102 +116,77 @@ class _TarjetaProductoWidgetState extends State<TarjetaProductoWidget> {
           ),
         ),
       ),
-    ),
-  );
+    );
   }
-}
 
-// Subwidget: imagen con badge de stock
-
-class _ImagenConBadge extends StatelessWidget {
-  const _ImagenConBadge({required this.producto});
-
-  final Producto producto;
-
-  @override
-  Widget build(BuildContext context) {
+  Widget _imagen(Producto p) {
     return Stack(
       children: [
-        ClipRRect(
-          borderRadius: BorderRadius.circular(10),
-          child: Container(
-            height: 110,
-            width: double.infinity,
-            color: ColoresApp.bgContent,
-            child: _buildImagen(),
+        SizedBox(
+          width: double.infinity,
+          child: MiniaturaProducto(
+            rutaImagen: p.imagenUrl,
+            lado: 120,
+            radio: 13,
           ),
         ),
-        // Positioned(
-        //   top: 6,
-        //   right: 6,
-        //   child: BadgeEstadoStock(estado: producto.estadoStock),
-        // ),
+        Positioned(
+          top: 8,
+          left: 8,
+          child: Container(
+            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+            decoration: BoxDecoration(
+              color: ColoresApp.bgCard,
+              borderRadius: BorderRadius.circular(8),
+            ),
+            child: Text(
+              p.sku,
+              style: TipografiaApp.monoespaciada(
+                TipografiaApp.caption.copyWith(
+                  fontSize: 10.5,
+                  fontWeight: FontWeight.w600,
+                  color: ColoresApp.textSecondary,
+                ),
+              ),
+            ),
+          ),
+        ),
+        Positioned(
+          top: 8,
+          right: 8,
+          child: BadgeEstadoStock(estado: p.estadoStock),
+        ),
       ],
     );
   }
 
-  Widget _buildImagen() {
-    final ruta = producto.imagenUrl;
-    if (ruta == null || ruta.isEmpty) {
-      return const Center(
-        child: Icon(
-          Icons.inventory_2_outlined,
-          size: 36,
-          color: ColoresApp.textLight,
-        ),
-      );
-    }
-
-    if (ruta.startsWith('http://') || ruta.startsWith('https://')) {
-      return Image.network(
-        ruta,
-        fit: BoxFit.cover,
-        // Para imágenes de red también limitamos el cache en memoria
-        cacheWidth: 250,
-        errorBuilder: (context, e, st) => const Center(
-          child: Icon(
-            Icons.broken_image_outlined,
-            size: 28,
-            color: ColoresApp.textLight,
+  Widget _acciones() {
+    return Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        if (widget.alVerDetalle != null)
+          BotonIcono(
+            icono: Icons.visibility_outlined,
+            tooltip: 'Ver detalle',
+            alPresionar: widget.alVerDetalle,
           ),
-        ),
-      );
-    }
-
-    return Image.file(
-      File(ruta),
-      fit: BoxFit.cover,
-      cacheWidth: 300,
-      errorBuilder: (context, e, st) => const Center(
-        child: Icon(
-          Icons.broken_image_outlined,
-          size: 28,
-          color: ColoresApp.textLight,
-        ),
-      ),
+        if (widget.alEditar != null)
+          BotonIcono(
+            icono: Icons.edit_outlined,
+            tooltip: 'Editar',
+            alPresionar: widget.alEditar,
+          ),
+        if (widget.alEliminar != null)
+          BotonIcono(
+            icono: Icons.delete_outline_rounded,
+            tooltip: 'Eliminar',
+            color: ColoresApp.statusDanger,
+            alPresionar: widget.alEliminar,
+          ),
+      ],
     );
   }
-}
 
-class _BadgeUnidades extends StatelessWidget {
-  const _BadgeUnidades({required this.stock, this.unidad});
-
-  final double stock;
-  final String? unidad;
-
-  @override
-  Widget build(BuildContext context) {
-    final stockStr = stock == stock.truncateToDouble()
-        ? stock.toInt().toString()
-        : stock.toStringAsFixed(1);
-
-    return Text(
-      '$stockStr ${'uds'}',
-      style: const TextStyle(
-        color: ColoresApp.textMedium,
-        fontSize: 12,
-        fontWeight: FontWeight.w500,
-      ),
-    );
-  }
+  String _cantidad(double v) =>
+      v.truncateToDouble() == v ? v.toInt().toString() : v.toStringAsFixed(2);
 }

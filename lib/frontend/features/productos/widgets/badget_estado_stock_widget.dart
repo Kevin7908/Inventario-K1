@@ -1,34 +1,48 @@
 import 'package:flutter/material.dart';
 
 import '../../../../backend/features/productos/modelo/producto.dart';
+import '../../../share2/share2.dart';
 
+/// Chip con el estado de stock de un producto.
+///
+/// Traduce [EstadoStock] a la pareja de colores del semáforo de `ColoresApp` y
+/// delega el dibujo en [IndicadorEstado] de share2, para que se vea igual que
+/// cualquier otro estado de la aplicación.
 class BadgeEstadoStock extends StatelessWidget {
-  const BadgeEstadoStock({super.key, required this.estado});
+  const BadgeEstadoStock({
+    super.key,
+    required this.estado,
+    this.conPunto = true,
+  });
 
   final EstadoStock estado;
+  final bool conPunto;
 
   @override
   Widget build(BuildContext context) {
-    final (label, color) = switch (estado) {
-      EstadoStock.enStock => ('En stock', const Color(0xFF10B981)),
-      EstadoStock.stockBajo => ('Stock bajo', const Color(0xFFF59E0B)),
-      EstadoStock.sinStock => ('Sin stock', const Color(0xFFEF4444)),
+    final (etiqueta, color, fondo) = switch (estado) {
+      EstadoStock.enStock => (
+          'En stock',
+          ColoresApp.stockOk,
+          ColoresApp.statusSuccessBg,
+        ),
+      EstadoStock.stockBajo => (
+          'Stock bajo',
+          ColoresApp.stockLow,
+          ColoresApp.statusWarningBg,
+        ),
+      EstadoStock.sinStock => (
+          'Agotado',
+          ColoresApp.stockOut,
+          ColoresApp.statusDangerBg,
+        ),
     };
 
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-      decoration: BoxDecoration(
-        color: color.withValues(alpha: 0.12),
-        borderRadius: BorderRadius.circular(20),
-      ),
-      child: Text(
-        label,
-        style: TextStyle(
-          color: color,
-          fontSize: 10.5,
-          fontWeight: FontWeight.w600,
-        ),
-      ),
+    return IndicadorEstado(
+      etiqueta: etiqueta,
+      color: color,
+      colorFondo: fondo,
+      conPunto: conPunto,
     );
   }
 }
