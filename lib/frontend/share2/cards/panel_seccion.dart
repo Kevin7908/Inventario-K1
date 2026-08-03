@@ -41,7 +41,7 @@ class PanelSeccion extends StatelessWidget {
       padding: const EdgeInsets.all(24),
       decoration: BoxDecoration(
         color: ColoresApp.bgCard,
-        borderRadius: BorderRadius.circular(12),
+        borderRadius: BorderRadius.circular(18),
         border: Border.all(color: ColoresApp.border),
       ),
       child: Column(
@@ -57,7 +57,7 @@ class PanelSeccion extends StatelessWidget {
               Text(titulo, style: TipografiaApp.subtitulo),
             ],
           ),
-          const SizedBox(height: 20),
+          const SizedBox(height: 18),
           child,
         ],
       ),
