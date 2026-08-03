@@ -44,14 +44,14 @@ class SelectorWidget<T> extends StatelessWidget {
       crossAxisAlignment: CrossAxisAlignment.start,
       mainAxisSize: MainAxisSize.min,
       children: [
-        Text(etiqueta, style: TipografiaApp.caption),
-        const SizedBox(height: 6),
+        Text(etiqueta, style: TipografiaApp.etiquetaCampo),
+        const SizedBox(height: 7),
         Container(
           padding: const EdgeInsets.symmetric(horizontal: 14),
           decoration: BoxDecoration(
             color: ColoresApp.bgInput,
-            borderRadius: BorderRadius.circular(8),
-            border: Border.all(color: ColoresApp.border),
+            borderRadius: BorderRadius.circular(11),
+            border: Border.all(color: ColoresApp.borderInput),
           ),
           child: DropdownButtonHideUnderline(
             child: DropdownButton<T>(
