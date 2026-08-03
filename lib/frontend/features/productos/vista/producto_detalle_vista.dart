@@ -1,0 +1,511 @@
+import 'dart:io';
+
+import 'package:flutter/material.dart';
+
+import '../../../../backend/features/productos/modelo/producto.dart';
+import '../../../share2/share2.dart';
+import 'producto_vista.dart';
+
+/// Ficha de un producto: imagen, datos de inventario y acciones.
+///
+/// Es una página completa dentro del módulo de Productos, no un diálogo: el
+/// contenido no cabe cómodamente en un modal y así se replica el flujo del
+/// diseño ("Volver a productos" → ficha → "Editar producto").
+///
+/// [alVolver] y [alEditar] son opcionales para poder reutilizar la misma ficha
+/// dentro de `DialogoDetalleProductoWidget`, que ya trae su propio botón de
+/// cerrar y no ofrece edición. Si son `null`, se ocultan esos controles.
+class ProductoDetalleVista extends StatelessWidget {
+  const ProductoDetalleVista({
+    super.key,
+    required this.producto,
+    this.alVolver,
+    this.alEditar,
+    this.padding = const EdgeInsets.fromLTRB(32, 24, 32, 40),
+  });
+
+  final Producto producto;
+  final VoidCallback? alVolver;
+  final VoidCallback? alEditar;
+  final EdgeInsets padding;
+
+  @override
+  Widget build(BuildContext context) {
+    return SingleChildScrollView(
+      padding: padding,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          if (alVolver != null) ...[
+            _BotonVolver(
+              etiqueta: 'Volver a productos',
+              alPresionar: alVolver!,
+            ),
+            const SizedBox(height: 18),
+          ],
+          LayoutBuilder(
+            builder: (context, constraints) {
+              // En ventanas angostas la ficha pasa a una sola columna en vez
+              // de comprimir la imagen y los datos.
+              if (constraints.maxWidth < 900) {
+                return Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    _Galeria(rutaImagen: producto.imagenUrl),
+                    const SizedBox(height: 26),
+                    _Ficha(producto: producto, alEditar: alEditar),
+                  ],
+                );
+              }
+              return Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Expanded(
+                    flex: 4,
+                    child: _Galeria(rutaImagen: producto.imagenUrl),
+                  ),
+                  const SizedBox(width: 26),
+                  Expanded(
+                    flex: 5,
+                    child: _Ficha(producto: producto, alEditar: alEditar),
+                  ),
+                ],
+              );
+            },
+          ),
+          const SizedBox(height: 26),
+          _PanelesSecundarios(producto: producto),
+        ],
+      ),
+    );
+  }
+}
+
+class _BotonVolver extends StatelessWidget {
+  const _BotonVolver({required this.etiqueta, required this.alPresionar});
+
+  final String etiqueta;
+  final VoidCallback alPresionar;
+
+  @override
+  Widget build(BuildContext context) {
+    return Material(
+      color: Colors.transparent,
+      borderRadius: BorderRadius.circular(8),
+      child: InkWell(
+        onTap: alPresionar,
+        borderRadius: BorderRadius.circular(8),
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 4),
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              const Icon(
+                Icons.arrow_back_rounded,
+                size: 16,
+                color: ColoresApp.textMuted,
+              ),
+              const SizedBox(width: 8),
+              Text(
+                etiqueta,
+                style: TipografiaApp.caption.copyWith(
+                  fontSize: 13,
+                  fontWeight: FontWeight.w600,
+                  color: ColoresApp.textMuted,
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _Galeria extends StatelessWidget {
+  const _Galeria({required this.rutaImagen});
+
+  final String? rutaImagen;
+
+  @override
+  Widget build(BuildContext context) {
+    final ruta = rutaImagen;
+    final hayImagen = ruta != null && ruta.isNotEmpty && File(ruta).existsSync();
+
+    return Container(
+      height: 360,
+      decoration: BoxDecoration(
+        color: ColoresApp.bgInput,
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(color: ColoresApp.border),
+      ),
+      clipBehavior: Clip.antiAlias,
+      child: hayImagen
+          ? Image.file(
+              File(ruta),
+              fit: BoxFit.cover,
+              width: double.infinity,
+              errorBuilder: (_, _, _) => const _SinImagen(),
+            )
+          : const _SinImagen(),
+    );
+  }
+}
+
+class _SinImagen extends StatelessWidget {
+  const _SinImagen();
+
+  @override
+  Widget build(BuildContext context) {
+    return Center(
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          const Icon(
+            Icons.image_outlined,
+            size: 46,
+            color: ColoresApp.textDisabled,
+          ),
+          const SizedBox(height: 10),
+          Text('Sin imagen', style: TipografiaApp.caption),
+        ],
+      ),
+    );
+  }
+}
+
+/// Columna derecha: categoría, nombre, precio, estado y datos de inventario.
+class _Ficha extends StatelessWidget {
+  const _Ficha({required this.producto, this.alEditar});
+
+  final Producto producto;
+  final VoidCallback? alEditar;
+
+  @override
+  Widget build(BuildContext context) {
+    final (etiquetaStock, colorStock, fondoStock) =
+        switch (producto.estadoStock) {
+      EstadoStock.enStock => (
+          'En stock',
+          ColoresApp.stockOk,
+          ColoresApp.statusSuccessBg,
+        ),
+      EstadoStock.stockBajo => (
+          'Stock bajo',
+          ColoresApp.stockLow,
+          ColoresApp.statusWarningBg,
+        ),
+      EstadoStock.sinStock => (
+          'Agotado',
+          ColoresApp.stockOut,
+          ColoresApp.statusDangerBg,
+        ),
+    };
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        IndicadorEstado(
+          etiqueta: producto.categoriaNombre ?? 'Sin categoría',
+          color: ColoresApp.castletonGreen,
+          colorFondo: ColoresApp.greenChipBg,
+        ),
+        const SizedBox(height: 12),
+        Text(producto.nombre, style: TipografiaApp.heading1.copyWith(fontSize: 28)),
+        const SizedBox(height: 6),
+        Text(
+          'SKU ${producto.sku}',
+          style: TipografiaApp.monoespaciada(
+            TipografiaApp.cuerpo.copyWith(color: ColoresApp.textDisabled),
+          ),
+        ),
+        const SizedBox(height: 18),
+        Row(
+          children: [
+            Text(
+              formatearPrecio(producto.precioVenta),
+              style: TipografiaApp.heading1.copyWith(
+                fontSize: 32,
+                color: ColoresApp.castletonGreen,
+              ),
+            ),
+            const SizedBox(width: 16),
+            IndicadorEstado(
+              etiqueta: etiquetaStock,
+              color: colorStock,
+              colorFondo: fondoStock,
+              conPunto: true,
+            ),
+          ],
+        ),
+        if (producto.aplicaIva) ...[
+          const SizedBox(height: 6),
+          Text(
+            'IVA incluido: ${formatearPrecio(producto.precioVentaConIva)}',
+            style: TipografiaApp.caption,
+          ),
+        ],
+        const SizedBox(height: 22),
+        _GrillaDatos(producto: producto),
+        const SizedBox(height: 22),
+        _Compatibilidad(descripcion: producto.descripcion),
+        if (alEditar != null) ...[
+          const SizedBox(height: 22),
+          Row(
+            children: [
+              Expanded(
+                child: BotonSecundario(
+                  etiqueta: 'Editar producto',
+                  icono: Icons.edit_outlined,
+                  oscuro: true,
+                  expandido: true,
+                  alPresionar: alEditar,
+                ),
+              ),
+            ],
+          ),
+        ],
+      ],
+    );
+  }
+}
+
+/// Los cuatro datos de inventario, en dos filas de dos.
+class _GrillaDatos extends StatelessWidget {
+  const _GrillaDatos({required this.producto});
+
+  final Producto producto;
+
+  @override
+  Widget build(BuildContext context) {
+    String cantidad(double v) {
+      final entero = v.truncateToDouble() == v;
+      return entero ? v.toInt().toString() : v.toStringAsFixed(2);
+    }
+
+    final unidad = producto.unidadMedidaNombre ?? 'und';
+
+    return Column(
+      children: [
+        Row(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            Expanded(
+              child: TarjetaInfo(
+                etiqueta: 'Stock disponible',
+                valor: '${cantidad(producto.stockActual)} $unidad',
+                colorValor: producto.estadoStock == EstadoStock.sinStock
+                    ? ColoresApp.stockOut
+                    : null,
+              ),
+            ),
+            const SizedBox(width: 13),
+            Expanded(
+              child: TarjetaInfo(
+                etiqueta: 'Stock mínimo',
+                valor: '${cantidad(producto.stockMinimo)} $unidad',
+              ),
+            ),
+          ],
+        ),
+        const SizedBox(height: 13),
+        Row(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            Expanded(
+              child: TarjetaInfo(
+                etiqueta: 'Ubicación',
+                valor: producto.ubicacionBodega ?? '—',
+              ),
+            ),
+            const SizedBox(width: 13),
+            Expanded(
+              child: TarjetaInfo(
+                etiqueta: 'Unidad de medida',
+                valor: producto.unidadMedidaNombre ?? '—',
+              ),
+            ),
+          ],
+        ),
+      ],
+    );
+  }
+}
+
+/// Bloque "Compatibilidad" del diseño.
+///
+/// El modelo `Producto` no tiene todavía un campo de motos compatibles, así
+/// que el bloque queda como marcador hasta que exista en el backend.
+class _Compatibilidad extends StatelessWidget {
+  const _Compatibilidad({required this.descripcion});
+
+  final String? descripcion;
+
+  @override
+  Widget build(BuildContext context) {
+    final texto = descripcion?.trim() ?? '';
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          'Compatibilidad',
+          style: TipografiaApp.caption.copyWith(
+            fontSize: 13,
+            fontWeight: FontWeight.w600,
+          ),
+        ),
+        const SizedBox(height: 8),
+        if (texto.isEmpty)
+          Container(
+            width: double.infinity,
+            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+            decoration: BoxDecoration(
+              color: ColoresApp.bgInput,
+              borderRadius: BorderRadius.circular(11),
+              border: Border.all(color: ColoresApp.borderFila),
+            ),
+            child: Text(
+              'Sin información de compatibilidad',
+              style: TipografiaApp.caption.copyWith(
+                color: ColoresApp.textDisabled,
+              ),
+            ),
+          )
+        else
+          Text(texto, style: TipografiaApp.caption.copyWith(fontSize: 13)),
+      ],
+    );
+  }
+}
+
+/// Paneles inferiores: proveedor y movimientos recientes.
+class _PanelesSecundarios extends StatelessWidget {
+  const _PanelesSecundarios({required this.producto});
+
+  final Producto producto;
+
+  @override
+  Widget build(BuildContext context) {
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final proveedor = _PanelProveedor(producto: producto);
+        const movimientos = _PanelMovimientos();
+
+        // En ventanas angostas los dos paneles se apilan.
+        if (constraints.maxWidth < 900) {
+          return Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              proveedor,
+              const SizedBox(height: 22),
+              movimientos,
+            ],
+          );
+        }
+
+        return Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Expanded(child: proveedor),
+            const SizedBox(width: 22),
+            const Expanded(child: movimientos),
+          ],
+        );
+      },
+    );
+  }
+}
+
+class _PanelProveedor extends StatelessWidget {
+  const _PanelProveedor({required this.producto});
+
+  final Producto producto;
+
+  @override
+  Widget build(BuildContext context) {
+    return PanelSeccion(
+      titulo: 'Proveedor',
+      child: Row(
+        children: [
+          Container(
+            width: 46,
+            height: 46,
+            decoration: BoxDecoration(
+              color: ColoresApp.statusInfoBg,
+              borderRadius: BorderRadius.circular(12),
+            ),
+            child: const Icon(
+              Icons.local_shipping_outlined,
+              color: ColoresApp.statusInfo,
+              size: 21,
+            ),
+          ),
+          const SizedBox(width: 14),
+          Expanded(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  producto.proveedorNombre ?? 'Sin proveedor asignado',
+                  style: TipografiaApp.tituloTarjeta,
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
+                ),
+                const SizedBox(height: 2),
+                Text(
+                  'Precio de compra: ${formatearPrecio(producto.precioCompra)}',
+                  style: TipografiaApp.caption.copyWith(
+                    color: ColoresApp.textMuted,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+/// Bloque "Movimientos recientes" del diseño.
+///
+/// Marcador: no existe todavía una tabla de movimientos de inventario en el
+/// backend, así que no hay datos reales que mostrar.
+class _PanelMovimientos extends StatelessWidget {
+  const _PanelMovimientos();
+
+  @override
+  Widget build(BuildContext context) {
+    return PanelSeccion(
+      titulo: 'Movimientos recientes',
+      child: Container(
+        width: double.infinity,
+        padding: const EdgeInsets.symmetric(vertical: 26, horizontal: 16),
+        decoration: BoxDecoration(
+          color: ColoresApp.bgInput,
+          borderRadius: BorderRadius.circular(12),
+          border: Border.all(color: ColoresApp.borderFila),
+        ),
+        child: Column(
+          children: [
+            const Icon(
+              Icons.swap_vert_rounded,
+              size: 26,
+              color: ColoresApp.textDisabled,
+            ),
+            const SizedBox(height: 8),
+            Text(
+              'Aún no se registran movimientos',
+              style: TipografiaApp.caption.copyWith(
+                color: ColoresApp.textDisabled,
+              ),
+              textAlign: TextAlign.center,
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
