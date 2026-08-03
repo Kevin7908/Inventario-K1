@@ -26,11 +26,15 @@ final class ProductosState {
     this.todos = const [],
     this.busqueda = '',
     this.filtroStock = FiltroStock.todos,
+    this.filtroCategoriaId,
   });
 
   final List<Producto> todos;
   final String busqueda;
   final FiltroStock filtroStock;
+
+  /// Categoría por la que se filtra. `null` = todas las categorías.
+  final int? filtroCategoriaId;
 
   /// Lista filtrada — se computa solo cuando cambia el estado.
   List<Producto> get filtrados {
@@ -43,6 +47,11 @@ final class ProductosState {
             p.sku.toLowerCase().contains(q) ||
             (p.categoriaNombre?.toLowerCase().contains(q) ?? false);
       }).toList();
+    }
+
+    if (filtroCategoriaId != null) {
+      lista =
+          lista.where((p) => p.categoriaId == filtroCategoriaId).toList();
     }
 
     switch (filtroStock) {
@@ -63,15 +72,23 @@ final class ProductosState {
     }
   }
 
+  /// Centinela para distinguir "no tocar [filtroCategoriaId]" de "ponerlo en
+  /// null" (= quitar el filtro de categoría), que con `??` serían lo mismo.
+  static const Object _sinCambio = Object();
+
   ProductosState copyWith({
     List<Producto>? todos,
     String? busqueda,
     FiltroStock? filtroStock,
+    Object? filtroCategoriaId = _sinCambio,
   }) =>
       ProductosState(
         todos:       todos       ?? this.todos,
         busqueda:    busqueda    ?? this.busqueda,
         filtroStock: filtroStock ?? this.filtroStock,
+        filtroCategoriaId: identical(filtroCategoriaId, _sinCambio)
+            ? this.filtroCategoriaId
+            : filtroCategoriaId as int?,
       );
 }
 
@@ -114,6 +131,13 @@ class ProductosNotifier extends AsyncNotifier<ProductosState> {
     final actual = state.value;
     if (actual == null || actual.filtroStock == filtro) return;
     state = AsyncData(actual.copyWith(filtroStock: filtro));
+  }
+
+  /// Filtra por categoría. `null` quita el filtro y muestra todas.
+  void filtrarPorCategoria(int? categoriaId) {
+    final actual = state.value;
+    if (actual == null || actual.filtroCategoriaId == categoriaId) return;
+    state = AsyncData(actual.copyWith(filtroCategoriaId: categoriaId));
   }
 
   // Generación de SKU a partir de la categoría seleccionada
