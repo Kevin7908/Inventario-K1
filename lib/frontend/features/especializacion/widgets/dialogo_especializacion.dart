@@ -1,13 +1,14 @@
-// frontend/features/especializaciones/widgets/dialogo_especializacion_widget.dart
-
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:inventario_k1/frontend/features/especializacion/provider/especializacion_provider.dart';
 
 import '../../../../backend/features/especializacion/modelo/especializacion.dart';
-import '../../../share/temas/colores_app.dart';
-import '../../../share/widgets/output/snack_bar_mensaje.dart';
+import '../../../share2/share2.dart';
+import '../provider/especializacion_provider.dart';
 
+/// Diálogo de creación y edición de una especialización.
+///
+/// Se abre con [DialogoEspecializacion.mostrar]. Si recibe
+/// [especializacionAEditar] trabaja en modo edición; si no, crea una nueva.
 class DialogoEspecializacion extends ConsumerStatefulWidget {
   const DialogoEspecializacion({
     super.key,
@@ -18,7 +19,6 @@ class DialogoEspecializacion extends ConsumerStatefulWidget {
 
   bool get esEdicion => especializacionAEditar != null;
 
-  // Factory helper
   static Future<void> mostrar(
     BuildContext context, {
     Especializacion? especializacionAEditar,
@@ -60,9 +60,22 @@ class _DialogoEspecializacionState
     super.dispose();
   }
 
-  // Validación asíncrona de nombre único
+  void _mostrarMensaje(String texto, {required bool esError}) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(
+          texto,
+          style: TipografiaApp.sobrePrimario(TipografiaApp.cuerpo),
+        ),
+        backgroundColor:
+            esError ? ColoresApp.statusDanger : ColoresApp.statusSuccess,
+      ),
+    );
+  }
+
+  /// Validación de nombre único contra el repositorio, antes de persistir.
   Future<String?> _validarNombreUnico(String nombre) async {
-    if (nombre.trim().length < 2) return null; // ya capturado por validación síncrona
+    if (nombre.trim().length < 2) return null;
 
     final repo = ref.read(repositorioEspecializacionProvider);
     final existe = await repo.existeNombre(
@@ -73,173 +86,152 @@ class _DialogoEspecializacionState
     return null;
   }
 
-  // Guardar
   Future<void> _guardar() async {
-    // 1. Validación síncrona del formulario
     if (!_formKey.currentState!.validate()) return;
 
     setState(() => _guardando = true);
 
-    // 2. Validación asíncrona de unicidad antes de llamar al repositorio
     final errorUnicidad = await _validarNombreUnico(_nombreCtrl.text);
     if (errorUnicidad != null) {
       if (!mounted) return;
-      SnackBarMensaje.error(context, errorUnicidad);
+      _mostrarMensaje(errorUnicidad, esError: true);
       setState(() => _guardando = false);
       return;
     }
 
-    // 3. Persistencia a través del Notifier
     final notifier = ref.read(especializacionesProvider.notifier);
+    final descripcion = _descripcionCtrl.text.trim();
     final String? error;
 
     if (widget.esEdicion) {
       error = await notifier.actualizar(
         id: widget.especializacionAEditar!.id,
         nombre: _nombreCtrl.text.trim(),
-        descripcion: _descripcionCtrl.text.trim().isEmpty
-            ? null
-            : _descripcionCtrl.text.trim(),
+        descripcion: descripcion.isEmpty ? null : descripcion,
       );
     } else {
       error = await notifier.agregar(
         nombre: _nombreCtrl.text.trim(),
-        descripcion: _descripcionCtrl.text.trim().isEmpty
-            ? null
-            : _descripcionCtrl.text.trim(),
+        descripcion: descripcion.isEmpty ? null : descripcion,
       );
     }
 
     if (!mounted) return;
 
     if (error != null) {
-      SnackBarMensaje.error(context, error);
+      _mostrarMensaje(error, esError: true);
       setState(() => _guardando = false);
-    } else {
-      Navigator.of(context).pop();
-      SnackBarMensaje.success(
-        context,
-        widget.esEdicion
-            ? 'Especialización actualizada correctamente.'
-            : 'Especialización creada correctamente.',
-      );
+      return;
     }
+
+    Navigator.of(context).pop();
+    _mostrarMensaje(
+      widget.esEdicion
+          ? 'Especialización actualizada correctamente.'
+          : 'Especialización creada correctamente.',
+      esError: false,
+    );
   }
 
-  // UI
   @override
   Widget build(BuildContext context) {
     return Dialog(
-      backgroundColor: ColoresApp.bgCard,
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+      backgroundColor: Colors.transparent,
       child: Container(
         width: 460,
         constraints: BoxConstraints(
           maxHeight: MediaQuery.of(context).size.height * 0.75,
         ),
+        decoration: BoxDecoration(
+          color: ColoresApp.bgCard,
+          borderRadius: BorderRadius.circular(18),
+          boxShadow: const [
+            BoxShadow(
+              color: ColoresApp.shadowMedium,
+              blurRadius: 24,
+              offset: Offset(0, 8),
+            ),
+          ],
+        ),
+        clipBehavior: Clip.antiAlias,
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            // Encabezado
             Padding(
-              padding: const EdgeInsets.fromLTRB(28, 28, 20, 0),
+              padding: const EdgeInsets.fromLTRB(24, 24, 16, 0),
               child: Row(
                 children: [
                   Container(
-                    width: 40,
-                    height: 40,
+                    width: 42,
+                    height: 42,
                     decoration: BoxDecoration(
-                      color: ColoresApp.primary.withOpacity(0.10),
-                      borderRadius: BorderRadius.circular(10),
+                      color: ColoresApp.greenChipBg,
+                      borderRadius: BorderRadius.circular(12),
                     ),
                     child: const Icon(
                       Icons.build_outlined,
-                      color: ColoresApp.primary,
+                      color: ColoresApp.goGreen,
                       size: 20,
                     ),
                   ),
-                  const SizedBox(width: 14),
+                  const SizedBox(width: 13),
                   Expanded(
                     child: Text(
                       widget.esEdicion
-                          ? 'Editar Especialización'
-                          : 'Nueva Especialización',
-                      style: const TextStyle(
-                        color: ColoresApp.textDark,
-                        fontSize: 17,
-                        fontWeight: FontWeight.w700,
-                      ),
+                          ? 'Editar especialización'
+                          : 'Nueva especialización',
+                      style: TipografiaApp.heading3,
                     ),
                   ),
-                  IconButton(
-                    onPressed: _guardando
+                  BotonIcono(
+                    icono: Icons.close_rounded,
+                    tooltip: 'Cerrar',
+                    alPresionar: _guardando
                         ? null
                         : () => Navigator.of(context).pop(),
-                    icon: const Icon(
-                      Icons.close_rounded,
-                      color: ColoresApp.textMedium,
-                    ),
-                    style: IconButton.styleFrom(
-                      backgroundColor: ColoresApp.bgContent,
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(8),
-                      ),
-                    ),
                   ),
                 ],
               ),
             ),
-
-            // Formulario scrollable
             Flexible(
               child: SingleChildScrollView(
-                padding: const EdgeInsets.all(28),
+                padding: const EdgeInsets.fromLTRB(24, 22, 24, 4),
                 child: Form(
                   key: _formKey,
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      // Nombre — obligatorio
-                      _Etiqueta('Nombre *'),
-                      const SizedBox(height: 6),
-                      TextFormField(
-                        controller: _nombreCtrl,
+                      CampoTexto(
+                        etiqueta: 'Nombre *',
+                        controlador: _nombreCtrl,
+                        placeholder: 'Ej: Motor, Eléctrico, Suspensión...',
                         autofocus: true,
-                        textCapitalization: TextCapitalization.words,
-                        decoration: _inputDeco(
-                          'Ej: Motores, Eléctrico, Suspensión...',
-                        ),
-                        validator: (v) {
-                          if (v == null || v.trim().isEmpty) {
+                        validador: (v) {
+                          final texto = v?.trim() ?? '';
+                          if (texto.isEmpty) {
                             return 'El nombre es obligatorio.';
                           }
-                          if (v.trim().length < 2) {
-                            return 'Mínimo 2 caracteres.';
-                          }
-                          if (v.trim().length > 120) {
+                          if (texto.length < 2) return 'Mínimo 2 caracteres.';
+                          if (texto.length > 120) {
                             return 'Máximo 120 caracteres.';
                           }
                           return null;
                         },
                       ),
                       const SizedBox(height: 18),
-
-                      // Descripción — opcional
-                      _Etiqueta('Descripción (opcional)'),
-                      const SizedBox(height: 6),
-                      TextFormField(
-                        controller: _descripcionCtrl,
-                        maxLines: 3,
-                        decoration: _inputDeco(
-                          'Describe el alcance de esta área técnica...',
-                        ),
+                      CampoTexto(
+                        etiqueta: 'Descripción (opcional)',
+                        controlador: _descripcionCtrl,
+                        placeholder:
+                            'Describe el alcance de esta área técnica...',
+                        lineas: 3,
                       ),
-                      const SizedBox(height: 4),
-                      const Text(
+                      const SizedBox(height: 6),
+                      Text(
                         'Una descripción breve ayuda al equipo a entender el área.',
-                        style: TextStyle(
-                          color: ColoresApp.textLight,
-                          fontSize: 11.5,
+                        style: TipografiaApp.caption.copyWith(
+                          fontSize: 12,
+                          color: ColoresApp.textMuted,
                         ),
                       ),
                     ],
@@ -247,106 +239,36 @@ class _DialogoEspecializacionState
                 ),
               ),
             ),
-
-            // Botones fijos
             Padding(
-              padding: const EdgeInsets.fromLTRB(28, 0, 28, 28),
+              padding: const EdgeInsets.fromLTRB(24, 18, 24, 24),
               child: Row(
+                mainAxisAlignment: MainAxisAlignment.end,
                 children: [
-                  Expanded(
-                    child: OutlinedButton(
-                      onPressed: _guardando
-                          ? null
-                          : () => Navigator.of(context).pop(),
-                      style: OutlinedButton.styleFrom(
-                        foregroundColor: ColoresApp.textMedium,
-                        side: const BorderSide(color: ColoresApp.border),
-                        padding: const EdgeInsets.symmetric(vertical: 13),
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(10),
-                        ),
+                  TextButton(
+                    onPressed:
+                        _guardando ? null : () => Navigator.of(context).pop(),
+                    child: Text(
+                      'Cancelar',
+                      style: TipografiaApp.cuerpoMedium.copyWith(
+                        color: ColoresApp.textSecondary,
                       ),
-                      child: const Text('Cancelar'),
                     ),
                   ),
                   const SizedBox(width: 12),
-                  Expanded(
-                    child: ElevatedButton(
-                      onPressed: _guardando ? null : _guardar,
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: ColoresApp.primary,
-                        foregroundColor: Colors.white,
-                        padding: const EdgeInsets.symmetric(vertical: 13),
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(10),
-                        ),
-                        elevation: 0,
-                      ),
-                      child: _guardando
-                          ? const SizedBox(
-                              width: 18,
-                              height: 18,
-                              child: CircularProgressIndicator(
-                                strokeWidth: 2,
-                                color: Colors.white,
-                              ),
-                            )
-                          : Text(
-                              widget.esEdicion
-                                  ? 'Guardar cambios'
-                                  : 'Crear especialización',
-                            ),
-                    ),
+                  BotonPrimario(
+                    etiqueta: _guardando
+                        ? 'Guardando...'
+                        : widget.esEdicion
+                            ? 'Guardar cambios'
+                            : 'Crear especialización',
+                    icono: Icons.check,
+                    alPresionar: _guardando ? null : _guardar,
                   ),
                 ],
               ),
             ),
           ],
         ),
-      ),
-    );
-  }
-
-  // Helpers de estilo
-  Widget _Etiqueta(String texto) {
-    return Text(
-      texto,
-      style: const TextStyle(
-        color: ColoresApp.textDark,
-        fontSize: 13,
-        fontWeight: FontWeight.w600,
-      ),
-    );
-  }
-
-  InputDecoration _inputDeco(String hint) {
-    return InputDecoration(
-      hintText: hint,
-      hintStyle: const TextStyle(color: ColoresApp.textLight, fontSize: 13.5),
-      filled: true,
-      fillColor: ColoresApp.bgContent,
-      contentPadding:
-          const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
-      border: OutlineInputBorder(
-        borderRadius: BorderRadius.circular(10),
-        borderSide: const BorderSide(color: ColoresApp.border),
-      ),
-      enabledBorder: OutlineInputBorder(
-        borderRadius: BorderRadius.circular(10),
-        borderSide: const BorderSide(color: ColoresApp.border),
-      ),
-      focusedBorder: OutlineInputBorder(
-        borderRadius: BorderRadius.circular(10),
-        borderSide: const BorderSide(color: ColoresApp.primary, width: 1.5),
-      ),
-      errorBorder: OutlineInputBorder(
-        borderRadius: BorderRadius.circular(10),
-        borderSide: const BorderSide(color: ColoresApp.statusDebt),
-      ),
-      focusedErrorBorder: OutlineInputBorder(
-        borderRadius: BorderRadius.circular(10),
-        borderSide:
-            const BorderSide(color: ColoresApp.statusDebt, width: 1.5),
       ),
     );
   }

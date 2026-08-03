@@ -1,21 +1,19 @@
-// frontend/features/especializaciones/vistas/especializaciones_vista.dart
-
 import 'dart:async';
 
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
-import '../../../share/temas/colores_app.dart';
-import '../../../share/widgets/dialogos/dialogo_confirmar_eliminar_widget.dart';
-import '../../../share/widgets/input/barra_busqueda_widget.dart';
-import '../../../share/widgets/output/estado_error_widget.dart';
-import '../../../share/widgets/output/estado_vacio_widget.dart';
-import '../../../share/widgets/output/snack_bar_mensaje.dart';
-import '../../../share/widgets/top_bar_widget.dart';
+import '../../../../backend/features/especializacion/modelo/especializacion.dart';
+import '../../../share2/share2.dart';
+import '../../tecnicos/provider/tecnico_provider.dart';
 import '../provider/especializacion_provider.dart';
 import '../widgets/dialogo_especializacion.dart';
-import '../widgets/fila_especializacion_widget.dart';
 
+/// Pestaña "Especializaciones" de Configuración: catálogo de áreas técnicas
+/// presentado como grilla de tarjetas, con creación, edición y eliminación.
+///
+/// Vive fuera de `share2` porque conecta con [especializacionesProvider] y
+/// [tecnicosProvider] (Riverpod) — share2 es puramente presentacional.
 class EspecializacionesVista extends ConsumerStatefulWidget {
   const EspecializacionesVista({super.key});
 
@@ -26,158 +24,185 @@ class EspecializacionesVista extends ConsumerStatefulWidget {
 
 class _EspecializacionesVistaState
     extends ConsumerState<EspecializacionesVista> {
+  final _busquedaController = TextEditingController();
   Timer? _debounce;
 
   @override
   void dispose() {
     _debounce?.cancel();
+    _busquedaController.dispose();
     super.dispose();
   }
 
-  void _onSearchChanged(String query) {
-    if (_debounce?.isActive ?? false) _debounce!.cancel();
+  void _alBuscar(String texto) {
+    _debounce?.cancel();
     _debounce = Timer(const Duration(milliseconds: 280), () {
-      ref.read(busquedaEspecializacionProvider.notifier).state = query;
+      if (!mounted) return;
+      ref.read(busquedaEspecializacionProvider.notifier).state = texto;
     });
+  }
+
+  void _mostrarError(String error) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(
+          error,
+          style: TipografiaApp.sobrePrimario(TipografiaApp.cuerpo),
+        ),
+        backgroundColor: ColoresApp.statusDanger,
+      ),
+    );
+  }
+
+  Future<void> _eliminar(Especializacion especializacion) async {
+    final confirmado = await DialogoConfirmacion.mostrar(
+      context,
+      titulo: '¿Eliminar "${especializacion.nombre}"?',
+      mensaje: 'Esta acción no se puede deshacer.',
+    );
+    if (confirmado != true || !mounted) return;
+
+    final error = await ref
+        .read(especializacionesProvider.notifier)
+        .eliminar(especializacion.id);
+    if (!mounted || error == null) return;
+    _mostrarError(error);
+  }
+
+  /// Cuenta cuántos técnicos tienen asignada cada especialización.
+  /// Se deriva en la vista a partir de datos ya cargados: no consulta la BD
+  /// ni agrega lógica al backend.
+  Map<int, int> _tecnicosPorEspecializacion() {
+    final tecnicos = ref.watch(tecnicosProvider).value ?? const [];
+    final conteo = <int, int>{};
+    for (final tecnico in tecnicos) {
+      final id = tecnico.especializacionId;
+      if (id != null) conteo[id] = (conteo[id] ?? 0) + 1;
+    }
+    return conteo;
   }
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      backgroundColor: ColoresApp.bgContent,
-      body: Column(
-        children: [
-          // TopBar — solo se reconstruye si cambia el scaffold 
-          TopBarConBoton(
-            titulo: 'Especializaciones',
-            etiquetaBoton: 'Agregar',
-            alPresionarBoton: () =>
-                DialogoEspecializacion.mostrar(context),
-          ),
-
-          // Barra de búsqueda 
-          BarraBusquedaWidget(
-            placeholder: 'Buscar especialización...',
-            alCambiar: _onSearchChanged,
-          ),
-
-          // Cuerpo reactivo 
-          const Expanded(child: _CuerpoLista()),
-        ],
-      ),
-    );
-  }
-}
-
-// Cuerpo — Consumer aislado del Scaffold para evitar reconstrucciones globales
-class _CuerpoLista extends ConsumerWidget {
-  const _CuerpoLista();
-
-  @override
-  Widget build(BuildContext context, WidgetRef ref) {
     final asyncFiltradas = ref.watch(especializacionesFiltradasProvider);
-    final query = ref.watch(busquedaEspecializacionProvider);
+    final busqueda = ref.watch(busquedaEspecializacionProvider);
 
-    return asyncFiltradas.when(
-      // Loading 
-      loading: () => const Center(
-        child: CircularProgressIndicator(color: ColoresApp.primary),
-      ),
-
-      // Error 
-      error: (err, _) => EstadoErrorWidget(
-        mensaje: err.toString(),
-        alReintentar: () =>
-            ref.invalidate(especializacionesProvider),
-      ),
-
-      // Data 
-      data: (lista) {
-        if (lista.isEmpty) {
-          return EstadoVacioWidget(
-            icono: Icons.build_circle_outlined,
-            textoSinDatos: 'Sin especializaciones aún',
-            textoSinResultados:
-                'No hay áreas que coincidan con "$query".',
-            textoCTA:
-                'Crea tu primera especialización presionando "Agregar".',
-            hayFiltro: query.isNotEmpty,
-          );
-        }
-
-        return CustomScrollView(
-          slivers: [
-            // Contador + separador superior
-            SliverToBoxAdapter(
-              child: Padding(
-                padding:
-                    const EdgeInsets.fromLTRB(24, 20, 24, 8),
-                child: _ContadorEspecializaciones(total: lista.length),
+    // Sin `ConstrainedBox`: a diferencia de las tablas, la grilla aprovecha
+    // todo el ancho disponible para caber más tarjetas por fila.
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Row(
+          children: [
+            Expanded(
+              child: BarraBusqueda(
+                controlador: _busquedaController,
+                placeholder: 'Buscar especialización...',
+                alCambiar: _alBuscar,
               ),
             ),
-
-            // Lista de filas
-            SliverList.builder(
-              itemCount: lista.length,
-              itemBuilder: (context, i) {
-                final e = lista[i];
-                return FilaEspecializacion(
-                  key: ValueKey(e.id),
-                  especializacion: e,
-                  indice: i,
-                  alEditar: () => DialogoEspecializacion.mostrar(
-                    context,
-                    especializacionAEditar: e,
-                  ),
-                  alEliminar: () => DialogoConfirmarEliminar.mostrar(
-                    context: context,
-                    nombreElemento: e.nombre,
-                    tipoElemento: 'especialización',
-                    onConfirmar: () {
-                      // leemos ref desde el Consumer padre mediante closure
-                      final notif = ProviderScope.containerOf(context)
-                          .read(especializacionesProvider.notifier);
-                      notif.eliminar(e.id).then((error) {
-                        if (!context.mounted) return;
-                        if (error != null) {
-                          SnackBarMensaje.error(context, error);
-                        } else {
-                          SnackBarMensaje.success(
-                            context,
-                            '"${e.nombre}" eliminado correctamente.',
-                          );
-                        }
-                      });
-                    },
-                  ),
-                );
-              },
+            const SizedBox(width: 20),
+            BotonPrimario(
+              etiqueta: 'Agregar especialización',
+              icono: Icons.add,
+              alPresionar: () => DialogoEspecializacion.mostrar(context),
             ),
-
-            // Padding final para no quedar tapado por la nav bar
-            const SliverPadding(padding: EdgeInsets.only(bottom: 32)),
           ],
+        ),
+        const SizedBox(height: 20),
+        Expanded(
+          child: asyncFiltradas.when(
+            loading: () => const Center(
+              child: CircularProgressIndicator(color: ColoresApp.goGreen),
+            ),
+            error: (e, _) => Center(
+              child: Text(
+                'Error al cargar especializaciones: $e',
+                style: TipografiaApp.cuerpo,
+              ),
+            ),
+            data: (lista) => lista.isEmpty ? _vacio(busqueda) : _grilla(lista),
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _grilla(List<Especializacion> lista) {
+    final conteo = _tecnicosPorEspecializacion();
+
+    // Sin `Scrollbar` explícito: en escritorio `MaterialScrollBehavior` ya la
+    // añade con el controller correcto.
+    return GridView.builder(
+      padding: const EdgeInsets.only(bottom: 8),
+      // Tarjetas anchas y con alto para dos líneas de título, para que los
+      // nombres largos ("Frenos y suspensión") se lean completos.
+      gridDelegate: const SliverGridDelegateWithMaxCrossAxisExtent(
+        maxCrossAxisExtent: 420,
+        mainAxisExtent: 104,
+        crossAxisSpacing: 16,
+        mainAxisSpacing: 16,
+      ),
+      itemCount: lista.length,
+      itemBuilder: (context, i) {
+        final especializacion = lista[i];
+        final total = conteo[especializacion.id] ?? 0;
+
+        return TarjetaCatalogo(
+          icono: Icons.build_outlined,
+          titulo: especializacion.nombre,
+          subtitulo: total == 1 ? '1 técnico' : '$total técnicos',
+          acciones: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              BotonIcono(
+                icono: Icons.edit_outlined,
+                tooltip: 'Editar',
+                alPresionar: () => DialogoEspecializacion.mostrar(
+                  context,
+                  especializacionAEditar: especializacion,
+                ),
+              ),
+              BotonIcono(
+                icono: Icons.delete_outline_rounded,
+                tooltip: 'Eliminar',
+                color: ColoresApp.statusDanger,
+                alPresionar: () => _eliminar(especializacion),
+              ),
+            ],
+          ),
         );
       },
     );
   }
-}
 
-// Contador
-class _ContadorEspecializaciones extends StatelessWidget {
-  const _ContadorEspecializaciones({required this.total});
+  Widget _vacio(String busqueda) {
+    final hayFiltro = busqueda.trim().isNotEmpty;
 
-  final int total;
-
-  @override
-  Widget build(BuildContext context) {
-    return Text(
-      '$total ESPECIALIZACIÓN${total == 1 ? '' : 'ES'}',
-      style: const TextStyle(
-        color: ColoresApp.textLight,
-        fontSize: 11,
-        fontWeight: FontWeight.w600,
-        letterSpacing: 1.1,
+    return Center(
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(
+            Icons.build_circle_outlined,
+            size: 44,
+            color: ColoresApp.textDisabled,
+          ),
+          const SizedBox(height: 14),
+          Text(
+            hayFiltro
+                ? 'Sin resultados para "$busqueda"'
+                : 'Aún no hay especializaciones',
+            style: TipografiaApp.subtitulo,
+          ),
+          const SizedBox(height: 6),
+          Text(
+            hayFiltro
+                ? 'Prueba con otro término de búsqueda.'
+                : 'Crea la primera con "Agregar especialización".',
+            style: TipografiaApp.caption,
+          ),
+        ],
       ),
     );
   }
