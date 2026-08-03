@@ -24,6 +24,8 @@ class ColoresApp {
   static const Color bgSidebar   = Color(0xFF16201B);
 
   static const Color border         = Color(0xFFEAECEA); // borde por defecto de cards, inputs y filas
+  static const Color borderInput    = Color(0xFFE2E6E3); // borde de inputs — un punto más marcado que `border`
+  static const Color borderFila     = Color(0xFFF3F5F3); // separador entre filas de tabla
   static const Color borderFocus    = Color(0xFF01B763); // borde de input enfocado
   static const Color borderSidebar  = Color(0xFF243128); // separador dentro del sidebar
 
