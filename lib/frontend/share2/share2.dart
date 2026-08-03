@@ -3,6 +3,7 @@ export 'cards/cards.dart';
 export 'cuenta/cuenta.dart';
 export 'encabezados/encabezados.dart';
 export 'feedback/feedback.dart';
+export 'filtros/filtros.dart';
 export 'inputs/inputs.dart';
 export 'nav/nav.dart';
 export 'navegacion_secundaria/navegacion_secundaria.dart';
