@@ -4,11 +4,12 @@ import '../../../layout/encabezado_con_cuenta.dart';
 import '../../../share2/share2.dart';
 import '../../especializacion/vista/especializacion_vista.dart';
 import '../../unidades_medida/vista/unidad_medida_vista.dart';
+import '../widgets/tab_servicios.dart';
 
 /// Pantalla de Configuración: ajustes generales del negocio y catálogos base.
 ///
 /// Consolida, como pestañas, catálogos que antes eran secciones propias del
-/// sidebar (Unidades de medida, Especializaciones).
+/// sidebar (Unidades de medida, Especializaciones, Servicios).
 class ConfiguracionVista extends StatefulWidget {
   const ConfiguracionVista({super.key});
 
@@ -24,7 +25,7 @@ class _ConfiguracionVistaState extends State<ConfiguracionVista> {
   @override
   Widget build(BuildContext context) {
     return Padding(
-      padding: const EdgeInsets.all(32),
+      padding: const EdgeInsets.fromLTRB(32, 28, 32, 28),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
@@ -32,7 +33,7 @@ class _ConfiguracionVistaState extends State<ConfiguracionVista> {
             titulo: 'Configuración',
             subtitulo: 'Ajustes generales del negocio y catálogos base',
           ),
-          const SizedBox(height: 24),
+          const SizedBox(height: 20),
           BarraTabsSecundaria(
             indiceActivo: _tabActivo,
             tabs: [
@@ -54,7 +55,7 @@ class _ConfiguracionVistaState extends State<ConfiguracionVista> {
               ),
             ],
           ),
-          const SizedBox(height: 24),
+          const SizedBox(height: 20),
           Expanded(
             child: IndexedStack(
               index: _tabActivo,
@@ -62,7 +63,7 @@ class _ConfiguracionVistaState extends State<ConfiguracionVista> {
                 _TabGeneral(),
                 UnidadesMedidaVista(),
                 EspecializacionesVista(),
-                _TabServiciosPendiente(),
+                TabServicios(),
               ],
             ),
           ),
@@ -80,13 +81,14 @@ class _TabGeneral extends StatefulWidget {
 }
 
 class _TabGeneralState extends State<_TabGeneral> {
-  final _nombreController =
-      TextEditingController(text: 'Taller Inventario K1');
+  final _nombreController = TextEditingController(text: 'Taller Inventario K1');
   final _nitController = TextEditingController(text: '901.555.222-8');
   final _telefonoController = TextEditingController(text: '602 555 7788');
   final _direccionController =
       TextEditingController(text: 'Cra. 8 #23-45, Cali');
-  final _ivaController = TextEditingController(text: '19');
+  final _monedaController =
+      TextEditingController(text: 'Peso colombiano (COP \$)');
+  final _ivaController = TextEditingController(text: '19%');
 
   @override
   void dispose() {
@@ -94,6 +96,7 @@ class _TabGeneralState extends State<_TabGeneral> {
     _nitController.dispose();
     _telefonoController.dispose();
     _direccionController.dispose();
+    _monedaController.dispose();
     _ivaController.dispose();
     super.dispose();
   }
@@ -101,95 +104,76 @@ class _TabGeneralState extends State<_TabGeneral> {
   @override
   Widget build(BuildContext context) {
     return SingleChildScrollView(
-      child: PanelSeccion(
-        titulo: 'Datos del negocio',
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Row(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Expanded(
-                  child: CampoTexto(
-                    etiqueta: 'Nombre del taller',
-                    controlador: _nombreController,
-                  ),
+      child: ConstrainedBox(
+        constraints: const BoxConstraints(maxWidth: 760),
+        child: PanelSeccion(
+          titulo: 'Datos del negocio',
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              _Fila(
+                izquierda: CampoTexto(
+                  etiqueta: 'Nombre del taller',
+                  controlador: _nombreController,
                 ),
-                const SizedBox(width: 24),
-                Expanded(
-                  child: CampoTexto(
-                    etiqueta: 'NIT',
-                    controlador: _nitController,
-                  ),
+                derecha: CampoTexto(
+                  etiqueta: 'NIT',
+                  controlador: _nitController,
+                  monoespaciado: true,
                 ),
-              ],
-            ),
-            const SizedBox(height: 20),
-            Row(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Expanded(
-                  child: CampoTexto(
-                    etiqueta: 'Teléfono',
-                    controlador: _telefonoController,
-                  ),
+              ),
+              const SizedBox(height: 16),
+              _Fila(
+                izquierda: CampoTexto(
+                  etiqueta: 'Teléfono',
+                  controlador: _telefonoController,
                 ),
-                const SizedBox(width: 24),
-                Expanded(
-                  child: CampoTexto(
-                    etiqueta: 'Dirección',
-                    controlador: _direccionController,
-                  ),
+                derecha: CampoTexto(
+                  etiqueta: 'Dirección',
+                  controlador: _direccionController,
                 ),
-              ],
-            ),
-            const SizedBox(height: 20),
-            Row(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Expanded(
-                  child: CampoTexto(
-                    etiqueta: 'IVA por defecto (%)',
-                    controlador: _ivaController,
-                  ),
+              ),
+              const SizedBox(height: 16),
+              _Fila(
+                izquierda: CampoTexto(
+                  etiqueta: 'Moneda',
+                  controlador: _monedaController,
                 ),
-                const SizedBox(width: 24),
-                const Expanded(child: SizedBox()),
-              ],
-            ),
-            const SizedBox(height: 24),
-            BotonPrimario(
-              etiqueta: 'Guardar cambios',
-              icono: Icons.check,
-              alPresionar: () {},
-            ),
-          ],
+                derecha: CampoTexto(
+                  etiqueta: 'IVA por defecto',
+                  controlador: _ivaController,
+                ),
+              ),
+              const SizedBox(height: 22),
+              BotonPrimario(
+                etiqueta: 'Guardar cambios',
+                icono: Icons.check,
+                alPresionar: () {},
+              ),
+            ],
+          ),
         ),
       ),
     );
   }
 }
 
-class _TabServiciosPendiente extends StatelessWidget {
-  const _TabServiciosPendiente();
+/// Dos campos lado a lado, replicando la grilla de 2 columnas del mockup.
+class _Fila extends StatelessWidget {
+  const _Fila({required this.izquierda, required this.derecha});
+
+  final Widget izquierda;
+  final Widget derecha;
 
   @override
   Widget build(BuildContext context) {
-    return Center(
-      child: Column(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          const Icon(
-            Icons.construction_rounded,
-            size: 48,
-            color: ColoresApp.textSecondary,
-          ),
-          const SizedBox(height: 16),
-          Text('Servicios', style: TipografiaApp.heading2),
-          const SizedBox(height: 8),
-          Text('Catálogo en construcción', style: TipografiaApp.caption),
-        ],
-      ),
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Expanded(child: izquierda),
+        const SizedBox(width: 16),
+        Expanded(child: derecha),
+      ],
     );
   }
 }
