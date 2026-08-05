@@ -53,7 +53,7 @@ class DialogoDetalleProductoWidget extends StatelessWidget {
               padding: const EdgeInsets.fromLTRB(24, 20, 16, 0),
               child: Row(
                 children: [
-                  Expanded(
+                  const Expanded(
                     child: Text(
                       'Detalle del producto',
                       style: TipografiaApp.heading3,

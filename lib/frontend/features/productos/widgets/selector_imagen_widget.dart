@@ -226,7 +226,7 @@ class DottedBorder extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return CustomPaint(
-      painter: _PintorPunteado(
+      painter: const _PintorPunteado(
         color: ColoresApp.borderInput,
         radio: 14,
       ),
