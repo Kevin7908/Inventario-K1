@@ -4,7 +4,6 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../../../../backend/features/productos/modelo/producto.dart';
 import '../../../../../../backend/features/ventas/facturas/enum/enum_facturas.dart';
-import '../../../../../../backend/share/database/locator.dart';
 import '../../../../../share/formateadores/moneda_formateador.dart';
 import '../../../../../share/temas/colores_app.dart';
 import '../../../../../share/widgets/botones/boton_mas_widget.dart';
@@ -12,7 +11,6 @@ import '../../../../../share/widgets/output/precio_cop_widget.dart';
 import '../../../../../share/widgets/output/snack_bar_mensaje.dart';
 import '../../../../productos/provider/productos_provider.dart';
 import '../../../../productos/widgets/dialogo_producto_widget.dart';
-import '../../../../proveedores/view_model/proveedores_view_model.dart';
 import '../../provider/facturas_provider.dart';
 
 class PanelBusquedaProductosFactura extends ConsumerStatefulWidget {
@@ -136,7 +134,6 @@ class _PanelBusquedaProductosFacturaState
                 BotonMasWidget(
                   onPressed: () => DialogoProducto.mostrar(
                     context,
-                    proveedoresVm: locator<ProveedoresViewModel>(),
                   ),
                 ),
               ],

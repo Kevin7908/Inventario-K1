@@ -4,12 +4,10 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:inventario_k1/backend/features/motos/modelo/moto.dart';
 import 'package:inventario_k1/backend/features/productos/modelo/producto.dart';
-import 'package:inventario_k1/backend/share/database/locator.dart';
 import 'package:inventario_k1/frontend/features/motos/widgets/dialogo_motos.dart';
 import 'package:inventario_k1/frontend/features/productos/widgets/dialogo_detalle_producto_widget.dart';
 import 'package:inventario_k1/frontend/features/productos/widgets/dialogo_producto_widget.dart';
 import 'package:inventario_k1/frontend/features/productos/widgets/tarjeta_producto_widget.dart';
-import 'package:inventario_k1/frontend/features/proveedores/view_model/proveedores_view_model.dart';
 import 'package:inventario_k1/frontend/share/temas/colores_app.dart';
 import 'package:inventario_k1/frontend/share/widgets/botones/boton_mas_widget.dart';
 import 'package:inventario_k1/frontend/share/widgets/dialogos/dialogo_confirmar_eliminar_widget.dart';
@@ -118,7 +116,6 @@ class _CotizacionDetalleVistaState
   void _agregarNuevoProducto() {
     DialogoProducto.mostrar(
       context,
-      proveedoresVm: locator<ProveedoresViewModel>(),
     ).then((_) => ref.invalidate(productosParaCotizacionProvider));
   }
 
@@ -128,7 +125,6 @@ class _CotizacionDetalleVistaState
   void _editarProducto(Producto p) {
     DialogoProducto.mostrar(
       context,
-      proveedoresVm: locator<ProveedoresViewModel>(),
       productoAEditar: p,
     ).then((_) => ref.invalidate(productosParaCotizacionProvider));
   }

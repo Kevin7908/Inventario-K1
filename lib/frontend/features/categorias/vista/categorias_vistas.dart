@@ -310,16 +310,3 @@ class _Vacio extends StatelessWidget {
     );
   }
 }
-
-/// Inicial en mayúscula de un nombre. Cadena vacía si el nombre lo está.
-String inicialDe(String nombre) =>
-    nombre.trim().isEmpty ? '' : nombre.trim()[0].toUpperCase();
-
-/// Convierte `#RRGGBB` en [Color]. Devuelve `null` si el texto no es un hex
-/// válido, y quien lo use cae a su color por defecto.
-Color? colorDeHex(String hex) {
-  final limpio = hex.replaceAll('#', '').trim();
-  if (limpio.length != 6) return null;
-  final valor = int.tryParse(limpio, radix: 16);
-  return valor == null ? null : Color(0xFF000000 | valor);
-}

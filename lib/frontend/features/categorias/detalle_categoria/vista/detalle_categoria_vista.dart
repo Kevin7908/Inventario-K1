@@ -11,7 +11,6 @@ import '../../../../share2/share2.dart';
 import '../../../productos/provider/productos_provider.dart';
 import '../../../productos/vista/producto_detalle_vista.dart';
 import '../../../productos/vista/producto_formulario_vista.dart';
-import '../../vista/categorias_vistas.dart';
 import '../widgets/tabla_productos_categoria.dart';
 
 /// Ficha de una categoría: sus datos y la tabla de productos que contiene.
