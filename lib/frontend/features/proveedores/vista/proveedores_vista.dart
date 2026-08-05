@@ -1,232 +1,183 @@
-// frontend/features/proveedores/vistas/proveedores_vista.dart
-
 import 'dart:async';
 
 import 'package:flutter/material.dart';
-import 'package:provider/provider.dart';
+import 'package:flutter/services.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 
-import '../../../../backend/share/database/locator.dart';
-import '../../../share/temas/colores_app.dart';
-import '../../../share/widgets/dialogos/dialogo_confirmar_eliminar_widget.dart';
-import '../../../share/widgets/input/barra_busqueda_widget.dart';
-import '../../../share/widgets/output/chip_filtro_widget.dart';
-import '../../../share/widgets/output/estado_error_widget.dart';
-import '../../../share/widgets/output/estado_vacio_widget.dart';
-import '../../../share/widgets/top_bar_widget.dart';
-import '../view_model/proveedores_view_model.dart';
-import '../widgets/dialogo_proveedor_widget.dart';
-import '../widgets/tarjeta_proveedor_widget.dart';
+import '../../../../backend/features/proveedores/modelo/proveedor.dart';
+import '../../../layout/encabezado_con_cuenta.dart';
+import '../../../share2/share2.dart';
+import '../provider/proveedores_provider.dart';
+import '../widgets/grilla_proveedores.dart';
+import 'proveedor_formulario_vista.dart';
 
-class ProveedoresVista extends StatefulWidget {
+/// Pantalla de Proveedores: distribuidores y casas de repuestos en grilla.
+///
+/// Igual que Productos y Categorías, hospeda la navegación interna del módulo
+/// —catálogo y formulario— sin rutas globales. El alta y la edición van en
+/// página completa, no en diálogo.
+class ProveedoresVista extends ConsumerStatefulWidget {
   const ProveedoresVista({super.key});
 
   @override
-  State<ProveedoresVista> createState() => _ProveedoresVistaState();
+  ConsumerState<ProveedoresVista> createState() => _ProveedoresVistaState();
 }
 
-class _ProveedoresVistaState extends State<ProveedoresVista> {
-  late final ProveedoresViewModel _vm;
+/// Vista activa dentro del módulo.
+enum _Pantalla { lista, formulario }
+
+class _ProveedoresVistaState extends ConsumerState<ProveedoresVista> {
+  final _busquedaController = TextEditingController();
+  final _focoBusqueda = FocusNode();
   Timer? _debounce;
 
-  @override
-  void initState() {
-    super.initState();
-    _vm = locator<ProveedoresViewModel>();
-  }
+  _Pantalla _pantalla = _Pantalla.lista;
+  Proveedor? _seleccionado;
 
   @override
   void dispose() {
     _debounce?.cancel();
-    _vm.dispose();
+    _busquedaController.dispose();
+    _focoBusqueda.dispose();
     super.dispose();
   }
 
-  void _onSearchChanged(String query) {
-    if (_debounce?.isActive ?? false) _debounce?.cancel();
-    _debounce = Timer(const Duration(milliseconds: 300), () {
-      _vm.buscar(query);
+  void _alBuscar(String texto) {
+    _debounce?.cancel();
+    _debounce = Timer(const Duration(milliseconds: 280), () {
+      if (!mounted) return;
+      ref.read(proveedoresProvider.notifier).buscar(texto);
     });
   }
 
+  void _nuevoProveedor() => setState(() {
+    _seleccionado = null;
+    _pantalla = _Pantalla.formulario;
+  });
+
+  void _editar(Proveedor proveedor) => setState(() {
+    _seleccionado = proveedor;
+    _pantalla = _Pantalla.formulario;
+  });
+
+  void _volverALista() => setState(() => _pantalla = _Pantalla.lista);
+
   @override
   Widget build(BuildContext context) {
-    return ChangeNotifierProvider<ProveedoresViewModel>.value(
-      value: _vm,
-      child: Scaffold(
-        backgroundColor: ColoresApp.bgContent,
-        body: Column(
+    return switch (_pantalla) {
+      _Pantalla.lista => _lista(),
+      _Pantalla.formulario => ProveedorFormularioVista(
+        proveedorAEditar: _seleccionado,
+        alCerrar: _volverALista,
+      ),
+    };
+  }
+
+  /// La raíz no observa ningún provider: cada bloque se suscribe al suyo, así
+  /// que escribir en el buscador no reconstruye el encabezado ni los chips.
+  Widget _lista() {
+    return CallbackShortcuts(
+      bindings: {
+        const SingleActivator(LogicalKeyboardKey.keyF, control: true): () =>
+            _focoBusqueda.requestFocus(),
+      },
+      child: Padding(
+        padding: const EdgeInsets.fromLTRB(32, 28, 32, 28),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            // TopBar: no depende del VM → nunca se reconstruye por datos
-            Consumer<ProveedoresViewModel>(
-              builder: (context, vm, _) => TopBarConBoton(
-                titulo: 'Proveedores',
-                etiquetaBoton: 'Agregar',
-                alPresionarBoton: () =>
-                    DialogoProveedor.mostrar(context, viewModel: vm),
-              ),
+            const _EncabezadoProveedores(),
+            const SizedBox(height: 20),
+            Row(
+              children: [
+                Expanded(
+                  child: BarraBusqueda(
+                    controlador: _busquedaController,
+                    focoTeclado: _focoBusqueda,
+                    placeholder: 'Buscar proveedor, NIT, ciudad...',
+                    alCambiar: _alBuscar,
+                  ),
+                ),
+                const SizedBox(width: 20),
+                BotonPrimario(
+                  etiqueta: 'Nuevo proveedor',
+                  icono: Icons.add,
+                  alPresionar: _nuevoProveedor,
+                ),
+              ],
             ),
-
-            BarraBusquedaWidget(
-              placeholder: 'Buscar proveedor, NIT, ciudad...',
-              alCambiar: _onSearchChanged,
-            ),
-
-            // El Consumer queda confinado al cuerpo de datos
-            const Expanded(child: _CuerpoLista()),
+            const SizedBox(height: 16),
+            const _ChipsEstado(),
+            const SizedBox(height: 16),
+            Expanded(child: GrillaProveedores(alEditar: _editar)),
           ],
         ),
       ),
     );
   }
 }
-class _CuerpoLista extends StatelessWidget {
-  const _CuerpoLista();
+
+/// Encabezado con los conteos del catálogo.
+class _EncabezadoProveedores extends ConsumerWidget {
+  const _EncabezadoProveedores();
 
   @override
-  Widget build(BuildContext context) {
-    return Consumer<ProveedoresViewModel>(
-      builder: (context, vm, _) {
-        if (vm.estaCargando) {
-          return const Center(
-            child: CircularProgressIndicator(color: ColoresApp.primary),
-          );
-        }
+  Widget build(BuildContext context, WidgetRef ref) {
+    final resumen = ref.watch(proveedoresResumenProvider).value;
+    final total = resumen?.total ?? 0;
+    final activos = resumen?.activos ?? 0;
 
-        if (vm.estado == EstadoProveedores.error) {
-          return EstadoErrorWidget(
-            mensaje: vm.mensajeError ?? 'Error desconocido',
-            alReintentar: vm.cargarProveedores,
-          );
-        }
+    final buffer = StringBuffer('Distribuidores y casas de repuestos');
+    if (total > 0) {
+      buffer.write(total == 1 ? ' · 1 proveedor' : ' · $total proveedores');
+      if (activos < total) buffer.write(' · $activos activos');
+    }
 
-        if (vm.proveedores.isEmpty) {
-          return EstadoVacioWidget(
-            icono: Icons.store_mall_directory_outlined,
-            textoSinDatos: 'Sin proveedores aún',
-            textoSinResultados: 'No hay proveedores que coincidan.',
-            textoCTA: 'Crea tu primer proveedor presionando "Agregar".',
-            hayFiltro:
-                vm.consultaBusqueda.isNotEmpty || vm.filtroActivo != null,
-          );
-        }
-
-        return CustomScrollView(
-          slivers: [
-            SliverToBoxAdapter(
-              child: Padding(
-                padding: const EdgeInsets.fromLTRB(24, 20, 24, 16),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    const SizedBox(height: 12),
-                    _ChipsFiltro(vm: vm),
-                    const SizedBox(height: 14),
-                    _ContadorProveedores(total: vm.proveedores.length),
-                  ],
-                ),
-              ),
-            ),
-            _SliverGrillaProveedores(vm: vm),
-          ],
-        );
-      },
+    return EncabezadoConCuenta(
+      titulo: 'Proveedores',
+      subtitulo: buffer.toString(),
     );
   }
 }
 
-class _ChipsFiltro extends StatelessWidget {
-  const _ChipsFiltro({required this.vm});
-
-  final ProveedoresViewModel vm;
+/// Chips de filtro por estado.
+///
+/// El diseño no los tiene, pero el modelo distingue activo de inactivo desde
+/// siempre y la grilla mezclaría ambos sin forma de separarlos.
+class _ChipsEstado extends ConsumerWidget {
+  const _ChipsEstado();
 
   @override
-  Widget build(BuildContext context) {
-    return Row(
+  Widget build(BuildContext context, WidgetRef ref) {
+    final activo = ref.watch(
+      proveedoresProvider.select((s) => s.value?.filtroActivo),
+    );
+
+    void filtrar(bool? valor) =>
+        ref.read(proveedoresProvider.notifier).filtrarPorActivo(valor);
+
+    return Wrap(
+      spacing: 9,
+      runSpacing: 9,
       children: [
         ChipFiltro(
           etiqueta: 'Todos',
-          seleccionado: vm.filtroActivo == null,
-          alPresionar: () => vm.filtrarPorActivo(null),
+          seleccionado: activo == null,
+          alPresionar: () => filtrar(null),
         ),
-        const SizedBox(width: 8),
         ChipFiltro(
           etiqueta: 'Activos',
-          seleccionado: vm.filtroActivo == true,
-          alPresionar: () => vm.filtrarPorActivo(true),
-          color: const Color(0xFF10B981),
+          seleccionado: activo == true,
+          colorActivo: ColoresApp.statusSuccess,
+          alPresionar: () => filtrar(true),
         ),
-        const SizedBox(width: 8),
         ChipFiltro(
           etiqueta: 'Inactivos',
-          seleccionado: vm.filtroActivo == false,
-          alPresionar: () => vm.filtrarPorActivo(false),
-          color: ColoresApp.textLight,
+          seleccionado: activo == false,
+          colorActivo: ColoresApp.statusNeutral,
+          alPresionar: () => filtrar(false),
         ),
       ],
-    );
-  }
-}
-
-class _ContadorProveedores extends StatelessWidget {
-  const _ContadorProveedores({required this.total});
-
-  final int total;
-
-  @override
-  Widget build(BuildContext context) {
-    return Text(
-      '$total PROVEEDOR${total == 1 ? '' : 'ES'}',
-      style: const TextStyle(
-        color: ColoresApp.textLight,
-        fontSize: 11,
-        fontWeight: FontWeight.w600,
-        letterSpacing: 1.1,
-      ),
-    );
-  }
-}
-class _SliverGrillaProveedores extends StatelessWidget {
-  const _SliverGrillaProveedores({required this.vm});
-
-  final ProveedoresViewModel vm;
-
-  static const double _maxAnchoCelda = 340.0;
-  static const double _espaciado = 16.0;
-  static const double _alturaCelda = 320.0;
-
-  @override
-  Widget build(BuildContext context) {
-    return SliverPadding(
-      padding: const EdgeInsets.fromLTRB(24, 0, 24, 32),
-      sliver: SliverGrid(
-        delegate: SliverChildBuilderDelegate(
-          (context, i) {
-            final proveedor = vm.proveedores[i];
-            return TarjetaProveedorWidget(
-              key: ValueKey(proveedor.id),
-              proveedor: proveedor,
-              alEditar: () => DialogoProveedor.mostrar(
-                context,
-                proveedorAEditar: proveedor,
-                viewModel: vm,
-              ),
-              alEliminar: () => DialogoConfirmarEliminar.mostrar(
-                context: context,
-                nombreElemento: proveedor.nombre,
-                tipoElemento: 'proveedor',
-                onConfirmar: () => vm.eliminarProveedor(proveedor.id!),
-              ),
-            );
-          },
-          childCount: vm.proveedores.length,
-        ),
-        gridDelegate: const SliverGridDelegateWithMaxCrossAxisExtent(
-          maxCrossAxisExtent: _maxAnchoCelda,
-          crossAxisSpacing: _espaciado,
-          mainAxisSpacing: _espaciado,
-          mainAxisExtent: _alturaCelda,
-        ),
-      ),
     );
   }
 }

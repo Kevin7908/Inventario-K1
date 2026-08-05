@@ -3,11 +3,8 @@ import 'package:inventario_k1/backend/share/database/app_db.dart';
 
 import '../../../frontend/features/autenticacion/view_model/auth_view_model.dart';
 import '../../../frontend/features/autenticacion/view_model/registro_view_model.dart';
-import '../../../frontend/features/proveedores/view_model/proveedores_view_model.dart';
 import '../../features/autenticacion/repositorio/repositorio_auth.dart';
 import '../../features/autenticacion/repositorio/repositorio_auth_impl.dart';
-import '../../features/productos/repositorio/repositorio_producto_impl.dart';
-import '../../features/proveedores/repositorio/repositorio_proveedor_impl.dart';
 
 import '../servicios/servicio_email.dart';
 import '../servicios/servicio_verificacion.dart';
@@ -33,12 +30,8 @@ void setupLocator() {
   locator.registerLazySingleton<RepositorioAuth>(
     () => RepositorioAuthImpl(locator<AppDb>()),
   );
-  locator.registerLazySingleton<RepositorioProveedoresImpl>(
-    () => RepositorioProveedoresImpl(locator<AppDb>()),
-  );
-  locator.registerLazySingleton<RepositorioProductosImpl>(
-    () => RepositorioProductosImpl(locator<AppDb>()),
-  );
+  // Productos, categorías, unidades de medida y proveedores ya no pasan por
+  // aquí: sus repositorios los construye Riverpod (`repositorioXProvider`).
 
   // ViewModels de Auth
   locator.registerLazySingleton<AuthViewModel>(
@@ -50,10 +43,5 @@ void setupLocator() {
       locator<ServicioEmail>(),
       locator<ServicioVerificacion>(),
     ),
-  );
-
-  // ViewModels (Riverpod gestiona categorías y unidades de medida)
-  locator.registerLazySingleton<ProveedoresViewModel>(
-    () => ProveedoresViewModel(locator<RepositorioProveedoresImpl>()),
   );
 }
