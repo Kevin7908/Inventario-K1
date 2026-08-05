@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 
 import '../../../../backend/features/productos/modelo/producto.dart';
 import '../../../share2/share2.dart';
+import '../widgets/badget_estado_stock_widget.dart';
 import 'producto_vista.dart';
 
 /// Ficha de un producto: imagen, datos de inventario y acciones.
@@ -130,7 +131,7 @@ class _Galeria extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final ruta = rutaImagen;
-    final hayImagen = ruta != null && ruta.isNotEmpty && File(ruta).existsSync();
+    final hayRuta = ruta != null && ruta.isNotEmpty;
 
     return Container(
       height: 360,
@@ -140,14 +141,22 @@ class _Galeria extends StatelessWidget {
         border: Border.all(color: ColoresApp.border),
       ),
       clipBehavior: Clip.antiAlias,
-      child: hayImagen
-          ? Image.file(
-              File(ruta),
-              fit: BoxFit.cover,
-              width: double.infinity,
-              errorBuilder: (_, _, _) => const _SinImagen(),
-            )
-          : const _SinImagen(),
+      child: hayRuta ? _imagen(context, ruta) : const _SinImagen(),
+    );
+  }
+
+  Widget _imagen(BuildContext context, String ruta) {
+    // Sin `existsSync()` en build (I/O síncrono): el `errorBuilder` ya cubre el
+    // archivo que no está. `cacheHeight` evita decodificar una foto enorme para
+    // pintarla en 360 px de alto.
+    final escala = MediaQuery.devicePixelRatioOf(context);
+
+    return Image.file(
+      File(ruta),
+      fit: BoxFit.cover,
+      width: double.infinity,
+      cacheHeight: (360 * escala).round(),
+      errorBuilder: (_, _, _) => const _SinImagen(),
     );
   }
 }
@@ -157,16 +166,16 @@ class _SinImagen extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Center(
+    return const Center(
       child: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
-          const Icon(
+          Icon(
             Icons.image_outlined,
             size: 46,
             color: ColoresApp.textDisabled,
           ),
-          const SizedBox(height: 10),
+          SizedBox(height: 10),
           Text('Sin imagen', style: TipografiaApp.caption),
         ],
       ),
@@ -183,25 +192,6 @@ class _Ficha extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final (etiquetaStock, colorStock, fondoStock) =
-        switch (producto.estadoStock) {
-      EstadoStock.enStock => (
-          'En stock',
-          ColoresApp.stockOk,
-          ColoresApp.statusSuccessBg,
-        ),
-      EstadoStock.stockBajo => (
-          'Stock bajo',
-          ColoresApp.stockLow,
-          ColoresApp.statusWarningBg,
-        ),
-      EstadoStock.sinStock => (
-          'Agotado',
-          ColoresApp.stockOut,
-          ColoresApp.statusDangerBg,
-        ),
-    };
-
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -230,12 +220,7 @@ class _Ficha extends StatelessWidget {
               ),
             ),
             const SizedBox(width: 16),
-            IndicadorEstado(
-              etiqueta: etiquetaStock,
-              color: colorStock,
-              colorFondo: fondoStock,
-              conPunto: true,
-            ),
+            BadgeEstadoStock(estado: producto.estadoStock),
           ],
         ),
         if (producto.aplicaIva) ...[
@@ -285,47 +270,55 @@ class _GrillaDatos extends StatelessWidget {
 
     final unidad = producto.unidadMedidaNombre ?? 'und';
 
+    // `IntrinsicHeight` iguala el alto de las dos tarjetas de cada fila.
+    // No se usa `CrossAxisAlignment.stretch`: la ficha vive dentro de un
+    // `SingleChildScrollView`, así que no tiene alto acotado y estirar los
+    // hijos hasta el infinito reventaba el layout.
     return Column(
       children: [
-        Row(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            Expanded(
-              child: TarjetaInfo(
-                etiqueta: 'Stock disponible',
-                valor: '${cantidad(producto.stockActual)} $unidad',
-                colorValor: producto.estadoStock == EstadoStock.sinStock
-                    ? ColoresApp.stockOut
-                    : null,
+        IntrinsicHeight(
+          child: Row(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              Expanded(
+                child: TarjetaInfo(
+                  etiqueta: 'Stock disponible',
+                  valor: '${cantidad(producto.stockActual)} $unidad',
+                  colorValor: producto.estadoStock == EstadoStock.sinStock
+                      ? ColoresApp.stockOut
+                      : null,
+                ),
               ),
-            ),
-            const SizedBox(width: 13),
-            Expanded(
-              child: TarjetaInfo(
-                etiqueta: 'Stock mínimo',
-                valor: '${cantidad(producto.stockMinimo)} $unidad',
+              const SizedBox(width: 13),
+              Expanded(
+                child: TarjetaInfo(
+                  etiqueta: 'Stock mínimo',
+                  valor: '${cantidad(producto.stockMinimo)} $unidad',
+                ),
               ),
-            ),
-          ],
+            ],
+          ),
         ),
         const SizedBox(height: 13),
-        Row(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            Expanded(
-              child: TarjetaInfo(
-                etiqueta: 'Ubicación',
-                valor: producto.ubicacionBodega ?? '—',
+        IntrinsicHeight(
+          child: Row(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              Expanded(
+                child: TarjetaInfo(
+                  etiqueta: 'Ubicación',
+                  valor: producto.ubicacionBodega ?? '—',
+                ),
               ),
-            ),
-            const SizedBox(width: 13),
-            Expanded(
-              child: TarjetaInfo(
-                etiqueta: 'Unidad de medida',
-                valor: producto.unidadMedidaNombre ?? '—',
+              const SizedBox(width: 13),
+              Expanded(
+                child: TarjetaInfo(
+                  etiqueta: 'Unidad de medida',
+                  valor: producto.unidadMedidaNombre ?? '—',
+                ),
               ),
-            ),
-          ],
+            ],
+          ),
         ),
       ],
     );
