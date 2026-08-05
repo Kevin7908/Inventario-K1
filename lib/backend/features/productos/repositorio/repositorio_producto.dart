@@ -1,5 +1,36 @@
 import '../modelo/producto.dart';
 
+/// Una página de resultados junto al total de coincidencias.
+///
+/// [total] cuenta **todas** las filas que cumplen el filtro, no las de la
+/// página: es lo que necesita el paginador para saber cuántas páginas hay.
+class PaginaProductos {
+  const PaginaProductos({required this.items, required this.total});
+
+  final List<Producto> items;
+  final int total;
+
+  static const vacia = PaginaProductos(items: [], total: 0);
+}
+
+/// Criterios de filtrado que se aplican **en SQL**, no en memoria.
+class FiltroProductos {
+  const FiltroProductos({
+    this.busqueda = '',
+    this.categoriaId,
+    this.soloStockBajo = false,
+    this.soloSinStock = false,
+    this.soloEnStock = false,
+  });
+
+  /// Coincide contra nombre, SKU o nombre de categoría.
+  final String busqueda;
+  final int? categoriaId;
+  final bool soloStockBajo;
+  final bool soloSinStock;
+  final bool soloEnStock;
+}
+
 /// Contrato abstracto del repositorio de productos.
 /// El ViewModel depende de esta abstracción, nunca de la implementación concreta.
 abstract class RepositorioProducto {
@@ -58,4 +89,25 @@ abstract class RepositorioProducto {
 
   /// Retorna el total de productos con stock bajo.
   Future<int> contarConStockBajo();
+
+  // Paginación — el filtrado y el conteo ocurren en la base de datos.
+
+  /// Observa una página de productos que cumplen [filtro].
+  ///
+  /// [pagina] es de base cero. Re-emite cuando cambian los datos, igual que
+  /// [observarTodos], pero trayendo solo [tamano] filas en vez del catálogo
+  /// completo.
+  Stream<PaginaProductos> observarPagina({
+    required FiltroProductos filtro,
+    required int pagina,
+    required int tamano,
+  });
+
+  /// Observa cuántos productos tiene cada categoría, indexado por su id.
+  ///
+  /// Se resuelve con un `GROUP BY`, no cargando los productos en memoria.
+  Stream<Map<int, int>> observarConteoPorCategoria();
+
+  /// Observa el total de productos y cuántos no están en stock normal.
+  Stream<({int total, int stockBajo})> observarResumen();
 }

@@ -198,4 +198,108 @@ class RepositorioProductosImpl implements RepositorioProducto {
     final result = await query.getSingle();
     return result.read(expr) ?? 0;
   }
+
+  // Paginación — WHERE, COUNT y LIMIT los resuelve SQLite, no el frontend.
+
+  /// Traduce [FiltroProductos] a una expresión SQL reutilizable por la
+  /// consulta de la página y por la del total.
+  Expression<bool> _condicion(FiltroProductos filtro) {
+    final p = _db.tablaProducto;
+    Expression<bool> acumulado = const Constant(true);
+
+    final texto = filtro.busqueda.trim();
+    if (texto.isNotEmpty) {
+      final patron = '%${texto.toLowerCase()}%';
+      acumulado = acumulado &
+          (p.nombre.lower().like(patron) |
+              p.sku.lower().like(patron) |
+              _db.tablaCategoria.nombre.lower().like(patron));
+    }
+
+    final categoria = filtro.categoriaId;
+    if (categoria != null) {
+      acumulado = acumulado & p.categoriaId.equals(categoria);
+    }
+
+    if (filtro.soloSinStock) {
+      acumulado = acumulado & p.stockActual.isSmallerOrEqualValue(0);
+    } else if (filtro.soloStockBajo) {
+      acumulado = acumulado &
+          p.stockActual.isBiggerThanValue(0) &
+          p.stockActual.isSmallerOrEqual(p.stockMinimo);
+    } else if (filtro.soloEnStock) {
+      acumulado = acumulado & p.stockActual.isBiggerThan(p.stockMinimo);
+    }
+
+    return acumulado;
+  }
+
+  @override
+  Stream<PaginaProductos> observarPagina({
+    required FiltroProductos filtro,
+    required int pagina,
+    required int tamano,
+  }) {
+    final condicion = _condicion(filtro);
+
+    final consultaPagina = _queryConJoin()
+      ..where(condicion)
+      ..orderBy([OrderingTerm.asc(_db.tablaProducto.nombre)])
+      ..limit(tamano, offset: pagina * tamano);
+
+    // El total va en su propia consulta: `limit` no debe afectarlo.
+    final total = _db.tablaProducto.id.count();
+    final consultaTotal = _db.select(_db.tablaProducto).join([
+      leftOuterJoin(
+        _db.tablaCategoria,
+        _db.tablaCategoria.id.equalsExp(_db.tablaProducto.categoriaId),
+      ),
+    ])
+      ..addColumns([total])
+      ..where(condicion);
+
+    return consultaPagina.watch().asyncMap((filas) async {
+      final fila = await consultaTotal.getSingleOrNull();
+      return PaginaProductos(
+        items: _mapear(filas),
+        total: fila?.read(total) ?? 0,
+      );
+    });
+  }
+
+  @override
+  Stream<Map<int, int>> observarConteoPorCategoria() {
+    final cantidad = _db.tablaProducto.id.count();
+    final consulta = _db.selectOnly(_db.tablaProducto)
+      ..addColumns([_db.tablaProducto.categoriaId, cantidad])
+      ..where(_db.tablaProducto.categoriaId.isNotNull())
+      ..groupBy([_db.tablaProducto.categoriaId]);
+
+    return consulta.watch().map((filas) {
+      final conteo = <int, int>{};
+      for (final fila in filas) {
+        final id = fila.read(_db.tablaProducto.categoriaId);
+        if (id != null) conteo[id] = fila.read(cantidad) ?? 0;
+      }
+      return conteo;
+    });
+  }
+
+  @override
+  Stream<({int total, int stockBajo})> observarResumen() {
+    final p = _db.tablaProducto;
+    final total = p.id.count();
+    final bajos = p.id.count(
+      filter: p.stockActual.isSmallerOrEqual(p.stockMinimo),
+    );
+
+    final consulta = _db.selectOnly(p)..addColumns([total, bajos]);
+
+    return consulta.watchSingleOrNull().map(
+          (fila) => (
+            total: fila?.read(total) ?? 0,
+            stockBajo: fila?.read(bajos) ?? 0,
+          ),
+        );
+  }
 }

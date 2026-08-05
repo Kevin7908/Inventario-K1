@@ -68,4 +68,37 @@ class RepositorioCategoriasImpl implements RepositorioCategorias {
     final resultado = await query.getSingleOrNull();
     return resultado != null;
   }
+
+  @override
+  Stream<PaginaCategorias> observarPagina({
+    String busqueda = '',
+    required int pagina,
+    required int tamano,
+  }) {
+    final t = _db.tablaCategoria;
+    final texto = busqueda.trim().toLowerCase();
+
+    Expression<bool> condicion(dynamic tabla) => texto.isEmpty
+        ? const Constant(true)
+        : t.nombre.lower().like('%$texto%');
+
+    final consultaPagina = _db.select(t)
+      ..where(condicion)
+      ..orderBy([(f) => OrderingTerm.asc(f.nombre)])
+      ..limit(tamano, offset: pagina * tamano);
+
+    // El total va en su propia consulta: `limit` no debe recortarlo.
+    final cantidad = t.id.count();
+    final consultaTotal = _db.selectOnly(t)
+      ..addColumns([cantidad])
+      ..where(condicion(t));
+
+    return consultaPagina.watch().asyncMap((filas) async {
+      final fila = await consultaTotal.getSingleOrNull();
+      return PaginaCategorias(
+        items: filas.map(CategoriaMapper.filaAModelo).toList(),
+        total: fila?.read(cantidad) ?? 0,
+      );
+    });
+  }
 }
