@@ -1,15 +1,20 @@
 import 'dart:async';
 import 'dart:io';
 
+import '../../../../core/resultado.dart';
+
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../../backend/features/productos/modelo/producto.dart';
 import '../../../layout/encabezado_con_cuenta.dart';
 import '../../../share2/share2.dart';
+import '../../../../backend/features/categorias/modelo/categoria.dart';
 import '../../categorias/provider/categorias_provider.dart';
+import '../../categorias/vista/categorias_vistas.dart';
 import '../provider/productos_provider.dart';
-import '../widgets/badget_estado_stock_widget.dart';
+import '../widgets/columnas_tabla_producto.dart';
 import 'producto_detalle_vista.dart';
 import 'producto_formulario_vista.dart';
 
@@ -30,6 +35,7 @@ enum _Pantalla { lista, detalle, formulario }
 
 class _ProductosVistaState extends ConsumerState<ProductosVista> {
   final _busquedaController = TextEditingController();
+  final _focoBusqueda = FocusNode();
   Timer? _debounce;
 
   _Pantalla _pantalla = _Pantalla.lista;
@@ -39,6 +45,7 @@ class _ProductosVistaState extends ConsumerState<ProductosVista> {
   void dispose() {
     _debounce?.cancel();
     _busquedaController.dispose();
+    _focoBusqueda.dispose();
     super.dispose();
   }
 
@@ -51,35 +58,72 @@ class _ProductosVistaState extends ConsumerState<ProductosVista> {
   }
 
   void _verDetalle(Producto producto) => setState(() {
-        _seleccionado = producto;
-        _pantalla = _Pantalla.detalle;
-      });
+    _seleccionado = producto;
+    _pantalla = _Pantalla.detalle;
+  });
 
   void _nuevoProducto() => setState(() {
-        _seleccionado = null;
-        _pantalla = _Pantalla.formulario;
-      });
+    _seleccionado = null;
+    _pantalla = _Pantalla.formulario;
+  });
 
   void _editar(Producto producto) => setState(() {
-        _seleccionado = producto;
-        _pantalla = _Pantalla.formulario;
-      });
+    _seleccionado = producto;
+    _pantalla = _Pantalla.formulario;
+  });
 
   void _volverALista() => setState(() => _pantalla = _Pantalla.lista);
+
+  void _mostrarError(String error) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(
+          error,
+          style: TipografiaApp.sobrePrimario(TipografiaApp.cuerpo),
+        ),
+        backgroundColor: ColoresApp.statusDanger,
+      ),
+    );
+  }
+
+  /// Elimina el producto abierto y regresa al catálogo.
+  Future<void> _eliminar(Producto producto) async {
+    final confirmado = await DialogoConfirmacion.mostrar(
+      context,
+      titulo: '¿Eliminar "${producto.nombre}"?',
+      mensaje:
+          'Se quitará del catálogo y de los filtros. '
+          'Esta acción no se puede deshacer.',
+    );
+    if (confirmado != true || !mounted) return;
+
+    final resultado = await ref
+        .read(productosProvider.notifier)
+        .eliminar(producto.id!);
+    if (!mounted) return;
+
+    switch (resultado) {
+      case Exito():
+        _volverALista();
+      case Fallo(:final mensaje):
+        _mostrarError(mensaje);
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
     return switch (_pantalla) {
       _Pantalla.lista => _lista(),
       _Pantalla.detalle => ProductoDetalleVista(
-          producto: _seleccionado!,
-          alVolver: _volverALista,
-          alEditar: () => _editar(_seleccionado!),
-        ),
+        producto: _seleccionado!,
+        alVolver: _volverALista,
+        alEditar: () => _editar(_seleccionado!),
+        alEliminar: () => _eliminar(_seleccionado!),
+      ),
       _Pantalla.formulario => ProductoFormularioVista(
-          productoAEditar: _seleccionado,
-          alCerrar: _volverALista,
-        ),
+        productoAEditar: _seleccionado,
+        alCerrar: _volverALista,
+      ),
     };
   }
 
@@ -87,42 +131,49 @@ class _ProductosVistaState extends ConsumerState<ProductosVista> {
   /// que escribir en el buscador de categorías no reconstruye la tabla ni el
   /// encabezado.
   Widget _lista() {
-    return Row(
-      crossAxisAlignment: CrossAxisAlignment.stretch,
-      children: [
-        const _PanelCategorias(),
-        Expanded(
-          child: Padding(
-            padding: const EdgeInsets.fromLTRB(32, 28, 32, 28),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                const _EncabezadoProductos(),
-                const SizedBox(height: 20),
-                Row(
-                  children: [
-                    Expanded(
-                      child: BarraBusqueda(
-                        controlador: _busquedaController,
-                        placeholder: 'Buscar repuesto, referencia, SKU...',
-                        alCambiar: _alBuscar,
+    return CallbackShortcuts(
+      bindings: {
+        const SingleActivator(LogicalKeyboardKey.keyF, control: true): () =>
+            _focoBusqueda.requestFocus(),
+      },
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          const _PanelCategorias(),
+          Expanded(
+            child: Padding(
+              padding: const EdgeInsets.fromLTRB(32, 28, 32, 28),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const _EncabezadoProductos(),
+                  const SizedBox(height: 20),
+                  Row(
+                    children: [
+                      Expanded(
+                        child: BarraBusqueda(
+                          controlador: _busquedaController,
+                          focoTeclado: _focoBusqueda,
+                          placeholder: 'Buscar repuesto, referencia, SKU...',
+                          alCambiar: _alBuscar,
+                        ),
                       ),
-                    ),
-                    const SizedBox(width: 20),
-                    BotonPrimario(
-                      etiqueta: 'Nuevo producto',
-                      icono: Icons.add,
-                      alPresionar: _nuevoProducto,
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 18),
-                Expanded(child: _TablaProductos(alVerDetalle: _verDetalle)),
-              ],
+                      const SizedBox(width: 20),
+                      BotonPrimario(
+                        etiqueta: 'Nuevo producto',
+                        icono: Icons.add,
+                        alPresionar: _nuevoProducto,
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 18),
+                  Expanded(child: _TablaProductos(alVerDetalle: _verDetalle)),
+                ],
+              ),
             ),
           ),
-        ),
-      ],
+        ],
+      ),
     );
   }
 }
@@ -136,12 +187,13 @@ class _EncabezadoProductos extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final resumen = ref.watch(productosResumenProvider);
+    final resumen = ref.watch(productosResumenProvider).value;
+    final total = resumen?.total ?? 0;
+    final bajos = resumen?.stockBajo ?? 0;
 
     return EncabezadoConCuenta(
       titulo: 'Productos',
-      subtitulo: '${resumen.total} repuestos en catálogo · '
-          '${resumen.stockBajo} con stock bajo',
+      subtitulo: '$total repuestos en catálogo · $bajos con stock bajo',
     );
   }
 }
@@ -170,68 +222,44 @@ class _TablaProductos extends ConsumerWidget {
       );
     }
 
-    // Lista ya calculada por el provider derivado, no por el getter en build.
+    // Página traída de la base de datos, no un recorte en memoria.
     final productos = ref.watch(productosFiltradosProvider);
     final hayFiltro = ref.watch(hayFiltroProductosProvider);
+    final pagina = ref.watch(
+      productosProvider.select(
+        (s) => (
+          actual: s.value?.pagina ?? 0,
+          total: s.value?.total ?? 0,
+          paginas: s.value?.totalPaginas ?? 1,
+          tamano: s.value?.tamanoPagina ?? 25,
+        ),
+      ),
+    );
 
+    return Column(
+      children: [
+        Expanded(child: _tabla(productos, hayFiltro)),
+        if (pagina.paginas > 1)
+          PaginacionWidget(
+            paginaActual: pagina.actual,
+            totalPaginas: pagina.paginas,
+            totalItems: pagina.total,
+            itemsPorPagina: pagina.tamano,
+            alCambiarPagina: (p) =>
+                ref.read(productosProvider.notifier).irAPagina(p),
+          ),
+      ],
+    );
+  }
+
+  Widget _tabla(List<Producto> productos, bool hayFiltro) {
     return TablaGenerica<Producto>(
       items: productos,
       alPresionarFila: alVerDetalle,
       mensajeVacio: hayFiltro
           ? 'Ningún producto coincide con el filtro'
           : 'Aún no hay productos en el catálogo',
-      columnas: [
-        ColumnaTabla(
-          titulo: 'Producto',
-          flex: 5,
-          constructor: (p) => _CeldaProducto(producto: p),
-        ),
-        ColumnaTabla(
-          titulo: 'Categoría',
-          flex: 2,
-          constructor: (p) => Text(
-            p.categoriaNombre ?? '—',
-            style: TipografiaApp.caption.copyWith(fontSize: 13),
-            maxLines: 1,
-            overflow: TextOverflow.ellipsis,
-          ),
-        ),
-        ColumnaTabla(
-          titulo: 'Precio',
-          flex: 2,
-          constructor: (p) => Text(
-            formatearPrecio(p.precioVenta),
-            style: TipografiaApp.cuerpoMedium.copyWith(
-              color: ColoresApp.castletonGreen,
-            ),
-          ),
-        ),
-        ColumnaTabla(
-          titulo: 'Stock',
-          flex: 2,
-          constructor: (p) => BadgeEstadoStock(estado: p.estadoStock),
-        ),
-        ColumnaTabla(
-          titulo: 'Ubicación',
-          flex: 2,
-          constructor: (p) => Text(
-            p.ubicacionBodega ?? '—',
-            style: TipografiaApp.caption,
-            maxLines: 1,
-            overflow: TextOverflow.ellipsis,
-          ),
-        ),
-        ColumnaTabla(
-          titulo: '',
-          ancho: 32,
-          alineacion: Alignment.centerRight,
-          constructor: (_) => const Icon(
-            Icons.chevron_right_rounded,
-            size: 20,
-            color: ColoresApp.textDisabled,
-          ),
-        ),
-      ],
+      columnas: columnasTablaProducto(),
     );
   }
 }
@@ -266,12 +294,12 @@ class _PanelCategoriasState extends ConsumerState<_PanelCategorias> {
   /// Al contraerlo limpia su búsqueda: en la tira de íconos no se ve el
   /// buscador, y dejar una lista recortada sin explicar por qué confunde.
   void _alternar() => setState(() {
-        _expandido = !_expandido;
-        if (!_expandido) {
-          _busqueda = '';
-          _controladorBusqueda.clear();
-        }
-      });
+    _expandido = !_expandido;
+    if (!_expandido) {
+      _busqueda = '';
+      _controladorBusqueda.clear();
+    }
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -280,9 +308,8 @@ class _PanelCategoriasState extends ConsumerState<_PanelCategorias> {
     final seleccionada = ref.watch(
       productosProvider.select((s) => s.value?.filtroCategoriaId),
     );
-    final categorias = ref.watch(
-      categoriasProvider.select((s) => s.value?.categorias ?? const []),
-    );
+    final categorias =
+        ref.watch(catalogoCategoriasProvider).value ?? const <Categoria>[];
 
     final query = _busqueda.trim().toLowerCase();
     final items = [
@@ -292,7 +319,7 @@ class _PanelCategoriasState extends ConsumerState<_PanelCategorias> {
           CategoriaPanelDato(
             id: categoria.id!,
             nombre: categoria.nombre,
-            color: _colorDeHex(categoria.colorHex),
+            color: colorDeHex(categoria.colorHex),
           ),
     ];
 
@@ -305,58 +332,6 @@ class _PanelCategoriasState extends ConsumerState<_PanelCategorias> {
       alAlternar: _alternar,
       controladorBusqueda: _controladorBusqueda,
       alBuscar: (texto) => setState(() => _busqueda = texto),
-    );
-  }
-}
-
-/// Convierte `#RRGGBB` en [Color]. Devuelve null si el texto no es un hex
-/// válido, y el panel cae a su color por defecto.
-Color? _colorDeHex(String hex) {
-  final limpio = hex.replaceAll('#', '').trim();
-  if (limpio.length != 6) return null;
-  final valor = int.tryParse(limpio, radix: 16);
-  return valor == null ? null : Color(0xFF000000 | valor);
-}
-
-/// Celda principal: miniatura + nombre + SKU monoespaciado.
-class _CeldaProducto extends StatelessWidget {
-  const _CeldaProducto({required this.producto});
-
-  final Producto producto;
-
-  @override
-  Widget build(BuildContext context) {
-    return Row(
-      children: [
-        MiniaturaProducto(rutaImagen: producto.imagenUrl),
-        const SizedBox(width: 13),
-        Expanded(
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(
-                producto.nombre,
-                style: TipografiaApp.cuerpoMedium,
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-              ),
-              const SizedBox(height: 2),
-              Text(
-                producto.sku,
-                style: TipografiaApp.monoespaciada(
-                  TipografiaApp.caption.copyWith(
-                    fontSize: 12,
-                    color: ColoresApp.textDisabled,
-                  ),
-                ),
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-              ),
-            ],
-          ),
-        ),
-      ],
     );
   }
 }
@@ -411,19 +386,8 @@ class MiniaturaProducto extends StatelessWidget {
   }
 
   Widget _marcador() => Icon(
-        Icons.image_outlined,
-        size: lado * 0.42,
-        color: ColoresApp.textDisabled,
-      );
-}
-
-/// Formatea un precio como "$28.000" (separador de miles con punto).
-String formatearPrecio(double valor) {
-  final entero = valor.round().toString();
-  final buffer = StringBuffer();
-  for (var i = 0; i < entero.length; i++) {
-    if (i > 0 && (entero.length - i) % 3 == 0) buffer.write('.');
-    buffer.write(entero[i]);
-  }
-  return '\$$buffer';
+    Icons.image_outlined,
+    size: lado * 0.42,
+    color: ColoresApp.textDisabled,
+  );
 }

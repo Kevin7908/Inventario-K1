@@ -37,7 +37,7 @@ class _PanelBusquedaProductosFacturaState
 
   @override
   Widget build(BuildContext context) {
-    final todos = ref.watch(productosProvider).value?.todos ?? const [];
+    final todos = ref.watch(catalogoCompletoProvider).value ?? const [];
     final filtrados = _query.isEmpty
         ? todos
         : todos

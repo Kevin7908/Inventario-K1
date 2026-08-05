@@ -5,6 +5,7 @@ import '../../../../backend/features/categorias/modelo/categoria.dart';
 import '../../../../backend/features/productos/modelo/producto.dart';
 import '../../../../backend/features/proveedores/modelo/proveedor.dart';
 import '../../../../backend/features/unidades_medida/modelo/unidad_medida.dart';
+import '../../../../core/resultado.dart';
 import '../../../share2/share2.dart';
 import '../../categorias/provider/categorias_provider.dart';
 import '../../proveedores/view_model/proveedores_view_model.dart';
@@ -100,7 +101,7 @@ class _FormularioProductoState extends ConsumerState<FormularioProducto> {
 
   void _preseleccionarFk(Producto p) {
     if (!mounted) return;
-    final categorias = ref.read(categoriasProvider).value?.categorias ?? const [];
+    final categorias = ref.read(catalogoCategoriasProvider).value ?? const [];
     final unidades = ref.read(unidadesMedidaProvider).value?.unidades ?? const [];
 
     setState(() {
@@ -129,11 +130,16 @@ class _FormularioProductoState extends ConsumerState<FormularioProducto> {
 
   /// Al elegir categoría se propone un SKU, solo cuando se está creando:
   /// en edición el SKU ya existe y regenerarlo rompería referencias.
-  void _alCambiarCategoria(Categoria? categoria) {
+  Future<void> _alCambiarCategoria(Categoria? categoria) async {
     setState(() => _categoria = categoria);
     if (categoria == null || widget.esEdicion) return;
-    _skuCtrl.text =
-        ref.read(productosProvider.notifier).generarSku(categoria.nombre);
+
+    // Consulta el catálogo completo, así que es asíncrono: el SKU tiene que
+    // ser único en toda la tabla, no solo en la página visible.
+    final sku =
+        await ref.read(productosProvider.notifier).generarSku(categoria.nombre);
+    if (!mounted) return;
+    _skuCtrl.text = sku;
   }
 
   void _mostrarMensaje(String texto, {required bool esError}) {
@@ -185,14 +191,14 @@ class _FormularioProductoState extends ConsumerState<FormularioProducto> {
     );
 
     final notifier = ref.read(productosProvider.notifier);
-    final error = widget.esEdicion
+    final resultado = widget.esEdicion
         ? await notifier.actualizar(producto)
         : await notifier.crear(producto);
 
     if (!mounted) return;
 
-    if (error != null) {
-      _mostrarMensaje(error, esError: true);
+    if (resultado case Fallo(:final mensaje)) {
+      _mostrarMensaje(mensaje, esError: true);
       setState(() => _guardando = false);
       return;
     }
@@ -241,7 +247,7 @@ class _FormularioProductoState extends ConsumerState<FormularioProducto> {
 
   Widget _bloqueInformacionGeneral() {
     final categorias =
-        ref.watch(categoriasProvider).value?.categorias ?? const [];
+        ref.watch(catalogoCategoriasProvider).value ?? const [];
     final unidades =
         ref.watch(unidadesMedidaProvider).value?.unidades ?? const [];
 

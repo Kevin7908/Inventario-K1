@@ -2,10 +2,11 @@ import 'dart:io';
 
 import 'package:flutter/material.dart';
 
+import '../../../../core/formato.dart';
+
 import '../../../../backend/features/productos/modelo/producto.dart';
 import '../../../share2/share2.dart';
 import '../widgets/badget_estado_stock_widget.dart';
-import 'producto_vista.dart';
 
 /// Ficha de un producto: imagen, datos de inventario y acciones.
 ///
@@ -13,21 +14,24 @@ import 'producto_vista.dart';
 /// contenido no cabe cómodamente en un modal y así se replica el flujo del
 /// diseño ("Volver a productos" → ficha → "Editar producto").
 ///
-/// [alVolver] y [alEditar] son opcionales para poder reutilizar la misma ficha
-/// dentro de `DialogoDetalleProductoWidget`, que ya trae su propio botón de
-/// cerrar y no ofrece edición. Si son `null`, se ocultan esos controles.
+/// [alVolver], [alEditar] y [alEliminar] son opcionales para poder reutilizar
+/// la misma ficha dentro de `DialogoDetalleProductoWidget`, que ya trae su
+/// propio botón de cerrar y no ofrece edición ni borrado. Si son `null`, se
+/// ocultan esos controles.
 class ProductoDetalleVista extends StatelessWidget {
   const ProductoDetalleVista({
     super.key,
     required this.producto,
     this.alVolver,
     this.alEditar,
+    this.alEliminar,
     this.padding = const EdgeInsets.fromLTRB(32, 24, 32, 40),
   });
 
   final Producto producto;
   final VoidCallback? alVolver;
   final VoidCallback? alEditar;
+  final VoidCallback? alEliminar;
   final EdgeInsets padding;
 
   @override
@@ -38,7 +42,7 @@ class ProductoDetalleVista extends StatelessWidget {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           if (alVolver != null) ...[
-            _BotonVolver(
+            BotonVolver(
               etiqueta: 'Volver a productos',
               alPresionar: alVolver!,
             ),
@@ -54,7 +58,7 @@ class ProductoDetalleVista extends StatelessWidget {
                   children: [
                     _Galeria(rutaImagen: producto.imagenUrl),
                     const SizedBox(height: 26),
-                    _Ficha(producto: producto, alEditar: alEditar),
+                    _Ficha(producto: producto, alEditar: alEditar, alEliminar: alEliminar),
                   ],
                 );
               }
@@ -68,7 +72,7 @@ class ProductoDetalleVista extends StatelessWidget {
                   const SizedBox(width: 26),
                   Expanded(
                     flex: 5,
-                    child: _Ficha(producto: producto, alEditar: alEditar),
+                    child: _Ficha(producto: producto, alEditar: alEditar, alEliminar: alEliminar),
                   ),
                 ],
               );
@@ -77,47 +81,6 @@ class ProductoDetalleVista extends StatelessWidget {
           const SizedBox(height: 26),
           _PanelesSecundarios(producto: producto),
         ],
-      ),
-    );
-  }
-}
-
-class _BotonVolver extends StatelessWidget {
-  const _BotonVolver({required this.etiqueta, required this.alPresionar});
-
-  final String etiqueta;
-  final VoidCallback alPresionar;
-
-  @override
-  Widget build(BuildContext context) {
-    return Material(
-      color: Colors.transparent,
-      borderRadius: BorderRadius.circular(8),
-      child: InkWell(
-        onTap: alPresionar,
-        borderRadius: BorderRadius.circular(8),
-        child: Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 4),
-          child: Row(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              const Icon(
-                Icons.arrow_back_rounded,
-                size: 16,
-                color: ColoresApp.textMuted,
-              ),
-              const SizedBox(width: 8),
-              Text(
-                etiqueta,
-                style: TipografiaApp.caption.copyWith(
-                  fontSize: 13,
-                  fontWeight: FontWeight.w600,
-                  color: ColoresApp.textMuted,
-                ),
-              ),
-            ],
-          ),
-        ),
       ),
     );
   }
@@ -185,10 +148,11 @@ class _SinImagen extends StatelessWidget {
 
 /// Columna derecha: categoría, nombre, precio, estado y datos de inventario.
 class _Ficha extends StatelessWidget {
-  const _Ficha({required this.producto, this.alEditar});
+  const _Ficha({required this.producto, this.alEditar, this.alEliminar});
 
   final Producto producto;
   final VoidCallback? alEditar;
+  final VoidCallback? alEliminar;
 
   @override
   Widget build(BuildContext context) {
@@ -234,19 +198,30 @@ class _Ficha extends StatelessWidget {
         _GrillaDatos(producto: producto),
         const SizedBox(height: 22),
         _Compatibilidad(descripcion: producto.descripcion),
-        if (alEditar != null) ...[
+        if (alEditar != null || alEliminar != null) ...[
           const SizedBox(height: 22),
           Row(
             children: [
-              Expanded(
-                child: BotonSecundario(
-                  etiqueta: 'Editar producto',
-                  icono: Icons.edit_outlined,
-                  oscuro: true,
-                  expandido: true,
-                  alPresionar: alEditar,
+              if (alEditar != null)
+                Expanded(
+                  child: BotonSecundario(
+                    etiqueta: 'Editar producto',
+                    icono: Icons.edit_outlined,
+                    oscuro: true,
+                    expandido: true,
+                    alPresionar: alEditar,
+                  ),
                 ),
-              ),
+              if (alEditar != null && alEliminar != null)
+                const SizedBox(width: 12),
+              // Eliminar vive solo aquí, en la ficha: obliga a abrir el
+              // producto y ver qué se está borrando antes de hacerlo.
+              if (alEliminar != null)
+                BotonDestructivo(
+                  etiqueta: 'Eliminar',
+                  icono: Icons.delete_outline_rounded,
+                  alPresionar: alEliminar,
+                ),
             ],
           ),
         ],

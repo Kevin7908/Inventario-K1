@@ -7,6 +7,7 @@ import '../../../../backend/features/productos/repositorio/repositorio_producto.
 import '../../../../backend/features/productos/repositorio/repositorio_producto_impl.dart';
 import '../../../../backend/share/database/app_db_provider.dart';
 import '../../../../backend/share/utils/sku_utils.dart';
+import '../../../../core/resultado.dart';
 
 // Repositorio
 
@@ -21,71 +22,74 @@ enum FiltroStock { todos, enStock, stockBajo, sinStock }
 
 // Estado
 
+/// Estado del catálogo: **solo la página visible**, más los filtros y el total.
+///
+/// Ya no guarda el catálogo entero: el filtrado, el conteo y el recorte los
+/// hace SQLite. Quien necesite todos los productos —el POS, los buscadores de
+/// factura y orden— usa [catalogoCompletoProvider].
 final class ProductosState {
   const ProductosState({
-    this.todos = const [],
+    this.items = const [],
+    this.total = 0,
+    this.pagina = 0,
+    this.tamanoPagina = 25,
     this.busqueda = '',
     this.filtroStock = FiltroStock.todos,
     this.filtroCategoriaId,
   });
 
-  final List<Producto> todos;
+  /// Productos de la página actual.
+  final List<Producto> items;
+
+  /// Total de productos que cumplen el filtro, en todas las páginas.
+  final int total;
+
+  /// Página actual, de base cero.
+  final int pagina;
+  final int tamanoPagina;
+
   final String busqueda;
   final FiltroStock filtroStock;
 
   /// Categoría por la que se filtra. `null` = todas las categorías.
   final int? filtroCategoriaId;
 
-  /// Lista filtrada — se computa solo cuando cambia el estado.
-  List<Producto> get filtrados {
-    var lista = todos;
+  int get totalPaginas => total <= 0 ? 1 : (total + tamanoPagina - 1) ~/ tamanoPagina;
 
-    if (busqueda.isNotEmpty) {
-      final q = busqueda.toLowerCase();
-      lista = lista.where((p) {
-        return p.nombre.toLowerCase().contains(q) ||
-            p.sku.toLowerCase().contains(q) ||
-            (p.categoriaNombre?.toLowerCase().contains(q) ?? false);
-      }).toList();
-    }
+  bool get hayFiltro =>
+      busqueda.isNotEmpty ||
+      filtroCategoriaId != null ||
+      filtroStock != FiltroStock.todos;
 
-    if (filtroCategoriaId != null) {
-      lista =
-          lista.where((p) => p.categoriaId == filtroCategoriaId).toList();
-    }
-
-    switch (filtroStock) {
-      case FiltroStock.enStock:
-        return lista
-            .where((p) => p.estadoStock == EstadoStock.enStock)
-            .toList();
-      case FiltroStock.stockBajo:
-        return lista
-            .where((p) => p.estadoStock == EstadoStock.stockBajo)
-            .toList();
-      case FiltroStock.sinStock:
-        return lista
-            .where((p) => p.estadoStock == EstadoStock.sinStock)
-            .toList();
-      case FiltroStock.todos:
-        return lista;
-    }
-  }
+  /// Traduce los filtros de la interfaz a los que entiende el repositorio.
+  FiltroProductos get filtro => FiltroProductos(
+        busqueda: busqueda,
+        categoriaId: filtroCategoriaId,
+        soloEnStock: filtroStock == FiltroStock.enStock,
+        soloStockBajo: filtroStock == FiltroStock.stockBajo,
+        soloSinStock: filtroStock == FiltroStock.sinStock,
+      );
 
   /// Centinela para distinguir "no tocar [filtroCategoriaId]" de "ponerlo en
   /// null" (= quitar el filtro de categoría), que con `??` serían lo mismo.
   static const Object _sinCambio = Object();
 
   ProductosState copyWith({
-    List<Producto>? todos,
+    List<Producto>? items,
+    int? total,
+    int? pagina,
+    int? tamanoPagina,
     String? busqueda,
     FiltroStock? filtroStock,
     Object? filtroCategoriaId = _sinCambio,
   }) =>
       ProductosState(
-        todos:       todos       ?? this.todos,
-        busqueda:    busqueda    ?? this.busqueda,
-        filtroStock: filtroStock ?? this.filtroStock,
+        items:        items        ?? this.items,
+        total:        total        ?? this.total,
+        pagina:       pagina       ?? this.pagina,
+        tamanoPagina: tamanoPagina ?? this.tamanoPagina,
+        busqueda:     busqueda     ?? this.busqueda,
+        filtroStock:  filtroStock  ?? this.filtroStock,
         filtroCategoriaId: identical(filtroCategoriaId, _sinCambio)
             ? this.filtroCategoriaId
             : filtroCategoriaId as int?,
@@ -96,53 +100,91 @@ final class ProductosState {
 
 class ProductosNotifier extends AsyncNotifier<ProductosState> {
   late final RepositorioProducto _repo;
+  StreamSubscription<PaginaProductos>? _sub;
 
   @override
   Future<ProductosState> build() async {
     _repo = ref.watch(repositorioProductosProvider);
+    ref.onDispose(() => _sub?.cancel());
 
-    final sub = _repo.observarTodos().listen(
-      (lista) {
+    const inicial = ProductosState();
+    final primera = await _repo
+        .observarPagina(
+          filtro: inicial.filtro,
+          pagina: inicial.pagina,
+          tamano: inicial.tamanoPagina,
+        )
+        .first;
+
+    _suscribir(inicial);
+    return inicial.copyWith(items: primera.items, total: primera.total);
+  }
+
+  /// Reabre el stream con los filtros y la página vigentes.
+  ///
+  /// Cada cambio de filtro es una consulta nueva: por eso se cancela la
+  /// suscripción anterior en vez de recortar en memoria.
+  void _suscribir(ProductosState estado) {
+    _sub?.cancel();
+    _sub = _repo
+        .observarPagina(
+          filtro: estado.filtro,
+          pagina: estado.pagina,
+          tamano: estado.tamanoPagina,
+        )
+        .listen(
+      (pagina) {
         final actual = state.value;
+        if (actual == null) return;
         state = AsyncData(
-          actual != null
-              ? actual.copyWith(todos: lista)
-              : ProductosState(todos: lista),
+          actual.copyWith(items: pagina.items, total: pagina.total),
         );
       },
       onError: (Object e, StackTrace st) => state = AsyncError(e, st),
     );
-    ref.onDispose(sub.cancel);
-
-    return ProductosState(todos: await _repo.obtenerTodos());
   }
 
-  // Filtros
+  void _aplicar(ProductosState nuevo) {
+    state = AsyncData(nuevo);
+    _suscribir(nuevo);
+  }
+
+  // Filtros — todos vuelven a la primera página, porque el conjunto cambió.
 
   void buscar(String query) {
     final actual = state.value;
     if (actual == null) return;
     final trimmed = query.trim();
     if (actual.busqueda == trimmed) return;
-    state = AsyncData(actual.copyWith(busqueda: trimmed));
+    _aplicar(actual.copyWith(busqueda: trimmed, pagina: 0));
   }
 
   void filtrarPorStock(FiltroStock filtro) {
     final actual = state.value;
     if (actual == null || actual.filtroStock == filtro) return;
-    state = AsyncData(actual.copyWith(filtroStock: filtro));
+    _aplicar(actual.copyWith(filtroStock: filtro, pagina: 0));
   }
 
   /// Filtra por categoría. `null` quita el filtro y muestra todas.
   void filtrarPorCategoria(int? categoriaId) {
     final actual = state.value;
     if (actual == null || actual.filtroCategoriaId == categoriaId) return;
-    state = AsyncData(actual.copyWith(filtroCategoriaId: categoriaId));
+    _aplicar(actual.copyWith(filtroCategoriaId: categoriaId, pagina: 0));
   }
 
-  // Generación de SKU a partir de la categoría seleccionada
-  String generarSku(String nombreCategoria) {
-    final todos = state.value?.todos ?? [];
+  void irAPagina(int pagina) {
+    final actual = state.value;
+    if (actual == null || pagina == actual.pagina) return;
+    if (pagina < 0 || pagina >= actual.totalPaginas) return;
+    _aplicar(actual.copyWith(pagina: pagina));
+  }
+
+  // Generación de SKU a partir de la categoría seleccionada.
+  //
+  // Consulta el catálogo completo: el SKU debe ser único en toda la tabla,
+  // no solo dentro de la página que se está viendo.
+  Future<String> generarSku(String nombreCategoria) async {
+    final todos = await _repo.obtenerTodos();
     final base = normalizarCategoria(nombreCategoria);
     if (base.isEmpty) return 'PRD-001';
 
@@ -176,43 +218,65 @@ class ProductosNotifier extends AsyncNotifier<ProductosState> {
     return '$prefijo-${(maximo + 1).toString().padLeft(3, '0')}';
   }
 
-  // Mutaciones — retornan null en éxito o mensaje de error
-  Future<String?> crear(Producto producto) async {
+  // Mutaciones
+
+  Future<Resultado> crear(Producto producto) async {
     if (await _repo.existeNombre(producto.nombre)) {
-      return 'Ya existe un producto con el nombre "${producto.nombre}".';
+      return Fallo(
+        MotivoFallo.nombreDuplicado,
+        'Ya existe un producto con el nombre "${producto.nombre}".',
+      );
     }
     if (await _repo.existeSku(producto.sku)) {
-      return 'El SKU "${producto.sku}" ya está en uso.';
+      return Fallo(
+        MotivoFallo.skuDuplicado,
+        'El SKU "${producto.sku}" ya está en uso.',
+      );
     }
     try {
       await _repo.crear(producto);
-      return null;
+      return const Exito();
     } catch (e) {
-      return 'Error al crear el producto: $e';
+      return Fallo(
+        MotivoFallo.persistencia,
+        'Error al crear el producto: $e',
+      );
     }
   }
 
-  Future<String?> actualizar(Producto producto) async {
+  Future<Resultado> actualizar(Producto producto) async {
     if (await _repo.existeNombre(producto.nombre, excludirId: producto.id)) {
-      return 'Ya existe un producto con el nombre "${producto.nombre}".';
+      return Fallo(
+        MotivoFallo.nombreDuplicado,
+        'Ya existe un producto con el nombre "${producto.nombre}".',
+      );
     }
     if (await _repo.existeSku(producto.sku, excludirId: producto.id)) {
-      return 'El SKU "${producto.sku}" ya está en uso por otro producto.';
+      return Fallo(
+        MotivoFallo.skuDuplicado,
+        'El SKU "${producto.sku}" ya está en uso por otro producto.',
+      );
     }
     try {
       await _repo.actualizar(producto);
-      return null;
+      return const Exito();
     } catch (e) {
-      return 'Error al actualizar el producto: $e';
+      return Fallo(
+        MotivoFallo.persistencia,
+        'Error al actualizar el producto: $e',
+      );
     }
   }
 
-  Future<String?> eliminar(int id) async {
+  Future<Resultado> eliminar(int id) async {
     try {
       await _repo.eliminar(id);
-      return null;
+      return const Exito();
     } catch (e) {
-      return 'Error al eliminar el producto: $e';
+      return Fallo(
+        MotivoFallo.persistencia,
+        'Error al eliminar el producto: $e',
+      );
     }
   }
 }
@@ -225,45 +289,33 @@ final productosProvider =
   name: 'productosProvider',
 );
 
-/// Lista ya filtrada — solo rebuilda cuando la lista filtrada cambia.
+/// Catálogo completo, en vivo.
 ///
-/// La UI **siempre** debe leer de aquí y nunca llamar a `estado.filtrados`
-/// directamente: el getter recorre la lista hasta tres veces y hacerlo dentro
-/// de un `build()` lo repite en cada repintado, aunque el filtro no haya
-/// cambiado.
+/// Para lo que necesita buscar sobre **todo** el inventario: el punto de
+/// venta y los buscadores de factura y de orden. La tabla de Productos no lo
+/// usa — esa va paginada contra la base de datos.
+final catalogoCompletoProvider = StreamProvider<List<Producto>>(
+  name: 'catalogoCompletoProvider',
+  (ref) => ref.watch(repositorioProductosProvider).observarTodos(),
+);
+
+/// Productos de la página actual.
 final productosFiltradosProvider = Provider<List<Producto>>(
   name: 'productosFiltradosProvider',
-  (ref) => ref.watch(productosProvider).value?.filtrados ?? const [],
+  (ref) => ref.watch(productosProvider).value?.items ?? const [],
 );
 
-/// Conteos del encabezado del catálogo.
-///
-/// Depende solo de `todos`, así que escribir en el buscador o cambiar de
-/// categoría no lo recalcula. Devuelve un record: al ser structural equality,
-/// si los números no cambian Riverpod no notifica y el encabezado no rebuilda.
-final productosResumenProvider = Provider<({int total, int stockBajo})>(
+/// Conteos del encabezado, resueltos con un COUNT en SQL.
+final productosResumenProvider =
+    StreamProvider<({int total, int stockBajo})>(
   name: 'productosResumenProvider',
-  (ref) {
-    final todos = ref.watch(
-      productosProvider.select((s) => s.value?.todos ?? const <Producto>[]),
-    );
-
-    var bajos = 0;
-    for (final p in todos) {
-      if (p.estadoStock != EstadoStock.enStock) bajos++;
-    }
-    return (total: todos.length, stockBajo: bajos);
-  },
+  (ref) => ref.watch(repositorioProductosProvider).observarResumen(),
 );
 
-/// `true` cuando hay búsqueda o filtro de categoría activo.
+/// `true` cuando hay búsqueda o algún filtro activo.
 final hayFiltroProductosProvider = Provider<bool>(
   name: 'hayFiltroProductosProvider',
   (ref) => ref.watch(
-    productosProvider.select(
-      (s) =>
-          (s.value?.busqueda.isNotEmpty ?? false) ||
-          s.value?.filtroCategoriaId != null,
-    ),
+    productosProvider.select((s) => s.value?.hayFiltro ?? false),
   ),
 );
