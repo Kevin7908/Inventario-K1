@@ -7,6 +7,7 @@ import '../../../../backend/features/categorias/repositorio/repositorio_categori
 import '../../../../backend/features/categorias/repositorio/repositorio_categorias_impl.dart';
 import '../../../../backend/share/database/app_db_provider.dart';
 import '../../../../backend/share/utils/sku_utils.dart';
+import '../../../../core/resultado.dart';
 import '../../productos/provider/productos_provider.dart';
 
 final repositorioCategoriasProvider = Provider<RepositorioCategorias>(
@@ -14,58 +15,109 @@ final repositorioCategoriasProvider = Provider<RepositorioCategorias>(
   (ref) => RepositorioCategoriasImpl(ref.watch(appDatabaseProvider)),
 );
 
+/// Estado del catálogo de categorías: **solo la página visible**.
+///
+/// El filtrado, el conteo y el recorte los hace SQLite. Quien necesite todas
+/// las categorías —el panel lateral de Productos, el selector del formulario—
+/// usa [catalogoCategoriasProvider].
 class CategoriasState {
-  final List<Categoria> categorias;
+  const CategoriasState({
+    this.items = const [],
+    this.total = 0,
+    this.pagina = 0,
+    this.tamanoPagina = 24,
+    this.textoBusqueda = '',
+  });
+
+  final List<Categoria> items;
+  final int total;
+  final int pagina;
+  final int tamanoPagina;
   final String textoBusqueda;
 
-  const CategoriasState({required this.categorias, this.textoBusqueda = ''});
+  int get totalPaginas =>
+      total <= 0 ? 1 : (total + tamanoPagina - 1) ~/ tamanoPagina;
 
-  List<Categoria> get filtradas {
-    if (textoBusqueda.isEmpty) return categorias;
-    final t = textoBusqueda.toLowerCase();
-    return categorias.where((c) => c.nombre.toLowerCase().contains(t)).toList();
-  }
-
-  CategoriasState copyWith({List<Categoria>? categorias, String? textoBusqueda}) =>
+  CategoriasState copyWith({
+    List<Categoria>? items,
+    int? total,
+    int? pagina,
+    int? tamanoPagina,
+    String? textoBusqueda,
+  }) =>
       CategoriasState(
-        categorias: categorias ?? this.categorias,
+        items:         items         ?? this.items,
+        total:         total         ?? this.total,
+        pagina:        pagina        ?? this.pagina,
+        tamanoPagina:  tamanoPagina  ?? this.tamanoPagina,
         textoBusqueda: textoBusqueda ?? this.textoBusqueda,
       );
 }
 
 class CategoriasNotifier extends AsyncNotifier<CategoriasState> {
+  late final RepositorioCategorias _repo;
+  StreamSubscription<PaginaCategorias>? _sub;
+
   @override
   Future<CategoriasState> build() async {
-    final repo = ref.watch(repositorioCategoriasProvider);
-    final completer = Completer<CategoriasState>();
+    _repo = ref.watch(repositorioCategoriasProvider);
+    ref.onDispose(() => _sub?.cancel());
 
-    final sub = repo.observarTodas().listen(
-      (lista) {
-        if (!completer.isCompleted) {
-          completer.complete(CategoriasState(categorias: lista));
-        } else {
-          state = AsyncData(CategoriasState(
-            categorias: lista,
-            textoBusqueda: state.value?.textoBusqueda ?? '',
-          ));
-        }
+    const inicial = CategoriasState();
+    final primera = await _repo
+        .observarPagina(
+          busqueda: inicial.textoBusqueda,
+          pagina: inicial.pagina,
+          tamano: inicial.tamanoPagina,
+        )
+        .first;
+
+    _suscribir(inicial);
+    return inicial.copyWith(items: primera.items, total: primera.total);
+  }
+
+  /// Reabre el stream con la búsqueda y la página vigentes.
+  void _suscribir(CategoriasState estado) {
+    _sub?.cancel();
+    _sub = _repo
+        .observarPagina(
+          busqueda: estado.textoBusqueda,
+          pagina: estado.pagina,
+          tamano: estado.tamanoPagina,
+        )
+        .listen(
+      (pagina) {
+        final actual = state.value;
+        if (actual == null) return;
+        state = AsyncData(
+          actual.copyWith(items: pagina.items, total: pagina.total),
+        );
       },
-      onError: (e) {
-        if (!completer.isCompleted) completer.completeError(e);
-      },
+      onError: (Object e, StackTrace st) => state = AsyncError(e, st),
     );
+  }
 
-    ref.onDispose(sub.cancel);
-    return completer.future;
+  void _aplicar(CategoriasState nuevo) {
+    state = AsyncData(nuevo);
+    _suscribir(nuevo);
   }
 
   void buscar(String texto) {
-    final s = state.value;
-    if (s == null) return;
-    state = AsyncData(s.copyWith(textoBusqueda: texto));
+    final actual = state.value;
+    if (actual == null) return;
+    final trimmed = texto.trim();
+    if (actual.textoBusqueda == trimmed) return;
+    _aplicar(actual.copyWith(textoBusqueda: trimmed, pagina: 0));
   }
 
-  Future<String?> crear({
+  void irAPagina(int pagina) {
+    final actual = state.value;
+    if (actual == null || pagina == actual.pagina) return;
+    if (pagina < 0 || pagina >= actual.totalPaginas) return;
+    _aplicar(actual.copyWith(pagina: pagina));
+  }
+
+  Future<Resultado> crear({
     required String nombre,
     String? descripcion,
     String colorHex = '#3B82F6',
@@ -73,9 +125,24 @@ class CategoriasNotifier extends AsyncNotifier<CategoriasState> {
   }) async {
     try {
       final repo = ref.read(repositorioCategoriasProvider);
-      if (nombre.trim().isEmpty) return 'El nombre no puede estar vacío';
-      if (nombre.trim().length < 2) return 'El nombre debe tener al menos 2 caracteres';
-      if (await repo.existeNombre(nombre.trim())) return 'Ya existe una categoría con ese nombre';
+      if (nombre.trim().isEmpty) {
+        return const Fallo(
+          MotivoFallo.validacion,
+          'El nombre no puede estar vacío.',
+        );
+      }
+      if (nombre.trim().length < 2) {
+        return const Fallo(
+          MotivoFallo.validacion,
+          'El nombre debe tener al menos 2 caracteres.',
+        );
+      }
+      if (await repo.existeNombre(nombre.trim())) {
+        return const Fallo(
+          MotivoFallo.nombreDuplicado,
+          'Ya existe una categoría con ese nombre.',
+        );
+      }
       await repo.crear(Categoria(
         nombre: nombre.trim(),
         descripcion: descripcion?.trim(),
@@ -84,13 +151,13 @@ class CategoriasNotifier extends AsyncNotifier<CategoriasState> {
         creadoEn: DateTime.now(),
         actualizadoEn: DateTime.now(),
       ));
-      return null;
+      return const Exito();
     } catch (e) {
-      return e.toString();
+      return Fallo(MotivoFallo.persistencia, 'Error al crear la categoría: $e');
     }
   }
 
-  Future<String?> actualizar({
+  Future<Resultado> actualizar({
     required int id,
     required String nombre,
     String? descripcion,
@@ -99,12 +166,31 @@ class CategoriasNotifier extends AsyncNotifier<CategoriasState> {
   }) async {
     try {
       final repo = ref.read(repositorioCategoriasProvider);
-      if (nombre.trim().isEmpty) return 'El nombre no puede estar vacío';
-      if (nombre.trim().length < 2) return 'El nombre debe tener al menos 2 caracteres';
-      if (await repo.existeNombre(nombre.trim(), excludirId: id)) {
-        return 'Ya existe una categoría con ese nombre';
+      if (nombre.trim().isEmpty) {
+        return const Fallo(
+          MotivoFallo.validacion,
+          'El nombre no puede estar vacío.',
+        );
       }
-      final actual = state.value!.categorias.firstWhere((c) => c.id == id);
+      if (nombre.trim().length < 2) {
+        return const Fallo(
+          MotivoFallo.validacion,
+          'El nombre debe tener al menos 2 caracteres.',
+        );
+      }
+      if (await repo.existeNombre(nombre.trim(), excludirId: id)) {
+        return const Fallo(
+          MotivoFallo.nombreDuplicado,
+          'Ya existe una categoría con ese nombre.',
+        );
+      }
+      final actual = await repo.obtenerPorId(id);
+      if (actual == null) {
+        return const Fallo(
+          MotivoFallo.validacion,
+          'La categoría ya no existe.',
+        );
+      }
       await repo.actualizar(actual.copyWith(
         nombre: nombre.trim(),
         descripcion: descripcion?.trim(),
@@ -117,9 +203,12 @@ class CategoriasNotifier extends AsyncNotifier<CategoriasState> {
       if (nombre.trim().toLowerCase() != actual.nombre.toLowerCase()) {
         await _actualizarSkusProductos(id, nombre.trim());
       }
-      return null;
+      return const Exito();
     } catch (e) {
-      return e.toString();
+      return Fallo(
+        MotivoFallo.persistencia,
+        'Error al actualizar la categoría: $e',
+      );
     }
   }
 
@@ -149,12 +238,15 @@ class CategoriasNotifier extends AsyncNotifier<CategoriasState> {
     }
   }
 
-  Future<String?> eliminar(int id) async {
+  Future<Resultado> eliminar(int id) async {
     try {
       await ref.read(repositorioCategoriasProvider).eliminar(id);
-      return null;
+      return const Exito();
     } catch (e) {
-      return e.toString();
+      return Fallo(
+        MotivoFallo.persistencia,
+        'No se pudo eliminar la categoría: $e',
+      );
     }
   }
 }
@@ -164,3 +256,48 @@ final categoriasProvider =
   CategoriasNotifier.new,
   name: 'categoriasProvider',
 );
+
+/// Catálogo completo de categorías, en vivo.
+///
+/// Para lo que necesita todas: el panel lateral de Productos y el selector de
+/// categoría del formulario. La grilla de Categorías no lo usa — esa va
+/// paginada contra la base de datos.
+final catalogoCategoriasProvider = StreamProvider<List<Categoria>>(
+  name: 'catalogoCategoriasProvider',
+  (ref) => ref.watch(repositorioCategoriasProvider).observarTodas(),
+);
+
+/// Categorías de la página actual.
+final categoriasFiltradasProvider = Provider<List<Categoria>>(
+  name: 'categoriasFiltradasProvider',
+  (ref) => ref.watch(categoriasProvider).value?.items ?? const [],
+);
+
+/// Texto activo del buscador de categorías.
+final busquedaCategoriasProvider = Provider<String>(
+  name: 'busquedaCategoriasProvider',
+  (ref) =>
+      ref.watch(categoriasProvider.select((s) => s.value?.textoBusqueda ?? '')),
+);
+
+/// Cuántos productos tiene cada categoría, indexado por id de categoría.
+///
+/// Sale de un `GROUP BY` en SQLite, no de recorrer el catálogo en memoria.
+/// El `distinct` compara el contenido del mapa: Drift re-emite ante cualquier
+/// cambio en la tabla, y sin esto la grilla se reconstruiría aunque ningún
+/// conteo hubiera cambiado.
+final conteoProductosPorCategoriaProvider = StreamProvider<Map<int, int>>(
+  name: 'conteoProductosPorCategoriaProvider',
+  (ref) => ref
+      .watch(repositorioProductosProvider)
+      .observarConteoPorCategoria()
+      .distinct(_mismoConteo),
+);
+
+bool _mismoConteo(Map<int, int> a, Map<int, int> b) {
+  if (a.length != b.length) return false;
+  for (final entrada in a.entries) {
+    if (b[entrada.key] != entrada.value) return false;
+  }
+  return true;
+}

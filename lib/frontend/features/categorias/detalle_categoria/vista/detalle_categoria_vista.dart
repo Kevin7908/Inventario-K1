@@ -1,301 +1,246 @@
 import 'dart:async';
 
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../../../backend/features/categorias/modelo/categoria.dart';
 import '../../../../../backend/features/productos/modelo/producto.dart';
-import '../../../../../backend/share/database/locator.dart';
-import '../../../../share/temas/colores_app.dart';
-import '../../../../share/widgets/dialogos/dialogo_confirmar_eliminar_widget.dart';
-import '../../../../share/widgets/input/barra_busqueda_widget.dart';
-import '../../../../share/widgets/output/chip_filtro_widget.dart';
-import '../../../../share/widgets/output/estado_vacio_widget.dart';
-import '../../../../share/widgets/output/snack_bar_mensaje.dart';
-import '../../../../share/widgets/top_bar_widget.dart';
+import '../../../../../core/resultado.dart';
+import '../../../../share2/share2.dart';
 import '../../../productos/provider/productos_provider.dart';
-import '../../../productos/widgets/dialogo_detalle_producto_widget.dart';
-import '../../../productos/widgets/dialogo_producto_widget.dart';
-import '../../../productos/widgets/tarjeta_producto_widget.dart';
-import '../../../proveedores/view_model/proveedores_view_model.dart';
-import '../provider/detalle_categoria_provider.dart';
+import '../../../productos/vista/producto_detalle_vista.dart';
+import '../../../productos/vista/producto_formulario_vista.dart';
+import '../../vista/categorias_vistas.dart';
+import '../widgets/tabla_productos_categoria.dart';
 
+/// Ficha de una categoría: sus datos y la tabla de productos que contiene.
+///
+/// Es una página dentro del módulo, no una ruta: `CategoriasVista` la muestra
+/// en lugar del catálogo y vuelve con [alVolver], igual que hace Productos.
+///
+/// Los productos se abren con las **mismas páginas** del módulo de Productos
+/// —[ProductoDetalleVista] y [ProductoFormularioVista]—, no con los diálogos
+/// legacy: la ficha de un producto debe verse igual se llegue desde donde se
+/// llegue. Por eso esta vista hospeda su propia navegación interna.
 class DetalleCategoriaVista extends ConsumerStatefulWidget {
-  const DetalleCategoriaVista({super.key, required this.categoria});
+  const DetalleCategoriaVista({
+    super.key,
+    required this.categoria,
+    required this.alVolver,
+  });
 
   final Categoria categoria;
+  final VoidCallback alVolver;
 
   @override
   ConsumerState<DetalleCategoriaVista> createState() =>
       _DetalleCategoriaVistaState();
 }
 
-class _DetalleCategoriaVistaState
-    extends ConsumerState<DetalleCategoriaVista> {
-  late final ProveedoresViewModel _proveedoresVm;
+/// Pantalla activa dentro de la ficha de categoría.
+enum _Pantalla { productos, detalleProducto, formularioProducto }
+
+class _DetalleCategoriaVistaState extends ConsumerState<DetalleCategoriaVista> {
+  final _busquedaController = TextEditingController();
+  final _focoBusqueda = FocusNode();
   Timer? _debounce;
+
   String _busqueda = '';
   FiltroStock _filtroStock = FiltroStock.todos;
+  int _pagina = 0;
 
-  @override
-  void initState() {
-    super.initState();
-    _proveedoresVm = locator<ProveedoresViewModel>();
-  }
+  _Pantalla _pantalla = _Pantalla.productos;
+  Producto? _seleccionado;
 
   @override
   void dispose() {
     _debounce?.cancel();
+    _busquedaController.dispose();
+    _focoBusqueda.dispose();
     super.dispose();
   }
 
-  void _onBusquedaCambiada(String query) {
+  void _alBuscar(String texto) {
     _debounce?.cancel();
-    _debounce = Timer(const Duration(milliseconds: 300), () {
-      if (mounted) setState(() => _busqueda = query.trim());
+    _debounce = Timer(const Duration(milliseconds: 280), () {
+      if (!mounted) return;
+      setState(() {
+        _busqueda = texto.trim();
+        _pagina = 0;
+      });
     });
   }
 
+  void _verProducto(Producto producto) => setState(() {
+        _seleccionado = producto;
+        _pantalla = _Pantalla.detalleProducto;
+      });
+
+  void _editarProducto(Producto producto) => setState(() {
+        _seleccionado = producto;
+        _pantalla = _Pantalla.formularioProducto;
+      });
+
+  void _nuevoProducto() => setState(() {
+        _seleccionado = null;
+        _pantalla = _Pantalla.formularioProducto;
+      });
+
+  void _volverAProductos() => setState(() => _pantalla = _Pantalla.productos);
+
+  void _mostrarError(String error) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(
+          error,
+          style: TipografiaApp.sobrePrimario(TipografiaApp.cuerpo),
+        ),
+        backgroundColor: ColoresApp.statusDanger,
+      ),
+    );
+  }
+
+  Future<void> _eliminarProducto(Producto producto) async {
+    final confirmado = await DialogoConfirmacion.mostrar(
+      context,
+      titulo: '¿Eliminar "${producto.nombre}"?',
+      mensaje: 'Se quitará del catálogo y de esta categoría. '
+          'Esta acción no se puede deshacer.',
+    );
+    if (confirmado != true || !mounted) return;
+
+    final resultado =
+        await ref.read(productosProvider.notifier).eliminar(producto.id!);
+    if (!mounted) return;
+
+    switch (resultado) {
+      case Exito():
+        _volverAProductos();
+      case Fallo(:final mensaje):
+        _mostrarError(mensaje);
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      backgroundColor: ColoresApp.bgContent,
-      body: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          TopBarConBoton(
-            titulo: widget.categoria.nombre,
-            etiquetaBoton: 'Agregar producto',
-            alPresionarBoton: () => DialogoProducto.mostrar(
-              context,
-              proveedoresVm: _proveedoresVm,
+    return switch (_pantalla) {
+      _Pantalla.productos => _listaProductos(),
+      _Pantalla.detalleProducto => ProductoDetalleVista(
+          producto: _seleccionado!,
+          alVolver: _volverAProductos,
+          alEditar: () => _editarProducto(_seleccionado!),
+          alEliminar: () => _eliminarProducto(_seleccionado!),
+        ),
+      _Pantalla.formularioProducto => ProductoFormularioVista(
+          productoAEditar: _seleccionado,
+          alCerrar: _volverAProductos,
+        ),
+    };
+  }
+
+  Widget _listaProductos() {
+    final categoria = widget.categoria;
+
+    return CallbackShortcuts(
+      bindings: {
+        const SingleActivator(LogicalKeyboardKey.keyF, control: true): () =>
+            _focoBusqueda.requestFocus(),
+      },
+      child: Padding(
+        padding: const EdgeInsets.fromLTRB(32, 24, 32, 28),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            BotonVolver(
+              etiqueta: 'Volver a categorías',
+              alPresionar: widget.alVolver,
             ),
-            mostrarBotonVolver: true,
-          ),
-          Padding(
-            padding: const EdgeInsets.fromLTRB(24, 16, 24, 0),
-            child: BarraBusquedaWidget(
-              placeholder: 'Buscar en ${widget.categoria.nombre}...',
-              alCambiar: _onBusquedaCambiada,
+            const SizedBox(height: 18),
+            _Encabezado(
+              categoria: categoria,
+              alAgregarProducto: _nuevoProducto,
             ),
-          ),
-          Expanded(
-            child: _CuerpoDetalle(
-              categoria: widget.categoria,
-              busqueda: _busqueda,
-              filtroStock: _filtroStock,
-              onFiltroChanged: (f) => setState(() => _filtroStock = f),
-              proveedoresVm: _proveedoresVm,
+            const SizedBox(height: 22),
+            BarraBusqueda(
+              controlador: _busquedaController,
+              focoTeclado: _focoBusqueda,
+              placeholder: 'Buscar en ${categoria.nombre}...',
+              alCambiar: _alBuscar,
             ),
-          ),
-        ],
+            const SizedBox(height: 16),
+            ChipsFiltroStock(
+              filtroActual: _filtroStock,
+              alCambiar: (f) => setState(() {
+                _filtroStock = f;
+                _pagina = 0;
+              }),
+            ),
+            const SizedBox(height: 18),
+            Expanded(
+              child: TablaProductosCategoria(
+                categoriaId: categoria.id!,
+                nombreCategoria: categoria.nombre,
+                busqueda: _busqueda,
+                filtroStock: _filtroStock,
+                pagina: _pagina,
+                alCambiarPagina: (p) => setState(() => _pagina = p),
+                alVerProducto: _verProducto,
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }
 }
 
-// ── Cuerpo ──────────────────────────────────────────────────────────────────
-// ConsumerWidget: reacciona al provider de categoría y aplica filtros locales.
-
-class _CuerpoDetalle extends ConsumerWidget {
-  const _CuerpoDetalle({
+/// Marcador, nombre, descripción y acción principal de la categoría.
+class _Encabezado extends StatelessWidget {
+  const _Encabezado({
     required this.categoria,
-    required this.busqueda,
-    required this.filtroStock,
-    required this.onFiltroChanged,
-    required this.proveedoresVm,
+    required this.alAgregarProducto,
   });
 
   final Categoria categoria;
-  final String busqueda;
-  final FiltroStock filtroStock;
-  final ValueChanged<FiltroStock> onFiltroChanged;
-  final ProveedoresViewModel proveedoresVm;
-
-  static const double _maxAncho  = 250.0;
-  static const double _espaciado = 16.0;
-  static const double _altura    = 310.0;
-
-  @override
-  Widget build(BuildContext context, WidgetRef ref) {
-    final todos     = ref.watch(productosDeCategoriaProvider(categoria.id!));
-    final filtrados = _aplicarFiltros(todos);
-    final hayFiltro =
-        busqueda.isNotEmpty || filtroStock != FiltroStock.todos;
-
-    return CustomScrollView(
-      slivers: [
-        // ── Encabezado + controles ───────────────────────────────
-        SliverToBoxAdapter(
-          child: Padding(
-            padding: const EdgeInsets.fromLTRB(24, 20, 24, 0),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                _ChipsFiltroStock(
-                  filtroActual: filtroStock,
-                  onChange: onFiltroChanged,
-                ),
-                if (filtrados.isNotEmpty) ...[
-                  const SizedBox(height: 12),
-                  _ContadorResultados(total: filtrados.length),
-                ],
-                const SizedBox(height: 4),
-              ],
-            ),
-          ),
-        ),
-
-        // ── Grid o estado vacío ──────────────────────────────────
-        if (filtrados.isEmpty)
-          SliverFillRemaining(
-            hasScrollBody: false,
-            child: EstadoVacioWidget(
-              icono: Icons.inventory_2_outlined,
-              textoSinDatos:
-                  'Sin productos en "${categoria.nombre}"',
-              textoSinResultados:
-                  'Ningún producto coincide con la búsqueda.',
-              textoCTA:
-                  'Presiona "Agregar producto" para crear el primero.',
-              hayFiltro: hayFiltro,
-            ),
-          )
-        else
-          SliverPadding(
-            padding: const EdgeInsets.fromLTRB(24, 8, 24, 32),
-            sliver: SliverGrid(
-              gridDelegate: const SliverGridDelegateWithMaxCrossAxisExtent(
-                maxCrossAxisExtent: _maxAncho,
-                crossAxisSpacing:   _espaciado,
-                mainAxisSpacing:    _espaciado,
-                mainAxisExtent:     _altura,
-              ),
-              delegate: SliverChildBuilderDelegate(
-                (_, i) {
-                  final p = filtrados[i];
-                  return TarjetaProductoWidget(
-                    key: ValueKey(p.id),
-                    producto: p,
-                    alVerDetalle: () =>
-                        DialogoDetalleProductoWidget.mostrar(
-                          context,
-                          producto: p,
-                        ),
-                    alEditar: () => DialogoProducto.mostrar(
-                      context,
-                      productoAEditar: p,
-                      proveedoresVm: proveedoresVm,
-                    ),
-                    alEliminar: () => DialogoConfirmarEliminar.mostrar(
-                      context: context,
-                      nombreElemento: p.nombre,
-                      tipoElemento: 'producto',
-                      onConfirmar: () async {
-                        final error = await ref
-                            .read(productosProvider.notifier)
-                            .eliminar(p.id!);
-                        if (error != null && context.mounted) {
-                          SnackBarMensaje.error(context, error);
-                        }
-                      },
-                    ),
-                  );
-                },
-                childCount: filtrados.length,
-              ),
-            ),
-          ),
-      ],
-    );
-  }
-
-  List<Producto> _aplicarFiltros(List<Producto> todos) {
-    var lista = todos;
-
-    if (busqueda.isNotEmpty) {
-      final q = busqueda.toLowerCase();
-      lista = lista
-          .where(
-            (p) =>
-                p.nombre.toLowerCase().contains(q) ||
-                p.sku.toLowerCase().contains(q),
-          )
-          .toList();
-    }
-
-    return switch (filtroStock) {
-      FiltroStock.enStock =>
-        lista.where((p) => p.estadoStock == EstadoStock.enStock).toList(),
-      FiltroStock.stockBajo =>
-        lista.where((p) => p.estadoStock == EstadoStock.stockBajo).toList(),
-      FiltroStock.sinStock =>
-        lista.where((p) => p.estadoStock == EstadoStock.sinStock).toList(),
-      FiltroStock.todos => lista,
-    };
-  }
-}
-
-// ── Widgets privados de esta vista ──────────────────────────────────────────
-
-class _ChipsFiltroStock extends StatelessWidget {
-  const _ChipsFiltroStock({
-    required this.filtroActual,
-    required this.onChange,
-  });
-
-  final FiltroStock filtroActual;
-  final ValueChanged<FiltroStock> onChange;
+  final VoidCallback alAgregarProducto;
 
   @override
   Widget build(BuildContext context) {
-    return Wrap(
-      spacing: 8,
-      runSpacing: 6,
+    final descripcion = categoria.descripcion?.trim() ?? '';
+
+    return Row(
       children: [
-        ChipFiltro(
-          etiqueta: 'Todos',
-          seleccionado: filtroActual == FiltroStock.todos,
-          alPresionar: () => onChange(FiltroStock.todos),
+        MarcadorIdentidad(
+          inicial: inicialDe(categoria.nombre),
+          color: colorDeHex(categoria.colorHex),
+          lado: 50,
+          radio: 14,
         ),
-        ChipFiltro(
-          etiqueta: 'En stock',
-          seleccionado: filtroActual == FiltroStock.enStock,
-          alPresionar: () => onChange(FiltroStock.enStock),
-          color: ColoresApp.statusPaid,
+        const SizedBox(width: 14),
+        Expanded(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(categoria.nombre, style: TipografiaApp.heading1),
+              const SizedBox(height: 4),
+              Text(
+                descripcion.isEmpty ? 'Sin descripción' : descripcion,
+                style: TipografiaApp.subtituloPagina,
+                maxLines: 2,
+                overflow: TextOverflow.ellipsis,
+              ),
+            ],
+          ),
         ),
-        ChipFiltro(
-          etiqueta: 'Stock bajo',
-          seleccionado: filtroActual == FiltroStock.stockBajo,
-          alPresionar: () => onChange(FiltroStock.stockBajo),
-          color: ColoresApp.statusPending,
-        ),
-        ChipFiltro(
-          etiqueta: 'Sin stock',
-          seleccionado: filtroActual == FiltroStock.sinStock,
-          alPresionar: () => onChange(FiltroStock.sinStock),
-          color: ColoresApp.statusDebt,
+        const SizedBox(width: 20),
+        BotonPrimario(
+          etiqueta: 'Agregar producto',
+          icono: Icons.add,
+          alPresionar: alAgregarProducto,
         ),
       ],
-    );
-  }
-}
-
-class _ContadorResultados extends StatelessWidget {
-  const _ContadorResultados({required this.total});
-
-  final int total;
-
-  @override
-  Widget build(BuildContext context) {
-    return Text(
-      '$total PRODUCTO${total == 1 ? '' : 'S'}',
-      style: const TextStyle(
-        color: ColoresApp.textLight,
-        fontSize: 11,
-        fontWeight: FontWeight.w600,
-        letterSpacing: 1.1,
-      ),
     );
   }
 }
