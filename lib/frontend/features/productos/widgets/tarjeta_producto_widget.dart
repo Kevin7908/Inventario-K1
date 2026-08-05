@@ -49,9 +49,11 @@ class _TarjetaProductoWidgetState extends State<TarjetaProductoWidget> {
         widget.alEditar != null ||
         widget.alEliminar != null;
 
+    // `RepaintBoundary` sí está justificado aquí: la tarjeta se anima al pasar
+    // el mouse, y sin él ese repintado se propaga a toda la grilla.
     return RepaintBoundary(
-      child: Opacity(
-        opacity: p.activo ? 1 : 0.55,
+      child: _AtenuadoSiInactivo(
+        activo: p.activo,
         child: MouseRegion(
           cursor: SystemMouseCursors.click,
           onEnter: (_) => setState(() => _hover = true),
@@ -189,4 +191,19 @@ class _TarjetaProductoWidgetState extends State<TarjetaProductoWidget> {
 
   String _cantidad(double v) =>
       v.truncateToDouble() == v ? v.toInt().toString() : v.toStringAsFixed(2);
+}
+
+/// Atenúa la tarjeta de un producto inactivo.
+///
+/// Solo inserta el `Opacity` cuando hace falta: el widget reserva un buffer
+/// fuera de pantalla y el caso normal —producto activo— no debe pagarlo.
+class _AtenuadoSiInactivo extends StatelessWidget {
+  const _AtenuadoSiInactivo({required this.activo, required this.child});
+
+  final bool activo;
+  final Widget child;
+
+  @override
+  Widget build(BuildContext context) =>
+      activo ? child : Opacity(opacity: 0.55, child: child);
 }

@@ -226,7 +226,44 @@ final productosProvider =
 );
 
 /// Lista ya filtrada — solo rebuilda cuando la lista filtrada cambia.
+///
+/// La UI **siempre** debe leer de aquí y nunca llamar a `estado.filtrados`
+/// directamente: el getter recorre la lista hasta tres veces y hacerlo dentro
+/// de un `build()` lo repite en cada repintado, aunque el filtro no haya
+/// cambiado.
 final productosFiltradosProvider = Provider<List<Producto>>(
   name: 'productosFiltradosProvider',
   (ref) => ref.watch(productosProvider).value?.filtrados ?? const [],
+);
+
+/// Conteos del encabezado del catálogo.
+///
+/// Depende solo de `todos`, así que escribir en el buscador o cambiar de
+/// categoría no lo recalcula. Devuelve un record: al ser structural equality,
+/// si los números no cambian Riverpod no notifica y el encabezado no rebuilda.
+final productosResumenProvider = Provider<({int total, int stockBajo})>(
+  name: 'productosResumenProvider',
+  (ref) {
+    final todos = ref.watch(
+      productosProvider.select((s) => s.value?.todos ?? const <Producto>[]),
+    );
+
+    var bajos = 0;
+    for (final p in todos) {
+      if (p.estadoStock != EstadoStock.enStock) bajos++;
+    }
+    return (total: todos.length, stockBajo: bajos);
+  },
+);
+
+/// `true` cuando hay búsqueda o filtro de categoría activo.
+final hayFiltroProductosProvider = Provider<bool>(
+  name: 'hayFiltroProductosProvider',
+  (ref) => ref.watch(
+    productosProvider.select(
+      (s) =>
+          (s.value?.busqueda.isNotEmpty ?? false) ||
+          s.value?.filtroCategoriaId != null,
+    ),
+  ),
 );
