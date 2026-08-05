@@ -1,16 +1,22 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:inventario_k1/frontend/share/temas/colores_app.dart';
-import 'package:inventario_k1/frontend/share/temas/decoracion_inputs_widget.dart';
 
 import '../../../../backend/features/categorias/modelo/categoria.dart';
-import '../../../share/widgets/output/snack_bar_mensaje.dart';
+import '../../../../core/resultado.dart';
+import '../../../share2/share2.dart';
 import '../provider/categorias_provider.dart';
 
+/// Diálogo de creación y edición de una categoría.
+///
+/// Se abre con [DialogoCategoria.mostrar]. Si recibe [categoriaAEditar]
+/// trabaja en modo edición; si no, crea una nueva.
+///
+/// Es diálogo y no página porque el formulario son dos campos: el patrón de
+/// páginas completas de Productos existe por el tamaño de aquel formulario.
 class DialogoCategoria extends ConsumerStatefulWidget {
-  final Categoria? categoriaAEditar;
-
   const DialogoCategoria({super.key, this.categoriaAEditar});
+
+  final Categoria? categoriaAEditar;
 
   bool get esEdicion => categoriaAEditar != null;
 
@@ -33,17 +39,15 @@ class _DialogoCategoriaState extends ConsumerState<DialogoCategoria> {
   final _formKey = GlobalKey<FormState>();
   late final TextEditingController _nombreCtrl;
   late final TextEditingController _descripcionCtrl;
+
   bool _guardando = false;
 
   @override
   void initState() {
     super.initState();
-    _nombreCtrl = TextEditingController(
-      text: widget.categoriaAEditar?.nombre ?? '',
-    );
-    _descripcionCtrl = TextEditingController(
-      text: widget.categoriaAEditar?.descripcion ?? '',
-    );
+    final c = widget.categoriaAEditar;
+    _nombreCtrl = TextEditingController(text: c?.nombre ?? '');
+    _descripcionCtrl = TextEditingController(text: c?.descripcion ?? '');
   }
 
   @override
@@ -53,170 +57,192 @@ class _DialogoCategoriaState extends ConsumerState<DialogoCategoria> {
     super.dispose();
   }
 
-  Future<void> _guardar() async {
-    if (!_formKey.currentState!.validate()) return;
-    setState(() => _guardando = true);
-
-    final notifier = ref.read(categoriasProvider.notifier);
-    String? error;
-
-    if (widget.esEdicion) {
-      error = await notifier.actualizar(
-        id: widget.categoriaAEditar!.id!,
-        nombre: _nombreCtrl.text,
-        descripcion:
-            _descripcionCtrl.text.isEmpty ? null : _descripcionCtrl.text,
-      );
-    } else {
-      error = await notifier.crear(
-        nombre: _nombreCtrl.text,
-        descripcion:
-            _descripcionCtrl.text.isEmpty ? null : _descripcionCtrl.text,
-      );
-    }
-
-    if (!mounted) return;
-    setState(() => _guardando = false);
-
-    if (error == null) {
-      Navigator.of(context).pop();
-      SnackBarMensaje.success(
-        context,
-        widget.esEdicion
-            ? 'Categoría actualizada correctamente'
-            : 'Categoría creada correctamente',
-      );
-    } else {
-      SnackBarMensaje.error(context, error);
-    }
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    return Dialog(
-      backgroundColor: ColoresApp.bgCard,
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-      child: Container(
-        width: 480,
-        padding: const EdgeInsets.all(28),
-        child: Form(
-          key: _formKey,
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [
-                  Text(
-                    widget.esEdicion ? 'Editar Categoría' : 'Nueva Categoría',
-                    style: const TextStyle(
-                      color: ColoresApp.textDark,
-                      fontSize: 18,
-                      fontWeight: FontWeight.w700,
-                    ),
-                  ),
-                  IconButton(
-                    onPressed: () => Navigator.of(context).pop(),
-                    icon: const Icon(Icons.close, color: ColoresApp.textMedium),
-                    style: IconButton.styleFrom(
-                      backgroundColor: ColoresApp.bgContent,
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(8),
-                      ),
-                    ),
-                  ),
-                ],
-              ),
-              const SizedBox(height: 24),
-
-              _etiquetaCampo('Nombre'),
-              const SizedBox(height: 6),
-              TextFormField(
-                controller: _nombreCtrl,
-                decoration: dialogInputDecoration('Ej: Filtros, Lubricantes...'),
-                validator: (v) {
-                  if (v == null || v.trim().isEmpty) {
-                    return 'El nombre es requerido';
-                  }
-                  if (v.trim().length < 2) return 'Mínimo 2 caracteres';
-                  return null;
-                },
-              ),
-              const SizedBox(height: 16),
-
-              _etiquetaCampo('Descripción (opcional)'),
-              const SizedBox(height: 6),
-              TextFormField(
-                controller: _descripcionCtrl,
-                maxLines: 2,
-                decoration: dialogInputDecoration(
-                  'Breve descripción de la categoría...',
-                ),
-              ),
-              const SizedBox(height: 28),
-
-              Row(
-                children: [
-                  Expanded(
-                    child: OutlinedButton(
-                      onPressed: () => Navigator.of(context).pop(),
-                      style: OutlinedButton.styleFrom(
-                        foregroundColor: ColoresApp.textMedium,
-                        side: const BorderSide(color: ColoresApp.border),
-                        padding: const EdgeInsets.symmetric(vertical: 13),
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(10),
-                        ),
-                      ),
-                      child: const Text('Cancelar'),
-                    ),
-                  ),
-                  const SizedBox(width: 12),
-                  Expanded(
-                    child: ElevatedButton(
-                      onPressed: _guardando ? null : _guardar,
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: ColoresApp.primary,
-                        foregroundColor: Colors.white,
-                        padding: const EdgeInsets.symmetric(vertical: 13),
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(10),
-                        ),
-                        elevation: 0,
-                      ),
-                      child: _guardando
-                          ? const SizedBox(
-                              width: 18,
-                              height: 18,
-                              child: CircularProgressIndicator(
-                                strokeWidth: 2,
-                                color: Colors.white,
-                              ),
-                            )
-                          : Text(
-                              widget.esEdicion
-                                  ? 'Guardar cambios'
-                                  : 'Crear categoría',
-                            ),
-                    ),
-                  ),
-                ],
-              ),
-            ],
-          ),
+  void _mostrarMensaje(String texto, {required bool esError}) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(
+          texto,
+          style: TipografiaApp.sobrePrimario(TipografiaApp.cuerpo),
         ),
+        backgroundColor: esError
+            ? ColoresApp.statusDanger
+            : ColoresApp.statusSuccess,
       ),
     );
   }
 
-  Widget _etiquetaCampo(String texto) {
-    return Text(
-      texto,
-      style: const TextStyle(
-        color: ColoresApp.textDark,
-        fontSize: 13,
-        fontWeight: FontWeight.w600,
+  Future<void> _guardar() async {
+    if (!_formKey.currentState!.validate()) return;
+
+    setState(() => _guardando = true);
+
+    final notifier = ref.read(categoriasProvider.notifier);
+    final descripcion = _descripcionCtrl.text.trim();
+    final Resultado resultado;
+
+    if (widget.esEdicion) {
+      resultado = await notifier.actualizar(
+        id: widget.categoriaAEditar!.id!,
+        nombre: _nombreCtrl.text.trim(),
+        descripcion: descripcion.isEmpty ? null : descripcion,
+      );
+    } else {
+      resultado = await notifier.crear(
+        nombre: _nombreCtrl.text.trim(),
+        descripcion: descripcion.isEmpty ? null : descripcion,
+      );
+    }
+
+    if (!mounted) return;
+
+    if (resultado case Fallo(:final mensaje)) {
+      _mostrarMensaje(mensaje, esError: true);
+      setState(() => _guardando = false);
+      return;
+    }
+
+    Navigator.of(context).pop();
+    _mostrarMensaje(
+      widget.esEdicion
+          ? 'Categoría actualizada correctamente.'
+          : 'Categoría creada correctamente.',
+      esError: false,
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return AtajosFormulario(
+      alGuardar: _guardando ? null : _guardar,
+      alCancelar: _guardando ? null : () => Navigator.of(context).pop(),
+      child: Dialog(
+        backgroundColor: Colors.transparent,
+        child: Container(
+          width: 460,
+          constraints: BoxConstraints(
+            maxHeight: MediaQuery.of(context).size.height * 0.75,
+          ),
+          decoration: BoxDecoration(
+            color: ColoresApp.bgCard,
+            borderRadius: BorderRadius.circular(18),
+            boxShadow: const [
+              BoxShadow(
+                color: ColoresApp.shadowMedium,
+                blurRadius: 24,
+                offset: Offset(0, 8),
+              ),
+            ],
+          ),
+          clipBehavior: Clip.antiAlias,
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Padding(
+                padding: const EdgeInsets.fromLTRB(24, 24, 16, 0),
+                child: Row(
+                  children: [
+                    const MarcadorIdentidad(
+                      icono: Icons.layers_outlined,
+                      lado: 42,
+                    ),
+                    const SizedBox(width: 13),
+                    Expanded(
+                      child: Text(
+                        widget.esEdicion
+                            ? 'Editar categoría'
+                            : 'Nueva categoría',
+                        style: TipografiaApp.heading3,
+                      ),
+                    ),
+                    BotonIcono(
+                      icono: Icons.close_rounded,
+                      tooltip: 'Cerrar',
+                      alPresionar: _guardando
+                          ? null
+                          : () => Navigator.of(context).pop(),
+                    ),
+                  ],
+                ),
+              ),
+              Flexible(
+                child: SingleChildScrollView(
+                  padding: const EdgeInsets.fromLTRB(24, 22, 24, 4),
+                  child: Form(
+                    key: _formKey,
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        CampoTexto(
+                          etiqueta: 'Nombre *',
+                          controlador: _nombreCtrl,
+                          placeholder: 'Ej: Frenos, Motor, Lubricantes...',
+                          autofocus: true,
+                          validador: (v) {
+                            final texto = v?.trim() ?? '';
+                            if (texto.isEmpty) {
+                              return 'El nombre es obligatorio.';
+                            }
+                            if (texto.length < 2) return 'Mínimo 2 caracteres.';
+                            if (texto.length > 120) {
+                              return 'Máximo 120 caracteres.';
+                            }
+                            return null;
+                          },
+                        ),
+                        const SizedBox(height: 18),
+                        CampoTexto(
+                          etiqueta: 'Descripción (opcional)',
+                          controlador: _descripcionCtrl,
+                          placeholder:
+                              'Qué tipo de repuestos agrupa esta categoría...',
+                          lineas: 3,
+                        ),
+                        const SizedBox(height: 6),
+                        Text(
+                          'Al renombrar una categoría se regenera el SKU de sus '
+                          'productos.',
+                          style: TipografiaApp.caption.copyWith(
+                            fontSize: 12,
+                            color: ColoresApp.textMuted,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+              ),
+              Padding(
+                padding: const EdgeInsets.fromLTRB(24, 18, 24, 24),
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.end,
+                  children: [
+                    TextButton(
+                      onPressed: _guardando
+                          ? null
+                          : () => Navigator.of(context).pop(),
+                      child: Text(
+                        'Cancelar',
+                        style: TipografiaApp.cuerpoMedium.copyWith(
+                          color: ColoresApp.textSecondary,
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: 12),
+                    BotonPrimario(
+                      etiqueta: _guardando
+                          ? 'Guardando...'
+                          : widget.esEdicion
+                          ? 'Guardar cambios'
+                          : 'Crear categoría',
+                      icono: Icons.check,
+                      alPresionar: _guardando ? null : _guardar,
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+        ),
       ),
     );
   }
