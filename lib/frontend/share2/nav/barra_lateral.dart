@@ -66,44 +66,51 @@ class BarraLateral extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      width: 240,
-      color: ColoresApp.bgSidebar,
-      child: Column(
-        children: [
-          LogoSidebar(
-            nombreEmpresa: nombreEmpresa,
-            subtitulo: subtituloEmpresa,
-          ),
-          Expanded(
-            child: ListView(
-              padding: EdgeInsets.zero,
-              children: [
-                for (final seccion in secciones) ...[
-                  SeccionNav(titulo: seccion.titulo),
-                  for (final item in seccion.items)
-                    ItemNav(
-                      icono: item.icono,
-                      etiqueta: item.etiqueta,
-                      activo: rutaActiva == item.ruta,
-                      contadorBadge: item.contadorBadge,
-                      alPresionar: item.alPresionar,
-                    ),
+    // `RepaintBoundary` obligatorio: el resaltado de hover de cada `ItemNav`
+    // se anima, y sin capa propia ese repintado ensucia la capa que comparte
+    // con todo el contenido de la app. En Linux, donde la barra de título es
+    // client-side y vive en la misma superficie, eso se ve como un parpadeo
+    // de los botones de minimizar/maximizar/cerrar al pasar el mouse.
+    return RepaintBoundary(
+      child: Container(
+        width: 240,
+        color: ColoresApp.bgSidebar,
+        child: Column(
+          children: [
+            LogoSidebar(
+              nombreEmpresa: nombreEmpresa,
+              subtitulo: subtituloEmpresa,
+            ),
+            Expanded(
+              child: ListView(
+                padding: EdgeInsets.zero,
+                children: [
+                  for (final seccion in secciones) ...[
+                    SeccionNav(titulo: seccion.titulo),
+                    for (final item in seccion.items)
+                      ItemNav(
+                        icono: item.icono,
+                        etiqueta: item.etiqueta,
+                        activo: rutaActiva == item.ruta,
+                        contadorBadge: item.contadorBadge,
+                        alPresionar: item.alPresionar,
+                      ),
+                  ],
                 ],
-              ],
+              ),
             ),
-          ),
-          const SeparadorNav(),
-          for (final item in itemsInferiores)
-            ItemNav(
-              icono: item.icono,
-              etiqueta: item.etiqueta,
-              activo: rutaActiva == item.ruta,
-              contadorBadge: item.contadorBadge,
-              alPresionar: item.alPresionar,
-            ),
-          const SizedBox(height: 12),
-        ],
+            const SeparadorNav(),
+            for (final item in itemsInferiores)
+              ItemNav(
+                icono: item.icono,
+                etiqueta: item.etiqueta,
+                activo: rutaActiva == item.ruta,
+                contadorBadge: item.contadorBadge,
+                alPresionar: item.alPresionar,
+              ),
+            const SizedBox(height: 12),
+          ],
+        ),
       ),
     );
   }

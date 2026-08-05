@@ -18,9 +18,13 @@ class EncabezadoConCuenta extends StatelessWidget {
   final String titulo;
   final String? subtitulo;
 
+  /// Resuelto una vez, no en cada `build`: `locator` dentro de `build` es
+  /// service location en caliente y esconde la dependencia.
+  static final AuthViewModel _authViewModel = locator<AuthViewModel>();
+
   @override
   Widget build(BuildContext context) {
-    final authViewModel = locator<AuthViewModel>();
+    final authViewModel = _authViewModel;
 
     return ListenableBuilder(
       listenable: authViewModel,
