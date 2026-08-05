@@ -75,4 +75,11 @@ abstract interface class RepositorioOrdenes {
   });
 
   Future<void> eliminarRepuesto(int repuestoId);
+
+  // Reportes
+
+  /// Cuántas órdenes distintas tiene asignadas cada técnico, indexado por
+  /// id de técnico. Cuenta una vez por orden aunque el técnico tenga varias
+  /// tareas ahí.
+  Stream<Map<int, int>> observarConteoTareasPorTecnico();
 }

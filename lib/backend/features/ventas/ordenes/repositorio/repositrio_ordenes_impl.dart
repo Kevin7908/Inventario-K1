@@ -329,4 +329,23 @@ class RepositorioOrdenesImpl implements RepositorioOrdenes {
       updates: {_db.tablaProducto},
     );
   }
+
+  // Reportes
+
+  @override
+  Stream<Map<int, int>> observarConteoTareasPorTecnico() {
+    final ordenesDistintas = _tablaTareas.ordenId.count(distinct: true);
+    final consulta = _db.selectOnly(_tablaTareas)
+      ..addColumns([_tablaTareas.tecnicoId, ordenesDistintas])
+      ..groupBy([_tablaTareas.tecnicoId]);
+
+    return consulta.watch().map((filas) {
+      final conteo = <int, int>{};
+      for (final fila in filas) {
+        final id = fila.read(_tablaTareas.tecnicoId);
+        if (id != null) conteo[id] = fila.read(ordenesDistintas) ?? 0;
+      }
+      return conteo;
+    });
+  }
 }

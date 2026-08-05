@@ -21,25 +21,17 @@ abstract final class TecnicoMapper {
     );
   }
 
-  static TablaTecnicoCompanion aCompanion({
-    required String nombres,
-    String? cedula,
-    String? apellidos,
-    String? telefono,
-    String? email,
-    int? especializacionId,
-    double? salarioBase,
-    required bool activo,
-  }) {
-    return TablaTecnicoCompanion.insert(
-      nombres: nombres,
-      cedula: Value(cedula),
-      apellidos: Value(apellidos),
-      telefono: Value(telefono),
-      email: Value(email),
-      especializacionId: Value(especializacionId),
-      salarioBase: Value(salarioBase),
-      activo: Value(activo),
+  static TablaTecnicoCompanion modeloACompanion(Tecnico t) {
+    return TablaTecnicoCompanion(
+      cedula: Value(t.cedula),
+      nombres: Value(t.nombres),
+      apellidos: Value(t.apellidos),
+      telefono: Value(t.telefono),
+      email: Value(t.email),
+      especializacionId: Value(t.especializacionId),
+      salarioBase: Value(t.salarioBase),
+      activo: Value(t.activo),
+      creadoEn: Value(t.creadoEn),
     );
   }
 }
