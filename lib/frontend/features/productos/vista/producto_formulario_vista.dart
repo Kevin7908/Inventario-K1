@@ -68,7 +68,7 @@ class ProductoFormularioVista extends StatelessWidget {
               style: TipografiaApp.heading1,
             ),
             const SizedBox(height: 4),
-            Text(
+            const Text(
               'Completa la información del repuesto',
               style: TipografiaApp.subtituloPagina,
             ),

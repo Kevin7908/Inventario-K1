@@ -1,1 +1,13 @@
 include: package:flutter_lints/flutter.yaml
+
+linter:
+  rules:
+    # Sin fallout en el código actual: se activan ya y atajan bugs reales.
+    - unawaited_futures
+    - avoid_print
+    - use_build_context_synchronously
+
+    # Activas. Dejan ~40 avisos en módulos legacy que se limpian por módulo,
+    # no de golpe (ver §9 de CLAUDE.md). `productos` y `share2` ya están al día.
+    - prefer_const_constructors
+    - prefer_const_literals_to_create_immutables

@@ -16,8 +16,8 @@ class SeparadorNav extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 8),
+    return const Padding(
+      padding: EdgeInsets.symmetric(vertical: 8),
       child: Divider(
         color: ColoresApp.borderSidebar,
         thickness: 1,

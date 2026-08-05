@@ -66,11 +66,11 @@ class DialogoConfirmacion extends StatelessWidget {
         decoration: BoxDecoration(
           color: ColoresApp.bgCard,
           borderRadius: BorderRadius.circular(12),
-          boxShadow: [
+          boxShadow: const [
             BoxShadow(
               color: ColoresApp.shadowMedium,
               blurRadius: 24,
-              offset: const Offset(0, 8),
+              offset: Offset(0, 8),
             ),
           ],
         ),
