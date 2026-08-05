@@ -305,11 +305,40 @@ final productosFiltradosProvider = Provider<List<Producto>>(
   (ref) => ref.watch(productosProvider).value?.items ?? const [],
 );
 
-/// Conteos del encabezado, resueltos con un COUNT en SQL.
+/// Conteos del catálogo entero, para el encabezado. Resueltos con COUNT en SQL.
 final productosResumenProvider =
-    StreamProvider<({int total, int stockBajo})>(
+    StreamProvider<({int total, int enStock, int stockBajo, int sinStock})>(
   name: 'productosResumenProvider',
   (ref) => ref.watch(repositorioProductosProvider).observarResumen(),
+);
+
+/// Conteos por estado de stock **dentro del filtro activo**, para los chips.
+///
+/// Se separa de [productosResumenProvider] porque los números tienen que
+/// coincidir con lo que la tabla muestra: con la categoría "Frenos" activa,
+/// "Stock bajo 4" son los cuatro frenos bajos, no los de todo el catálogo.
+/// El `select` devuelve un record —igualdad estructural—, así que cambiar de
+/// chip no reabre esta consulta.
+final conteoStockProvider =
+    StreamProvider<({int total, int enStock, int stockBajo, int sinStock})>(
+  name: 'conteoStockProvider',
+  (ref) {
+    final ambito = ref.watch(
+      productosProvider.select(
+        (s) => (
+          busqueda: s.value?.busqueda ?? '',
+          categoriaId: s.value?.filtroCategoriaId,
+        ),
+      ),
+    );
+
+    return ref.watch(repositorioProductosProvider).observarResumen(
+          filtro: FiltroProductos(
+            busqueda: ambito.busqueda,
+            categoriaId: ambito.categoriaId,
+          ),
+        );
+  },
 );
 
 /// `true` cuando hay búsqueda o algún filtro activo.

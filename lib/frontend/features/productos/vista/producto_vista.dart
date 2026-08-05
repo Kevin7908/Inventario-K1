@@ -12,7 +12,6 @@ import '../../../layout/encabezado_con_cuenta.dart';
 import '../../../share2/share2.dart';
 import '../../../../backend/features/categorias/modelo/categoria.dart';
 import '../../categorias/provider/categorias_provider.dart';
-import '../../categorias/vista/categorias_vistas.dart';
 import '../provider/productos_provider.dart';
 import '../widgets/columnas_tabla_producto.dart';
 import 'producto_detalle_vista.dart';
@@ -166,7 +165,9 @@ class _ProductosVistaState extends ConsumerState<ProductosVista> {
                       ),
                     ],
                   ),
-                  const SizedBox(height: 18),
+                  const SizedBox(height: 16),
+                  const _ChipsStock(),
+                  const SizedBox(height: 16),
                   Expanded(child: _TablaProductos(alVerDetalle: _verDetalle)),
                 ],
               ),
@@ -190,12 +191,81 @@ class _EncabezadoProductos extends ConsumerWidget {
     final resumen = ref.watch(productosResumenProvider).value;
     final total = resumen?.total ?? 0;
     final bajos = resumen?.stockBajo ?? 0;
+    final agotados = resumen?.sinStock ?? 0;
+
+    // "Stock bajo" y "agotado" son tramos distintos desde que existen los
+    // chips; el subtítulo nombra el segundo solo cuando hay algo que reponer.
+    final buffer = StringBuffer('$total repuestos en catálogo')
+      ..write(' · $bajos con stock bajo');
+    if (agotados > 0) buffer.write(' · $agotados agotados');
 
     return EncabezadoConCuenta(
       titulo: 'Productos',
-      subtitulo: '$total repuestos en catálogo · $bajos con stock bajo',
+      subtitulo: buffer.toString(),
     );
   }
+}
+
+/// Chips de filtro por estado de stock, con el conteo de cada tramo.
+///
+/// No están en el mockup —ahí solo se filtra por categoría—, pero el catálogo
+/// se revisa sobre todo para reponer, y llegar a "lo que falta" no debería
+/// obligar a recorrer la tabla. Cada chip lleva el color del semáforo que ya
+/// usa `BadgeEstadoStock`, así que el filtro y la columna Estado se leen igual.
+///
+/// Observa el resumen y el filtro activo por separado: cambiar de chip no
+/// vuelve a consultar los conteos, y que entre un producto nuevo no repinta
+/// la selección.
+class _ChipsStock extends ConsumerWidget {
+  const _ChipsStock();
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final activo = ref.watch(
+      productosProvider.select(
+        (s) => s.value?.filtroStock ?? FiltroStock.todos,
+      ),
+    );
+    final resumen = ref.watch(conteoStockProvider).value;
+
+    void filtrar(FiltroStock filtro) =>
+        ref.read(productosProvider.notifier).filtrarPorStock(filtro);
+
+    return Wrap(
+      spacing: 9,
+      runSpacing: 9,
+      children: [
+        ChipFiltro(
+          etiqueta: _conConteo('Todos', resumen?.total),
+          seleccionado: activo == FiltroStock.todos,
+          alPresionar: () => filtrar(FiltroStock.todos),
+        ),
+        ChipFiltro(
+          etiqueta: _conConteo('En stock', resumen?.enStock),
+          seleccionado: activo == FiltroStock.enStock,
+          colorActivo: ColoresApp.stockOk,
+          alPresionar: () => filtrar(FiltroStock.enStock),
+        ),
+        ChipFiltro(
+          etiqueta: _conConteo('Stock bajo', resumen?.stockBajo),
+          seleccionado: activo == FiltroStock.stockBajo,
+          colorActivo: ColoresApp.stockLow,
+          alPresionar: () => filtrar(FiltroStock.stockBajo),
+        ),
+        ChipFiltro(
+          etiqueta: _conConteo('Agotado', resumen?.sinStock),
+          seleccionado: activo == FiltroStock.sinStock,
+          colorActivo: ColoresApp.stockOut,
+          alPresionar: () => filtrar(FiltroStock.sinStock),
+        ),
+      ],
+    );
+  }
+
+  /// Mientras el conteo no llega, el chip va sin número en vez de mostrar un
+  /// cero que sería falso.
+  static String _conConteo(String etiqueta, int? cantidad) =>
+      cantidad == null ? etiqueta : '$etiqueta $cantidad';
 }
 
 /// Tabla del catálogo.

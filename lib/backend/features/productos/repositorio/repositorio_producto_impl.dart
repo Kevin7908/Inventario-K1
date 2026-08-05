@@ -201,9 +201,12 @@ class RepositorioProductosImpl implements RepositorioProducto {
 
   // Paginación — WHERE, COUNT y LIMIT los resuelve SQLite, no el frontend.
 
-  /// Traduce [FiltroProductos] a una expresión SQL reutilizable por la
-  /// consulta de la página y por la del total.
-  Expression<bool> _condicion(FiltroProductos filtro) {
+  /// Parte del filtro que **no** mira el stock: búsqueda y categoría.
+  ///
+  /// Va aparte porque `observarResumen` necesita contar los tres tramos de
+  /// stock dentro del mismo ámbito que la tabla está mostrando; si aplicara
+  /// también el tramo activo, cada chip contaría solo sus propias filas.
+  Expression<bool> _condicionAmbito(FiltroProductos filtro) {
     final p = _db.tablaProducto;
     Expression<bool> acumulado = const Constant(true);
 
@@ -220,6 +223,15 @@ class RepositorioProductosImpl implements RepositorioProducto {
     if (categoria != null) {
       acumulado = acumulado & p.categoriaId.equals(categoria);
     }
+
+    return acumulado;
+  }
+
+  /// Traduce [FiltroProductos] a una expresión SQL reutilizable por la
+  /// consulta de la página y por la del total.
+  Expression<bool> _condicion(FiltroProductos filtro) {
+    final p = _db.tablaProducto;
+    var acumulado = _condicionAmbito(filtro);
 
     if (filtro.soloSinStock) {
       acumulado = acumulado & p.stockActual.isSmallerOrEqualValue(0);
@@ -286,19 +298,59 @@ class RepositorioProductosImpl implements RepositorioProducto {
   }
 
   @override
-  Stream<({int total, int stockBajo})> observarResumen() {
+  Stream<Map<int, int>> observarConteoPorProveedor() {
+    final cantidad = _db.tablaProducto.id.count();
+    final consulta = _db.selectOnly(_db.tablaProducto)
+      ..addColumns([_db.tablaProducto.proveedorId, cantidad])
+      ..where(_db.tablaProducto.proveedorId.isNotNull())
+      ..groupBy([_db.tablaProducto.proveedorId]);
+
+    return consulta.watch().map((filas) {
+      final conteo = <int, int>{};
+      for (final fila in filas) {
+        final id = fila.read(_db.tablaProducto.proveedorId);
+        if (id != null) conteo[id] = fila.read(cantidad) ?? 0;
+      }
+      return conteo;
+    });
+  }
+
+  @override
+  Stream<({int total, int enStock, int stockBajo, int sinStock})>
+      observarResumen({FiltroProductos filtro = const FiltroProductos()}) {
     final p = _db.tablaProducto;
     final total = p.id.count();
+
+    // Los mismos tres tramos que `_condicion`, para que el número del chip
+    // coincida siempre con las filas que ese chip termina mostrando.
+    final enStock = p.id.count(
+      filter: p.stockActual.isBiggerThan(p.stockMinimo),
+    );
     final bajos = p.id.count(
-      filter: p.stockActual.isSmallerOrEqual(p.stockMinimo),
+      filter: p.stockActual.isBiggerThanValue(0) &
+          p.stockActual.isSmallerOrEqual(p.stockMinimo),
+    );
+    final agotados = p.id.count(
+      filter: p.stockActual.isSmallerOrEqualValue(0),
     );
 
-    final consulta = _db.selectOnly(p)..addColumns([total, bajos]);
+    // El join con categorías es el mismo de `observarPagina`: la búsqueda del
+    // ámbito también mira el nombre de la categoría.
+    final consulta = _db.selectOnly(p).join([
+      leftOuterJoin(
+        _db.tablaCategoria,
+        _db.tablaCategoria.id.equalsExp(p.categoriaId),
+      ),
+    ])
+      ..addColumns([total, enStock, bajos, agotados])
+      ..where(_condicionAmbito(filtro));
 
     return consulta.watchSingleOrNull().map(
           (fila) => (
             total: fila?.read(total) ?? 0,
+            enStock: fila?.read(enStock) ?? 0,
             stockBajo: fila?.read(bajos) ?? 0,
+            sinStock: fila?.read(agotados) ?? 0,
           ),
         );
   }

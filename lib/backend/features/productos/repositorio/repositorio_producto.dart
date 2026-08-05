@@ -108,6 +108,23 @@ abstract class RepositorioProducto {
   /// Se resuelve con un `GROUP BY`, no cargando los productos en memoria.
   Stream<Map<int, int>> observarConteoPorCategoria();
 
-  /// Observa el total de productos y cuántos no están en stock normal.
-  Stream<({int total, int stockBajo})> observarResumen();
+  /// Observa cuántos productos surte cada proveedor, indexado por su id.
+  ///
+  /// Igual que [observarConteoPorCategoria], sale de un `GROUP BY`: es el
+  /// "N productos" que muestra cada tarjeta de proveedor.
+  Stream<Map<int, int>> observarConteoPorProveedor();
+
+  /// Observa cuántos productos hay en cada estado de stock.
+  ///
+  /// Los tres estados son excluyentes y suman `total`, para que los chips de
+  /// filtro puedan mostrar su conteo sin recorrer el catálogo:
+  /// - `enStock`: `stockActual > stockMinimo`
+  /// - `stockBajo`: `0 < stockActual <= stockMinimo`
+  /// - `sinStock`: `stockActual <= 0`
+  ///
+  /// De [filtro] solo se aplican la búsqueda y la categoría: los tramos de
+  /// stock son justamente lo que se está contando. Sin filtro cuenta todo el
+  /// catálogo, que es lo que necesita el encabezado de la pantalla.
+  Stream<({int total, int enStock, int stockBajo, int sinStock})>
+      observarResumen({FiltroProductos filtro});
 }

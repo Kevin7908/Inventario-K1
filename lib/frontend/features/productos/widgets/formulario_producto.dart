@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
@@ -8,7 +10,7 @@ import '../../../../backend/features/unidades_medida/modelo/unidad_medida.dart';
 import '../../../../core/resultado.dart';
 import '../../../share2/share2.dart';
 import '../../categorias/provider/categorias_provider.dart';
-import '../../proveedores/view_model/proveedores_view_model.dart';
+import '../../proveedores/provider/proveedores_provider.dart';
 import '../../unidades_medida/provider/unidades_medida_provider.dart';
 import '../provider/productos_provider.dart';
 import 'selector_imagen_widget.dart';
@@ -26,7 +28,6 @@ import 'selector_imagen_widget.dart';
 ///
 /// Parámetros:
 /// - [productoAEditar]: producto a modificar. Si es `null`, crea uno nuevo.
-/// - [proveedoresVm]: fuente de proveedores (vive en `get_it`, no en Riverpod).
 /// - [alTerminar]: se llama tras guardar con éxito, para que el contenedor
 ///   cierre el diálogo o vuelva a la lista.
 /// - [alCancelar]: se llama al presionar "Cancelar".
@@ -34,13 +35,11 @@ class FormularioProducto extends ConsumerStatefulWidget {
   const FormularioProducto({
     super.key,
     this.productoAEditar,
-    required this.proveedoresVm,
     required this.alTerminar,
     required this.alCancelar,
   });
 
   final Producto? productoAEditar;
-  final ProveedoresViewModel proveedoresVm;
   final VoidCallback alTerminar;
   final VoidCallback alCancelar;
 
@@ -93,25 +92,49 @@ class _FormularioProductoState extends ConsumerState<FormularioProducto> {
     _activo = p?.activo ?? true;
 
     if (p != null) {
-      // Las listas de FK viven en providers que pueden no estar resueltos
-      // durante initState; se preseleccionan tras el primer frame.
+      // Las listas de FK viven en providers que no están resueltos durante
+      // initState. Se preseleccionan tras el primer frame, cuando el `build`
+      // ya suscribió los tres providers y sus futuros pueden completarse.
       WidgetsBinding.instance.addPostFrameCallback((_) => _preseleccionarFk(p));
     }
   }
 
+  /// Marca en los selectores la categoría, unidad y proveedor que el producto
+  /// ya tiene.
+  ///
+  /// **Espera** a que cada catálogo llegue en vez de leer su valor actual: al
+  /// abrir el formulario en frío —el diálogo que abren cotizaciones, facturas
+  /// u órdenes— los streams todavía no han emitido, y una lectura seca dejaba
+  /// los tres campos en "Sin …" aunque el producto los tuviera asignados.
+  ///
+  /// Los tres van por su cuenta, no en un `await` encadenado: si un catálogo
+  /// tarda o falla, los otros dos igual quedan marcados.
   void _preseleccionarFk(Producto p) {
-    if (!mounted) return;
-    final categorias = ref.read(catalogoCategoriasProvider).value ?? const [];
-    final unidades = ref.read(unidadesMedidaProvider).value?.unidades ?? const [];
+    unawaited(_marcar(
+      ref.read(catalogoCategoriasProvider.future),
+      (lista) =>
+          _categoria = lista.where((c) => c.id == p.categoriaId).firstOrNull,
+    ));
+    unawaited(_marcar(
+      ref.read(unidadesMedidaProvider.future),
+      (estado) => _unidad =
+          estado.unidades.where((u) => u.id == p.unidadMedidaId).firstOrNull,
+    ));
+    unawaited(_marcar(
+      ref.read(catalogoProveedoresProvider.future),
+      (lista) =>
+          _proveedor = lista.where((pr) => pr.id == p.proveedorId).firstOrNull,
+    ));
+  }
 
-    setState(() {
-      _categoria =
-          categorias.where((c) => c.id == p.categoriaId).firstOrNull;
-      _unidad = unidades.where((u) => u.id == p.unidadMedidaId).firstOrNull;
-      _proveedor = widget.proveedoresVm.proveedores
-          .where((pr) => pr.id == p.proveedorId)
-          .firstOrNull;
-    });
+  /// Espera a [futuro] y aplica [asignar] dentro de un `setState`.
+  Future<void> _marcar<T>(
+    Future<T> futuro,
+    void Function(T datos) asignar,
+  ) async {
+    final datos = await futuro;
+    if (!mounted) return;
+    setState(() => asignar(datos));
   }
 
   @override
@@ -257,7 +280,7 @@ class _FormularioProductoState extends ConsumerState<FormularioProducto> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          _Fila(
+          FilaCampos(
             pesos: const [2, 1],
             hijos: [
               CampoTexto(
@@ -280,7 +303,7 @@ class _FormularioProductoState extends ConsumerState<FormularioProducto> {
             ],
           ),
           const SizedBox(height: 16),
-          _Fila(
+          FilaCampos(
             hijos: [
               SelectorWidget<Categoria?>(
                 etiqueta: 'Categoría',
@@ -311,7 +334,12 @@ class _FormularioProductoState extends ConsumerState<FormularioProducto> {
   }
 
   Widget _bloquePrecioInventario() {
-    final proveedores = widget.proveedoresVm.proveedores;
+    // Solo los activos: un proveedor dado de baja sigue asociado a sus
+    // productos viejos, pero no debería ofrecerse para nuevos.
+    final proveedores = [
+      for (final p in ref.watch(catalogoProveedoresProvider).value ?? const [])
+        if (p.activo || p.id == _proveedor?.id) p,
+    ];
 
     return PanelSeccion(
       titulo: 'Precio e inventario',
@@ -319,7 +347,7 @@ class _FormularioProductoState extends ConsumerState<FormularioProducto> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          _Fila(
+          FilaCampos(
             hijos: [
               CampoTexto(
                 etiqueta: 'Precio de venta *',
@@ -351,7 +379,7 @@ class _FormularioProductoState extends ConsumerState<FormularioProducto> {
             ],
           ),
           const SizedBox(height: 16),
-          _Fila(
+          FilaCampos(
             hijos: [
               CampoTexto(
                 etiqueta: 'Precio de compra',
@@ -376,7 +404,7 @@ class _FormularioProductoState extends ConsumerState<FormularioProducto> {
           Row(
             children: [
               Expanded(
-                child: _Interruptor(
+                child: InterruptorCampo(
                   etiqueta: 'Aplica IVA',
                   detalle: _aplicaIva
                       ? 'Se suma ${(kTasaIva * 100).toStringAsFixed(0)}% al precio'
@@ -387,7 +415,7 @@ class _FormularioProductoState extends ConsumerState<FormularioProducto> {
               ),
               const SizedBox(width: 16),
               Expanded(
-                child: _Interruptor(
+                child: InterruptorCampo(
                   etiqueta: 'Producto activo',
                   detalle:
                       _activo ? 'Visible en el catálogo' : 'Oculto del catálogo',
@@ -415,96 +443,3 @@ class _FormularioProductoState extends ConsumerState<FormularioProducto> {
   }
 }
 
-/// Fila de campos con pesos configurables, que se apila en ventanas angostas.
-class _Fila extends StatelessWidget {
-  const _Fila({required this.hijos, this.pesos});
-
-  final List<Widget> hijos;
-  final List<int>? pesos;
-
-  @override
-  Widget build(BuildContext context) {
-    return LayoutBuilder(
-      builder: (context, constraints) {
-        if (constraints.maxWidth < 640) {
-          return Column(
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              for (var i = 0; i < hijos.length; i++) ...[
-                if (i > 0) const SizedBox(height: 16),
-                hijos[i],
-              ],
-            ],
-          );
-        }
-
-        return Row(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            for (var i = 0; i < hijos.length; i++) ...[
-              if (i > 0) const SizedBox(width: 16),
-              Expanded(flex: pesos?[i] ?? 1, child: hijos[i]),
-            ],
-          ],
-        );
-      },
-    );
-  }
-}
-
-/// Interruptor con etiqueta y línea de detalle, al estilo de los campos.
-class _Interruptor extends StatelessWidget {
-  const _Interruptor({
-    required this.etiqueta,
-    required this.detalle,
-    required this.valor,
-    required this.alCambiar,
-  });
-
-  final String etiqueta;
-  final String detalle;
-  final bool valor;
-  final ValueChanged<bool> alCambiar;
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.fromLTRB(14, 8, 8, 8),
-      decoration: BoxDecoration(
-        color: ColoresApp.bgInput,
-        borderRadius: BorderRadius.circular(11),
-        border: Border.all(color: ColoresApp.borderInput),
-      ),
-      child: Row(
-        children: [
-          Expanded(
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(etiqueta, style: TipografiaApp.etiquetaCampo),
-                const SizedBox(height: 2),
-                Text(
-                  detalle,
-                  style: TipografiaApp.caption.copyWith(
-                    fontSize: 12,
-                    color: ColoresApp.textMuted,
-                  ),
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                ),
-              ],
-            ),
-          ),
-          Switch(
-            value: valor,
-            onChanged: alCambiar,
-            activeThumbColor: ColoresApp.goGreen,
-            inactiveThumbColor: ColoresApp.textDisabled,
-            inactiveTrackColor: ColoresApp.border,
-          ),
-        ],
-      ),
-    );
-  }
-}
