@@ -80,4 +80,77 @@ class RepositorioProveedoresImpl implements RepositorioProveedores {
     final resultado = await query.getSingleOrNull();
     return resultado != null;
   }
+
+  // Paginación — WHERE, COUNT y LIMIT los resuelve SQLite, no el frontend.
+
+  /// Traduce [FiltroProveedores] a una expresión SQL reutilizable por la
+  /// consulta de la página y por la del total.
+  Expression<bool> _condicion(FiltroProveedores filtro) {
+    final p = _db.tablaProveedor;
+    Expression<bool> acumulado = const Constant(true);
+
+    final texto = filtro.busqueda.trim();
+    if (texto.isNotEmpty) {
+      final patron = '%${texto.toLowerCase()}%';
+      // NIT, ciudad y contacto son nullable: en esas filas el LIKE devuelve
+      // NULL, no false. No hace falta `coalesce` porque en SQLite
+      // `TRUE OR NULL` sigue siendo TRUE — basta con que otro campo coincida.
+      acumulado = acumulado &
+          (p.nombre.lower().like(patron) |
+              p.nitCedula.lower().like(patron) |
+              p.ciudad.lower().like(patron) |
+              p.contacto.lower().like(patron));
+    }
+
+    final activo = filtro.activo;
+    if (activo != null) {
+      acumulado = acumulado & p.activo.equals(activo);
+    }
+
+    return acumulado;
+  }
+
+  @override
+  Stream<PaginaProveedores> observarPagina({
+    required FiltroProveedores filtro,
+    required int pagina,
+    required int tamano,
+  }) {
+    final condicion = _condicion(filtro);
+
+    final consultaPagina = _db.select(_db.tablaProveedor)
+      ..where((_) => condicion)
+      ..orderBy([(t) => OrderingTerm.asc(t.nombre)])
+      ..limit(tamano, offset: pagina * tamano);
+
+    // El total va en su propia consulta: `limit` no debe afectarlo.
+    final total = _db.tablaProveedor.id.count();
+    final consultaTotal = _db.selectOnly(_db.tablaProveedor)
+      ..addColumns([total])
+      ..where(condicion);
+
+    return consultaPagina.watch().asyncMap((filas) async {
+      final fila = await consultaTotal.getSingleOrNull();
+      return PaginaProveedores(
+        items: filas.map(ProveedorMapper.filaAModelo).toList(),
+        total: fila?.read(total) ?? 0,
+      );
+    });
+  }
+
+  @override
+  Stream<({int total, int activos})> observarResumen() {
+    final p = _db.tablaProveedor;
+    final total = p.id.count();
+    final activos = p.id.count(filter: p.activo.equals(true));
+
+    final consulta = _db.selectOnly(p)..addColumns([total, activos]);
+
+    return consulta.watchSingleOrNull().map(
+          (fila) => (
+            total: fila?.read(total) ?? 0,
+            activos: fila?.read(activos) ?? 0,
+          ),
+        );
+  }
 }

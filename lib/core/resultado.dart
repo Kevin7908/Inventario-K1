@@ -47,6 +47,9 @@ enum MotivoFallo {
   /// Ya existe otro producto con ese SKU.
   skuDuplicado,
 
+  /// Ya existe otro registro con ese documento (NIT, cédula…).
+  documentoDuplicado,
+
   /// El dato no cumple una regla de negocio (vacío, muy corto…).
   validacion,
 
