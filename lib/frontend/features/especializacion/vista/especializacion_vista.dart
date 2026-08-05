@@ -13,7 +13,7 @@ import '../widgets/dialogo_especializacion.dart';
 /// presentado como grilla de tarjetas, con creación, edición y eliminación.
 ///
 /// Vive fuera de `share2` porque conecta con [especializacionesProvider] y
-/// [tecnicosProvider] (Riverpod) — share2 es puramente presentacional.
+/// [catalogoTecnicosProvider] (Riverpod) — share2 es puramente presentacional.
 class EspecializacionesVista extends ConsumerStatefulWidget {
   const EspecializacionesVista({super.key});
 
@@ -73,7 +73,7 @@ class _EspecializacionesVistaState
   /// Se deriva en la vista a partir de datos ya cargados: no consulta la BD
   /// ni agrega lógica al backend.
   Map<int, int> _tecnicosPorEspecializacion() {
-    final tecnicos = ref.watch(tecnicosProvider).value ?? const [];
+    final tecnicos = ref.watch(catalogoTecnicosProvider).value ?? const [];
     final conteo = <int, int>{};
     for (final tecnico in tecnicos) {
       final id = tecnico.especializacionId;

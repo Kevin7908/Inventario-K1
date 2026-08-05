@@ -141,7 +141,7 @@ class _DialogoAgregarItemServicioState
   Widget build(BuildContext context) {
     final servicios = ref.watch(serviciosProvider).value ?? [];
     final activos   = servicios.where((s) => s.activo).toList();
-    final tecnicos  = ref.watch(tecnicosProvider).value ?? [];
+    final tecnicos  = ref.watch(catalogoTecnicosProvider).value ?? [];
 
     if (widget.esEdicion && !_preseleccionado && activos.isNotEmpty) {
       final item = widget.itemAEditar!;
