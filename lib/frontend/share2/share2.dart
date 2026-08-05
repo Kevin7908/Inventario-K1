@@ -9,4 +9,5 @@ export 'nav/nav.dart';
 export 'navegacion_secundaria/navegacion_secundaria.dart';
 export 'tablas/tablas.dart';
 export 'temas/colores_app.dart';
+export 'temas/hex_color.dart';
 export 'temas/tipografia_app.dart';

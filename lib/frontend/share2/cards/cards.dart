@@ -1,3 +1,4 @@
+export 'fila_dato.dart';
 export 'marcador_identidad.dart';
 export 'panel_seccion.dart';
 export 'tarjeta_catalogo.dart';

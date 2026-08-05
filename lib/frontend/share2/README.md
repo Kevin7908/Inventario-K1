@@ -43,6 +43,7 @@ share2/
 ├── temas/                          ← tokens de diseño (colores, tipografía)
 │   ├── colores_app.dart
 │   ├── tipografia_app.dart
+│   ├── hex_color.dart              ← colorDeHex / inicialDe
 │   └── README.md
 │
 ├── encabezados/                    ← título y subtítulo de cada pantalla
@@ -69,6 +70,10 @@ share2/
 │   ├── campo_moneda.dart
 │   ├── selector_widget.dart
 │   ├── checkbox_app.dart
+│   ├── fila_campos.dart
+│   ├── interruptor_campo.dart
+│   ├── atajos_formulario.dart
+│   ├── barra_busqueda.dart
 │   └── inputs.dart
 │
 ├── tablas/                         ← visualización de colecciones
@@ -81,6 +86,9 @@ share2/
 │
 ├── cards/                          ← contenedores de información
 │   ├── tarjeta_info.dart
+│   ├── tarjeta_catalogo.dart
+│   ├── marcador_identidad.dart
+│   ├── fila_dato.dart
 │   ├── panel_seccion.dart
 │   ├── contenedor_modal.dart
 │   └── cards.dart
@@ -140,6 +148,9 @@ Widgets para formularios y entrada de datos. Aplican el estilo visual del proyec
 | `SelectorWidget` | Dropdown de opciones predefinidas |
 | `CheckboxApp` | Selección booleana estilizada |
 | `BarraBusqueda` | Campo de búsqueda con ícono, para filtrar listas o tablas |
+| `FilaCampos` | Reparte campos en una fila y los apila cuando falta ancho |
+| `InterruptorCampo` | Switch con etiqueta y una línea que explica qué implica el estado |
+| `AtajosFormulario` | Esc cancela, Ctrl/Cmd+Enter guarda |
 
 ---
 
@@ -164,6 +175,9 @@ Widgets para agrupar y presentar información con estilos consistentes.
 | Widget | Cuándo usarlo |
 |---|---|
 | `TarjetaInfo` | Muestra un KPI o dato destacado (ej: total ventas del día) |
+| `TarjetaCatalogo` | Ítem de catálogo en grilla o fila: marcador, título, subtítulo, acciones y `pie` opcional |
+| `MarcadorIdentidad` | Cuadro con el ícono de la entidad o la inicial de su nombre sobre su color |
+| `FilaDato` | Línea "ícono + texto" dentro de una tarjeta (contacto, teléfono, ciudad) |
 | `PanelSeccion` | Agrupa un bloque de contenido con título y borde |
 | `ContenedorModal` | Wrapper base para el contenido de diálogos y modales |
 
