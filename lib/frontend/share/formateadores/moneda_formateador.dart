@@ -1,17 +1,15 @@
-import 'package:intl/intl.dart';
+import '../../../core/formato.dart';
 
-final _fmt = NumberFormat.currency(
-  locale: 'es_CO',
-  symbol: '\$',
-  decimalDigits: 0,
-);
+/// Formateo de moneda para los módulos legacy.
+///
+/// Delega en `core/formato.dart`, la fuente única. No agregar formato aquí.
 
-/// Formatea un [double] como pesos colombianos. Ej: 45000 → "$ 45.000"
-String fmtMoneda(double valor) => _fmt.format(valor);
+/// Formatea un [double] como pesos colombianos. Ej: 45000 → "$45.000"
+String fmtMoneda(double valor) => formatearPrecio(valor);
 
 /// Convierte texto crudo a COP. Devuelve vacío si no es parseable.
 String fmtMonedaDesdeTexto(String texto) {
   final valor = double.tryParse(texto.replaceAll(',', '').replaceAll('.', ''));
   if (valor == null) return '';
-  return _fmt.format(valor);
+  return formatearPrecio(valor);
 }
