@@ -37,7 +37,7 @@ class _PanelBusquedaInventarioState
 
   @override
   Widget build(BuildContext context) {
-    final todos = ref.watch(productosProvider).value?.todos ?? const [];
+    final todos = ref.watch(catalogoCompletoProvider).value ?? const [];
 
     return Container(
       decoration: BoxDecoration(

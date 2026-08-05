@@ -17,7 +17,7 @@ final posProvider = NotifierProvider<PosNotifier, PosState>(
 final posCatalogoProvider = Provider<List<Producto>>(
   name: 'posCatalogoProvider',
   (ref) {
-    final todos  = ref.watch(productosProvider).value?.todos ?? const [];
+    final todos  = ref.watch(catalogoCompletoProvider).value ?? const [];
     final pos    = ref.watch(posProvider);
     final q      = pos.buscando.toLowerCase();
     final cat    = pos.categoriaFiltro;
@@ -45,7 +45,7 @@ final posCatalogoProvider = Provider<List<Producto>>(
 final posCategoriasProvider = Provider<List<String>>(
   name: 'posCategoriasProvider',
   (ref) {
-    final todos = ref.watch(productosProvider).value?.todos ?? const [];
+    final todos = ref.watch(catalogoCompletoProvider).value ?? const [];
     final cats  = <String>{};
     for (final p in todos) {
       if (p.activo && p.categoriaNombre != null) {
