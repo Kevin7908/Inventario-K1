@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import '../cards/marcador_identidad.dart';
 import '../inputs/barra_busqueda.dart';
 import '../temas/colores_app.dart';
 import '../temas/tipografia_app.dart';
@@ -299,12 +300,7 @@ class _FilaCategoria extends StatelessWidget {
             padding: const EdgeInsets.fromLTRB(7, 6, 4, 6),
             child: Row(
               children: [
-                _Marcador(
-                  icono: icono,
-                  inicial: inicial,
-                  color: color,
-                  activa: activa,
-                ),
+                _marcador(),
                 const SizedBox(width: 8),
                 Expanded(
                   child: Text(
@@ -331,6 +327,22 @@ class _FilaCategoria extends StatelessWidget {
           ),
         ),
       ),
+    );
+  }
+
+  /// El ícono va suelto y solo la inicial se enmarca: en la tira contraída un
+  /// recuadro alrededor de cada ícono se leería como un botón.
+  Widget _marcador() {
+    final acento = color ?? (activa ? ColoresApp.goGreen : ColoresApp.textMuted);
+    final propio = icono;
+    if (propio != null) return Icon(propio, size: 16, color: acento);
+
+    return MarcadorIdentidad(
+      inicial: inicial,
+      color: acento,
+      lado: 18,
+      radio: 5,
+      tamanoContenido: 10,
     );
   }
 }
@@ -369,12 +381,7 @@ class _MarcadorCategoria extends StatelessWidget {
             child: SizedBox(
               height: 32,
               child: Center(
-                child: _Marcador(
-                  icono: icono,
-                  inicial: inicial,
-                  color: color,
-                  activa: activa,
-                ),
+                child: _marcador(),
               ),
             ),
           ),
@@ -382,50 +389,20 @@ class _MarcadorCategoria extends StatelessWidget {
       ),
     );
   }
-}
 
-/// Distintivo de la categoría: su ícono, o la inicial sobre su color.
-///
-/// La inicial no es decorativa — con el panel contraído es lo único que
-/// diferencia una categoría de otra.
-class _Marcador extends StatelessWidget {
-  const _Marcador({
-    required this.icono,
-    required this.inicial,
-    required this.color,
-    required this.activa,
-  });
-
-  final IconData? icono;
-  final String? inicial;
-  final Color? color;
-  final bool activa;
-
-  @override
-  Widget build(BuildContext context) {
+  /// El ícono va suelto y solo la inicial se enmarca: en la tira contraída un
+  /// recuadro alrededor de cada ícono se leería como un botón.
+  Widget _marcador() {
     final acento = color ?? (activa ? ColoresApp.goGreen : ColoresApp.textMuted);
+    final propio = icono;
+    if (propio != null) return Icon(propio, size: 16, color: acento);
 
-    if (icono != null) {
-      return Icon(icono, size: 16, color: acento);
-    }
-
-    return Container(
-      width: 18,
-      height: 18,
-      alignment: Alignment.center,
-      decoration: BoxDecoration(
-        color: acento.withValues(alpha: 0.16),
-        borderRadius: BorderRadius.circular(5),
-      ),
-      child: Text(
-        inicial ?? '',
-        style: TipografiaApp.caption.copyWith(
-          fontSize: 10,
-          fontWeight: FontWeight.w700,
-          color: acento,
-          height: 1,
-        ),
-      ),
+    return MarcadorIdentidad(
+      inicial: inicial,
+      color: acento,
+      lado: 18,
+      radio: 5,
+      tamanoContenido: 10,
     );
   }
 }
