@@ -14,6 +14,8 @@ import '../temas/tipografia_app.dart';
 /// - [placeholder]: texto de ejemplo cuando el campo está vacío.
 /// - [alCambiar]: callback ejecutado en cada cambio de texto.
 /// - [ancho]: ancho fijo opcional. Por defecto ocupa el ancho de su contenedor.
+/// - [focoTeclado]: nodo de foco, para poder enfocar el campo desde un atajo
+///   de teclado (Ctrl+F en las pantallas de listado).
 ///
 /// Ejemplo:
 /// ```dart
@@ -31,17 +33,20 @@ class BarraBusqueda extends StatelessWidget {
     this.placeholder,
     this.alCambiar,
     this.ancho,
+    this.focoTeclado,
   });
 
   final TextEditingController controlador;
   final String? placeholder;
   final ValueChanged<String>? alCambiar;
   final double? ancho;
+  final FocusNode? focoTeclado;
 
   @override
   Widget build(BuildContext context) {
     final campo = TextField(
       controller: controlador,
+      focusNode: focoTeclado,
       onChanged: alCambiar,
       style: TipografiaApp.cuerpo,
       decoration: InputDecoration(
