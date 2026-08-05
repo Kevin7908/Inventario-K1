@@ -9,6 +9,7 @@ import '../../../layout/encabezado_con_cuenta.dart';
 import '../../../share2/share2.dart';
 import '../../categorias/provider/categorias_provider.dart';
 import '../provider/productos_provider.dart';
+import '../widgets/badget_estado_stock_widget.dart';
 import 'producto_detalle_vista.dart';
 import 'producto_formulario_vista.dart';
 
@@ -82,81 +83,100 @@ class _ProductosVistaState extends ConsumerState<ProductosVista> {
     };
   }
 
+  /// La lista no observa ningún provider: cada bloque se suscribe al suyo, así
+  /// que escribir en el buscador de categorías no reconstruye la tabla ni el
+  /// encabezado.
   Widget _lista() {
-    final estadoAsync = ref.watch(productosProvider);
-
-    return Padding(
-      padding: const EdgeInsets.fromLTRB(32, 28, 32, 28),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          _encabezado(estadoAsync.value),
-          const SizedBox(height: 20),
-          Row(
-            children: [
-              Expanded(
-                child: BarraBusqueda(
-                  controlador: _busquedaController,
-                  placeholder: 'Buscar repuesto, referencia, SKU...',
-                  alCambiar: _alBuscar,
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        const _PanelCategorias(),
+        Expanded(
+          child: Padding(
+            padding: const EdgeInsets.fromLTRB(32, 28, 32, 28),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const _EncabezadoProductos(),
+                const SizedBox(height: 20),
+                Row(
+                  children: [
+                    Expanded(
+                      child: BarraBusqueda(
+                        controlador: _busquedaController,
+                        placeholder: 'Buscar repuesto, referencia, SKU...',
+                        alCambiar: _alBuscar,
+                      ),
+                    ),
+                    const SizedBox(width: 20),
+                    BotonPrimario(
+                      etiqueta: 'Nuevo producto',
+                      icono: Icons.add,
+                      alPresionar: _nuevoProducto,
+                    ),
+                  ],
                 ),
-              ),
-              const SizedBox(width: 20),
-              BotonPrimario(
-                etiqueta: 'Nuevo producto',
-                icono: Icons.add,
-                alPresionar: _nuevoProducto,
-              ),
-            ],
-          ),
-          const SizedBox(height: 18),
-          _ChipsCategoria(
-            seleccionada: estadoAsync.value?.filtroCategoriaId,
-            alSeleccionar: (id) =>
-                ref.read(productosProvider.notifier).filtrarPorCategoria(id),
-          ),
-          const SizedBox(height: 18),
-          Expanded(
-            child: estadoAsync.when(
-              loading: () => const Center(
-                child: CircularProgressIndicator(color: ColoresApp.goGreen),
-              ),
-              error: (e, _) => Center(
-                child: Text(
-                  'Error al cargar productos: $e',
-                  style: TipografiaApp.cuerpo,
-                ),
-              ),
-              data: (estado) => _tabla(estado),
+                const SizedBox(height: 18),
+                Expanded(child: _TablaProductos(alVerDetalle: _verDetalle)),
+              ],
             ),
           ),
-        ],
-      ),
+        ),
+      ],
     );
   }
+}
 
-  Widget _encabezado(ProductosState? estado) {
-    final total = estado?.todos.length ?? 0;
-    final bajos = estado?.todos
-            .where((p) => p.estadoStock != EstadoStock.enStock)
-            .length ??
-        0;
+/// Encabezado con los conteos del catálogo.
+///
+/// Watch propio sobre `productosResumenProvider`: solo rebuilda cuando cambian
+/// los números, no cuando se filtra.
+class _EncabezadoProductos extends ConsumerWidget {
+  const _EncabezadoProductos();
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final resumen = ref.watch(productosResumenProvider);
 
     return EncabezadoConCuenta(
       titulo: 'Productos',
-      subtitulo:
-          '$total repuestos en catálogo · $bajos con stock bajo',
+      subtitulo: '${resumen.total} repuestos en catálogo · '
+          '${resumen.stockBajo} con stock bajo',
     );
   }
+}
 
-  Widget _tabla(ProductosState estado) {
-    final productos = estado.filtrados;
-    final hayFiltro =
-        estado.busqueda.isNotEmpty || estado.filtroCategoriaId != null;
+/// Tabla del catálogo.
+class _TablaProductos extends ConsumerWidget {
+  const _TablaProductos({required this.alVerDetalle});
+
+  final ValueChanged<Producto> alVerDetalle;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final estado = ref.watch(productosProvider);
+
+    if (estado.isLoading && !estado.hasValue) {
+      return const Center(
+        child: CircularProgressIndicator(color: ColoresApp.goGreen),
+      );
+    }
+    if (estado.hasError && !estado.hasValue) {
+      return Center(
+        child: Text(
+          'Error al cargar productos: ${estado.error}',
+          style: TipografiaApp.cuerpo,
+        ),
+      );
+    }
+
+    // Lista ya calculada por el provider derivado, no por el getter en build.
+    final productos = ref.watch(productosFiltradosProvider);
+    final hayFiltro = ref.watch(hayFiltroProductosProvider);
 
     return TablaGenerica<Producto>(
       items: productos,
-      alPresionarFila: _verDetalle,
+      alPresionarFila: alVerDetalle,
       mensajeVacio: hayFiltro
           ? 'Ningún producto coincide con el filtro'
           : 'Aún no hay productos en el catálogo',
@@ -189,7 +209,7 @@ class _ProductosVistaState extends ConsumerState<ProductosVista> {
         ColumnaTabla(
           titulo: 'Stock',
           flex: 2,
-          constructor: (p) => _ChipStock(producto: p),
+          constructor: (p) => BadgeEstadoStock(estado: p.estadoStock),
         ),
         ColumnaTabla(
           titulo: 'Ubicación',
@@ -216,39 +236,86 @@ class _ProductosVistaState extends ConsumerState<ProductosVista> {
   }
 }
 
-/// Chips de categoría. "Todas" limpia el filtro.
-class _ChipsCategoria extends ConsumerWidget {
-  const _ChipsCategoria({
-    required this.seleccionada,
-    required this.alSeleccionar,
-  });
-
-  final int? seleccionada;
-  final ValueChanged<int?> alSeleccionar;
+/// Adaptador entre `categoriasProvider` y [PanelCategorias].
+///
+/// Traduce el modelo de dominio al DTO del panel y aplica la búsqueda local
+/// de categorías. "Todas" —que pinta el propio panel— limpia el filtro.
+/// El estado del panel (abierto/cerrado y su búsqueda) vive aquí y no en la
+/// página: es UI local, y tenerlo arriba hacía que teclear una categoría
+/// reconstruyera también la tabla y el encabezado.
+class _PanelCategorias extends ConsumerStatefulWidget {
+  const _PanelCategorias();
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
-    final categorias = ref.watch(categoriasProvider).value?.categorias ?? const [];
+  ConsumerState<_PanelCategorias> createState() => _PanelCategoriasState();
+}
 
-    return Wrap(
-      spacing: 9,
-      runSpacing: 9,
-      children: [
-        ChipFiltro(
-          etiqueta: 'Todas',
-          icono: Icons.grid_view_rounded,
-          seleccionado: seleccionada == null,
-          alPresionar: () => alSeleccionar(null),
-        ),
-        for (final categoria in categorias)
-          ChipFiltro(
-            etiqueta: categoria.nombre,
-            seleccionado: seleccionada == categoria.id,
-            alPresionar: () => alSeleccionar(categoria.id),
+class _PanelCategoriasState extends ConsumerState<_PanelCategorias> {
+  final _controladorBusqueda = TextEditingController();
+  String _busqueda = '';
+  bool _expandido = true;
+
+  @override
+  void dispose() {
+    _controladorBusqueda.dispose();
+    super.dispose();
+  }
+
+  /// Contrae o expande el panel.
+  ///
+  /// Al contraerlo limpia su búsqueda: en la tira de íconos no se ve el
+  /// buscador, y dejar una lista recortada sin explicar por qué confunde.
+  void _alternar() => setState(() {
+        _expandido = !_expandido;
+        if (!_expandido) {
+          _busqueda = '';
+          _controladorBusqueda.clear();
+        }
+      });
+
+  @override
+  Widget build(BuildContext context) {
+    // `select` en ambos: el panel solo rebuilda si cambia la categoría activa
+    // o la lista de categorías, no con cada tecla del buscador de productos.
+    final seleccionada = ref.watch(
+      productosProvider.select((s) => s.value?.filtroCategoriaId),
+    );
+    final categorias = ref.watch(
+      categoriasProvider.select((s) => s.value?.categorias ?? const []),
+    );
+
+    final query = _busqueda.trim().toLowerCase();
+    final items = [
+      for (final categoria in categorias)
+        if (categoria.id != null &&
+            (query.isEmpty || categoria.nombre.toLowerCase().contains(query)))
+          CategoriaPanelDato(
+            id: categoria.id!,
+            nombre: categoria.nombre,
+            color: _colorDeHex(categoria.colorHex),
           ),
-      ],
+    ];
+
+    return PanelCategorias(
+      categorias: items,
+      seleccionada: seleccionada,
+      alSeleccionar: (id) =>
+          ref.read(productosProvider.notifier).filtrarPorCategoria(id),
+      expandido: _expandido,
+      alAlternar: _alternar,
+      controladorBusqueda: _controladorBusqueda,
+      alBuscar: (texto) => setState(() => _busqueda = texto),
     );
   }
+}
+
+/// Convierte `#RRGGBB` en [Color]. Devuelve null si el texto no es un hex
+/// válido, y el panel cae a su color por defecto.
+Color? _colorDeHex(String hex) {
+  final limpio = hex.replaceAll('#', '').trim();
+  if (limpio.length != 6) return null;
+  final valor = int.tryParse(limpio, radix: 16);
+  return valor == null ? null : Color(0xFF000000 | valor);
 }
 
 /// Celda principal: miniatura + nombre + SKU monoespaciado.
@@ -294,41 +361,6 @@ class _CeldaProducto extends StatelessWidget {
   }
 }
 
-/// Chip de estado de stock, con el color del semáforo del diseño.
-class _ChipStock extends StatelessWidget {
-  const _ChipStock({required this.producto});
-
-  final Producto producto;
-
-  @override
-  Widget build(BuildContext context) {
-    final (etiqueta, color, fondo) = switch (producto.estadoStock) {
-      EstadoStock.enStock => (
-          'En stock',
-          ColoresApp.stockOk,
-          ColoresApp.statusSuccessBg,
-        ),
-      EstadoStock.stockBajo => (
-          'Stock bajo',
-          ColoresApp.stockLow,
-          ColoresApp.statusWarningBg,
-        ),
-      EstadoStock.sinStock => (
-          'Agotado',
-          ColoresApp.stockOut,
-          ColoresApp.statusDangerBg,
-        ),
-    };
-
-    return IndicadorEstado(
-      etiqueta: etiqueta,
-      color: color,
-      colorFondo: fondo,
-      conPunto: true,
-    );
-  }
-}
-
 /// Miniatura cuadrada del producto, con marcador cuando no hay imagen.
 ///
 /// Vive en el módulo (no en share2) porque lee un archivo del disco, y share2
@@ -348,7 +380,7 @@ class MiniaturaProducto extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final ruta = rutaImagen;
-    final hayImagen = ruta != null && ruta.isNotEmpty && File(ruta).existsSync();
+    final hayRuta = ruta != null && ruta.isNotEmpty;
 
     return Container(
       width: lado,
@@ -359,13 +391,22 @@ class MiniaturaProducto extends StatelessWidget {
         border: Border.all(color: ColoresApp.border),
       ),
       clipBehavior: Clip.antiAlias,
-      child: hayImagen
-          ? Image.file(
-              File(ruta),
-              fit: BoxFit.cover,
-              errorBuilder: (_, _, _) => _marcador(),
-            )
-          : _marcador(),
+      child: hayRuta ? _imagen(context, ruta) : _marcador(),
+    );
+  }
+
+  Widget _imagen(BuildContext context, String ruta) {
+    // `cacheWidth` decodifica al tamaño en que se pinta: una foto de 4000 px no
+    // tiene por qué ocupar memoria completa para una miniatura de 44.
+    final escala = MediaQuery.devicePixelRatioOf(context);
+
+    return Image.file(
+      File(ruta),
+      fit: BoxFit.cover,
+      cacheWidth: (lado * escala).round(),
+      // Sin `existsSync()`: era I/O síncrono en el build de cada fila y de cada
+      // hover de tarjeta. `errorBuilder` ya cubre el archivo que no está.
+      errorBuilder: (_, _, _) => _marcador(),
     );
   }
 
