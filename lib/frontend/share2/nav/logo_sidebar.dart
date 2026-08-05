@@ -37,24 +37,33 @@ class LogoSidebar extends StatelessWidget {
             height: 40,
           ),
           const SizedBox(width: 10),
-          Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(
-                nombreEmpresa,
-                style: TipografiaApp.cuerpoMedium.copyWith(
-                  color: ColoresApp.textOnPrimary,
-                  fontWeight: FontWeight.w700,
+          // `Expanded` + recorte: el sidebar tiene ancho fijo (240) y los
+          // textos son configurables, así que un nombre largo —o una fuente
+          // más ancha que la prevista— desbordaba la fila.
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  nombreEmpresa,
+                  style: TipografiaApp.cuerpoMedium.copyWith(
+                    color: ColoresApp.textOnPrimary,
+                    fontWeight: FontWeight.w700,
+                  ),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
                 ),
-              ),
-              const SizedBox(height: 2),
-              Text(
-                subtitulo,
-                style: TipografiaApp.caption.copyWith(
-                  color: ColoresApp.textSidebarSecondary,
+                const SizedBox(height: 2),
+                Text(
+                  subtitulo,
+                  style: TipografiaApp.caption.copyWith(
+                    color: ColoresApp.textSidebarSecondary,
+                  ),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
                 ),
-              ),
-            ],
+              ],
+            ),
           ),
         ],
       ),
