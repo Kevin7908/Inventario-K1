@@ -34,6 +34,23 @@ Producto _producto({
       activo: true,
     );
 
+Producto _conProveedor({
+  required String nombre,
+  required String sku,
+  required int proveedorId,
+}) =>
+    Producto(
+      sku: sku,
+      nombre: nombre,
+      proveedorId: proveedorId,
+      precioCompra: 1000,
+      precioVenta: 2000,
+      stockActual: 10,
+      stockMinimo: 3,
+      aplicaIva: true,
+      activo: true,
+    );
+
 Future<int> _crearCategoria(String nombre) async {
   final creada = await repoCategorias.crear(
     Categoria(
@@ -154,15 +171,87 @@ void main() {
     expect(conteo.length, 2, reason: 'los productos sin categoría no cuentan');
   });
 
-  test('el resumen cuenta total y los que no están en stock normal', () async {
+  test('el resumen parte el catálogo en tres tramos que suman el total',
+      () async {
     await repo.crear(_producto(nombre: 'Ok', sku: 'A-1', stock: 10, stockMinimo: 3));
+    await repo.crear(_producto(nombre: 'Ok2', sku: 'A-4', stock: 8, stockMinimo: 3));
     await repo.crear(_producto(nombre: 'Bajo', sku: 'A-2', stock: 2, stockMinimo: 3));
     await repo.crear(_producto(nombre: 'Agotado', sku: 'A-3', stock: 0, stockMinimo: 3));
 
     final resumen = await repo.observarResumen().first;
 
-    expect(resumen.total, 3);
-    expect(resumen.stockBajo, 2, reason: 'bajo + agotado');
+    expect(resumen.total, 4);
+    expect(resumen.enStock, 2);
+    expect(resumen.stockBajo, 1, reason: 'el agotado ya no cuenta como bajo');
+    expect(resumen.sinStock, 1);
+    expect(
+      resumen.enStock + resumen.stockBajo + resumen.sinStock,
+      resumen.total,
+      reason: 'los tramos son excluyentes: es lo que hace sumables los chips',
+    );
+  });
+
+  test('el resumen respeta la categoría y la búsqueda del filtro', () async {
+    final frenos = await _crearCategoria('Frenos');
+    final motor = await _crearCategoria('Motor');
+
+    await repo.crear(
+      _producto(nombre: 'Pastillas', sku: 'F-1', categoriaId: frenos, stock: 9),
+    );
+    await repo.crear(
+      _producto(nombre: 'Disco', sku: 'F-2', categoriaId: frenos, stock: 1),
+    );
+    await repo.crear(
+      _producto(nombre: 'Bujía', sku: 'M-1', categoriaId: motor, stock: 0),
+    );
+
+    final soloFrenos =
+        await repo.observarResumen(filtro: FiltroProductos(categoriaId: frenos)).first;
+
+    expect(soloFrenos.total, 2, reason: 'la bujía de Motor queda fuera');
+    expect(soloFrenos.enStock, 1);
+    expect(soloFrenos.stockBajo, 1);
+    expect(soloFrenos.sinStock, 0, reason: 'el agotado es de otra categoría');
+
+    final porBusqueda =
+        await repo.observarResumen(filtro: const FiltroProductos(busqueda: 'buj')).first;
+    expect(porBusqueda.total, 1);
+    expect(porBusqueda.sinStock, 1);
+  });
+
+  test('el tramo de stock activo no recorta los conteos del resumen', () async {
+    await repo.crear(_producto(nombre: 'Ok', sku: 'A-1', stock: 10, stockMinimo: 3));
+    await repo.crear(_producto(nombre: 'Bajo', sku: 'A-2', stock: 2, stockMinimo: 3));
+
+    // Con "Stock bajo" seleccionado, los demás chips tienen que seguir
+    // mostrando su número: si no, seleccionar uno vaciaría a los otros.
+    final resumen = await repo
+        .observarResumen(filtro: const FiltroProductos(soloStockBajo: true))
+        .first;
+
+    expect(resumen.total, 2);
+    expect(resumen.enStock, 1);
+    expect(resumen.stockBajo, 1);
+  });
+
+  test('el conteo por proveedor se resuelve con GROUP BY', () async {
+    await db.into(db.tablaProveedor).insert(
+          TablaProveedorCompanion.insert(nombre: 'Distrimotos'),
+        );
+    await db.into(db.tablaProveedor).insert(
+          TablaProveedorCompanion.insert(nombre: 'MotoPartes'),
+        );
+
+    await repo.crear(_conProveedor(nombre: 'A', sku: 'A-1', proveedorId: 1));
+    await repo.crear(_conProveedor(nombre: 'B', sku: 'B-1', proveedorId: 1));
+    await repo.crear(_conProveedor(nombre: 'C', sku: 'C-1', proveedorId: 2));
+    await repo.crear(_producto(nombre: 'D', sku: 'D-1'));
+
+    final conteo = await repo.observarConteoPorProveedor().first;
+
+    expect(conteo[1], 2);
+    expect(conteo[2], 1);
+    expect(conteo.length, 2, reason: 'los productos sin proveedor no cuentan');
   });
 
   test('las categorías también se paginan y buscan en SQL', () async {
