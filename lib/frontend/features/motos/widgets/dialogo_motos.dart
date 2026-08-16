@@ -1,24 +1,40 @@
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
-import '../../../../backend/features/clientes/modelo/cliente.dart';
 import '../../../../backend/features/motos/modelo/moto.dart';
-import '../../../share/temas/colores_app.dart';
-import '../../../share/widgets/input/app_searc_widget.dart';
-import '../../../share/widgets/output/snack_bar_mensaje.dart';
+import '../../../../core/resultado.dart';
+import '../../../share2/share2.dart';
 import '../../clientes/provider/cliente_provider.dart';
-import '../../clientes/widget/dialogo_cliente_widget.dart';
+import '../../clientes/widgets/dialogo_cliente_widget.dart';
 import '../provider/motos_provider.dart';
+import 'formulario_moto.dart';
 
+/// Alta y edición de una moto **que se guarda al confirmar**.
+///
+/// Es el diálogo que abren el catálogo de Motos y —sin salir de su pantalla—
+/// las órdenes, las reservas y las cotizaciones. Reutiliza [FormularioMoto],
+/// igual que `DialogoCliente` reutiliza `FormularioCliente`: los campos y su
+/// validación de formato están en un solo sitio.
+///
+/// A diferencia de `DialogoMotoCliente`, aquí el dueño se elige a mano y la
+/// moto se persiste de inmediato.
+///
+/// Parámetros:
+/// - [moto]: moto a modificar. Si es `null`, crea una nueva.
+///
+/// Ejemplo:
+/// ```dart
+/// await DialogoMoto.mostrar(context);
+/// ```
 class DialogoMoto extends ConsumerStatefulWidget {
   const DialogoMoto({super.key, this.moto});
+
   final Moto? moto;
 
   bool get esEdicion => moto != null;
 
   static Future<void> mostrar(BuildContext context, {Moto? moto}) {
-    return showDialog(
+    return showDialog<void>(
       context: context,
       barrierDismissible: false,
       builder: (_) => DialogoMoto(moto: moto),
@@ -30,440 +46,89 @@ class DialogoMoto extends ConsumerStatefulWidget {
 }
 
 class _DialogoMotoState extends ConsumerState<DialogoMoto> {
-  final _formKey = GlobalKey<FormState>();
-  late final ValueNotifier<Cliente?> _clienteNotifier;
-
-  late final TextEditingController _placaCtrl;
-  late final TextEditingController _marcaCtrl;
-  late final TextEditingController _modeloCtrl;
-  late final TextEditingController _anioCtrl;
-  late final TextEditingController _cilindrajeCtrl;
-  late final TextEditingController _colorCtrl;
-  late final TextEditingController _vinCtrl;
-  late final TextEditingController _numeroMotorCtrl;
-  late final TextEditingController _kilometrajeCtrl;
-  late final TextEditingController _notasCtrl;
-  late bool _activo;
   bool _guardando = false;
 
-  @override
-  void initState() {
-    super.initState();
-    final m = widget.moto;
-
-    final clientesActuales =
-        ref.read(clientesProvider).value?.clientes ?? [];
-    final clienteInicial = m != null
-        ? clientesActuales.where((c) => c.id == m.clienteId).firstOrNull
-        : null;
-
-    _clienteNotifier = ValueNotifier<Cliente?>(clienteInicial);
-    _placaCtrl = TextEditingController(text: m?.placa ?? '');
-    _marcaCtrl = TextEditingController(text: m?.marca ?? '');
-    _modeloCtrl = TextEditingController(text: m?.modelo ?? '');
-    _anioCtrl = TextEditingController(
-      text: m?.anio != null ? m!.anio.toString() : '',
+  void _mensaje(String texto, {required bool esError}) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(
+          texto,
+          style: TipografiaApp.sobrePrimario(TipografiaApp.cuerpo),
+        ),
+        backgroundColor:
+            esError ? ColoresApp.statusDanger : ColoresApp.statusSuccess,
+      ),
     );
-    _cilindrajeCtrl = TextEditingController(
-      text: m?.cilindraje != null ? m!.cilindraje.toString() : '',
-    );
-    _colorCtrl = TextEditingController(text: m?.color ?? '');
-    _vinCtrl = TextEditingController(text: m?.vin ?? '');
-    _numeroMotorCtrl = TextEditingController(text: m?.numeroMotor ?? '');
-    _kilometrajeCtrl = TextEditingController(
-      text: m != null && m.kilometrajeInicial > 0
-          ? m.kilometrajeInicial.toString()
-          : '',
-    );
-    _notasCtrl = TextEditingController(text: m?.notas ?? '');
-    _activo = m?.activo ?? true;
   }
 
-  @override
-  void dispose() {
-    _clienteNotifier.dispose();
-    _placaCtrl.dispose();
-    _marcaCtrl.dispose();
-    _modeloCtrl.dispose();
-    _anioCtrl.dispose();
-    _cilindrajeCtrl.dispose();
-    _colorCtrl.dispose();
-    _vinCtrl.dispose();
-    _numeroMotorCtrl.dispose();
-    _kilometrajeCtrl.dispose();
-    _notasCtrl.dispose();
-    super.dispose();
-  }
-
-  Future<void> _guardar() async {
-    if (!_formKey.currentState!.validate()) return;
-    if (_clienteNotifier.value == null) {
-      SnackBarMensaje.error(context, 'Selecciona un cliente.');
-      return;
-    }
+  Future<void> _guardar(Moto moto) async {
     setState(() => _guardando = true);
 
-    final moto = Moto(
-      id: widget.moto?.id ?? 0,
-      clienteId: _clienteNotifier.value!.id,
-      placa: _placaCtrl.text.trim().isEmpty ? null : _placaCtrl.text.trim(),
-      marca: _marcaCtrl.text.trim(),
-      modelo: _modeloCtrl.text.trim(),
-      anio: _anioCtrl.text.trim().isEmpty
-          ? null
-          : int.tryParse(_anioCtrl.text.trim()),
-      cilindraje: _cilindrajeCtrl.text.trim().isEmpty
-          ? null
-          : int.tryParse(_cilindrajeCtrl.text.trim()),
-      color: _colorCtrl.text.trim().isEmpty ? null : _colorCtrl.text.trim(),
-      vin: _vinCtrl.text.trim().isEmpty ? null : _vinCtrl.text.trim(),
-      numeroMotor: _numeroMotorCtrl.text.trim().isEmpty
-          ? null
-          : _numeroMotorCtrl.text.trim(),
-      kilometrajeInicial: int.tryParse(_kilometrajeCtrl.text.trim()) ?? 0,
-      notas: _notasCtrl.text.trim().isEmpty ? null : _notasCtrl.text.trim(),
-      activo: _activo,
-      creadoEn: widget.moto?.creadoEn ?? DateTime.now(),
-      actualizadoEn: DateTime.now(),
-    );
-
-    final notifier = ref.read(motosProvider.notifier);
-    final String? error = widget.esEdicion
-        ? await notifier.actualizar(moto)
-        : await notifier.crear(moto);
-
+    final resultado = await ref.read(motosProvider.notifier).guardar(moto);
     if (!mounted) return;
 
-    if (error == null) {
-      Navigator.of(context).pop();
-      SnackBarMensaje.success(
-        context,
-        widget.esEdicion
-            ? 'Moto actualizada correctamente'
-            : 'Moto creada correctamente',
-      );
-    } else {
-      SnackBarMensaje.error(context, error);
+    if (resultado case Fallo(:final mensaje)) {
+      _mensaje(mensaje, esError: true);
       setState(() => _guardando = false);
+      return;
     }
+
+    Navigator.of(context).pop();
+    _mensaje(
+      widget.esEdicion
+          ? 'Moto actualizada correctamente.'
+          : 'Moto agregada correctamente.',
+      esError: false,
+    );
   }
 
   @override
   Widget build(BuildContext context) {
-    final clientes =
-        ref.watch(clientesProvider).value?.clientes ?? const [];
+    final clientes = ref.watch(catalogoClientesProvider).value ?? const [];
+    final previa = widget.moto;
+    final dueno = previa == null
+        ? null
+        : clientes.where((c) => c.id == previa.clienteId).firstOrNull;
 
     return Dialog(
-      backgroundColor: ColoresApp.bgCard,
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+      backgroundColor: Colors.transparent,
       child: Container(
-        width: 560,
+        width: 640,
         constraints: BoxConstraints(
-          maxHeight: MediaQuery.of(context).size.height * 0.88,
+          maxHeight: MediaQuery.of(context).size.height * 0.9,
         ),
+        decoration: BoxDecoration(
+          color: ColoresApp.bgCard,
+          borderRadius: BorderRadius.circular(18),
+          boxShadow: const [
+            BoxShadow(
+              color: ColoresApp.shadowMedium,
+              blurRadius: 24,
+              offset: Offset(0, 8),
+            ),
+          ],
+        ),
+        clipBehavior: Clip.antiAlias,
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            Padding(
-              padding: const EdgeInsets.fromLTRB(28, 28, 28, 0),
-              child: Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [
-                  Text(
-                    widget.esEdicion ? 'Editar Moto' : 'Nueva Moto',
-                    style: const TextStyle(
-                      color: ColoresApp.textDark,
-                      fontSize: 18,
-                      fontWeight: FontWeight.w700,
-                    ),
-                  ),
-                  IconButton(
-                    onPressed: _guardando
-                        ? null
-                        : () => Navigator.of(context).pop(),
-                    icon:
-                        const Icon(Icons.close, color: ColoresApp.textMedium),
-                    style: IconButton.styleFrom(
-                      backgroundColor: ColoresApp.bgContent,
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(8),
-                      ),
-                    ),
-                  ),
-                ],
-              ),
+            _Encabezado(
+              esEdicion: widget.esEdicion,
+              alCerrar: _guardando ? null : () => Navigator.of(context).pop(),
             ),
             Flexible(
               child: SingleChildScrollView(
-                padding: const EdgeInsets.all(28),
-                child: Form(
-                  key: _formKey,
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      _etiqueta('Cliente *'),
-                      const SizedBox(height: 6),
-                      AppSearch<Cliente>(
-                        notifier: _clienteNotifier,
-                        items: clientes,
-                        labelBuilder: (c) => c.nombreCompleto,
-                        hint: 'Seleccionar cliente',
-                        validator: (v) =>
-                            v == null ? 'Selecciona un cliente' : null,
-                        onAgregar: () => DialogoCliente.mostrar(context),
-                      ),
-                      const SizedBox(height: 14),
-                      Row(
-                        children: [
-                          Expanded(
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                _etiqueta('Marca *'),
-                                const SizedBox(height: 6),
-                                TextFormField(
-                                  controller: _marcaCtrl,
-                                  decoration: _inputDeco('Ej: Honda'),
-                                  textCapitalization:
-                                      TextCapitalization.words,
-                                  validator: (v) =>
-                                      v == null || v.trim().isEmpty
-                                          ? 'La marca es requerida'
-                                          : null,
-                                ),
-                              ],
-                            ),
-                          ),
-                          const SizedBox(width: 12),
-                          Expanded(
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                _etiqueta('Modelo *'),
-                                const SizedBox(height: 6),
-                                TextFormField(
-                                  controller: _modeloCtrl,
-                                  decoration: _inputDeco('Ej: CB 190R'),
-                                  textCapitalization:
-                                      TextCapitalization.characters,
-                                  validator: (v) =>
-                                      v == null || v.trim().isEmpty
-                                          ? 'El modelo es requerido'
-                                          : null,
-                                ),
-                              ],
-                            ),
-                          ),
-                        ],
-                      ),
-                      const SizedBox(height: 14),
-                      _etiqueta('Placa'),
-                      const SizedBox(height: 6),
-                      TextFormField(
-                        controller: _placaCtrl,
-                        decoration: _inputDeco('Ej: ABC123'),
-                        textCapitalization: TextCapitalization.characters,
-                        inputFormatters: [
-                          FilteringTextInputFormatter.allow(
-                              RegExp(r'[a-zA-Z0-9]')),
-                          LengthLimitingTextInputFormatter(7),
-                        ],
-                      ),
-                      const SizedBox(height: 14),
-                      Row(
-                        children: [
-                          Expanded(
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                _etiqueta('Año'),
-                                const SizedBox(height: 6),
-                                TextFormField(
-                                  controller: _anioCtrl,
-                                  decoration: _inputDeco('Ej: 2022'),
-                                  keyboardType: TextInputType.number,
-                                  inputFormatters: [
-                                    FilteringTextInputFormatter.digitsOnly,
-                                    LengthLimitingTextInputFormatter(4),
-                                  ],
-                                  validator: (v) {
-                                    if (v == null || v.trim().isEmpty) {
-                                      return null;
-                                    }
-                                    final anio = int.tryParse(v.trim());
-                                    if (anio == null ||
-                                        anio < 1900 ||
-                                        anio > DateTime.now().year + 1) {
-                                      return 'Año inválido';
-                                    }
-                                    return null;
-                                  },
-                                ),
-                              ],
-                            ),
-                          ),
-                          const SizedBox(width: 12),
-                          Expanded(
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                _etiqueta('Cilindraje (cc)'),
-                                const SizedBox(height: 6),
-                                TextFormField(
-                                  controller: _cilindrajeCtrl,
-                                  decoration: _inputDeco('Ej: 190'),
-                                  keyboardType: TextInputType.number,
-                                  inputFormatters: [
-                                    FilteringTextInputFormatter.digitsOnly,
-                                  ],
-                                ),
-                              ],
-                            ),
-                          ),
-                        ],
-                      ),
-                      const SizedBox(height: 14),
-                      Row(
-                        children: [
-                          Expanded(
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                _etiqueta('Color'),
-                                const SizedBox(height: 6),
-                                TextFormField(
-                                  controller: _colorCtrl,
-                                  decoration: _inputDeco('Ej: Rojo'),
-                                  textCapitalization:
-                                      TextCapitalization.sentences,
-                                ),
-                              ],
-                            ),
-                          ),
-                          const SizedBox(width: 12),
-                          Expanded(
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                _etiqueta('Km iniciales'),
-                                const SizedBox(height: 6),
-                                TextFormField(
-                                  controller: _kilometrajeCtrl,
-                                  decoration: _inputDeco('Ej: 15000'),
-                                  keyboardType: TextInputType.number,
-                                  inputFormatters: [
-                                    FilteringTextInputFormatter.digitsOnly,
-                                  ],
-                                ),
-                              ],
-                            ),
-                          ),
-                        ],
-                      ),
-                      const SizedBox(height: 14),
-                      _etiqueta('VIN / Nº Chasis'),
-                      const SizedBox(height: 6),
-                      TextFormField(
-                        controller: _vinCtrl,
-                        decoration: _inputDeco('Ej: 9BWZZZ377VT004251'),
-                        textCapitalization: TextCapitalization.characters,
-                      ),
-                      const SizedBox(height: 14),
-                      _etiqueta('Número de motor'),
-                      const SizedBox(height: 6),
-                      TextFormField(
-                        controller: _numeroMotorCtrl,
-                        decoration: _inputDeco('Ej: CB190E-1234567'),
-                        textCapitalization: TextCapitalization.characters,
-                      ),
-                      const SizedBox(height: 14),
-                      _etiqueta('Notas (opcional)'),
-                      const SizedBox(height: 6),
-                      TextFormField(
-                        controller: _notasCtrl,
-                        maxLines: 2,
-                        decoration: _inputDeco(
-                          'Observaciones, detalles especiales, etc.',
-                        ),
-                      ),
-                      const SizedBox(height: 16),
-                      Row(
-                        children: [
-                          _etiqueta('Estado'),
-                          const Spacer(),
-                          Switch(
-                            value: _activo,
-                            onChanged: (v) => setState(() => _activo = v),
-                            activeThumbColor: const Color(0xFF10B981),
-                          ),
-                          const SizedBox(width: 6),
-                          Text(
-                            _activo ? 'Activo' : 'Inactivo',
-                            style: TextStyle(
-                              color: _activo
-                                  ? const Color(0xFF10B981)
-                                  : ColoresApp.textLight,
-                              fontSize: 13,
-                              fontWeight: FontWeight.w500,
-                            ),
-                          ),
-                        ],
-                      ),
-                    ],
-                  ),
+                padding: const EdgeInsets.fromLTRB(24, 20, 24, 24),
+                child: FormularioMoto(
+                  motoAEditar: previa,
+                  clientes: clientes,
+                  clienteInicial: dueno,
+                  mostrarEstado: true,
+                  guardando: _guardando,
+                  alGuardar: _guardar,
+                  alCancelar: () => Navigator.of(context).pop(),
+                  alAgregarCliente: () => DialogoCliente.mostrar(context),
                 ),
-              ),
-            ),
-            Padding(
-              padding: const EdgeInsets.fromLTRB(28, 0, 28, 28),
-              child: Row(
-                children: [
-                  Expanded(
-                    child: OutlinedButton(
-                      onPressed: _guardando
-                          ? null
-                          : () => Navigator.of(context).pop(),
-                      style: OutlinedButton.styleFrom(
-                        foregroundColor: ColoresApp.textMedium,
-                        side: const BorderSide(color: ColoresApp.border),
-                        padding: const EdgeInsets.symmetric(vertical: 13),
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(10),
-                        ),
-                      ),
-                      child: const Text('Cancelar'),
-                    ),
-                  ),
-                  const SizedBox(width: 12),
-                  Expanded(
-                    child: ElevatedButton(
-                      onPressed: _guardando ? null : _guardar,
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: ColoresApp.primary,
-                        foregroundColor: Colors.white,
-                        padding: const EdgeInsets.symmetric(vertical: 13),
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(10),
-                        ),
-                        elevation: 0,
-                      ),
-                      child: _guardando
-                          ? const SizedBox(
-                              width: 18,
-                              height: 18,
-                              child: CircularProgressIndicator(
-                                strokeWidth: 2,
-                                color: Colors.white,
-                              ),
-                            )
-                          : Text(
-                              widget.esEdicion
-                                  ? 'Guardar cambios'
-                                  : 'Registrar moto',
-                            ),
-                    ),
-                  ),
-                ],
               ),
             ),
           ],
@@ -471,39 +136,39 @@ class _DialogoMotoState extends ConsumerState<DialogoMoto> {
       ),
     );
   }
+}
 
-  Widget _etiqueta(String texto) => Text(
-        texto,
-        style: const TextStyle(
-          color: ColoresApp.textDark,
-          fontSize: 13,
-          fontWeight: FontWeight.w600,
-        ),
-      );
+class _Encabezado extends StatelessWidget {
+  const _Encabezado({required this.esEdicion, required this.alCerrar});
 
-  InputDecoration _inputDeco(String hint) => InputDecoration(
-        hintText: hint,
-        hintStyle:
-            const TextStyle(color: ColoresApp.textLight, fontSize: 13.5),
-        filled: true,
-        fillColor: ColoresApp.bgContent,
-        contentPadding:
-            const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
-        border: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(10),
-          borderSide: const BorderSide(color: ColoresApp.border),
-        ),
-        enabledBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(10),
-          borderSide: const BorderSide(color: ColoresApp.border),
-        ),
-        focusedBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(10),
-          borderSide: const BorderSide(color: ColoresApp.primary, width: 1.5),
-        ),
-        errorBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(10),
-          borderSide: const BorderSide(color: ColoresApp.statusDebt),
-        ),
-      );
+  final bool esEdicion;
+  final VoidCallback? alCerrar;
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(24, 24, 16, 0),
+      child: Row(
+        children: [
+          const MarcadorIdentidad(
+            icono: Icons.two_wheeler_outlined,
+            lado: 42,
+            radio: 12,
+          ),
+          const SizedBox(width: 13),
+          Expanded(
+            child: Text(
+              esEdicion ? 'Editar moto' : 'Agregar moto',
+              style: TipografiaApp.heading3,
+            ),
+          ),
+          BotonIcono(
+            icono: Icons.close_rounded,
+            tooltip: 'Cerrar',
+            alPresionar: alCerrar,
+          ),
+        ],
+      ),
+    );
+  }
 }

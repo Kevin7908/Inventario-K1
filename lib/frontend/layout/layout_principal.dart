@@ -5,7 +5,6 @@ import '../features/clientes/vista/cliente_vista.dart';
 import '../features/configuracion/vista/configuracion_vista.dart';
 import '../features/cotizaciones/vista/cotizaciones_vista.dart';
 import '../features/deudores/vista/deudores_vista.dart';
-import '../features/motos/vista/motos_vista.dart';
 import '../features/productos/vista/producto_vista.dart';
 import '../features/proveedores/vista/proveedores_vista.dart';
 import '../features/reservas/vista/reservas_vista.dart';
@@ -40,7 +39,6 @@ class _LayoutPrincipalState extends State<LayoutPrincipal> {
     '/productos',
     '/categorias',
     '/proveedores',
-    '/motos',
     '/cotizaciones',
     '/reservas',
     '/tecnicos',
@@ -57,7 +55,6 @@ class _LayoutPrincipalState extends State<LayoutPrincipal> {
     ProductosVista(),
     CategoriasVista(),
     ProveedoresVista(),
-    MotosVista(),
     CotizacionesVista(),
     ReservasVista(),
     TecnicosVista(),
@@ -118,12 +115,6 @@ class _LayoutPrincipalState extends State<LayoutPrincipal> {
           etiqueta: 'Proveedores',
           ruta: '/proveedores',
           alPresionar: () => _navegar('/proveedores'),
-        ),
-        ItemNavDato(
-          icono: Icons.motorcycle_outlined,
-          etiqueta: 'Motos',
-          ruta: '/motos',
-          alPresionar: () => _navegar('/motos'),
         ),
       ],
     ),

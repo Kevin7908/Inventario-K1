@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import '../../../layout/encabezado_con_cuenta.dart';
 import '../../../share2/share2.dart';
 import '../../especializacion/vista/especializacion_vista.dart';
+import '../../motos/vista/motos_vista.dart';
 import '../../unidades_medida/vista/unidad_medida_vista.dart';
 import '../widgets/tab_servicios.dart';
 
@@ -53,6 +54,10 @@ class _ConfiguracionVistaState extends State<ConfiguracionVista> {
                 etiqueta: 'Servicios',
                 alPresionar: () => _cambiarTab(3),
               ),
+              TabSecundariaDato(
+                etiqueta: 'Motos',
+                alPresionar: () => _cambiarTab(4),
+              ),
             ],
           ),
           const SizedBox(height: 20),
@@ -64,6 +69,7 @@ class _ConfiguracionVistaState extends State<ConfiguracionVista> {
                 UnidadesMedidaVista(),
                 EspecializacionesVista(),
                 TabServicios(),
+                MotosVista(),
               ],
             ),
           ),
