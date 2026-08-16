@@ -1,14 +1,12 @@
 import 'package:drift/drift.dart';
 import 'package:inventario_k1/backend/share/database/app_db.dart';
 
+import '../../../../core/iva_app.dart';
 import '../enum/enum_cotizacion.dart';
 import '../mapper/cotizacion_mapper.dart';
 import '../modelo/cotizacion_detalle.dart';
 import '../modelo/cotizacion_resumen.dart';
 import 'repositorio_cotizaciones.dart';
-
-/// Tasa IVA Colombia vigente (19 %).
-const double kTasaIva = 0.19;
 
 class RepositorioCotizacionesImpl implements RepositorioCotizaciones {
   const RepositorioCotizacionesImpl(this._db);
@@ -54,10 +52,119 @@ class RepositorioCotizacionesImpl implements RepositorioCotizaciones {
 
   @override
   Stream<List<CotizacionResumen>> observarTodas() {
-    return (_baseQuery
-          ..orderBy([OrderingTerm.desc(_db.tablaCotizacion.creadoEn)]))
+    return (_baseQuery..orderBy(_orden))
         .watch()
         .map((rows) => rows.map(_rowToResumen).toList());
+  }
+
+  // ── Paginación — WHERE, COUNT y LIMIT los resuelve SQLite ─────────────────
+
+  /// Días que faltan para que venza, en SQL.
+  ///
+  /// `vigencia_hasta` es texto 'YYYY-MM-DD', así que se compara con
+  /// `julianday`: negativo = vencida, 0..3 = por vencer, más = vigente. Es la
+  /// misma regla que `CotizacionResumen.estado` aplica en Dart, pero aquí
+  /// puede entrar en el `WHERE` y en el `COUNT`.
+  static const _diasParaVencer =
+      "CAST(julianday(cotizaciones.vigencia_hasta) - julianday(date('now')) AS INTEGER)";
+
+  static String _condicionEstado(EstadoCotizacion estado) => switch (estado) {
+        EstadoCotizacion.vencida => '$_diasParaVencer < 0',
+        EstadoCotizacion.porVencer => '$_diasParaVencer BETWEEN 0 AND 3',
+        EstadoCotizacion.vigente => '$_diasParaVencer > 3',
+      };
+
+  /// La más reciente primero. El `id` desempata: dos cotizaciones creadas en el
+  /// mismo instante tendrían un orden arbitrario, y con `LIMIT`/`OFFSET` eso
+  /// hace que una fila salga en dos páginas o en ninguna.
+  List<OrderingTerm> get _orden => [
+        OrderingTerm.desc(_db.tablaCotizacion.creadoEn),
+        OrderingTerm.desc(_db.tablaCotizacion.id),
+      ];
+
+  Expression<bool> _condicion(FiltroCotizaciones filtro) {
+    Expression<bool> acumulado = const Constant(true);
+
+    final busqueda = filtro.busqueda.trim();
+    if (busqueda.isNotEmpty) {
+      final patron = '%${busqueda.toLowerCase()}%';
+      acumulado = acumulado &
+          (_db.tablaCotizacion.numero.lower().like(patron) |
+              _db.tablaCliente.nombres.lower().like(patron) |
+              _db.tablaCliente.apellidos.lower().like(patron));
+    }
+
+    final estado = filtro.estado;
+    if (estado != null) {
+      acumulado = acumulado & CustomExpression<bool>(_condicionEstado(estado));
+    }
+
+    return acumulado;
+  }
+
+  @override
+  Stream<PaginaCotizaciones> observarPagina({
+    required FiltroCotizaciones filtro,
+    required int pagina,
+    required int tamano,
+  }) {
+    final condicion = _condicion(filtro);
+
+    final consultaPagina = _baseQuery
+      ..where(condicion)
+      ..orderBy(_orden)
+      ..limit(tamano, offset: pagina * tamano);
+
+    // El total va en su propia consulta: el `limit` no debe afectarlo. Repite
+    // el JOIN porque la búsqueda mira el nombre del cliente.
+    final total = _db.tablaCotizacion.id.count();
+    final consultaTotal = _db.selectOnly(_db.tablaCotizacion).join([
+      leftOuterJoin(
+        _db.tablaCliente,
+        _db.tablaCliente.id.equalsExp(_db.tablaCotizacion.clienteId),
+      ),
+    ])
+      ..addColumns([total])
+      ..where(condicion);
+
+    return consultaPagina.watch().asyncMap((filas) async {
+      final fila = await consultaTotal.getSingleOrNull();
+      return PaginaCotizaciones(
+        items: filas.map(_rowToResumen).toList(),
+        total: fila?.read(total) ?? 0,
+      );
+    });
+  }
+
+  @override
+  Stream<ResumenCotizaciones> observarResumen() {
+    return _db
+        .customSelect(
+          '''
+          SELECT
+            COUNT(*) AS total,
+            COUNT(*) FILTER (WHERE ${_condicionEstado(EstadoCotizacion.vigente)})
+              AS vigentes,
+            COUNT(*) FILTER (WHERE ${_condicionEstado(EstadoCotizacion.porVencer)})
+              AS por_vencer,
+            COUNT(*) FILTER (WHERE ${_condicionEstado(EstadoCotizacion.vencida)})
+              AS vencidas,
+            COALESCE(SUM(total) FILTER (WHERE $_diasParaVencer >= 0), 0)
+              AS monto_vigente
+          FROM cotizaciones
+          ''',
+          readsFrom: {_db.tablaCotizacion},
+        )
+        .watchSingleOrNull()
+        .map(
+          (fila) => (
+            total: fila?.read<int>('total') ?? 0,
+            vigentes: fila?.read<int>('vigentes') ?? 0,
+            porVencer: fila?.read<int>('por_vencer') ?? 0,
+            vencidas: fila?.read<int>('vencidas') ?? 0,
+            montoVigente: fila?.read<int>('monto_vigente') ?? 0,
+          ),
+        );
   }
 
   @override
@@ -101,7 +208,7 @@ class RepositorioCotizacionesImpl implements RepositorioCotizaciones {
     return _db.transaction(() async {
       final numero = await _generarNumero();
       final subtotal = items.fold(0, (s, d) => s + d.subtotal);
-      final iva = (subtotal * kTasaIva).round();
+      final iva = ivaDe(subtotal);
       final total = subtotal + iva;
 
       final id = await _db.into(_db.tablaCotizacion).insert(
@@ -162,7 +269,7 @@ class RepositorioCotizacionesImpl implements RepositorioCotizaciones {
 
       // 2. Actualizar cabecera de la cotización.
       final subtotal = items.fold(0, (s, d) => s + d.subtotal);
-      final iva = (subtotal * kTasaIva).round();
+      final iva = ivaDe(subtotal);
       final total = subtotal + iva;
       await (_db.update(_db.tablaCotizacion)..where((t) => t.id.equals(id)))
           .write(TablaCotizacionCompanion(
@@ -281,7 +388,7 @@ class RepositorioCotizacionesImpl implements RepositorioCotizaciones {
           ..where((t) => t.cotizacionId.equals(cotizacionId)))
         .get();
     final subtotal = filas.fold(0, (s, i) => s + i.subtotal);
-    final iva = (subtotal * kTasaIva).round();
+    final iva = ivaDe(subtotal);
     final total = subtotal + iva;
     await (_db.update(_db.tablaCotizacion)
           ..where((t) => t.id.equals(cotizacionId)))

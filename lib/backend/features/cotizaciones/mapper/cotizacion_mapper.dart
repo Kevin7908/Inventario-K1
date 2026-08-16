@@ -37,7 +37,7 @@ class CotizacionMapper {
     return CotizacionItem(
       id: row.id,
       cotizacionId: row.cotizacionId,
-      tipoItem: TipoItemCotizacionExt.desdeTexto(row.tipoItem),
+      tipoItem: TipoItemCotizacion.desdeTexto(row.tipoItem),
       referenciaId: row.referenciaId,
       descripcion: row.descripcion,
       cantidad: row.cantidad,
