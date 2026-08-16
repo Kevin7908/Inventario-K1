@@ -290,7 +290,7 @@ class _CartPanelState extends ConsumerState<_CartPanel> {
   @override
   Widget build(BuildContext context) {
     final pos     = ref.watch(posProvider);
-    final clientes = ref.watch(clientesProvider).value?.clientes ?? const [];
+    final clientes = ref.watch(catalogoClientesProvider).value ?? const [];
 
     return Container(
       color: ColoresApp.bgCard,

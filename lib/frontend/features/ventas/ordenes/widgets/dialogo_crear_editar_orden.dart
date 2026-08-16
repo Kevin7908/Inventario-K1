@@ -153,8 +153,12 @@ class _DialogoCrearEditarOrdenState
 
   @override
   Widget build(BuildContext context) {
-    final todasLasMotos = ref.watch(motosProvider).value?.motos
-            .where((m) => m.activo)
+    // El catálogo completo, no el estado paginado: este selector necesita
+    // todas las motos, no las doce de la página que se esté viendo.
+    final todasLasMotos = ref
+            .watch(catalogoMotosProvider)
+            .value
+            ?.where((m) => m.activo)
             .toList(growable: false) ??
         const [];
 

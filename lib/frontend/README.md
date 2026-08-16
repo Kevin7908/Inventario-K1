@@ -33,7 +33,7 @@ Cada módulo del negocio tiene su propia carpeta. Las vistas de un módulo no im
 |---|---|
 | `autenticacion/` | Login y registro |
 | `categorias/` | Categorías de productos |
-| `clientes/` | Gestión de clientes |
+| `clientes/` | Gestión de clientes y de las motos de cada uno |
 | `configuracion/` | Ajustes de la aplicación |
 | `cotizaciones/` | Cotizaciones de venta |
 | `deudores/` | Cuentas por cobrar |

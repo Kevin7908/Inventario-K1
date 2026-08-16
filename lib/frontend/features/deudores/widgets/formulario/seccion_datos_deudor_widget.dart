@@ -3,7 +3,7 @@ import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:inventario_k1/backend/features/clientes/modelo/cliente.dart';
 import 'package:inventario_k1/backend/features/deudores/enum/enum_deudor.dart';
-import 'package:inventario_k1/frontend/features/clientes/widget/dialogo_cliente_widget.dart';
+import 'package:inventario_k1/frontend/features/clientes/widgets/dialogo_cliente_widget.dart';
 import 'package:inventario_k1/frontend/share/temas/colores_app.dart';
 import 'package:inventario_k1/frontend/share/widgets/input/app_searc_widget.dart';
 

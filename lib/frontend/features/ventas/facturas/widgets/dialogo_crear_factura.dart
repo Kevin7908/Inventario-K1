@@ -157,7 +157,7 @@ class _DialogoCrearFacturaState extends ConsumerState<DialogoCrearFactura> {
 
   @override
   Widget build(BuildContext context) {
-    final clientes = ref.watch(clientesProvider).value?.filtrados ?? const [];
+    final clientes = ref.watch(catalogoClientesProvider).value ?? const [];
 
     if (!_clientePreseleccionado && clientes.isNotEmpty) {
       _clientePreseleccionado = true;
