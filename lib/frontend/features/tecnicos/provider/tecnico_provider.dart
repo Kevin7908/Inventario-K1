@@ -28,7 +28,7 @@ final class TecnicosState {
     this.items = const [],
     this.total = 0,
     this.pagina = 0,
-    this.tamanoPagina = 12,
+    this.tamanoPagina = 20,
     this.busqueda = '',
     this.filtroActivo,
   });

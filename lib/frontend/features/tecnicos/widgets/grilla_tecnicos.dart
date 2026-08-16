@@ -89,7 +89,7 @@ class _GrillaTecnicosState extends ConsumerState<GrillaTecnicos> {
             actual: s.value?.pagina ?? 0,
             total: s.value?.total ?? 0,
             paginas: s.value?.totalPaginas ?? 1,
-            tamano: s.value?.tamanoPagina ?? 12,
+            tamano: s.value?.tamanoPagina ?? 20,
           )),
     );
 
