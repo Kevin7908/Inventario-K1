@@ -15,6 +15,10 @@ import '../temas/tipografia_app.dart';
 /// - [inicial]: una o dos letras, cuando no hay ícono.
 /// - [color]: color de acento del contenido. Por defecto [ColoresApp.goGreen].
 /// - [colorFondo]: fondo del cuadro. Por defecto, [color] atenuado.
+/// - [colorFondoFin]: segundo color del fondo. Si se pasa, el cuadro se pinta
+///   con un degradado diagonal de [colorFondo] a [colorFondoFin], que es como
+///   el diseño marca a las personas (el avatar verde de la tarjeta de
+///   cliente). Sin él, el fondo queda plano.
 /// - [lado]: alto y ancho del cuadro. Por defecto 44.
 /// - [radio]: radio de las esquinas. Por defecto 12.
 /// - [tamanoContenido]: tamaño del ícono o de la letra. Por defecto se deriva
@@ -29,6 +33,15 @@ import '../temas/tipografia_app.dart';
 ///   lado: 50,
 ///   radio: 14,
 /// )
+///
+/// MarcadorIdentidad(
+///   inicial: 'CR',
+///   color: ColoresApp.textOnPrimary,
+///   colorFondo: ColoresApp.goGreen,
+///   colorFondoFin: ColoresApp.castletonGreen,
+///   lado: 48,
+///   radio: 14,
+/// )
 /// ```
 class MarcadorIdentidad extends StatelessWidget {
   const MarcadorIdentidad({
@@ -37,6 +50,7 @@ class MarcadorIdentidad extends StatelessWidget {
     this.inicial,
     this.color,
     this.colorFondo,
+    this.colorFondoFin,
     this.lado = 44,
     this.radio = 12,
     this.tamanoContenido,
@@ -46,6 +60,7 @@ class MarcadorIdentidad extends StatelessWidget {
   final String? inicial;
   final Color? color;
   final Color? colorFondo;
+  final Color? colorFondoFin;
   final double lado;
   final double radio;
   final double? tamanoContenido;
@@ -57,13 +72,23 @@ class MarcadorIdentidad extends StatelessWidget {
         (color == null
             ? ColoresApp.greenChipBg
             : acento.withValues(alpha: 0.16));
+    final fin = colorFondoFin;
 
     return Container(
       width: lado,
       height: lado,
       alignment: Alignment.center,
       decoration: BoxDecoration(
-        color: fondo,
+        // Con degradado el color plano debe ir en `null`: `BoxDecoration` no
+        // admite `color` y `gradient` a la vez.
+        color: fin == null ? fondo : null,
+        gradient: fin == null
+            ? null
+            : LinearGradient(
+                colors: [fondo, fin],
+                begin: Alignment.topLeft,
+                end: Alignment.bottomRight,
+              ),
         borderRadius: BorderRadius.circular(radio),
       ),
       child: icono != null
