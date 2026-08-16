@@ -50,6 +50,12 @@ enum MotivoFallo {
   /// Ya existe otro registro con ese documento (NIT, cédula…).
   documentoDuplicado,
 
+  /// La moto ya está registrada a nombre de otro cliente. Es distinto de
+  /// [documentoDuplicado] porque el campo en conflicto no es del registro que
+  /// se está guardando, sino de una de sus motos: la vista necesita saberlo
+  /// para señalar la fila correcta.
+  placaRegistrada,
+
   /// El dato no cumple una regla de negocio (vacío, muy corto…).
   validacion,
 

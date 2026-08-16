@@ -3,6 +3,7 @@ import '../../persona/modelo/persona.dart'; // Asegúrate que esta ruta sea la c
 class Cliente extends Persona {
   final int id;
   final String? cedula;
+
   @override
   final String nombres;
   @override
