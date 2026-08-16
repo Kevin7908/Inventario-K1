@@ -252,7 +252,7 @@ class _CartPanelState extends ConsumerState<_CartPanel> {
   Future<void> _checkout() async {
     final pos      = ref.read(posProvider);
     final subtotal = pos.subtotal;
-    final total    = subtotal - pos.descuento + subtotal * kIva;
+    final total    = subtotal - pos.descuento + ivaDe(subtotal);
 
     final resultado = await DialogoCobrarPOS.mostrar(
       context,
@@ -595,7 +595,7 @@ class _CartFooter extends StatelessWidget {
   Widget build(BuildContext context) {
     final subtotal  = pos.subtotal;
     final descuento = pos.descuento;
-    final iva       = subtotal * kIva;
+    final iva       = ivaDe(subtotal);
     final total     = subtotal - descuento + iva;
 
     return Padding(

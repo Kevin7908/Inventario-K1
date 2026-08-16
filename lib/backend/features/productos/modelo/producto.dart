@@ -1,6 +1,6 @@
 import 'package:equatable/equatable.dart';
 
-const double kTasaIva = 0.19;
+import '../../../../core/iva_app.dart';
 
 enum EstadoStock { enStock, stockBajo, sinStock }
 
@@ -161,9 +161,13 @@ class Producto extends Equatable {
   /// Alias booleano para compatibilidad con filtros del ViewModel.
   bool get sinStock => estadoStock == EstadoStock.sinStock;
 
-  /// Precio de venta con IVA aplicado según kTasaIva.
+  /// Precio de venta con IVA aplicado, según la tasa global [kIva].
+  ///
+  /// Es solo informativo —para ver en la ficha cuánto pagaría el cliente—. Los
+  /// documentos (cotizaciones, facturas) no lo usan: ellos calculan el IVA
+  /// sobre el subtotal completo con [ivaDe], sin mirar [aplicaIva].
   double get precioVentaConIva =>
-      aplicaIva ? precioVenta * (1 + kTasaIva) : precioVenta;
+      aplicaIva ? precioVenta * (1 + kIva) : precioVenta;
 
   /// Margen de ganancia en porcentaje sobre el precio de compra.
   double get margenGanancia => precioCompra > 0

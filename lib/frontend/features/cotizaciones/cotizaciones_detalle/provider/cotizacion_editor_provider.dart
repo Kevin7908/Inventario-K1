@@ -7,6 +7,7 @@ import 'package:inventario_k1/backend/features/productos/modelo/producto.dart';
 import 'package:inventario_k1/frontend/features/cotizaciones/provider/cotizaciones_provider.dart';
 import 'package:inventario_k1/frontend/features/cotizaciones/widgets/dialogo/dialogo_cot_items_tabla.dart';
 import 'package:inventario_k1/frontend/features/productos/provider/productos_provider.dart';
+import '../../../../../core/iva_app.dart';
 
 // ── Estado ────────────────────────────────────────────────────────────────────
 
@@ -42,7 +43,7 @@ final class CotizacionEditorState {
   // ── Totales ─────────────────────────────────────────────────────────────────
 
   int get subtotal => items.fold(0, (s, i) => s + i.subtotal);
-  int get iva => (subtotal * kTasaIva).round();
+  int get iva => ivaDe(subtotal);
   int get total => subtotal + iva;
 
   // ── Helpers de stock para la UI ─────────────────────────────────────────────

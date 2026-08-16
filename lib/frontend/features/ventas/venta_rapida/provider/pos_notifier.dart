@@ -92,14 +92,14 @@ class PosNotifier extends Notifier<PosState> {
     try {
       final notifier  = ref.read(facturasProvider.notifier);
       final subtotal  = state.subtotal;
-      final ivaAmount = subtotal * kIva;
+      final ivaAmount = ivaDe(subtotal);
 
       final error = await notifier.crear(
         tipo:       TipoVenta.mostrador,
         clienteId:  state.clienteId,
         metodoPago: state.metodoPago,
         estadoPago: estadoPago,
-        iva:        ivaAmount,
+        iva:        ivaAmount.toDouble(),
         descuento:  state.descuento,
       );
       if (error != null) return error;

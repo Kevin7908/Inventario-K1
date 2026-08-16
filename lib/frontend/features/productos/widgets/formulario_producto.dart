@@ -7,6 +7,7 @@ import '../../../../backend/features/categorias/modelo/categoria.dart';
 import '../../../../backend/features/productos/modelo/producto.dart';
 import '../../../../backend/features/proveedores/modelo/proveedor.dart';
 import '../../../../backend/features/unidades_medida/modelo/unidad_medida.dart';
+import '../../../../core/iva_app.dart';
 import '../../../../core/resultado.dart';
 import '../../../share2/share2.dart';
 import '../../categorias/provider/categorias_provider.dart';
@@ -407,7 +408,7 @@ class _FormularioProductoState extends ConsumerState<FormularioProducto> {
                 child: InterruptorCampo(
                   etiqueta: 'Aplica IVA',
                   detalle: _aplicaIva
-                      ? 'Se suma ${(kTasaIva * 100).toStringAsFixed(0)}% al precio'
+                      ? 'Se suma ${(kIva * 100).toStringAsFixed(0)}% al precio'
                       : 'Precio sin IVA',
                   valor: _aplicaIva,
                   alCambiar: (v) => setState(() => _aplicaIva = v),
