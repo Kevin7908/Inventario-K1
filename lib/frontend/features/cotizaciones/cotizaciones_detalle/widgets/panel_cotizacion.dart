@@ -1,10 +1,11 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../../../../core/formato.dart';
 import '../../../../share2/share2.dart';
 import '../provider/catalogo_cotizacion_providers.dart';
 import '../provider/cotizacion_editor_provider.dart';
-import 'encabezamiento_cotizacion.dart';
+import 'dialogo_datos_cotizacion.dart';
 import 'linea_cotizacion.dart';
 import 'totales_cotizacion.dart';
 
@@ -18,7 +19,6 @@ class PanelCotizacion extends ConsumerWidget {
   const PanelCotizacion({
     super.key,
     required this.cotizacionId,
-    required this.notasControlador,
     required this.alReservar,
     required this.alImprimir,
   });
@@ -26,7 +26,6 @@ class PanelCotizacion extends ConsumerWidget {
   static const double ancho = 360;
 
   final int? cotizacionId;
-  final TextEditingController notasControlador;
   final VoidCallback alReservar;
   final VoidCallback alImprimir;
 
@@ -45,7 +44,6 @@ class PanelCotizacion extends ConsumerWidget {
           Expanded(child: _Lineas(cotizacionId: cotizacionId)),
           _Pie(
             cotizacionId: cotizacionId,
-            notasControlador: notasControlador,
             alReservar: alReservar,
             alImprimir: alImprimir,
           ),
@@ -55,7 +53,11 @@ class PanelCotizacion extends ConsumerWidget {
   }
 }
 
-/// Título, contador de ítems y a quién se le cotiza.
+/// Título, contador de ítems y la ficha de a quién se le cotiza.
+///
+/// La ficha va arriba y no en el pie —donde estaban los tres campos— porque
+/// así el pie queda con lo que se mira al cerrar la venta (totales y acciones)
+/// y la lista de líneas recupera el alto que le comían tres inputs apilados.
 class _Cabecera extends ConsumerWidget {
   const _Cabecera({required this.cotizacionId});
 
@@ -67,12 +69,18 @@ class _Cabecera extends ConsumerWidget {
       cotizacionEditorProvider(cotizacionId).select((s) => (
             numero: s.value?.numero ?? '',
             cliente: s.value?.cliente?.nombreCompleto,
+            placa: s.value?.moto?.placa,
+            vigencia: s.value?.vigenciaHasta,
             items: s.value?.items.length ?? 0,
           )),
     );
 
     final referencia = datos.numero.isEmpty ? 'Sin guardar' : '#${datos.numero}';
-    final aQuien = datos.cliente ?? 'Mostrador';
+    final vigencia = datos.vigencia;
+    final subtitulo = [
+      if (datos.placa != null) datos.placa!,
+      if (vigencia != null) 'Vence ${formatearFecha(vigencia)}',
+    ].join(' · ');
 
     return Container(
       padding: const EdgeInsets.fromLTRB(22, 22, 22, 14),
@@ -96,13 +104,26 @@ class _Cabecera extends ConsumerWidget {
           ),
           const SizedBox(height: 6),
           Text(
-            '$referencia · Cliente: $aQuien',
+            referencia,
             style: TipografiaApp.caption.copyWith(
               fontSize: 12,
               color: ColoresApp.textMuted,
             ),
             maxLines: 1,
             overflow: TextOverflow.ellipsis,
+          ),
+          const SizedBox(height: 12),
+          FichaResumen(
+            titulo: datos.cliente ?? 'Mostrador',
+            subtitulo: subtitulo,
+            inicial: datos.cliente == null ? null : inicialDe(datos.cliente!),
+            icono: datos.cliente == null ? Icons.storefront_outlined : null,
+            tenue: datos.cliente == null,
+            etiquetaAccion: 'Cliente, moto, vigencia y notas',
+            alPresionar: () => DialogoDatosCotizacion.mostrar(
+              context,
+              cotizacionId: cotizacionId,
+            ),
           ),
         ],
       ),
@@ -176,22 +197,20 @@ class _Lineas extends ConsumerWidget {
   }
 }
 
-/// Notas, totales y acciones, sobre el fondo tenue del diseño.
-class _Pie extends ConsumerWidget {
+/// Totales y acciones, sobre el fondo tenue del diseño.
+class _Pie extends StatelessWidget {
   const _Pie({
     required this.cotizacionId,
-    required this.notasControlador,
     required this.alReservar,
     required this.alImprimir,
   });
 
   final int? cotizacionId;
-  final TextEditingController notasControlador;
   final VoidCallback alReservar;
   final VoidCallback alImprimir;
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  Widget build(BuildContext context) {
     return Container(
       padding: const EdgeInsets.fromLTRB(22, 18, 22, 22),
       decoration: const BoxDecoration(
@@ -201,18 +220,6 @@ class _Pie extends ConsumerWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          EncabezamientoCotizacion(cotizacionId: cotizacionId),
-          const SizedBox(height: 14),
-          CampoTexto(
-            etiqueta: 'Notas',
-            controlador: notasControlador,
-            placeholder: 'Condiciones, tiempos de entrega…',
-            lineas: 2,
-            alCambiar: ref
-                .read(cotizacionEditorProvider(cotizacionId).notifier)
-                .cambiarNotas,
-          ),
-          const SizedBox(height: 14),
           TotalesCotizacion(cotizacionId: cotizacionId),
           const SizedBox(height: 16),
           BotonPrimario(

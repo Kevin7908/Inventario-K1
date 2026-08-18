@@ -34,18 +34,12 @@ class CotizacionDetalleVista extends ConsumerStatefulWidget {
 
 class _CotizacionDetalleVistaState
     extends ConsumerState<CotizacionDetalleVista> {
-  final _notas = TextEditingController();
   final _focoBusqueda = FocusNode();
-
-  /// Las notas se copian una sola vez, cuando el editor termina de cargar.
-  /// Copiarlas en cada emisión pisaría lo que el usuario esté escribiendo.
-  bool _notasCargadas = false;
 
   int? get _id => widget.cotizacion?.id;
 
   @override
   void dispose() {
-    _notas.dispose();
     _focoBusqueda.dispose();
     super.dispose();
   }
@@ -124,13 +118,6 @@ class _CotizacionDetalleVistaState
   @override
   Widget build(BuildContext context) {
     final provider = cotizacionEditorProvider(_id);
-
-    ref.listen(provider, (_, siguiente) {
-      if (_notasCargadas || !siguiente.hasValue) return;
-      _notas.text = siguiente.value!.notas;
-      _notasCargadas = true;
-    });
-
     final cargando = ref.watch(provider.select((s) => !s.hasValue));
     if (cargando) {
       return const Center(
@@ -163,7 +150,6 @@ class _CotizacionDetalleVistaState
                   ),
                   PanelCotizacion(
                     cotizacionId: _id,
-                    notasControlador: _notas,
                     alReservar: _reservar,
                     alImprimir: () =>
                         _avisar('Próximamente: vista previa en PDF.'),
