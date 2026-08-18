@@ -1,3 +1,4 @@
+import 'package:inventario_k1/backend/share/dominio/metodo_pago.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:inventario_k1/backend/features/deudores/modelo/deudor_pago.dart';
@@ -176,7 +177,7 @@ class _FilaPago extends ConsumerWidget {
 class _ChipMetodo extends StatelessWidget {
   const _ChipMetodo({required this.metodo});
 
-  final String metodo;
+  final MetodoPago metodo;
 
   @override
   Widget build(BuildContext context) {
@@ -187,7 +188,7 @@ class _ChipMetodo extends StatelessWidget {
         borderRadius: BorderRadius.circular(20),
       ),
       child: Text(
-        metodo,
+        metodo.etiqueta,
         style: const TextStyle(
           fontSize: 11,
           fontWeight: FontWeight.w700,

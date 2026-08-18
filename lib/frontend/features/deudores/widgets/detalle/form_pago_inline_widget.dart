@@ -1,6 +1,6 @@
+import 'package:inventario_k1/backend/share/dominio/metodo_pago.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:inventario_k1/backend/features/deudores/enum/enum_deudor.dart';
 import 'package:inventario_k1/core/currency_ext.dart';
 import 'package:inventario_k1/frontend/share/temas/colores_app.dart';
 import 'package:inventario_k1/frontend/share/widgets/output/snack_bar_mensaje.dart';
@@ -27,7 +27,7 @@ class FormPagoInlineWidget extends ConsumerStatefulWidget {
 class _FormPagoInlineWidgetState extends ConsumerState<FormPagoInlineWidget> {
   final _montoCtrl = TextEditingController();
   final _notasCtrl = TextEditingController();
-  String _metodoPago = kMetodosPagoDeudor.first;
+  MetodoPago _metodoPago = MetodoPago.efectivo;
   bool _guardando = false;
 
   @override
@@ -215,20 +215,20 @@ class _CampoMontoState extends State<_CampoMonto> {
 class _SelectorMetodo extends StatelessWidget {
   const _SelectorMetodo({required this.valor, required this.onCambio});
 
-  final String valor;
-  final ValueChanged<String?> onCambio;
+  final MetodoPago valor;
+  final ValueChanged<MetodoPago?> onCambio;
 
   @override
   Widget build(BuildContext context) {
     return _CampoFormPago(
       label: 'Método',
-      child: DropdownButtonFormField<String>(
+      child: DropdownButtonFormField<MetodoPago>(
         initialValue: valor,
         onChanged: onCambio,
         style: const TextStyle(fontSize: 13, color: ColoresApp.textDark),
         decoration: _deudorInputDecor(),
-        items: kMetodosPagoDeudor
-            .map((m) => DropdownMenuItem(value: m, child: Text(m)))
+        items: MetodoPago.paraAbonos
+            .map((m) => DropdownMenuItem(value: m, child: Text(m.etiqueta)))
             .toList(),
       ),
     );

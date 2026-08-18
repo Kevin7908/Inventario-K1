@@ -1,3 +1,4 @@
+import '../../../share/dominio/metodo_pago.dart';
 import '../enum/enum_deudor.dart';
 import '../modelo/deudor_detalle.dart';
 import '../modelo/deudor_resumen.dart';
@@ -14,10 +15,10 @@ abstract class RepositorioDeudores {
     int? ventaId,
     required String concepto,
     required int montoTotal,
-    String? fechaVencimiento,
+    DateTime? fechaVencimiento,
     String? notas,
     int pagoInicial = 0,
-    String metodoPagoInicial = 'Efectivo',
+    MetodoPago metodoPagoInicial = MetodoPago.efectivo,
     String? notasPagoInicial,
   });
 
@@ -26,7 +27,7 @@ abstract class RepositorioDeudores {
     int? ventaId,
     required String concepto,
     required int montoTotal,
-    String? fechaVencimiento,
+    DateTime? fechaVencimiento,
     String? notas,
     required EstadoDeudor estado,
   });
@@ -34,7 +35,7 @@ abstract class RepositorioDeudores {
   Future<void> registrarPago({
     required int deudorId,
     required int monto,
-    required String metodoPago,
+    required MetodoPago metodoPago,
     String? notas,
   });
 
@@ -43,4 +44,12 @@ abstract class RepositorioDeudores {
   Future<void> cambiarEstado(int id, EstadoDeudor nuevoEstado);
 
   Future<void> eliminar(int id);
+
+  /// Las deudas cuyo `monto_pagado` no cuadra con la suma de sus pagos,
+  /// indexadas por id y con la diferencia (`caché − suma`).
+  ///
+  /// Vacío es lo esperado. Existe por el mismo motivo que
+  /// `RepositorioInventario.descuadres` y `RepositorioReservas.descuadres`: un
+  /// caché solo está justificado si algo puede afirmar que coincide.
+  Future<Map<int, int>> descuadres();
 }

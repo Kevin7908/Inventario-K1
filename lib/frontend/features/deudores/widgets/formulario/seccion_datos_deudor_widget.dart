@@ -1,3 +1,4 @@
+import 'package:inventario_k1/core/formato.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -268,8 +269,9 @@ class _SelectorFechaVencimiento extends StatefulWidget {
     required this.onCambio,
   });
 
-  final String? valor;
-  final ValueChanged<String?> onCambio;
+  /// `null` = sin plazo pactado.
+  final DateTime? valor;
+  final ValueChanged<DateTime?> onCambio;
 
   @override
   State<_SelectorFechaVencimiento> createState() =>
@@ -283,7 +285,9 @@ class _SelectorFechaVencimientoState
   @override
   void initState() {
     super.initState();
-    _ctrl = TextEditingController(text: widget.valor ?? '');
+    _ctrl = TextEditingController(
+      text: widget.valor == null ? '' : formatearFecha(widget.valor!),
+    );
   }
 
   @override
@@ -293,9 +297,7 @@ class _SelectorFechaVencimientoState
   }
 
   Future<void> _seleccionarFecha() async {
-    final initial = widget.valor != null
-        ? DateTime.tryParse(widget.valor!) ?? DateTime.now()
-        : DateTime.now();
+    final initial = widget.valor ?? DateTime.now();
     final picked = await showDatePicker(
       context: context,
       initialDate: initial,
@@ -303,10 +305,8 @@ class _SelectorFechaVencimientoState
       lastDate: DateTime(2100),
     );
     if (picked == null) return;
-    final formatted =
-        '${picked.year}-${picked.month.toString().padLeft(2, '0')}-${picked.day.toString().padLeft(2, '0')}';
-    _ctrl.text = formatted;
-    widget.onCambio(formatted);
+    _ctrl.text = formatearFecha(picked);
+    widget.onCambio(picked);
   }
 
   @override

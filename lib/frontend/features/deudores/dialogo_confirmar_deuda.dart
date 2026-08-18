@@ -1,3 +1,4 @@
+import 'package:inventario_k1/backend/share/dominio/metodo_pago.dart';
 import 'package:flutter/material.dart';
 
 import '../../share/formateadores/moneda_formateador.dart';
@@ -16,8 +17,9 @@ class DatosDeuda {
   });
 
   final String  concepto;
-  final String  metodoPago;
-  final String? fechaVencimiento; // 'yyyy-MM-dd' o null
+  final MetodoPago metodoPago;
+  /// `null` = sin plazo pactado.
+  final DateTime? fechaVencimiento;
   final String? notas;
 }
 class DialogoConfirmarDeuda extends StatefulWidget {
@@ -30,17 +32,18 @@ class DialogoConfirmarDeuda extends StatefulWidget {
   });
 
   final String clienteNombre;
-  final double total;
-  final double recibido;
-  final double faltante;
+  // Pesos enteros, como todo importe del sistema.
+  final int total;
+  final int recibido;
+  final int faltante;
   final String conceptoInicial;
 
   static Future<DatosDeuda?> mostrar(
     BuildContext context, {
     required String clienteNombre,
-    required double total,
-    required double recibido,
-    required double faltante,
+    required int total,
+    required int recibido,
+    required int faltante,
     String conceptoInicial = '',
   }) =>
       showDialog<DatosDeuda>(
@@ -63,11 +66,11 @@ class _DialogoConfirmarDeudaState extends State<DialogoConfirmarDeuda> {
   late final TextEditingController _conceptoCtrl;
   final _notasCtrl = TextEditingController();
 
-  String    _metodoPago      = 'Efectivo';
+  MetodoPago _metodoPago = MetodoPago.efectivo;
   DateTime? _fechaVencimiento;
   String?   _errorConcepto;
 
-  static const _metodosPago = ['Efectivo', 'Tarjeta', 'Transferencia', 'Crédito'];
+  //static const _metodosPago = ['Efectivo', 'Tarjeta', 'Transferencia', 'Crédito'];
 
   @override
   void initState() {
@@ -106,16 +109,10 @@ class _DialogoConfirmarDeudaState extends State<DialogoConfirmarDeuda> {
       return;
     }
 
-    final fechaStr = _fechaVencimiento == null
-        ? null
-        : '${_fechaVencimiento!.year.toString().padLeft(4, '0')}-'
-          '${_fechaVencimiento!.month.toString().padLeft(2, '0')}-'
-          '${_fechaVencimiento!.day.toString().padLeft(2, '0')}';
-
     Navigator.of(context).pop(DatosDeuda(
       concepto:         concepto,
       metodoPago:       _metodoPago,
-      fechaVencimiento: fechaStr,
+      fechaVencimiento: _fechaVencimiento,
       notas: _notasCtrl.text.trim().isNotEmpty ? _notasCtrl.text.trim() : null,
     ));
   }
@@ -152,9 +149,9 @@ class _DialogoConfirmarDeudaState extends State<DialogoConfirmarDeuda> {
                         color: _kRed, size: 20),
                   ),
                   const SizedBox(width: 12),
-                  Column(
+                  const Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
-                    children: const [
+                    children: [
                       Text(
                         'Registrar deuda pendiente',
                         style: TextStyle(
@@ -211,7 +208,7 @@ class _DialogoConfirmarDeudaState extends State<DialogoConfirmarDeuda> {
               const SizedBox(height: 18),
 
               // ── Concepto ──────────────────────────────────────────────
-              _LabelCampo('CONCEPTO *'),
+              const _LabelCampo('CONCEPTO *'),
               const SizedBox(height: 5),
               TextField(
                 controller: _conceptoCtrl,
@@ -235,12 +232,15 @@ class _DialogoConfirmarDeudaState extends State<DialogoConfirmarDeuda> {
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        _LabelCampo('MÉTODO DE PAGO'),
+                        const _LabelCampo('MÉTODO DE PAGO'),
                         const SizedBox(height: 5),
-                        DropdownButtonFormField<String>(
-                          value: _metodoPago,
-                          items: _metodosPago
-                              .map((m) => DropdownMenuItem(value: m, child: Text(m)))
+                        DropdownButtonFormField<MetodoPago>(
+                          initialValue: _metodoPago,
+                          items: MetodoPago.paraAbonos
+                              .map((m) => DropdownMenuItem(
+                                    value: m,
+                                    child: Text(m.etiqueta),
+                                  ))
                               .toList(),
                           onChanged: (v) => setState(() => _metodoPago = v!),
                           style: const TextStyle(fontSize: 13, color: ColoresApp.textDark),
@@ -254,7 +254,7 @@ class _DialogoConfirmarDeudaState extends State<DialogoConfirmarDeuda> {
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        _LabelCampo('VENCIMIENTO (OPCIONAL)'),
+                        const _LabelCampo('VENCIMIENTO (OPCIONAL)'),
                         const SizedBox(height: 5),
                         InkWell(
                           onTap: _seleccionarFecha,
@@ -316,7 +316,7 @@ class _DialogoConfirmarDeudaState extends State<DialogoConfirmarDeuda> {
               const SizedBox(height: 14),
 
               // ── Notas ─────────────────────────────────────────────────
-              _LabelCampo('NOTAS (OPCIONAL)'),
+              const _LabelCampo('NOTAS (OPCIONAL)'),
               const SizedBox(height: 5),
               TextField(
                 controller: _notasCtrl,

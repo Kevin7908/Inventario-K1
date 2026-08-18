@@ -1,3 +1,4 @@
+import '../../../share/dominio/metodo_pago.dart';
 import 'package:drift/drift.dart';
 import 'package:inventario_k1/backend/share/database/app_db.dart';
 
@@ -33,7 +34,7 @@ class DeudorMapper {
       id: row.id,
       deudorId: row.deudorId,
       monto: row.monto,
-      metodoPago: row.metodoPago,
+      metodoPago: MetodoPago.desdeCodigo(row.metodoPago),
       notas: row.notas,
       fechaPago: row.fechaPago,
     );
@@ -45,7 +46,7 @@ class DeudorMapper {
     int? ventaId,
     required String concepto,
     required int montoTotal,
-    String? fechaVencimiento,
+    DateTime? fechaVencimiento,
     String? notas,
   }) {
     return TablaDeudorCompanion.insert(
@@ -62,13 +63,13 @@ class DeudorMapper {
   static TablaDeudorPagoCompanion pagoACompanion({
     required int deudorId,
     required int monto,
-    required String metodoPago,
+    required MetodoPago metodoPago,
     String? notas,
   }) {
     return TablaDeudorPagoCompanion.insert(
       deudorId: deudorId,
       monto: monto,
-      metodoPago: metodoPago,
+      metodoPago: metodoPago.codigo,
       notas: Value(notas),
     );
   }

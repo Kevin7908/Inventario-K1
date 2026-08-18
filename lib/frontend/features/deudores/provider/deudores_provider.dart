@@ -1,3 +1,4 @@
+import 'package:inventario_k1/backend/share/dominio/metodo_pago.dart';
 import 'package:flutter/foundation.dart' show listEquals;
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:inventario_k1/backend/features/clientes/modelo/cliente.dart';
@@ -155,10 +156,10 @@ class DeudoresNotifier extends AsyncNotifier<DeudoresState> {
     int? ventaId,
     required String concepto,
     required int montoTotal,
-    String? fechaVencimiento,
+    DateTime? fechaVencimiento,
     String? notas,
     int pagoInicial = 0,
-    String metodoPagoInicial = 'Efectivo',
+    MetodoPago metodoPagoInicial = MetodoPago.efectivo,
     String? notasPagoInicial,
   }) async {
     try {
@@ -188,7 +189,7 @@ class DeudoresNotifier extends AsyncNotifier<DeudoresState> {
     int? ventaId,
     required String concepto,
     required int montoTotal,
-    String? fechaVencimiento,
+    DateTime? fechaVencimiento,
     String? notas,
     required EstadoDeudor estado,
   }) async {
@@ -215,7 +216,7 @@ class DeudoresNotifier extends AsyncNotifier<DeudoresState> {
   Future<String?> registrarPago({
     required int deudorId,
     required int monto,
-    required String metodoPago,
+    required MetodoPago metodoPago,
     String? notas,
   }) async {
     try {

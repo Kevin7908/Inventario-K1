@@ -27,7 +27,7 @@ class DeudorResumen extends Equatable {
   final int montoTotal;
   final int montoPagado;
   final EstadoDeudor estado;
-  final String? fechaVencimiento;
+  final DateTime? fechaVencimiento;
   final String? notas;
   final DateTime creadoEn;
 
@@ -36,13 +36,18 @@ class DeudorResumen extends Equatable {
   double get porcentajePagado =>
       montoTotal > 0 ? (montoPagado / montoTotal).clamp(0.0, 1.0) : 0.0;
 
+  /// Si el plazo ya pasó. Distinto de `estado == EstadoDeudor.vencida`, que
+  /// es una marca que pone el usuario: esto lo dice el calendario.
+  ///
+  /// Una deuda pagada o dada por incobrable no vence: ya no espera nada.
   bool get estaVencida {
-    if (fechaVencimiento == null) return false;
-    if (estado == EstadoDeudor.pagada || estado == EstadoDeudor.incobrable) return false;
-    return fechaVencimiento!.compareTo(
-          DateTime.now().toIso8601String().substring(0, 10),
-        ) <
-        0;
+    final limite = fechaVencimiento;
+    if (limite == null) return false;
+    if (estado == EstadoDeudor.pagada || estado == EstadoDeudor.incobrable) {
+      return false;
+    }
+    final hoy = DateTime.now();
+    return limite.isBefore(DateTime(hoy.year, hoy.month, hoy.day));
   }
 
   @override

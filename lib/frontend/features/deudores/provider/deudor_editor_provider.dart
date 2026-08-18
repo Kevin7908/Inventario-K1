@@ -1,3 +1,4 @@
+import 'package:inventario_k1/backend/share/dominio/metodo_pago.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:inventario_k1/backend/features/deudores/enum/enum_deudor.dart';
 import 'package:inventario_k1/backend/features/deudores/modelo/deudor_resumen.dart';
@@ -18,7 +19,7 @@ final class DeudorEditorState {
     this.notas = '',
     this.estado = EstadoDeudor.activa,
     this.pagoInicial = 0,
-    this.metodoPagoInicial = 'Efectivo',
+    this.metodoPagoInicial = MetodoPago.efectivo,
     this.notasPagoInicial = '',
     this.guardando = false,
   });
@@ -29,11 +30,11 @@ final class DeudorEditorState {
   final int? ventaId;
   final String concepto;
   final int montoTotal;
-  final String? fechaVencimiento;
+  final DateTime? fechaVencimiento;
   final String notas;
   final EstadoDeudor estado;
   final int pagoInicial;
-  final String metodoPagoInicial;
+  final MetodoPago metodoPagoInicial;
   final String notasPagoInicial;
   final bool guardando;
 
@@ -52,7 +53,7 @@ final class DeudorEditorState {
     String? notas,
     EstadoDeudor? estado,
     int? pagoInicial,
-    String? metodoPagoInicial,
+    MetodoPago? metodoPagoInicial,
     String? notasPagoInicial,
     bool? guardando,
   }) {
@@ -65,7 +66,7 @@ final class DeudorEditorState {
       montoTotal: montoTotal ?? this.montoTotal,
       fechaVencimiento: fechaVencimiento == _sentinel
           ? this.fechaVencimiento
-          : fechaVencimiento as String?,
+          : fechaVencimiento as DateTime?,
       notas: notas ?? this.notas,
       estado: estado ?? this.estado,
       pagoInicial: pagoInicial ?? this.pagoInicial,
@@ -109,12 +110,12 @@ class DeudorEditorNotifier extends Notifier<DeudorEditorState> {
   void setVentaId(int? id) => state = state.copyWith(ventaId: id);
   void setConcepto(String v) => state = state.copyWith(concepto: v);
   void setMontoTotal(int v) => state = state.copyWith(montoTotal: v);
-  void setFechaVencimiento(String? v) =>
+  void setFechaVencimiento(DateTime? v) =>
       state = state.copyWith(fechaVencimiento: v);
   void setNotas(String v) => state = state.copyWith(notas: v);
   void setEstado(EstadoDeudor v) => state = state.copyWith(estado: v);
   void setPagoInicial(int v) => state = state.copyWith(pagoInicial: v);
-  void setMetodoPagoInicial(String v) =>
+  void setMetodoPagoInicial(MetodoPago v) =>
       state = state.copyWith(metodoPagoInicial: v);
   void setNotasPagoInicial(String v) =>
       state = state.copyWith(notasPagoInicial: v);

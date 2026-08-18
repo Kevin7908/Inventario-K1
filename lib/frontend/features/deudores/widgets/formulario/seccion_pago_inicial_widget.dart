@@ -1,7 +1,7 @@
+import 'package:inventario_k1/backend/share/dominio/metodo_pago.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:inventario_k1/backend/features/deudores/enum/enum_deudor.dart';
 import 'package:inventario_k1/core/currency_ext.dart';
 import 'package:inventario_k1/frontend/share/temas/colores_app.dart';
 
@@ -66,14 +66,16 @@ class _SeccionPagoInicialWidgetState
                 children: [
                   const _LabelCampoLocal(texto: 'Método'),
                   const SizedBox(height: 4),
-                  DropdownButtonFormField<String>(
+                  DropdownButtonFormField<MetodoPago>(
                     initialValue: editor.metodoPagoInicial,
                     style: const TextStyle(
                         fontSize: 13, color: ColoresApp.textDark),
                     decoration: _pagoDecor(),
-                    items: kMetodosPagoDeudor
-                        .map((m) =>
-                            DropdownMenuItem(value: m, child: Text(m)))
+                    items: MetodoPago.paraAbonos
+                        .map((m) => DropdownMenuItem(
+                              value: m,
+                              child: Text(m.etiqueta),
+                            ))
                         .toList(),
                     onChanged: (v) =>
                         v != null ? notifier.setMetodoPagoInicial(v) : null,

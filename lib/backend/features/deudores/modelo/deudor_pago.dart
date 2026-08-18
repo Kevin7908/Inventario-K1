@@ -1,3 +1,4 @@
+import '../../../share/dominio/metodo_pago.dart';
 import 'package:equatable/equatable.dart';
 
 class DeudorPago extends Equatable {
@@ -13,7 +14,7 @@ class DeudorPago extends Equatable {
   final int id;
   final int deudorId;
   final int monto;
-  final String metodoPago;
+  final MetodoPago metodoPago;
   final String? notas;
   final DateTime fechaPago;
 

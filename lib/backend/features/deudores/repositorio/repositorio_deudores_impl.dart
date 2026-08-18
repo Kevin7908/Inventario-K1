@@ -1,3 +1,6 @@
+import '../../../share/consecutivos/documento_consecutivo.dart';
+import '../../../share/consecutivos/repositorio_consecutivos.dart';
+import '../../../share/dominio/metodo_pago.dart';
 import 'package:drift/drift.dart';
 import 'package:inventario_k1/backend/share/database/app_db.dart';
 
@@ -9,9 +12,14 @@ import '../modelo/deudor_resumen.dart';
 import 'repositorio_deudores.dart';
 
 class RepositorioDeudoresImpl implements RepositorioDeudores {
-  const RepositorioDeudoresImpl(this._db);
+  RepositorioDeudoresImpl(this._db);
 
   final AppDb _db;
+
+  /// Los números de documento salen de la tabla `consecutivos`, no de `MAX+1`
+  /// ni del `id`: ver `RepositorioConsecutivos`.
+  late final RepositorioConsecutivos _consecutivos =
+      RepositorioConsecutivos(_db);
 
   // ── Join base ──────────────────────────────────────────────────────────────
 
@@ -21,12 +29,17 @@ class RepositorioDeudoresImpl implements RepositorioDeudores {
         _db.tablaCliente,
         _db.tablaCliente.id.equalsExp(_db.tablaDeudor.clienteId),
       ),
+      // El nombre del cliente vive en `personas`.
+      innerJoin(
+        _db.tablaPersona,
+        _db.tablaPersona.id.equalsExp(_db.tablaCliente.personaId),
+      ),
     ]);
   }
 
   DeudorResumen _filaAResumen(TypedResult row) {
     final d = row.readTable(_db.tablaDeudor);
-    final cli = row.readTable(_db.tablaCliente);
+    final cli = row.readTable(_db.tablaPersona);
     final nombreCliente = '${cli.nombres} ${cli.apellidos ?? ''}'.trim();
     return DeudorMapper.filaAResumen(d, nombreCliente: nombreCliente);
   }
@@ -77,14 +90,14 @@ class RepositorioDeudoresImpl implements RepositorioDeudores {
     int? ventaId,
     required String concepto,
     required int montoTotal,
-    String? fechaVencimiento,
+    DateTime? fechaVencimiento,
     String? notas,
     int pagoInicial = 0,
-    String metodoPagoInicial = 'Efectivo',
+    MetodoPago metodoPagoInicial = MetodoPago.efectivo,
     String? notasPagoInicial,
   }) {
     return _db.transaction(() async {
-      final numero = await _generarNumero();
+      final numero = await _consecutivos.siguiente(DocumentoConsecutivo.deuda);
       final montoPagadoInicial = pagoInicial.clamp(0, montoTotal);
 
       final id = await _db.into(_db.tablaDeudor).insert(
@@ -124,7 +137,7 @@ class RepositorioDeudoresImpl implements RepositorioDeudores {
     int? ventaId,
     required String concepto,
     required int montoTotal,
-    String? fechaVencimiento,
+    DateTime? fechaVencimiento,
     String? notas,
     required EstadoDeudor estado,
   }) async {
@@ -145,7 +158,7 @@ class RepositorioDeudoresImpl implements RepositorioDeudores {
   Future<void> registrarPago({
     required int deudorId,
     required int monto,
-    required String metodoPago,
+    required MetodoPago metodoPago,
     String? notas,
   }) {
     return _db.transaction(() async {
@@ -182,19 +195,28 @@ class RepositorioDeudoresImpl implements RepositorioDeudores {
 
   // ── Helpers privados ───────────────────────────────────────────────────────
 
-  Future<String> _generarNumero() async {
-    const prefix = 'DEU-';
-    final maxExpr = _db.tablaDeudor.numero.max();
-    final query = _db.selectOnly(_db.tablaDeudor)
-      ..addColumns([maxExpr])
-      ..where(_db.tablaDeudor.numero.like('$prefix%'));
 
-    final row = await query.getSingleOrNull();
-    final maxNumero = row?.read(maxExpr);
-    final maxSeq = maxNumero != null
-        ? (int.tryParse(maxNumero.replaceFirst(prefix, '')) ?? 0)
-        : 0;
-    return '$prefix${(maxSeq + 1).toString().padLeft(3, '0')}';
+  @override
+  Future<Map<int, int>> descuadres() async {
+    // Un solo `GROUP BY` contra todas las deudas. El `LEFT JOIN` incluye a las
+    // que no tienen ningún pago: si una de esas figura como pagada, también
+    // está descuadrada.
+    final filas = await _db.customSelect(
+      '''
+      SELECT d.id AS id,
+             d.monto_pagado - COALESCE(SUM(p.monto), 0) AS diferencia
+      FROM deudores d
+      LEFT JOIN deudor_pagos p ON p.deudor_id = d.id
+      GROUP BY d.id
+      HAVING diferencia <> 0
+      ''',
+      readsFrom: {_db.tablaDeudor, _db.tablaDeudorPago},
+    ).get();
+
+    return {
+      for (final fila in filas)
+        fila.read<int>('id'): fila.read<int>('diferencia'),
+    };
   }
 
   Future<void> _recalcularPagado(int deudorId, {bool restaurarActiva = false}) async {

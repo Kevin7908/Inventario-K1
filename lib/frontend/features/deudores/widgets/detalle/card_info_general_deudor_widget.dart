@@ -1,3 +1,4 @@
+import 'package:inventario_k1/core/formato.dart';
 import 'package:flutter/material.dart';
 import 'package:inventario_k1/backend/features/deudores/modelo/deudor_resumen.dart';
 import 'package:inventario_k1/core/currency_ext.dart';
@@ -29,7 +30,9 @@ class CardInfoGeneralDeudorWidget extends StatelessWidget {
                 ),
                 _InfoField(
                   label: 'Fecha vencimiento',
-                  valor: resumen.fechaVencimiento ?? '—',
+                  valor: resumen.fechaVencimiento == null
+                      ? '—'
+                      : formatearFecha(resumen.fechaVencimiento!),
                   alerta: resumen.estaVencida,
                 ),
                 _InfoField(
