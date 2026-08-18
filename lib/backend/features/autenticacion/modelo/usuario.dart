@@ -1,15 +1,12 @@
+/// Una cuenta de acceso a la app.
+///
+/// `nombre` y `email` se leen de `personas`: la cuenta no los guarda por su
+/// cuenta. No extiende `Persona` porque de la identidad solo usa esos dos
+/// campos, y lo suyo es `usuario` y `passwordHash`.
 class Usuario {
-  final int? id;
-  final String nombre;
-  final String usuario; 
-  final String email;
-  final String passwordHash;
-  final bool esAdmin;
-  final bool estaActivo;
-  final DateTime creadoEn;
-
   const Usuario({
     this.id,
+    this.personaId,
     required this.nombre,
     required this.usuario,
     required this.email,
@@ -19,8 +16,22 @@ class Usuario {
     required this.creadoEn,
   });
 
+  final int? id;
+
+  /// Id de la fila en `personas`. Lo que comparte con los demás roles.
+  final int? personaId;
+
+  final String nombre;
+  final String usuario;
+  final String email;
+  final String passwordHash;
+  final bool esAdmin;
+  final bool estaActivo;
+  final DateTime creadoEn;
+
   Usuario copyWith({
     int? id,
+    int? personaId,
     String? nombre,
     String? usuario,
     String? email,
@@ -31,6 +42,7 @@ class Usuario {
   }) {
     return Usuario(
       id: id ?? this.id,
+      personaId: personaId ?? this.personaId,
       nombre: nombre ?? this.nombre,
       usuario: usuario ?? this.usuario,
       email: email ?? this.email,

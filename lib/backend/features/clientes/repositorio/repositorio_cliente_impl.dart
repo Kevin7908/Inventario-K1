@@ -1,63 +1,83 @@
 import 'package:drift/drift.dart';
-import 'package:inventario_k1/backend/features/clientes/repositorio/repositorio_cliente.dart';
-import 'package:inventario_k1/backend/share/database/app_db.dart';
 
+import '../../../share/database/app_db.dart';
 import '../../motos/mapper/moto_mapper.dart';
 import '../../motos/modelo/moto.dart';
+import '../../persona/modelo/persona.dart';
+import '../../persona/repositorio/repositorio_persona.dart';
+import '../../persona/repositorio/repositorio_persona_impl.dart';
 import '../mapper/cliente_mapper.dart';
 import '../modelo/cliente.dart';
+import 'repositorio_cliente.dart';
 
 class RepositorioClientesImpl implements RepositorioClientes {
   RepositorioClientesImpl(this._db);
 
   final AppDb _db;
 
+  /// La identidad se escribe y se borra por aquí. No es service location: es
+  /// una dependencia concreta del backend sobre el backend, creada a la vista.
+  late final RepositorioPersona _personas = RepositorioPersonaImpl(_db);
+
   $TablaClienteTable get _tabla => _db.tablaCliente;
+  $TablaPersonaTable get _persona => _db.tablaPersona;
 
   /// Estados de deuda que cuentan como saldo pendiente. `PAGADA` ya no debe
   /// nada e `INCOBRABLE` se dio por perdida: ninguna de las dos suma.
   static const _estadosConSaldo = "('ACTIVA','VENCIDA')";
 
+  /// Un cliente son siempre dos filas. `innerJoin` y no `leftOuterJoin`
+  /// porque `persona_id` es obligatorio: un cliente sin persona no existe.
+  JoinedSelectStatement<HasResultSet, dynamic> _conPersona() {
+    return _db.select(_tabla).join([
+      innerJoin(_persona, _persona.id.equalsExp(_tabla.personaId)),
+    ]);
+  }
+
+  List<Cliente> _mapear(List<TypedResult> filas) =>
+      filas.map((f) => ClienteMapper.filaJoinAModelo(f, _db)).toList();
+
   // Streams y consultas simples
 
   @override
-  Stream<List<Cliente>> observarTodos() {
-    return (_db.select(_tabla)..orderBy([(t) => OrderingTerm.asc(t.nombres)]))
-        .watch()
-        .map((filas) => filas.map(ClienteMapper.filaAModelo).toList());
-  }
+  Stream<List<Cliente>> observarTodos() =>
+      (_conPersona()..orderBy([OrderingTerm.asc(_persona.nombres)]))
+          .watch()
+          .map(_mapear);
 
   @override
-  Future<List<Cliente>> obtenerTodos() async {
-    final filas = await (_db.select(_tabla)
-          ..orderBy([(t) => OrderingTerm.asc(t.nombres)]))
-        .get();
-    return filas.map(ClienteMapper.filaAModelo).toList();
-  }
+  Future<List<Cliente>> obtenerTodos() async => _mapear(
+        await (_conPersona()..orderBy([OrderingTerm.asc(_persona.nombres)]))
+            .get(),
+      );
 
   @override
-  Future<List<Cliente>> buscar(String query) async {
-    final filas = await (_db.select(_tabla)
-          ..where((t) => _texto(query))
-          ..orderBy([(t) => OrderingTerm.asc(t.nombres)]))
-        .get();
-    return filas.map(ClienteMapper.filaAModelo).toList();
-  }
+  Future<List<Cliente>> buscar(String query) async => _mapear(
+        await (_conPersona()
+              ..where(_texto(query))
+              ..orderBy([OrderingTerm.asc(_persona.nombres)]))
+            .get(),
+      );
 
   @override
   Future<Cliente?> obtenerPorId(int id) async {
-    final fila = await (_db.select(_tabla)..where((t) => t.id.equals(id)))
+    final fila = await (_conPersona()..where(_tabla.id.equals(id)))
         .getSingleOrNull();
-    return fila == null ? null : ClienteMapper.filaAModelo(fila);
+    return fila == null ? null : ClienteMapper.filaJoinAModelo(fila, _db);
   }
 
   @override
-  Future<bool> existeCedula(String cedula, {int? excluirId}) async {
-    var consulta = _db.select(_tabla)..where((t) => t.cedula.equals(cedula));
+  Future<bool> existeDocumento(String documento, {int? excluirId}) async {
+    final normalizado = normalizarDocumento(documento);
+    if (normalizado == null) return false;
+
+    var condicion = _persona.documento.equals(normalizado);
     if (excluirId != null) {
-      consulta = consulta..where((t) => t.id.isNotValue(excluirId));
+      condicion = condicion & _tabla.id.isNotValue(excluirId);
     }
-    return await consulta.getSingleOrNull() != null;
+
+    final fila = await (_conPersona()..where(condicion)).getSingleOrNull();
+    return fila != null;
   }
 
   // Paginación — WHERE, COUNT y LIMIT los resuelve SQLite, no el frontend.
@@ -65,18 +85,17 @@ class RepositorioClientesImpl implements RepositorioClientes {
   /// Coincidencia de texto libre, compartida por la búsqueda puntual y por la
   /// página.
   ///
-  /// Los campos opcionales son nullable: en esas filas el `LIKE` devuelve NULL
-  /// y no false, pero en SQLite `TRUE OR NULL` sigue siendo TRUE, así que
-  /// basta con que otro campo coincida.
+  /// Todos los campos salen de `personas`. Los opcionales son nullable: en
+  /// esas filas el `LIKE` devuelve NULL y no false, pero en SQLite
+  /// `TRUE OR NULL` sigue siendo TRUE, así que basta con que otro coincida.
   Expression<bool> _texto(String query) {
     final patron = '%${query.toLowerCase()}%';
-    final t = _tabla;
-    return t.nombres.lower().like(patron) |
-        t.apellidos.lower().like(patron) |
-        t.cedula.lower().like(patron) |
-        t.telefono.lower().like(patron) |
-        t.email.lower().like(patron) |
-        t.ciudad.lower().like(patron);
+    return _persona.nombres.lower().like(patron) |
+        _persona.apellidos.lower().like(patron) |
+        _persona.documento.lower().like(patron) |
+        _persona.telefono.lower().like(patron) |
+        _persona.email.lower().like(patron) |
+        _persona.ciudad.lower().like(patron);
   }
 
   /// Traduce [FiltroClientes] a una expresión que reusan la consulta de la
@@ -88,9 +107,7 @@ class RepositorioClientesImpl implements RepositorioClientes {
     if (busqueda.isNotEmpty) acumulado = acumulado & _texto(busqueda);
 
     final activo = filtro.activo;
-    if (activo != null) {
-      acumulado = acumulado & _tabla.activo.equals(activo ? 1 : 0);
-    }
+    if (activo != null) acumulado = acumulado & _tabla.activo.equals(activo);
 
     return acumulado;
   }
@@ -103,21 +120,22 @@ class RepositorioClientesImpl implements RepositorioClientes {
   }) {
     final condicion = _condicion(filtro);
 
-    final consultaPagina = _db.select(_tabla)
-      ..where((_) => condicion)
-      ..orderBy([(t) => OrderingTerm.asc(t.nombres)])
+    final consultaPagina = _conPersona()
+      ..where(condicion)
+      ..orderBy([OrderingTerm.asc(_persona.nombres)])
       ..limit(tamano, offset: pagina * tamano);
 
     // El total va en su propia consulta: el `limit` no debe afectarlo.
     final total = _tabla.id.count();
     final consultaTotal = _db.selectOnly(_tabla)
       ..addColumns([total])
+      ..join([innerJoin(_persona, _persona.id.equalsExp(_tabla.personaId))])
       ..where(condicion);
 
     return consultaPagina.watch().asyncMap((filas) async {
       final fila = await consultaTotal.getSingleOrNull();
       return PaginaClientes(
-        items: filas.map(ClienteMapper.filaAModelo).toList(),
+        items: _mapear(filas),
         total: fila?.read(total) ?? 0,
       );
     });
@@ -186,18 +204,44 @@ class RepositorioClientesImpl implements RepositorioClientes {
   // Escritura
 
   @override
-  Future<int> crear(Cliente cliente) =>
-      _db.into(_tabla).insert(ClienteMapper.modeloACompanion(cliente));
-
-  @override
-  Future<void> actualizar(Cliente cliente) async {
-    await (_db.update(_tabla)..where((t) => t.id.equals(cliente.id)))
-        .write(ClienteMapper.modeloACompanion(cliente));
+  Future<int> crear(Cliente cliente) {
+    // Persona y rol son dos filas: si la segunda falla, la primera no puede
+    // quedar suelta.
+    return _db.transaction(() async {
+      final personaId = await _personas.guardar(cliente.datosPersona);
+      return _db
+          .into(_tabla)
+          .insert(ClienteMapper.modeloACompanion(cliente, personaId: personaId));
+    });
   }
 
   @override
-  Future<void> eliminar(int id) async {
-    await (_db.delete(_tabla)..where((t) => t.id.equals(id))).go();
+  Future<void> actualizar(Cliente cliente) {
+    return _db.transaction(() async {
+      final personaId = await _personas.guardar(cliente.datosPersona);
+      await (_db.update(_tabla)..where((t) => t.id.equals(cliente.id))).write(
+        ClienteMapper.modeloACompanion(cliente, personaId: personaId),
+      );
+    });
+  }
+
+  @override
+  Future<void> eliminar(int id) {
+    return _db.transaction(() async {
+      final personaId = await _personaIdDe(id);
+      await (_db.delete(_tabla)..where((t) => t.id.equals(id))).go();
+      if (personaId != null) {
+        await _personas.borrarSiQuedoSinRoles(personaId);
+      }
+    });
+  }
+
+  Future<int?> _personaIdDe(int clienteId) async {
+    final fila = await (_db.selectOnly(_tabla)
+          ..addColumns([_tabla.personaId])
+          ..where(_tabla.id.equals(clienteId)))
+        .getSingleOrNull();
+    return fila?.read(_tabla.personaId);
   }
 
   @override

@@ -1,44 +1,53 @@
 import 'package:drift/drift.dart';
+
 import '../../../share/database/app_db.dart';
 import '../modelo/proveedor.dart';
 
-class ProveedorMapper {
-  // Convierte una fila de Drift al modelo de dominio
-  static Proveedor filaAModelo(TablaProveedorData fila) {
+abstract final class ProveedorMapper {
+  ProveedorMapper._();
+
+  /// Une las dos filas que forman un proveedor: la del rol y la de la persona.
+  static Proveedor filaAModelo(
+    TablaProveedorData rol,
+    TablaPersonaData persona,
+  ) {
     return Proveedor(
-      id: fila.id,
-      nombre: fila.nombre,
-      nitCedula: fila.nitCedula,
-      contacto: fila.contacto,
-      telefono: fila.telefono,
-      email: fila.email,
-      direccion: fila.direccion,
-      ciudad: fila.ciudad,
-      notas: fila.notas,
-      activo: fila.activo,
-      colorHex: fila.colorHex,
-      icono: fila.icono,
-      creadoEn: fila.creadoEn,
-      actualizadoEn: fila.actualizadoEn,
+      id: rol.id,
+      personaId: persona.id,
+      nombre: persona.nombres,
+      nitCedula: persona.documento,
+      contacto: rol.contacto,
+      telefono: persona.telefono,
+      email: persona.email,
+      direccion: persona.direccion,
+      ciudad: persona.ciudad,
+      notas: rol.notas,
+      activo: rol.activo,
+      colorHex: rol.colorHex,
+      icono: rol.icono,
+      creadoEn: rol.creadoEn,
+      actualizadoEn: rol.actualizadoEn,
     );
   }
 
-  // Convierte el modelo de dominio a un Companion de Drift para inserción/actualización
-  static TablaProveedorCompanion modeloACompanion(Proveedor p) {
+  static Proveedor filaJoinAModelo(TypedResult fila, AppDb db) => filaAModelo(
+        fila.readTable(db.tablaProveedor),
+        fila.readTable(db.tablaPersona),
+      );
+
+  /// Solo la parte de `proveedores`; la identidad la escribe `PersonaMapper`.
+  static TablaProveedorCompanion modeloACompanion(
+    Proveedor p, {
+    required int personaId,
+  }) {
     return TablaProveedorCompanion(
-      nombre: Value(p.nombre),
-      nitCedula: Value(p.nitCedula),
+      personaId: Value(personaId),
       contacto: Value(p.contacto),
-      telefono: Value(p.telefono),
-      email: Value(p.email),
-      direccion: Value(p.direccion),
-      ciudad: Value(p.ciudad),
       notas: Value(p.notas),
       activo: Value(p.activo),
       colorHex: Value(p.colorHex),
       icono: Value(p.icono),
-      creadoEn: Value(p.creadoEn),
-      actualizadoEn: Value(p.actualizadoEn),
+      actualizadoEn: Value(DateTime.now()),
     );
   }
 }

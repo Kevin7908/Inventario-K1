@@ -3,9 +3,12 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../../backend/features/clientes/modelo/cliente.dart';
 import '../../../../backend/features/motos/modelo/moto.dart';
+import '../../../../backend/features/persona/repositorio/repositorio_persona.dart';
 import '../../../../core/resultado.dart';
 import '../../../share2/share2.dart';
 import '../../motos/provider/motos_provider.dart';
+import '../../persona/provider/persona_provider.dart';
+import '../../persona/widgets/confirmar_persona_existente.dart';
 import '../provider/cliente_provider.dart';
 import 'editor_motos_cliente.dart';
 
@@ -65,7 +68,7 @@ class _FormularioClienteState extends ConsumerState<FormularioCliente> {
 
     _nombresCtrl = TextEditingController(text: c?.nombres ?? '');
     _apellidosCtrl = TextEditingController(text: c?.apellidos ?? '');
-    _cedulaCtrl = TextEditingController(text: c?.cedula ?? '');
+    _cedulaCtrl = TextEditingController(text: c?.documento ?? '');
     _telefonoCtrl = TextEditingController(text: c?.telefono ?? '');
     _emailCtrl = TextEditingController(text: c?.email ?? '');
     _direccionCtrl = TextEditingController(text: c?.direccion ?? '');
@@ -123,13 +126,16 @@ class _FormularioClienteState extends ConsumerState<FormularioCliente> {
   Future<void> _guardar() async {
     if (!_formKey.currentState!.validate()) return;
 
+    if (!await _confirmarReutilizacion()) return;
+
     setState(() => _guardando = true);
 
     final previo = widget.clienteAEditar;
     final cliente = Cliente(
       // `id == 0` marca al cliente como nuevo para el repositorio.
       id: previo?.id ?? 0,
-      cedula: _opcional(_cedulaCtrl),
+      personaId: previo?.personaId,
+      documento: _opcional(_cedulaCtrl),
       nombres: _nombresCtrl.text.trim(),
       apellidos: _opcional(_apellidosCtrl),
       telefono: _opcional(_telefonoCtrl),
@@ -161,6 +167,26 @@ class _FormularioClienteState extends ConsumerState<FormularioCliente> {
       esError: false,
     );
     widget.alTerminar();
+  }
+
+  /// Avisa si la cédula tecleada ya pertenece a alguien registrado con otro
+  /// rol, antes de que el repositorio reutilice —y sobrescriba— su ficha.
+  ///
+  /// Solo se pregunta al crear: al editar, la persona ya es la del cliente.
+  Future<bool> _confirmarReutilizacion() async {
+    final documento = _opcional(_cedulaCtrl);
+    if (documento == null || widget.esEdicion) return true;
+
+    final existente = await ref
+        .read(repositorioPersonaProvider)
+        .buscarPorDocumento(documento);
+    if (!mounted) return false;
+
+    return confirmarPersonaExistente(
+      context,
+      existente: existente,
+      rolNuevo: RolPersona.cliente,
+    );
   }
 
   @override

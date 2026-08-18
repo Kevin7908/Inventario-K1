@@ -137,8 +137,8 @@ class _Contacto extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final lineas = <({IconData icono, String texto})>[
-      if ((cliente.cedula ?? '').trim().isNotEmpty)
-        (icono: Icons.badge_outlined, texto: cliente.cedula!.trim()),
+      if ((cliente.documento ?? '').trim().isNotEmpty)
+        (icono: Icons.badge_outlined, texto: cliente.documento!.trim()),
       if ((cliente.telefono ?? '').trim().isNotEmpty)
         (icono: Icons.phone_outlined, texto: cliente.telefono!.trim()),
       if ((cliente.email ?? '').trim().isNotEmpty)

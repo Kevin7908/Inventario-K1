@@ -8,8 +8,8 @@ import '../modelo/cliente.dart';
 final class FiltroClientes {
   const FiltroClientes({this.busqueda = '', this.activo});
 
-  /// Texto libre. Busca en nombres, apellidos, cédula, teléfono, email y
-  /// ciudad.
+  /// Texto libre. Busca en nombres, apellidos, documento, teléfono, email y
+  /// ciudad —todos ellos en `personas`.
   final String busqueda;
 
   /// `null` = todos; `true` = solo activos; `false` = solo inactivos.
@@ -71,7 +71,13 @@ abstract class RepositorioClientes {
   /// la ausencia como "al día".
   Stream<Map<int, SaldoCliente>> observarSaldos();
 
-  Future<bool> existeCedula(String cedula, {int? excluirId});
+  /// ¿Hay **otro cliente** con ese documento?
+  ///
+  /// Distinto de que exista la persona: alguien puede estar registrado como
+  /// técnico y no ser cliente todavía. Eso lo responde
+  /// `RepositorioPersona.buscarPorDocumento`, y es lo que separa el error
+  /// «ya es cliente» del aviso «ya está registrado como técnico».
+  Future<bool> existeDocumento(String documento, {int? excluirId});
 
   Future<int> crear(Cliente cliente);
 

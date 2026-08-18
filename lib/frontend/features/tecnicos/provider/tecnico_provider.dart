@@ -216,9 +216,12 @@ class TecnicosNotifier extends AsyncNotifier<TecnicosState> {
       );
     }
 
-    final cedula = tecnico.cedula?.trim() ?? '';
-    if (cedula.isNotEmpty &&
-        await _repo.existeCedula(cedula, excluirId: excluirId)) {
+    // Que la persona ya exista no es un error: puede estar registrada solo
+    // como cliente, y en ese caso el repositorio reutiliza su fila de
+    // `personas`. Lo que sí se rechaza es que ya sea técnico.
+    final documento = tecnico.documento?.trim() ?? '';
+    if (documento.isNotEmpty &&
+        await _repo.existeDocumento(documento, excluirId: excluirId)) {
       return const Fallo(
         MotivoFallo.documentoDuplicado,
         'Ya existe un técnico con esa cédula.',

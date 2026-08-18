@@ -21,10 +21,13 @@ Future<Resultado?> validarCliente({
   final identidad = _validarIdentidad(cliente);
   if (identidad != null) return identidad;
 
-  final cedula = cliente.cedula?.trim() ?? '';
-  if (cedula.isNotEmpty &&
-      await repoClientes.existeCedula(
-        cedula,
+  // Que la persona ya exista no es un error: puede estar registrada solo como
+  // técnico, y en ese caso el repositorio reutiliza su fila de `personas`. Lo
+  // que sí se rechaza es que ya sea cliente.
+  final documento = cliente.documento?.trim() ?? '';
+  if (documento.isNotEmpty &&
+      await repoClientes.existeDocumento(
+        documento,
         excluirId: cliente.id == 0 ? null : cliente.id,
       )) {
     return const Fallo(

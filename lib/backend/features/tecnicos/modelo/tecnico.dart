@@ -1,9 +1,16 @@
-import 'package:equatable/equatable.dart';
+import '../../persona/modelo/persona.dart';
 
-class Tecnico extends Equatable {
+/// Un técnico del taller.
+///
+/// Igual que `Cliente`, expone la identidad aplanada aunque en la base viva en
+/// `personas`. `nombreCompleto` e [iniciales] ya no se calculan aquí: los
+/// hereda de [Persona], que es donde estaban duplicados.
+class Tecnico extends Persona {
   const Tecnico({
     this.id,
-    this.cedula,
+    this.personaId,
+    this.tipoDocumento = TipoDocumento.cc,
+    this.documento,
     required this.nombres,
     this.apellidos,
     this.telefono,
@@ -15,31 +22,44 @@ class Tecnico extends Equatable {
   });
 
   final int? id;
-  final String? cedula;
+
+  @override
+  final int? personaId;
+
+  final TipoDocumento tipoDocumento;
+
+  @override
+  final String? documento;
+  @override
   final String nombres;
+  @override
   final String? apellidos;
+  @override
   final String? telefono;
+  @override
   final String? email;
+
   final int? especializacionId;
   final double? salarioBase;
   final bool activo;
   final DateTime creadoEn;
 
-  /// Nombre completo: "Nombres Apellidos" o sólo "Nombres".
-  String get nombreCompleto =>
-      apellidos != null && apellidos!.isNotEmpty
-          ? '$nombres $apellidos'
-          : nombres;
-
-  String get iniciales {
-    final partes = nombreCompleto.trim().split(RegExp(r'\s+'));
-    if (partes.length == 1) return partes[0][0].toUpperCase();
-    return '${partes.first[0]}${partes.last[0]}'.toUpperCase();
-  }
+  /// La parte del técnico que se guarda en `personas`.
+  DatosPersona get datosPersona => DatosPersona(
+        personaId: personaId,
+        tipoDocumento: tipoDocumento,
+        documento: documento,
+        nombres: nombres,
+        apellidos: apellidos,
+        telefono: telefono,
+        email: email,
+      );
 
   Tecnico copyWith({
     int? id,
-    String? cedula,
+    int? personaId,
+    TipoDocumento? tipoDocumento,
+    String? documento,
     String? nombres,
     String? apellidos,
     String? telefono,
@@ -51,7 +71,9 @@ class Tecnico extends Equatable {
   }) {
     return Tecnico(
       id: id ?? this.id,
-      cedula: cedula ?? this.cedula,
+      personaId: personaId ?? this.personaId,
+      tipoDocumento: tipoDocumento ?? this.tipoDocumento,
+      documento: documento ?? this.documento,
       nombres: nombres ?? this.nombres,
       apellidos: apellidos ?? this.apellidos,
       telefono: telefono ?? this.telefono,
@@ -65,12 +87,9 @@ class Tecnico extends Equatable {
 
   @override
   List<Object?> get props => [
+        ...super.props,
         id,
-        cedula,
-        nombres,
-        apellidos,
-        telefono,
-        email,
+        tipoDocumento,
         especializacionId,
         salarioBase,
         activo,

@@ -173,7 +173,7 @@ class _FormularioMotoState extends State<FormularioMoto> {
                 valor: _dueno,
                 opciones: clientes,
                 constructorEtiqueta: (c) => c.nombreCompleto,
-                constructorDetalle: (c) => c.telefono ?? c.cedula,
+                constructorDetalle: (c) => c.telefono ?? c.documento,
                 placeholder: 'Elegir cliente…',
                 placeholderBusqueda: 'Buscar por nombre, teléfono o cédula…',
                 alCambiar: (c) => setState(() => _dueno = c),

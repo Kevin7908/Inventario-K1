@@ -17,7 +17,8 @@ class PaginaTecnicos {
 class FiltroTecnicos {
   const FiltroTecnicos({this.busqueda = '', this.activo});
 
-  /// Coincide contra nombres, apellidos, cédula o teléfono.
+  /// Coincide contra nombres, apellidos, documento o teléfono —todos ellos
+  /// en `personas`.
   final String busqueda;
 
   /// `null` = todos; `true` = solo activos; `false` = solo inactivos.
@@ -29,7 +30,11 @@ abstract interface class RepositorioTecnico {
   /// —los selectores de otros módulos—, no la grilla paginada.
   Stream<List<Tecnico>> observarTodos();
 
-  Future<bool> existeCedula(String cedula, {int? excluirId});
+  /// ¿Hay **otro técnico** con ese documento?
+  ///
+  /// Que la persona exista es otra pregunta —puede estar registrada solo como
+  /// cliente—: eso lo responde `RepositorioPersona.buscarPorDocumento`.
+  Future<bool> existeDocumento(String documento, {int? excluirId});
 
   Future<Tecnico> crear(Tecnico tecnico);
 

@@ -1,41 +1,53 @@
 import 'package:drift/drift.dart';
-import 'package:inventario_k1/backend/share/database/app_db.dart';
 
+import '../../../share/database/app_db.dart';
+import '../../persona/modelo/persona.dart';
 import '../modelo/cliente.dart';
 
-class ClienteMapper {
+abstract final class ClienteMapper {
   ClienteMapper._();
 
-  static Cliente filaAModelo(TablaClienteData fila) {
+  /// Une las dos filas que hoy forman un cliente: la del rol y la de la
+  /// persona. Nunca se lee una sin la otra —el `JOIN` es interno, no opcional.
+  static Cliente filaAModelo(
+    TablaClienteData rol,
+    TablaPersonaData persona,
+  ) {
     return Cliente(
-      id: fila.id,
-      cedula: fila.cedula,
-      nombres: fila.nombres,
-      apellidos: fila.apellidos,
-      telefono: fila.telefono,
-      email: fila.email,
-      direccion: fila.direccion,
-      ciudad: fila.ciudad,
-      fechaNacimiento: fila.fechaNacimiento,
-      notas: fila.notas,
-      activo: fila.activo == 1,
-      creadoEn: fila.creadoEn,
-      actualizadoEn: fila.actualizadoEn,
+      id: rol.id,
+      personaId: persona.id,
+      tipoDocumento: TipoDocumento.desdeCodigo(persona.tipoDocumento),
+      documento: persona.documento,
+      nombres: persona.nombres,
+      apellidos: persona.apellidos,
+      telefono: persona.telefono,
+      email: persona.email,
+      direccion: persona.direccion,
+      ciudad: persona.ciudad,
+      fechaNacimiento: rol.fechaNacimiento,
+      notas: rol.notas,
+      activo: rol.activo,
+      creadoEn: rol.creadoEn,
+      actualizadoEn: rol.actualizadoEn,
     );
   }
 
-  static TablaClienteCompanion modeloACompanion(Cliente modelo) {
-    return TablaClienteCompanion.insert(
-      cedula: Value(modelo.cedula),
-      nombres: modelo.nombres,
-      apellidos: Value(modelo.apellidos),
-      telefono: Value(modelo.telefono),
-      email: Value(modelo.email),
-      direccion: Value(modelo.direccion),
-      ciudad: Value(modelo.ciudad),
+  static Cliente filaJoinAModelo(TypedResult fila, AppDb db) => filaAModelo(
+        fila.readTable(db.tablaCliente),
+        fila.readTable(db.tablaPersona),
+      );
+
+  /// Solo la parte de `clientes`. La identidad la escribe [PersonaMapper] y su
+  /// id llega aquí como [personaId].
+  static TablaClienteCompanion modeloACompanion(
+    Cliente modelo, {
+    required int personaId,
+  }) {
+    return TablaClienteCompanion(
+      personaId: Value(personaId),
       fechaNacimiento: Value(modelo.fechaNacimiento),
       notas: Value(modelo.notas),
-      activo: Value(modelo.activo ? 1 : 0),
+      activo: Value(modelo.activo),
       actualizadoEn: Value(DateTime.now()),
     );
   }

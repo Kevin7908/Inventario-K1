@@ -1,22 +1,29 @@
 import 'package:drift/drift.dart';
 
+import '../../persona/esquema_datos/tabla_persona.dart';
+
+/// El rol «cliente» de una persona.
+///
+/// Los datos de identidad y contacto no están aquí: viven en `personas`. Esta
+/// tabla solo guarda lo que es propio de ser cliente del taller.
+@TableIndex(name: 'idx_clientes_activo', columns: {#activo})
 class TablaCliente extends Table {
   @override
   String get tableName => 'clientes';
 
   IntColumn get id => integer().autoIncrement()();
-  TextColumn get cedula => text().nullable().unique()();
-  TextColumn get nombres => text()();
-  TextColumn get apellidos => text().nullable()();
-  TextColumn get telefono => text().nullable()();
-  TextColumn get email => text().nullable()();
-  TextColumn get direccion => text().nullable()();
-  TextColumn get ciudad => text().nullable()();
-  TextColumn get fechaNacimiento => text().nullable()();
+
+  /// `restrict`: borrar la persona no puede llevarse por delante su historial
+  /// de facturas y deudas. Único porque nadie es cliente dos veces.
+  IntColumn get personaId => integer()
+      .unique()
+      .references(TablaPersona, #id, onDelete: KeyAction.restrict)();
+
+  DateTimeColumn get fechaNacimiento => dateTime().nullable()();
   TextColumn get notas => text().nullable()();
-  IntColumn get activo => integer().withDefault(const Constant(1))();
-  DateTimeColumn get creadoEn =>
-      dateTime().withDefault(currentDateAndTime)();
+  BoolColumn get activo => boolean().withDefault(const Constant(true))();
+
+  DateTimeColumn get creadoEn => dateTime().withDefault(currentDateAndTime)();
   DateTimeColumn get actualizadoEn =>
       dateTime().withDefault(currentDateAndTime)();
 }

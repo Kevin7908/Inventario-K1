@@ -1,64 +1,98 @@
 import 'dart:async';
-import 'package:drift/drift.dart';
-import 'package:inventario_k1/backend/features/tecnicos/repositorio/repositorio_tecnico.dart';
-import 'package:inventario_k1/backend/share/database/app_db.dart';
 
+import 'package:drift/drift.dart';
+
+import '../../../share/database/app_db.dart';
+import '../../persona/modelo/persona.dart';
+import '../../persona/repositorio/repositorio_persona.dart';
+import '../../persona/repositorio/repositorio_persona_impl.dart';
 import '../mapper/tecnico_mapper.dart';
 import '../modelo/tecnico.dart';
+import 'repositorio_tecnico.dart';
 
 final class RepositorioTecnicoDrift implements RepositorioTecnico {
-  const RepositorioTecnicoDrift(this._db);
+  RepositorioTecnicoDrift(this._db);
 
   final AppDb _db;
 
-  $TablaTecnicoTable get _tabla => _db.tablaTecnico;
+  late final RepositorioPersona _personas = RepositorioPersonaImpl(_db);
 
-  @override
-  Stream<List<Tecnico>> observarTodos() {
-    return (_db.select(_tabla)
-          ..orderBy([(t) => OrderingTerm(expression: t.nombres)]))
-        .watch()
-        .map((filas) => filas.map(TecnicoMapper.desdeFila).toList());
+  $TablaTecnicoTable get _tabla => _db.tablaTecnico;
+  $TablaPersonaTable get _persona => _db.tablaPersona;
+
+  /// `innerJoin` porque `persona_id` es obligatorio: un técnico sin persona no
+  /// existe.
+  JoinedSelectStatement<HasResultSet, dynamic> _conPersona() {
+    return _db.select(_tabla).join([
+      innerJoin(_persona, _persona.id.equalsExp(_tabla.personaId)),
+    ]);
   }
 
-  @override
-  Future<bool> existeCedula(String cedula, {int? excluirId}) async {
-    var query = _db.select(_tabla)..where((t) => t.cedula.equals(cedula));
+  List<Tecnico> _mapear(List<TypedResult> filas) =>
+      filas.map((f) => TecnicoMapper.desdeJoin(f, _db)).toList();
 
+  @override
+  Stream<List<Tecnico>> observarTodos() =>
+      (_conPersona()..orderBy([OrderingTerm.asc(_persona.nombres)]))
+          .watch()
+          .map(_mapear);
+
+  @override
+  Future<bool> existeDocumento(String documento, {int? excluirId}) async {
+    final normalizado = normalizarDocumento(documento);
+    if (normalizado == null) return false;
+
+    var condicion = _persona.documento.equals(normalizado);
     if (excluirId != null) {
-      query = query..where((t) => t.id.isNotValue(excluirId));
+      condicion = condicion & _tabla.id.isNotValue(excluirId);
     }
 
-    final resultado = await query.getSingleOrNull();
-    return resultado != null;
+    return await (_conPersona()..where(condicion)).getSingleOrNull() != null;
   }
 
   Future<Tecnico?> _obtenerPorId(int id) async {
-    final fila = await (_db.select(
-      _tabla,
-    )..where((t) => t.id.equals(id))).getSingleOrNull();
-    return fila != null ? TecnicoMapper.desdeFila(fila) : null;
+    final fila =
+        await (_conPersona()..where(_tabla.id.equals(id))).getSingleOrNull();
+    return fila == null ? null : TecnicoMapper.desdeJoin(fila, _db);
   }
 
   @override
-  Future<Tecnico> crear(Tecnico tecnico) async {
-    final companion = TecnicoMapper.modeloACompanion(tecnico);
-    final id = await _db.into(_tabla).insert(companion);
-    return (await _obtenerPorId(id))!;
+  Future<Tecnico> crear(Tecnico tecnico) {
+    // Persona y rol son dos filas: o entran las dos o no entra ninguna.
+    return _db.transaction(() async {
+      final personaId = await _personas.guardar(tecnico.datosPersona);
+      final id = await _db
+          .into(_tabla)
+          .insert(TecnicoMapper.modeloACompanion(tecnico, personaId: personaId));
+      return (await _obtenerPorId(id))!;
+    });
   }
 
   @override
-  Future<Tecnico> actualizar(Tecnico tecnico) async {
-    final companion = TecnicoMapper.modeloACompanion(tecnico);
-    await (_db.update(
-      _tabla,
-    )..where((t) => t.id.equals(tecnico.id!))).write(companion);
-    return (await _obtenerPorId(tecnico.id!))!;
+  Future<Tecnico> actualizar(Tecnico tecnico) {
+    return _db.transaction(() async {
+      final personaId = await _personas.guardar(tecnico.datosPersona);
+      await (_db.update(_tabla)..where((t) => t.id.equals(tecnico.id!))).write(
+        TecnicoMapper.modeloACompanion(tecnico, personaId: personaId),
+      );
+      return (await _obtenerPorId(tecnico.id!))!;
+    });
   }
 
   @override
-  Future<void> eliminar(int id) async {
-    await (_db.delete(_tabla)..where((t) => t.id.equals(id))).go();
+  Future<void> eliminar(int id) {
+    return _db.transaction(() async {
+      final fila = await (_db.selectOnly(_tabla)
+            ..addColumns([_tabla.personaId])
+            ..where(_tabla.id.equals(id)))
+          .getSingleOrNull();
+      final personaId = fila?.read(_tabla.personaId);
+
+      await (_db.delete(_tabla)..where((t) => t.id.equals(id))).go();
+      if (personaId != null) {
+        await _personas.borrarSiQuedoSinRoles(personaId);
+      }
+    });
   }
 
   // Paginación — WHERE, COUNT y LIMIT los resuelve SQLite, no el frontend.
@@ -66,26 +100,23 @@ final class RepositorioTecnicoDrift implements RepositorioTecnico {
   /// Traduce [FiltroTecnicos] a una expresión SQL reutilizable por la
   /// consulta de la página y por la del total.
   Expression<bool> _condicion(FiltroTecnicos filtro) {
-    final t = _tabla;
     Expression<bool> acumulado = const Constant(true);
 
     final texto = filtro.busqueda.trim();
     if (texto.isNotEmpty) {
       final patron = '%${texto.toLowerCase()}%';
-      // Apellidos, cédula y teléfono son nullable: en esas filas el LIKE
+      // Apellidos, documento y teléfono son nullable: en esas filas el LIKE
       // devuelve NULL, no false. No hace falta `coalesce` porque en SQLite
       // `TRUE OR NULL` sigue siendo TRUE — basta con que otro campo coincida.
       acumulado = acumulado &
-          (t.nombres.lower().like(patron) |
-              t.apellidos.lower().like(patron) |
-              t.cedula.lower().like(patron) |
-              t.telefono.lower().like(patron));
+          (_persona.nombres.lower().like(patron) |
+              _persona.apellidos.lower().like(patron) |
+              _persona.documento.lower().like(patron) |
+              _persona.telefono.lower().like(patron));
     }
 
     final activo = filtro.activo;
-    if (activo != null) {
-      acumulado = acumulado & t.activo.equals(activo);
-    }
+    if (activo != null) acumulado = acumulado & _tabla.activo.equals(activo);
 
     return acumulado;
   }
@@ -98,21 +129,22 @@ final class RepositorioTecnicoDrift implements RepositorioTecnico {
   }) {
     final condicion = _condicion(filtro);
 
-    final consultaPagina = _db.select(_tabla)
-      ..where((_) => condicion)
-      ..orderBy([(t) => OrderingTerm.asc(t.nombres)])
+    final consultaPagina = _conPersona()
+      ..where(condicion)
+      ..orderBy([OrderingTerm.asc(_persona.nombres)])
       ..limit(tamano, offset: pagina * tamano);
 
     // El total va en su propia consulta: `limit` no debe afectarlo.
     final total = _tabla.id.count();
     final consultaTotal = _db.selectOnly(_tabla)
       ..addColumns([total])
+      ..join([innerJoin(_persona, _persona.id.equalsExp(_tabla.personaId))])
       ..where(condicion);
 
     return consultaPagina.watch().asyncMap((filas) async {
       final fila = await consultaTotal.getSingleOrNull();
       return PaginaTecnicos(
-        items: filas.map(TecnicoMapper.desdeFila).toList(),
+        items: _mapear(filas),
         total: fila?.read(total) ?? 0,
       );
     });
@@ -120,11 +152,10 @@ final class RepositorioTecnicoDrift implements RepositorioTecnico {
 
   @override
   Stream<({int total, int activos})> observarResumen() {
-    final t = _tabla;
-    final total = t.id.count();
-    final activos = t.id.count(filter: t.activo.equals(true));
+    final total = _tabla.id.count();
+    final activos = _tabla.id.count(filter: _tabla.activo.equals(true));
 
-    final consulta = _db.selectOnly(t)..addColumns([total, activos]);
+    final consulta = _db.selectOnly(_tabla)..addColumns([total, activos]);
 
     return consulta.watchSingleOrNull().map(
           (fila) => (

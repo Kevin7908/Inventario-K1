@@ -4,10 +4,13 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../../backend/features/especializacion/modelo/especializacion.dart';
+import '../../../../backend/features/persona/repositorio/repositorio_persona.dart';
 import '../../../../backend/features/tecnicos/modelo/tecnico.dart';
 import '../../../../core/resultado.dart';
 import '../../../share2/share2.dart';
 import '../../especializacion/provider/especializacion_provider.dart';
+import '../../persona/provider/persona_provider.dart';
+import '../../persona/widgets/confirmar_persona_existente.dart';
 import '../provider/tecnico_provider.dart';
 
 /// Formulario de alta y edición de un técnico.
@@ -61,7 +64,7 @@ class _FormularioTecnicoState extends ConsumerState<FormularioTecnico> {
 
     _nombresCtrl = TextEditingController(text: t?.nombres ?? '');
     _apellidosCtrl = TextEditingController(text: t?.apellidos ?? '');
-    _cedulaCtrl = TextEditingController(text: t?.cedula ?? '');
+    _cedulaCtrl = TextEditingController(text: t?.documento ?? '');
     _telefonoCtrl = TextEditingController(text: t?.telefono ?? '');
     _emailCtrl = TextEditingController(text: t?.email ?? '');
     _salarioCtrl = TextEditingController(
@@ -122,11 +125,14 @@ class _FormularioTecnicoState extends ConsumerState<FormularioTecnico> {
   Future<void> _guardar() async {
     if (!_formKey.currentState!.validate()) return;
 
+    if (!await _confirmarReutilizacion()) return;
+
     setState(() => _guardando = true);
 
     final tecnico = Tecnico(
       id: widget.tecnicoAEditar?.id,
-      cedula: _opcional(_cedulaCtrl),
+      personaId: widget.tecnicoAEditar?.personaId,
+      documento: _opcional(_cedulaCtrl),
       nombres: _nombresCtrl.text.trim(),
       apellidos: _opcional(_apellidosCtrl),
       telefono: _opcional(_telefonoCtrl),
@@ -159,6 +165,26 @@ class _FormularioTecnicoState extends ConsumerState<FormularioTecnico> {
       esError: false,
     );
     widget.alTerminar();
+  }
+
+  /// Avisa si la cédula tecleada ya pertenece a alguien registrado con otro
+  /// rol, antes de que el repositorio reutilice —y sobrescriba— su ficha.
+  ///
+  /// Solo se pregunta al crear: al editar, la persona ya es la del técnico.
+  Future<bool> _confirmarReutilizacion() async {
+    final documento = _opcional(_cedulaCtrl);
+    if (documento == null || widget.esEdicion) return true;
+
+    final existente = await ref
+        .read(repositorioPersonaProvider)
+        .buscarPorDocumento(documento);
+    if (!mounted) return false;
+
+    return confirmarPersonaExistente(
+      context,
+      existente: existente,
+      rolNuevo: RolPersona.tecnico,
+    );
   }
 
   @override
