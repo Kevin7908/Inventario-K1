@@ -21,6 +21,7 @@ class FiltroProductos {
     this.soloStockBajo = false,
     this.soloSinStock = false,
     this.soloEnStock = false,
+    this.soloActivos = false,
   });
 
   /// Coincide contra nombre, SKU o nombre de categoría.
@@ -29,6 +30,11 @@ class FiltroProductos {
   final bool soloStockBajo;
   final bool soloSinStock;
   final bool soloEnStock;
+
+  /// Deja fuera lo dado de baja. Lo piden las pantallas que **venden** —punto
+  /// de venta y cotizaciones—, no el catálogo: en Productos, un producto
+  /// inactivo tiene que verse para poder reactivarlo.
+  final bool soloActivos;
 }
 
 /// Contrato abstracto del repositorio de productos.

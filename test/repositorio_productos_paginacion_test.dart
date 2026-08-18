@@ -132,6 +132,33 @@ void main() {
     expect(await buscar('nada'), isEmpty);
   });
 
+  test('soloActivos deja fuera lo dado de baja, y el total lo refleja',
+      () async {
+    await repo.crear(_producto(nombre: 'Vigente', sku: 'ACT-1'));
+    final baja = await repo.crear(_producto(nombre: 'Descontinuado', sku: 'BAJ-1'));
+    await repo.actualizar(baja.copyWith(activo: false));
+
+    final todos = await repo
+        .observarPagina(filtro: const FiltroProductos(), pagina: 0, tamano: 10)
+        .first;
+    expect(todos.total, 2, reason: 'el catálogo sí muestra los inactivos');
+
+    final vendibles = await repo
+        .observarPagina(
+          filtro: const FiltroProductos(soloActivos: true),
+          pagina: 0,
+          tamano: 10,
+        )
+        .first;
+
+    expect(vendibles.items.map((p) => p.nombre), ['Vigente']);
+    expect(
+      vendibles.total,
+      1,
+      reason: 'el COUNT tiene que aplicar el mismo WHERE que la página',
+    );
+  });
+
   test('los filtros de stock no se solapan', () async {
     await repo.crear(_producto(nombre: 'Ok', sku: 'A-1', stock: 10, stockMinimo: 3));
     await repo.crear(_producto(nombre: 'Bajo', sku: 'A-2', stock: 2, stockMinimo: 3));

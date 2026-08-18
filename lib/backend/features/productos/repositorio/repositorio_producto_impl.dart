@@ -224,6 +224,10 @@ class RepositorioProductosImpl implements RepositorioProducto {
       acumulado = acumulado & p.categoriaId.equals(categoria);
     }
 
+    if (filtro.soloActivos) {
+      acumulado = acumulado & p.activo.equals(true);
+    }
+
     return acumulado;
   }
 
