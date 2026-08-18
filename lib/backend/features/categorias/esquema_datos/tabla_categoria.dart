@@ -1,29 +1,39 @@
 import 'package:drift/drift.dart';
 
-// Tabla de categorías en la base de datos Drift
+/// Cómo se agrupan los productos del catálogo.
+///
+/// Lleva `activo` como todo catálogo referenciado por documentos: una
+/// categoría que ya no se usa se da de baja, no se borra. Borrarla dejaría sin
+/// clasificar a los productos que la usaban.
+@TableIndex(name: 'idx_categorias_activo', columns: {#activo})
 class TablaCategoria extends Table {
-  // Clave primaria autoincremental
+  @override
+  String get tableName => 'categorias';
+
   IntColumn get id => integer().autoIncrement()();
 
-  // Nombre de la categoría (único y requerido)
-  TextColumn get nombre => text().withLength(min: 1, max: 100)();
+  TextColumn get nombre => text().withLength(min: 1, max: 100).unique()();
 
-  // Descripción opcional de la categoría
   TextColumn get descripcion => text().nullable()();
 
-  // Color en formato hex (ej: '#3B82F6')
+  /// Color en hexadecimal, del estilo `#3B82F6`. Lo interpreta la vista: el
+  /// backend no conoce `Color`.
   TextColumn get colorHex => text().withDefault(const Constant('#3B82F6'))();
 
-  // Ícono (nombre del ícono de Material Icons como string)
+  /// Nombre del ícono de Material, como texto.
   TextColumn get icono => text().withDefault(const Constant('category'))();
 
-  // Fecha de creación
-  DateTimeColumn get creadoEn => dateTime().withDefault(currentDateAndTime)();
+  BoolColumn get activo => boolean().withDefault(const Constant(true))();
 
-  // Fecha de última actualización
+  DateTimeColumn get creadoEn => dateTime().withDefault(currentDateAndTime)();
   DateTimeColumn get actualizadoEn =>
       dateTime().withDefault(currentDateAndTime)();
 
   @override
-  String get tableName => 'categorias';
+  List<String> get customConstraints => [
+        'CHECK (length(trim(nombre)) > 0)',
+        // Seis dígitos hexadecimales detrás de una almohadilla.
+        r"CHECK (color_hex GLOB '#[0-9A-Fa-f][0-9A-Fa-f][0-9A-Fa-f]"
+            r"[0-9A-Fa-f][0-9A-Fa-f][0-9A-Fa-f]')",
+      ];
 }

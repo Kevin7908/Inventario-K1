@@ -16,14 +16,19 @@ JoinedSelectStatement<HasResultSet, dynamic> get _baseQuery {
       _db.tablaCliente,
       _db.tablaCliente.id.equalsExp(_db.tablaMoto.clienteId),
     ),
+    // El nombre del dueño vive en `personas`, no en `clientes`.
+    leftOuterJoin(
+      _db.tablaPersona,
+      _db.tablaPersona.id.equalsExp(_db.tablaCliente.personaId),
+    ),
   ]);
 }
 
   Moto _rowToMoto(TypedResult row) {
     final motoData = row.readTable(_db.tablaMoto);
-    final clienteData = row.readTableOrNull(_db.tablaCliente);
-    final nombreCliente = clienteData != null
-        ? '${clienteData.nombres} ${clienteData.apellidos ?? ''}'.trim()
+    final dueno = row.readTableOrNull(_db.tablaPersona);
+    final nombreCliente = dueno != null
+        ? '${dueno.nombres} ${dueno.apellidos ?? ''}'.trim()
         : null;
     return MotoMapper.filaAModelo(motoData, nombreCliente: nombreCliente);
   }
@@ -163,14 +168,14 @@ JoinedSelectStatement<HasResultSet, dynamic> get _baseQuery {
   Expression<bool> _texto(String query) {
     final patron = '%${query.toLowerCase()}%';
     final m = _db.tablaMoto;
-    final c = _db.tablaCliente;
+    final p = _db.tablaPersona;
     return m.marca.lower().like(patron) |
         m.modelo.lower().like(patron) |
         m.placa.lower().like(patron) |
         m.color.lower().like(patron) |
         m.vin.lower().like(patron) |
-        c.nombres.lower().like(patron) |
-        c.apellidos.lower().like(patron);
+        p.nombres.lower().like(patron) |
+        p.apellidos.lower().like(patron);
   }
 
   /// Traduce [FiltroMotos] a una expresión que reusan la consulta de la página
@@ -183,7 +188,7 @@ JoinedSelectStatement<HasResultSet, dynamic> get _baseQuery {
 
     final activo = filtro.activo;
     if (activo != null) {
-      acumulado = acumulado & _db.tablaMoto.activo.equals(activo ? 1 : 0);
+      acumulado = acumulado & _db.tablaMoto.activo.equals(activo);
     }
 
     return acumulado;
@@ -227,6 +232,10 @@ JoinedSelectStatement<HasResultSet, dynamic> get _baseQuery {
       leftOuterJoin(
         _db.tablaCliente,
         _db.tablaCliente.id.equalsExp(_db.tablaMoto.clienteId),
+      ),
+      leftOuterJoin(
+        _db.tablaPersona,
+        _db.tablaPersona.id.equalsExp(_db.tablaCliente.personaId),
       ),
     ])
       ..addColumns([total])

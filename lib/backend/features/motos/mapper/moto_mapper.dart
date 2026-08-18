@@ -22,7 +22,7 @@ class MotoMapper {
       numeroMotor: fila.numeroMotor,
       kilometrajeInicial: fila.kilometrajeInicial,
       notas: fila.notas,
-      activo: fila.activo == 1,
+      activo: fila.activo,
       creadoEn: fila.creadoEn,
       actualizadoEn: fila.actualizadoEn,
     );
@@ -43,7 +43,7 @@ class MotoMapper {
       numeroMotor: Value(moto.numeroMotor),
       kilometrajeInicial: Value(moto.kilometrajeInicial),
       notas: Value(moto.notas),
-      activo: Value(moto.activo ? 1 : 0),
+      activo: Value(moto.activo),
       actualizadoEn: Value(DateTime.now()),
     );
   }
