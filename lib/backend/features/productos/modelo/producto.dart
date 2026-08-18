@@ -23,9 +23,12 @@ class Producto extends Equatable {
   final String? unidadMedidaNombre;
   final String? proveedorNombre;
 
-  final double precioCompra;
-  final double precioVenta;
-  final double? precioVentaTaller;
+  /// Los tres, en **pesos enteros**. Ver el docstring de `TablaProducto`: el
+  /// peso colombiano no tiene decimales y `double` arrastraba error de coma
+  /// flotante entre el POS y las cotizaciones.
+  final int precioCompra;
+  final int precioVenta;
+  final int? precioVentaTaller;
 
   final double stockActual;
   final double stockMinimo;
@@ -108,9 +111,9 @@ class Producto extends Equatable {
     String? categoriaNombre,
     String? unidadMedidaNombre,
     String? proveedorNombre,
-    double? precioCompra,
-    double? precioVenta,
-    double? precioVentaTaller,
+    int? precioCompra,
+    int? precioVenta,
+    int? precioVentaTaller,
     double? stockActual,
     double? stockMinimo,
     String? ubicacionBodega,
@@ -166,8 +169,8 @@ class Producto extends Equatable {
   /// Es solo informativo —para ver en la ficha cuánto pagaría el cliente—. Los
   /// documentos (cotizaciones, facturas) no lo usan: ellos calculan el IVA
   /// sobre el subtotal completo con [ivaDe], sin mirar [aplicaIva].
-  double get precioVentaConIva =>
-      aplicaIva ? precioVenta * (1 + kIva) : precioVenta;
+  int get precioVentaConIva =>
+      aplicaIva ? precioVenta + ivaDe(precioVenta) : precioVenta;
 
   /// Margen de ganancia en porcentaje sobre el precio de compra.
   double get margenGanancia => precioCompra > 0

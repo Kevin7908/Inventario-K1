@@ -76,16 +76,16 @@ class _FormularioProductoState extends ConsumerState<FormularioProducto> {
     super.initState();
     final p = widget.productoAEditar;
 
-    String num(double? v) => v == null ? '' : v.toStringAsFixed(0);
+    String texto(num? v) => v == null ? '' : v.toStringAsFixed(0);
 
     _skuCtrl = TextEditingController(text: p?.sku ?? '');
     _nombreCtrl = TextEditingController(text: p?.nombre ?? '');
     _descripcionCtrl = TextEditingController(text: p?.descripcion ?? '');
-    _precioCompraCtrl = TextEditingController(text: num(p?.precioCompra));
-    _precioVentaCtrl = TextEditingController(text: num(p?.precioVenta));
-    _precioTallerCtrl = TextEditingController(text: num(p?.precioVentaTaller));
-    _stockCtrl = TextEditingController(text: num(p?.stockActual) );
-    _stockMinimoCtrl = TextEditingController(text: num(p?.stockMinimo));
+    _precioCompraCtrl = TextEditingController(text: texto(p?.precioCompra));
+    _precioVentaCtrl = TextEditingController(text: texto(p?.precioVenta));
+    _precioTallerCtrl = TextEditingController(text: texto(p?.precioVentaTaller));
+    _stockCtrl = TextEditingController(text: texto(p?.stockActual) );
+    _stockMinimoCtrl = TextEditingController(text: texto(p?.stockMinimo));
     _ubicacionCtrl = TextEditingController(text: p?.ubicacionBodega ?? '');
 
     _imagenRuta = p?.imagenUrl;
@@ -182,6 +182,12 @@ class _FormularioProductoState extends ConsumerState<FormularioProducto> {
   double _aDouble(TextEditingController ctrl) =>
       double.tryParse(ctrl.text.replaceAll(',', '').trim()) ?? 0;
 
+  /// Los importes del catálogo son pesos enteros (ver `TablaProducto`), así
+  /// que se redondean aquí y no en el repositorio: si el usuario tecleó
+  /// «19.999,5» lo que se guarda es 20000, no un `double` que arrastre el
+  /// medio peso hasta la factura.
+  int _aEntero(TextEditingController ctrl) => _aDouble(ctrl).round();
+
   Future<void> _guardar() async {
     if (!_formKey.currentState!.validate()) return;
     setState(() => _guardando = true);
@@ -190,7 +196,7 @@ class _FormularioProductoState extends ConsumerState<FormularioProducto> {
     final ubicacion = _ubicacionCtrl.text.trim();
     final precioTaller = _precioTallerCtrl.text.trim().isEmpty
         ? null
-        : _aDouble(_precioTallerCtrl);
+        : _aEntero(_precioTallerCtrl);
 
     final producto = Producto(
       id: widget.productoAEditar?.id,
@@ -203,8 +209,8 @@ class _FormularioProductoState extends ConsumerState<FormularioProducto> {
       unidadMedidaNombre: _unidad?.nombre,
       proveedorId: _proveedor?.id,
       proveedorNombre: _proveedor?.nombre,
-      precioCompra: _aDouble(_precioCompraCtrl),
-      precioVenta: _aDouble(_precioVentaCtrl),
+      precioCompra: _aEntero(_precioCompraCtrl),
+      precioVenta: _aEntero(_precioVentaCtrl),
       precioVentaTaller: precioTaller,
       stockActual: _aDouble(_stockCtrl),
       stockMinimo: _aDouble(_stockMinimoCtrl),

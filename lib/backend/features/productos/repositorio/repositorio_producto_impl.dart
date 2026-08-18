@@ -1,14 +1,21 @@
 import 'package:drift/drift.dart';
 
 import '../../../share/database/app_db.dart';
+import '../../inventario/modelo/movimiento_inventario.dart';
+import '../../inventario/repositorio/repositorio_inventario.dart';
+import '../../inventario/repositorio/repositorio_inventario_impl.dart';
 import '../mapper/producto_mapper.dart';
 import '../modelo/producto.dart';
 import 'repositorio_producto.dart';
 
 class RepositorioProductosImpl implements RepositorioProducto {
+  RepositorioProductosImpl(this._db);
+
   final AppDb _db;
 
-  RepositorioProductosImpl(this._db);
+  /// Todo cambio de stock pasa por aquí. Ni este repositorio escribe
+  /// `stock_actual` a mano.
+  late final RepositorioInventario _inventario = RepositorioInventarioImpl(_db);
 
   // Helper: JOIN base
 
@@ -21,6 +28,11 @@ class RepositorioProductosImpl implements RepositorioProducto {
       leftOuterJoin(
         _db.tablaProveedor,
         _db.tablaProveedor.id.equalsExp(_db.tablaProducto.proveedorId),
+      ),
+      // La razón social del proveedor vive en `personas`.
+      leftOuterJoin(
+        _db.tablaPersona,
+        _db.tablaPersona.id.equalsExp(_db.tablaProveedor.personaId),
       ),
       leftOuterJoin(
         _db.tablaUnidadesMedida,
@@ -115,11 +127,29 @@ class RepositorioProductosImpl implements RepositorioProducto {
   // Escrituras
 
   @override
-  Future<Producto> crear(Producto producto) async {
-    final companion = ProductoMapper.modeloACompanion(producto);
-    final id = await _db.into(_db.tablaProducto).insert(companion);
-    // No hay SELECT extra: el stream de Drift emite el dato completo.
-    return producto.copyWith(id: id);
+  Future<Producto> crear(Producto producto) {
+    // El producto nace con stock 0 y el inventario inicial entra como
+    // movimiento, no como columna: si el alta pusiera `stock_actual` a mano,
+    // el libro mayor arrancaría descuadrado desde la primera fila.
+    return _db.transaction(() async {
+      final id = await _db
+          .into(_db.tablaProducto)
+          .insert(ProductoMapper.modeloACompanion(producto));
+
+      if (producto.stockActual != 0) {
+        await _inventario.registrar(
+          SolicitudMovimiento(
+            productoId: id,
+            cantidad: producto.stockActual,
+            tipo: TipoMovimiento.ajusteInicial,
+            notas: 'Alta del producto',
+          ),
+        );
+      }
+
+      // No hay SELECT extra: el stream de Drift emite el dato completo.
+      return producto.copyWith(id: id);
+    });
   }
 
   @override
@@ -134,19 +164,20 @@ class RepositorioProductosImpl implements RepositorioProducto {
 
   @override
   Future<Producto> ajustarStock(int id, double cantidad) async {
-    // Un solo UPDATE atómico en vez del ciclo read→modify→write.
-    await _db.customUpdate(
-      'UPDATE productos SET stock_actual = stock_actual + ?, '
-      'actualizado_en = ? WHERE id = ?',
-      variables: [
-        Variable.withReal(cantidad),
-        Variable.withDateTime(DateTime.now()),
-        Variable.withInt(id),
-      ],
-      updates: {_db.tablaProducto},
+    if (cantidad == 0) return (await obtenerPorId(id))!;
+
+    await _inventario.registrar(
+      SolicitudMovimiento(
+        productoId: id,
+        cantidad: cantidad,
+        tipo: cantidad > 0
+            ? TipoMovimiento.ajustePositivo
+            : TipoMovimiento.ajusteNegativo,
+        notas: 'Ajuste manual',
+      ),
     );
-    final actualizado = await obtenerPorId(id);
-    return actualizado!;
+
+    return (await obtenerPorId(id))!;
   }
 
   @override
