@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../../../backend/features/ventas/facturas/enum/enum_facturas.dart';
-import '../../../../share/widgets/dialogos/dialogo_confirmar_eliminar_widget.dart';
+import '../../../../share2/feedback/dialogo_confirmacion.dart';
 import '../../../../share/widgets/output/estado_error_widget.dart';
 import '../../../../share/widgets/output/snack_bar_mensaje.dart';
 import '../provider/facturas_provider.dart';
@@ -42,22 +42,25 @@ class _ContenidoDetalle extends ConsumerWidget {
     final detalle = ref.read(facturaDetalleProvider(facturaId)).value;
     if (detalle == null) return;
 
-    DialogoConfirmarEliminar.mostrar(
-      context: context,
-      nombreElemento: detalle.numeroFactura,
-      tipoElemento: 'factura',
-      onConfirmar: () async {
-        final error =
-            await ref.read(facturasProvider.notifier).eliminar(detalle.id);
-        if (!context.mounted) return;
-        if (error != null) {
-          SnackBarMensaje.error(context, error);
-        } else {
-          Navigator.of(context).pop();
-          SnackBarMensaje.success(context, 'Factura eliminada.');
-        }
-      },
-    );
+    // No se ofrece «eliminar»: una factura es un documento contable y solo se
+    // anula.
+    DialogoConfirmacion.mostrar(
+      context,
+      titulo: '¿Anular la factura ${detalle.numeroFactura}?',
+      mensaje: 'Se devolverá al inventario lo que había salido. La factura no '
+          'se borra: queda registrada como anulada.',
+      textoConfirmar: 'Anular factura',
+    ).then((confirmado) async {
+      if (confirmado != true) return;
+      final error = await ref.read(facturasProvider.notifier).anular(detalle.id);
+      if (!context.mounted) return;
+      if (error != null) {
+        SnackBarMensaje.error(context, error);
+      } else {
+        Navigator.of(context).pop();
+        SnackBarMensaje.success(context, 'Factura anulada.');
+      }
+    });
   }
 
   @override

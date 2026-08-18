@@ -275,12 +275,14 @@ class _DialogoCantidadProductoState
   late final TextEditingController _cantCtrl;
   bool _guardando = false;
 
-  late final double _precioFijo;
+  late final int _precioFijo;
 
   @override
   void initState() {
     super.initState();
     _cantCtrl = TextEditingController(text: '1');
+    // `.toDouble()` es la costura con ventas, que aún guarda importes en
+    // `double`. El precio sale del catálogo, que ya son pesos enteros.
     _precioFijo = widget.producto.precioVentaTaller ??
         widget.producto.precioVenta;
   }

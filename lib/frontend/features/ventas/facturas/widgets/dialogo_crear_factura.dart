@@ -97,8 +97,10 @@ class _DialogoCrearFacturaState extends ConsumerState<DialogoCrearFactura> {
     setState(() => _guardando = true);
 
     final notifier   = ref.read(facturasProvider.notifier);
-    const iva        = 0.0; // IVA se recalcula al agregar ítems en el detalle
-    final descuento  = double.tryParse(_descuentoCtrl.text.trim()) ?? 0;
+    const iva        = 0; // IVA se recalcula al agregar ítems en el detalle
+    // Los importes se guardan en pesos enteros: el redondeo va aquí, al
+    // leer el campo, no en el repositorio.
+    final descuento  = (double.tryParse(_descuentoCtrl.text.trim()) ?? 0).round();
     String? error;
 
     if (widget.esEdicion) {
@@ -231,12 +233,12 @@ class _DialogoCrearFacturaState extends ConsumerState<DialogoCrearFactura> {
                                 color: ColoresApp.primary
                                     .withValues(alpha: 0.2)),
                           ),
-                          child: Row(
+                          child: const Row(
                             children: [
-                              const Icon(Icons.info_outline,
+                              Icon(Icons.info_outline,
                                   size: 14, color: ColoresApp.primary),
-                              const SizedBox(width: 8),
-                              const Expanded(
+                              SizedBox(width: 8),
+                              Expanded(
                                 child: Text(
                                   'Se importarán automáticamente las tareas y repuestos de la orden.',
                                   style: TextStyle(

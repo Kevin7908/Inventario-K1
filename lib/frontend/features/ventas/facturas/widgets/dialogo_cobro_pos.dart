@@ -24,7 +24,7 @@ class ResultadoCobro {
   });
 
   final EstadoPago  estadoPago;
-  final double      totalPagado;
+  final int         totalPagado;
   final DatosDeuda? datosDeuda;
 }
 
@@ -41,14 +41,14 @@ class DialogoCobrarPOS extends StatefulWidget {
     this.numeroFactura,
   });
 
-  final double  total;
+  final int total;
   final int?    clienteId;
   final String? clienteNombre;
   final String? numeroFactura;
 
   static Future<ResultadoCobro?> mostrar(
     BuildContext context, {
-    required double total,
+    required int total,
     int?            clienteId,
     String?         clienteNombre,
     String?         numeroFactura,
@@ -72,7 +72,7 @@ class _DialogoCobrarPOSState extends State<DialogoCobrarPOS> {
   final _recibidoCtrl  = TextEditingController();
   final _resultadoCtrl = TextEditingController(text: '0');
 
-  double  _recibido = 0;
+  int _recibido = 0;
   String? _errorMsg;
 
   @override
@@ -82,8 +82,8 @@ class _DialogoCobrarPOSState extends State<DialogoCobrarPOS> {
     super.dispose();
   }
 
-  double get _cambio   => (_recibido - widget.total).clamp(0, double.infinity);
-  double get _faltante => (widget.total - _recibido).clamp(0, double.infinity);
+  int get _cambio   => (_recibido - widget.total).clamp(0, _recibido);
+  int get _faltante => (widget.total - _recibido).clamp(0, widget.total);
   bool   get _completo => _recibido >= widget.total;
 
   void _actualizarResultado() {
@@ -246,7 +246,7 @@ class _DialogoCobrarPOSState extends State<DialogoCobrarPOS> {
                           const BorderSide(color: _kBlue, width: 1.5)),
                 ),
                 onChanged: (v) => setState(() {
-                  _recibido = double.tryParse(v.trim()) ?? 0;
+                  _recibido = (double.tryParse(v.trim()) ?? 0).round();
                   _errorMsg = null;
                   _actualizarResultado();
                 }),

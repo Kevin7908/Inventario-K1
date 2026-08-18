@@ -8,7 +8,8 @@ class OrdenTarea extends Equatable {
   final int tecnicoId;
   final String servicioNombre;
   final String tecnicoNombre;
-  final double precioPactado;
+  /// En pesos enteros (ver `TablaOrdenesTarea`).
+  final int precioPactado;
   final String? notas;
   final bool completado;
   final DateTime? creadoEn;

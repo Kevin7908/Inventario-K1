@@ -15,8 +15,8 @@ abstract interface class RepositorioFacturas {
     int? clienteId,
     required MetodoPago metodoPago,
     required EstadoPago estadoPago,
-    double iva,
-    double descuento,
+    int iva,
+    int descuento,
   });
 
   Future<FacturaResumen> crearDesdeOrden({
@@ -24,20 +24,28 @@ abstract interface class RepositorioFacturas {
     required int clienteId,
     required MetodoPago metodoPago,
     required EstadoPago estadoPago,
-    double iva,
+    int iva,
   });
 
   Future<FacturaResumen> actualizar({
     required int id,
     required MetodoPago metodoPago,
     required EstadoPago estadoPago,
-    double? iva,
-    double? descuento,
+    int? iva,
+    int? descuento,
     bool actualizarCliente = false,
     int? clienteId,
   });
 
-  Future<void> eliminar(int id);
+  /// Anula la factura y devuelve el stock que había salido.
+  ///
+  /// **No la borra**: una factura es un documento contable, y borrarla dejaría
+  /// huecos en el consecutivo y salidas de inventario sin documento que las
+  /// explique. Queda en `ANULADA`, con su número. La base lo refuerza: hay una
+  /// guarda que rechaza cualquier `DELETE` sobre `ventas`.
+  ///
+  /// Lanza si la factura no existe o si ya estaba anulada.
+  Future<void> anular(int id);
 
   Future<bool> tieneFactura(int ordenId);
 
@@ -49,8 +57,8 @@ abstract interface class RepositorioFacturas {
     int? clienteId,
     required MetodoPago metodoPago,
     required EstadoPago estadoPago,
-    double iva,
-    double descuento,
+    int iva,
+    int descuento,
   });
 
   // Items (venta_detalles)
@@ -63,21 +71,21 @@ abstract interface class RepositorioFacturas {
     int? tecnicoId,
     required String descripcion,
     required double cantidad,
-    required double precioUnitario,
-    double costoUnitario,
+    required int precioUnitario,
+    int costoUnitario,
   });
 
   Future<void> actualizarItem(
     int itemId, {
     double? cantidad,
-    double? precioUnitario,
+    int? precioUnitario,
   });
 
   Future<void> eliminarItem(int itemId);
 
   Future<FacturaResumen> actualizarPago({
     required int id,
-    required double totalPagado,
+    required int totalPagado,
     required EstadoPago estadoPago,
     required MetodoPago metodoPago,
   });

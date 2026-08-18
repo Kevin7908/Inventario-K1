@@ -254,7 +254,7 @@ class _FilaProducto extends ConsumerWidget {
     );
   }
 
-  String _fmtPrecio(double v) {
+  String _fmtPrecio(num v) {
     String s = v.abs().toStringAsFixed(2);
     final p = s.split('.');
     p[0] = p[0].replaceAllMapped(
@@ -352,7 +352,9 @@ class _DialogoCantidadRepuestoState
     setState(() => _guardando = true);
 
     final cant  = double.parse(_cantCtrl.text.trim());
-    final precio = double.parse(_precioCtrl.text.trim());
+    // Los importes se guardan en pesos enteros: el redondeo va aquí, al
+    // leer el campo, no en el repositorio.
+    final precio = double.parse(_precioCtrl.text.trim()).round();
 
     final error = await ref.read(ordenesProvider.notifier).agregarRepuesto(
           widget.ordenId,
@@ -521,8 +523,9 @@ class _DialogoCantidadRepuestoState
                 const SizedBox(height: 4),
                 PrecioCopWidget(
                   controller: _cantCtrl,
-                  multiplicador: widget.producto.precioVentaTaller ??
-                      widget.producto.precioVenta,
+                  multiplicador: (widget.producto.precioVentaTaller ??
+                          widget.producto.precioVenta)
+                      .toDouble(),
                   etiqueta: 'Total:',
                 ),
                 const SizedBox(height: 20),

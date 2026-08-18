@@ -22,5 +22,8 @@ class TablaServicio extends Table {
 
   BoolColumn get activo => boolean().withDefault(const Constant(true))();
 
-  TextColumn get creadoEn => text().nullable().named('creado_en')();
+  DateTimeColumn get creadoEn => dateTime().withDefault(currentDateAndTime)();
+
+  @override
+  List<String> get customConstraints => ['CHECK (precio_sugerido >= 0)'];
 }

@@ -67,7 +67,9 @@ class _DialogoEditarItemFacturaState
     setState(() => _guardando = true);
 
     final cantidad = double.tryParse(_cantCtrl.text.trim()) ?? 0;
-    final precio   = double.tryParse(_precioCtrl.text.trim()) ?? 0;
+    // Los importes se guardan en pesos enteros: el redondeo va aquí, al
+    // leer el campo, no en el repositorio.
+    final precio   = (double.tryParse(_precioCtrl.text.trim()) ?? 0).round();
 
     final error = await ref.read(facturasProvider.notifier).actualizarItem(
           widget.item.id,

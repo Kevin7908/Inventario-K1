@@ -73,8 +73,8 @@ class PosNotifier extends Notifier<PosState> {
         clienteId: venta.cliente?.id,
         metodoPago: metodoPago,
         estadoPago: EstadoPago.pagado,
-        iva: venta.iva.toDouble(),
-        descuento: venta.descuento.toDouble(),
+        iva: venta.iva,
+        descuento: venta.descuento,
       );
       if (errorCrear != null) {
         return Fallo(MotivoFallo.persistencia, errorCrear);
@@ -97,7 +97,7 @@ class PosNotifier extends Notifier<PosState> {
           productoId: linea.producto.id,
           descripcion: linea.producto.nombre,
           cantidad: linea.cantidad.toDouble(),
-          precioUnitario: linea.precioUnitario.toDouble(),
+          precioUnitario: linea.precioUnitario,
           costoUnitario: linea.producto.precioCompra,
         );
         if (errorItem != null) {
@@ -107,8 +107,8 @@ class PosNotifier extends Notifier<PosState> {
 
       final errorCobro = await facturas.cobrar(
         id: creada.id,
-        totalPagado: venta.total.toDouble(),
-        totalFactura: venta.total.toDouble(),
+        totalPagado: venta.total,
+        totalFactura: venta.total,
         estadoPago: EstadoPago.pagado,
         metodoPago: metodoPago,
       );

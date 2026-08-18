@@ -95,7 +95,9 @@ class _DialogoAgregarItemServicioState
 
     setState(() => _guardando = true);
 
-    final precio   = double.tryParse(_precioCtrl.text.trim()) ?? 0;
+    // Los importes se guardan en pesos enteros: el redondeo va aquí, al
+    // leer el campo, no en el repositorio.
+    final precio   = (double.tryParse(_precioCtrl.text.trim()) ?? 0).round();
     final cantidad = double.tryParse(_cantCtrl.text.trim()) ?? 1;
     final servicio = _servicioNotifier.value!;
     final tecnico  = _tecnicoNotifier.value;

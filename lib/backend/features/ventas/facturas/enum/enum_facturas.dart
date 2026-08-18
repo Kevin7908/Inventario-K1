@@ -1,3 +1,5 @@
+export '../../../../share/dominio/metodo_pago.dart';
+
 enum TipoVenta {
   servicio,
   mostrador;
@@ -13,30 +15,6 @@ enum TipoVenta {
   String get etiqueta => switch (this) {
         TipoVenta.servicio  => 'Servicio',
         TipoVenta.mostrador => 'Mostrador',
-      };
-}
-
-enum MetodoPago {
-  efectivo,
-  tarjeta,
-  transferencia,
-  credito;
-
-  static MetodoPago desdeTexto(String v) => switch (v.toUpperCase()) {
-        'EFECTIVO'      => MetodoPago.efectivo,
-        'TARJETA'       => MetodoPago.tarjeta,
-        'TRANSFERENCIA' => MetodoPago.transferencia,
-        'CREDITO'       => MetodoPago.credito,
-        _               => MetodoPago.efectivo,
-      };
-
-  String get aTexto => name.toUpperCase();
-
-  String get etiqueta => switch (this) {
-        MetodoPago.efectivo      => 'Efectivo',
-        MetodoPago.tarjeta       => 'Tarjeta',
-        MetodoPago.transferencia => 'Transferencia',
-        MetodoPago.credito       => 'Crédito',
       };
 }
 

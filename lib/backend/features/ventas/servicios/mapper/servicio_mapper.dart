@@ -35,7 +35,7 @@ abstract final class ServicioMapper {
       descripcion: Value(descripcion),
       precioSugerido: Value(precioSugerido),
       activo: Value(activo),
-      creadoEn: Value(DateTime.now().toLocal().toIso8601String()),
+      // `creado_en` lo pone el default de la tabla.
     );
   }
 ///////////////////////////////////////////////////////////////////////

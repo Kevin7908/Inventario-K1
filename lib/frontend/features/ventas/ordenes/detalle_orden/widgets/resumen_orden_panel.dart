@@ -313,7 +313,7 @@ class _InfoItem extends StatelessWidget {
 class _ResumenItem {
   const _ResumenItem(this.label, this.valor);
   final String label;
-  final double valor;
+  final num valor;
 }
 
 class _ResumenBloque extends StatelessWidget {
@@ -377,7 +377,7 @@ class _ResumenBloque extends StatelessWidget {
 class _FilaTotal extends StatelessWidget {
   const _FilaTotal(this.etiqueta, this.valor, this.esTotal);
   final String etiqueta;
-  final double valor;
+  final num valor;
   final bool esTotal;
 
   @override

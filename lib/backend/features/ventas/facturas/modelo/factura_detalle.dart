@@ -30,11 +30,12 @@ class FacturaDetalle extends Equatable {
   final String? numeroOrden;
   final int? clienteId;
   final String clienteNombre;
-  final double subtotal;
-  final double iva;
-  final double descuento;
-  final double total;
-  final double totalPagado;
+  /// Los cinco, en pesos enteros (ver `TablaVentas`).
+  final int subtotal;
+  final int iva;
+  final int descuento;
+  final int total;
+  final int totalPagado;
   final MetodoPago metodoPago;
   final EstadoPago estadoPago;
   final DateTime? creadoEn;
@@ -46,7 +47,7 @@ class FacturaDetalle extends Equatable {
   List<VentaItem> get itemsServicio =>
       items.where((i) => i.tipoItem == TipoItem.servicio).toList();
 
-  double get saldoPendiente => total - totalPagado;
+  int get saldoPendiente => total - totalPagado;
 
   @override
   List<Object?> get props => [

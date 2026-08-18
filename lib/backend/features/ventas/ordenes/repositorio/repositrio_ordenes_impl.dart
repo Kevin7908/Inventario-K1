@@ -2,30 +2,38 @@ import 'package:drift/drift.dart';
 import 'package:inventario_k1/backend/features/ventas/ordenes/repositorio/repositrio_ordenes.dart';
 import 'package:inventario_k1/backend/share/database/app_db.dart';
 
+import '../../../inventario/modelo/movimiento_inventario.dart';
+import '../../../inventario/repositorio/repositorio_inventario.dart';
+import '../../../inventario/repositorio/repositorio_inventario_impl.dart';
 import '../enum/enum_ordenes.dart';
 import '../mapper/ordenes_mapper.dart';
 import '../modelo/orden_detalle.dart';
 import '../modelo/orden_resumen.dart';
 
 class RepositorioOrdenesImpl implements RepositorioOrdenes {
-  const RepositorioOrdenesImpl(this._db);
+  RepositorioOrdenesImpl(this._db);
 
   final AppDb _db;
+
+  /// Agregar o quitar un repuesto mueve stock, y eso solo se hace por aquí.
+  late final RepositorioInventario _inventario = RepositorioInventarioImpl(_db);
 
   // Getters para acceso rápido a tablas
   $TablaOrdenesServicioTable get _tablaOrdenes => _db.tablaOrdenesServicio;
   $TablaOrdenesTareaTable get _tablaTareas => _db.tablaOrdenesTarea;
   $TablaOrdenesRepuestoTable get _tablaRepuestos => _db.tablaOrdenesRepuesto;
 
-  // SQL base para resúmenes (Corregido: nombres/apellidos coinciden con la tabla Clientes)
+  // SQL base para resúmenes. El nombre del cliente sale de `personas`: la
+  // tabla `clientes` solo guarda lo propio del rol.
   static const _sqlSelectResumen = '''
     SELECT
       os.*,
       m.marca, m.modelo, m.anio, m.placa,
-      (c.nombres || ' ' || COALESCE(c.apellidos, '')) AS cliente_nombre
+      (pe.nombres || ' ' || COALESCE(pe.apellidos, '')) AS cliente_nombre
     FROM ordenes_servicio os
-    JOIN motos    m ON m.id = os.moto_id
-    JOIN clientes c ON c.id = os.cliente_id
+    JOIN motos    m  ON m.id  = os.moto_id
+    JOIN clientes c  ON c.id  = os.cliente_id
+    JOIN personas pe ON pe.id = c.persona_id
   ''';
 
   @override
@@ -33,7 +41,12 @@ class RepositorioOrdenesImpl implements RepositorioOrdenes {
     return _db
         .customSelect(
           '$_sqlSelectResumen ORDER BY os.id DESC',
-          readsFrom: {_tablaOrdenes, _db.tablaMoto, _db.tablaCliente},
+          readsFrom: {
+            _tablaOrdenes,
+            _db.tablaMoto,
+            _db.tablaCliente,
+            _db.tablaPersona,
+          },
         )
         .watch()
         .map((rows) {
@@ -82,10 +95,11 @@ class RepositorioOrdenesImpl implements RepositorioOrdenes {
         .customSelect(
           '''
       SELECT ot.*, s.nombre AS servicio_nombre,
-             (t.nombres || ' ' || COALESCE(t.apellidos, '')) AS tecnico_nombre
+             (pe.nombres || ' ' || COALESCE(pe.apellidos, '')) AS tecnico_nombre
       FROM ordenes_tareas ot
-      JOIN servicios s ON s.id = ot.servicio_id
-      JOIN tecnicos  t ON t.id = ot.tecnico_id
+      JOIN servicios s  ON s.id  = ot.servicio_id
+      JOIN tecnicos  t  ON t.id  = ot.tecnico_id
+      JOIN personas  pe ON pe.id = t.persona_id
       WHERE ot.orden_id = ?
     ''',
           variables: [Variable.withInt(id)],
@@ -192,7 +206,7 @@ class RepositorioOrdenesImpl implements RepositorioOrdenes {
     required int ordenId,
     required int servicioId,
     required int tecnicoId,
-    required double precioPactado,
+    required int precioPactado,
     String? notas,
   }) async {
     await _db
@@ -223,7 +237,7 @@ class RepositorioOrdenesImpl implements RepositorioOrdenes {
     int tareaId, {
     int? servicioId,
     int? tecnicoId,
-    double? precioPactado,
+    int? precioPactado,
     String? notas,
     bool? completado,
   }) async {
@@ -248,86 +262,119 @@ class RepositorioOrdenesImpl implements RepositorioOrdenes {
     required int ordenId,
     required int productoId,
     required double cantidad,
-    required double precioUnitario,
-  }) async {
-    // Verificar stock disponible antes de cualquier operación
-    final stockRow = await _db
+    required int precioUnitario,
+  }) {
+    // Línea y descuento van en la misma transacción: antes eran dos
+    // escrituras sueltas y un fallo entre ellas dejaba el repuesto cobrado
+    // sin descontar del inventario.
+    return _db.transaction(() async {
+      await _verificarStock(productoId, cantidad);
+
+      await _db.into(_tablaRepuestos).insert(
+        OrdenMapper.repuestoCompanionNuevo(
+          ordenId: ordenId,
+          productoId: productoId,
+          cantidad: cantidad,
+          precioUnitario: precioUnitario,
+        ),
+      );
+
+      await _inventario.registrar(
+        SolicitudMovimiento.salida(
+          productoId: productoId,
+          cantidad: cantidad,
+          tipo: TipoMovimiento.salidaServicio,
+          ordenId: ordenId,
+        ),
+      );
+    });
+  }
+
+  /// Lanza si no alcanza el stock, con el mensaje que ve el usuario.
+  ///
+  /// La base también lo impediría —`productos.stock_actual` no puede quedar
+  /// negativo—, pero el error de SQLite no se le puede enseñar a nadie.
+  Future<void> _verificarStock(int productoId, double cantidad) async {
+    final fila = await _db
         .customSelect(
           'SELECT stock_actual FROM productos WHERE id = ?',
           variables: [Variable.withInt(productoId)],
         )
         .getSingleOrNull();
 
-    final stockActual = (stockRow?.data['stock_actual'] as num?)?.toDouble() ?? 0;
-    if (stockActual < cantidad) {
-      final disp = stockActual % 1 == 0
-          ? stockActual.toInt().toString()
-          : stockActual.toStringAsFixed(2);
-      throw Exception('Stock insuficiente. Disponible: $disp unidades.');
-    }
+    final disponible = (fila?.data['stock_actual'] as num?)?.toDouble() ?? 0;
+    if (disponible >= cantidad) return;
 
-    await _db.into(_tablaRepuestos).insert(
-      OrdenMapper.repuestoCompanionNuevo(
-        ordenId: ordenId,
-        productoId: productoId,
-        cantidad: cantidad,
-        precioUnitario: precioUnitario,
-      ),
-    );
-    // Descontar stock
-    await _db.customUpdate(
-      'UPDATE productos SET stock_actual = stock_actual - ? WHERE id = ?',
-      variables: [Variable.withReal(cantidad), Variable.withInt(productoId)],
-      updates: {_db.tablaProducto},
-    );
+    final texto = disponible % 1 == 0
+        ? disponible.toInt().toString()
+        : disponible.toStringAsFixed(2);
+    throw Exception('Stock insuficiente. Disponible: $texto unidades.');
   }
 
   @override
   Future<void> actualizarRepuesto(
     int repuestoId, {
     double? cantidad,
-    double? precioUnitario,
-  }) async {
-    final current = await (_db.select(_tablaRepuestos)
-          ..where((t) => t.id.equals(repuestoId)))
-        .getSingleOrNull();
-    if (current == null) return;
+    int? precioUnitario,
+  }) {
+    return _db.transaction(() async {
+      final current = await (_db.select(_tablaRepuestos)
+            ..where((t) => t.id.equals(repuestoId)))
+          .getSingleOrNull();
+      if (current == null) return;
 
-    final cantidadNueva = cantidad ?? current.cantidad;
-    final delta = cantidadNueva - current.cantidad;
+      final cantidadNueva = cantidad ?? current.cantidad;
+      final delta = cantidadNueva - current.cantidad;
 
-    // Ajustar stock por la diferencia (positivo = usó más, negativo = devolvió)
-    if (delta != 0) {
-      await _db.customUpdate(
-        'UPDATE productos SET stock_actual = stock_actual - ? WHERE id = ?',
-        variables: [Variable.withReal(delta), Variable.withInt(current.productoId)],
-        updates: {_db.tablaProducto},
+      // Solo se mueve la diferencia: positivo = usó más y sale del inventario,
+      // negativo = devolvió parte.
+      if (delta != 0) {
+        if (delta > 0) await _verificarStock(current.productoId, delta);
+        await _inventario.registrar(
+          SolicitudMovimiento(
+            productoId: current.productoId,
+            cantidad: -delta,
+            tipo: delta > 0
+                ? TipoMovimiento.salidaServicio
+                : TipoMovimiento.devolucionServicio,
+            ordenId: current.ordenId,
+            notas: 'Cambio de cantidad en la orden',
+          ),
+        );
+      }
+
+      await (_db.update(_tablaRepuestos)..where((t) => t.id.equals(repuestoId)))
+          .write(
+        TablaOrdenesRepuestoCompanion(
+          cantidad:       Value(cantidadNueva),
+          precioUnitario: Value(precioUnitario ?? current.precioUnitario),
+        ),
       );
-    }
-
-    await (_db.update(_tablaRepuestos)..where((t) => t.id.equals(repuestoId))).write(
-      TablaOrdenesRepuestoCompanion(
-        cantidad:       Value(cantidadNueva),
-        precioUnitario: Value(precioUnitario ?? current.precioUnitario),
-      ),
-    );
+    });
   }
 
   @override
-  Future<void> eliminarRepuesto(int repuestoId) async {
-    final current = await (_db.select(_tablaRepuestos)
-          ..where((t) => t.id.equals(repuestoId)))
-        .getSingleOrNull();
-    if (current == null) return;
+  Future<void> eliminarRepuesto(int repuestoId) {
+    return _db.transaction(() async {
+      final current = await (_db.select(_tablaRepuestos)
+            ..where((t) => t.id.equals(repuestoId)))
+          .getSingleOrNull();
+      if (current == null) return;
 
-    await (_db.delete(_tablaRepuestos)..where((t) => t.id.equals(repuestoId))).go();
+      await (_db.delete(_tablaRepuestos)
+            ..where((t) => t.id.equals(repuestoId)))
+          .go();
 
-    // Restaurar el stock al eliminar el repuesto
-    await _db.customUpdate(
-      'UPDATE productos SET stock_actual = stock_actual + ? WHERE id = ?',
-      variables: [Variable.withReal(current.cantidad), Variable.withInt(current.productoId)],
-      updates: {_db.tablaProducto},
-    );
+      await _inventario.registrar(
+        SolicitudMovimiento.entrada(
+          productoId: current.productoId,
+          cantidad: current.cantidad,
+          tipo: TipoMovimiento.devolucionServicio,
+          ordenId: current.ordenId,
+          notas: 'Repuesto retirado de la orden',
+        ),
+      );
+    });
   }
 
   // Reportes

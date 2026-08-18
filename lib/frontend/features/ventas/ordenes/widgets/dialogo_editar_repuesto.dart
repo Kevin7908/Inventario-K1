@@ -67,7 +67,10 @@ class _DialogoEditarRepuestoState extends ConsumerState<DialogoEditarRepuesto> {
     setState(() => _guardando = true);
 
     final cantidad = double.tryParse(_cantidadCtrl.text.trim()) ?? 0;
-    final precio = double.tryParse(_precioCtrl.text.replaceAll(',', '')) ?? 0;
+    // Los importes se guardan en pesos enteros: el redondeo va aquí, al
+    // leer el campo, no en el repositorio.
+    final precio =
+        (double.tryParse(_precioCtrl.text.replaceAll(',', '')) ?? 0).round();
 
     final error = await ref.read(ordenesProvider.notifier).actualizarRepuesto(
           widget.repuesto.id,

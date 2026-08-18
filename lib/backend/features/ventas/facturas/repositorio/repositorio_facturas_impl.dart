@@ -1,27 +1,43 @@
+import '../../../../share/consecutivos/documento_consecutivo.dart';
+import '../../../../share/consecutivos/repositorio_consecutivos.dart';
 import 'package:drift/drift.dart';
 
 import '../../../../share/database/app_db.dart';
 import '../enum/enum_facturas.dart';
+import '../../../inventario/modelo/movimiento_inventario.dart';
+import '../../../inventario/repositorio/repositorio_inventario.dart';
+import '../../../inventario/repositorio/repositorio_inventario_impl.dart';
 import '../mapper/facturas_mapper.dart';
 import '../modelo/factura_detalle.dart';
 import '../modelo/factura_resumen.dart';
 import 'repositorio_facturas.dart';
 
 class RepositorioFacturasImpl implements RepositorioFacturas {
-  const RepositorioFacturasImpl(this._db);
+  RepositorioFacturasImpl(this._db);
 
   final AppDb _db;
+
+  /// El número de factura sale de la tabla `consecutivos`, dentro de la misma
+  /// transacción: ver `RepositorioConsecutivos`.
+  late final RepositorioConsecutivos _consecutivos =
+      RepositorioConsecutivos(_db);
+
+  /// Facturar, corregir una línea y anular mueven stock. Todo por aquí.
+  late final RepositorioInventario _inventario = RepositorioInventarioImpl(_db);
 
   $TablaVentasTable get _tablaVentas => _db.tablaVentas;
   $TablaVentaDetallesTable get _tablaItems => _db.tablaVentaDetalles;
 
-  // SQL base para resúmenes (LEFT JOIN para clientes opcionales)
+  // SQL base para resúmenes. El nombre del cliente vive en `personas`, no en
+  // `clientes`, así que hacen falta los dos LEFT JOIN encadenados: la venta de
+  // mostrador no tiene cliente.
   static const _sqlSelectResumen = '''
     SELECT
       v.*,
-      COALESCE(c.nombres || ' ' || COALESCE(c.apellidos, ''), '— Sin cliente —') AS cliente_nombre
+      COALESCE(pe.nombres || ' ' || COALESCE(pe.apellidos, ''), '— Sin cliente —') AS cliente_nombre
     FROM ventas v
-    LEFT JOIN clientes c ON c.id = v.cliente_id
+    LEFT JOIN clientes c  ON c.id  = v.cliente_id
+    LEFT JOIN personas pe ON pe.id = c.persona_id
   ''';
 
   @override
@@ -29,7 +45,7 @@ class RepositorioFacturasImpl implements RepositorioFacturas {
     return _db
         .customSelect(
           '$_sqlSelectResumen ORDER BY v.id DESC',
-          readsFrom: {_tablaVentas, _db.tablaCliente},
+          readsFrom: {_tablaVentas, _db.tablaCliente, _db.tablaPersona},
         )
         .watch()
         .map((rows) =>
@@ -84,29 +100,30 @@ class RepositorioFacturasImpl implements RepositorioFacturas {
     int? clienteId,
     required MetodoPago metodoPago,
     required EstadoPago estadoPago,
-    double iva = 0,
-    double descuento = 0,
-  }) async {
-    // Número temporal — se actualiza tras conocer el id
-    final id = await _db.into(_tablaVentas).insert(
-          FacturasMapper.companionNuevo(
-            numeroFactura: 'FAC-TEMP',
-            tipo: tipo,
-            ordenId: ordenId,
-            clienteId: clienteId,
-            metodoPago: metodoPago,
-            estadoPago: estadoPago,
-            iva: iva,
-            descuento: descuento,
-          ),
-        );
+    int iva = 0,
+    int descuento = 0,
+  }) {
+    // El número se pide antes de insertar. Antes se guardaba `'FAC-TEMP'` y
+    // se pisaba con el `id`: dos facturas a la vez chocaban contra el `UNIQUE`
+    // y cualquier `INSERT` fallido se saltaba un número para siempre.
+    return _db.transaction(() async {
+      final id = await _db.into(_tablaVentas).insert(
+            FacturasMapper.companionNuevo(
+              numeroFactura: await _consecutivos.siguiente(
+                DocumentoConsecutivo.factura,
+              ),
+              tipo: tipo,
+              ordenId: ordenId,
+              clienteId: clienteId,
+              metodoPago: metodoPago,
+              estadoPago: estadoPago,
+              iva: iva,
+              descuento: descuento,
+            ),
+          );
 
-    final numeroFactura = FacturasMapper.formatearNumero(id);
-    await (_db.update(_tablaVentas)..where((t) => t.id.equals(id))).write(
-      TablaVentasCompanion(numeroFactura: Value(numeroFactura)),
-    );
-
-    return _obtenerResumenPorId(id);
+      return _obtenerResumenPorId(id);
+    });
   }
 
   @override
@@ -115,7 +132,7 @@ class RepositorioFacturasImpl implements RepositorioFacturas {
     required int clienteId,
     required MetodoPago metodoPago,
     required EstadoPago estadoPago,
-    double iva = 0,
+    int iva = 0,
   }) async {
     return _db.transaction(() async {
       // Validar que la orden tenga al menos un servicio
@@ -127,10 +144,12 @@ class RepositorioFacturasImpl implements RepositorioFacturas {
         throw Exception('La orden no tiene servicios. Agrega al menos uno antes de facturar.');
       }
 
-      // 1. Crear cabecera
+      // 1. Crear cabecera, ya con su número definitivo.
       final id = await _db.into(_tablaVentas).insert(
             FacturasMapper.companionNuevo(
-              numeroFactura: 'FAC-TEMP',
+              numeroFactura: await _consecutivos.siguiente(
+                DocumentoConsecutivo.factura,
+              ),
               tipo: TipoVenta.servicio,
               ordenId: ordenId,
               clienteId: clienteId,
@@ -139,10 +158,6 @@ class RepositorioFacturasImpl implements RepositorioFacturas {
               iva: iva,
             ),
           );
-      final numeroFactura = FacturasMapper.formatearNumero(id);
-      await (_db.update(_tablaVentas)..where((t) => t.id.equals(id))).write(
-        TablaVentasCompanion(numeroFactura: Value(numeroFactura)),
-      );
 
       // 2. Importar tareas como ítems SERVICIO
       final tareasRows = await _db.customSelect(
@@ -165,7 +180,7 @@ class RepositorioFacturasImpl implements RepositorioFacturas {
             tecnicoId: data['tecnico_id'] as int?,
             descripcion: data['servicio_nombre'] as String? ?? 'Servicio',
             cantidad: 1,
-            precioUnitario: (data['precio_pactado'] as num? ?? 0).toDouble(),
+            precioUnitario: (data['precio_pactado'] as num? ?? 0).round(),
             costoUnitario: 0,
           ),
         );
@@ -195,8 +210,8 @@ class RepositorioFacturasImpl implements RepositorioFacturas {
             productoId: data['producto_id'] as int,
             descripcion: data['producto_nombre'] as String? ?? 'Producto',
             cantidad: (data['cantidad'] as num).toDouble(),
-            precioUnitario: (data['precio_unitario'] as num? ?? 0).toDouble(),
-            costoUnitario: (data['precio_compra'] as num? ?? 0).toDouble(),
+            precioUnitario: (data['precio_unitario'] as num? ?? 0).round(),
+            costoUnitario: (data['precio_compra'] as num? ?? 0).round(),
           ),
         );
       }
@@ -232,8 +247,8 @@ class RepositorioFacturasImpl implements RepositorioFacturas {
     int?         clienteId,
     required MetodoPago metodoPago,
     required EstadoPago estadoPago,
-    double iva       = 0,
-    double descuento = 0,
+    int iva       = 0,
+    int descuento = 0,
   }) async {
     return _db.transaction(() async {
       // 1. Validar que la orden tenga al menos un servicio
@@ -248,7 +263,7 @@ class RepositorioFacturasImpl implements RepositorioFacturas {
       // 2. Actualizar cabecera
       await (_db.update(_tablaVentas)..where((t) => t.id.equals(facturaId))).write(
         TablaVentasCompanion(
-          metodoPago:    Value(metodoPago.aTexto),
+          metodoPago:    Value(metodoPago.codigo),
           estadoPago:    Value(estadoPago.aTexto),
           iva:           Value(iva),
           descuento:     Value(descuento),
@@ -283,7 +298,7 @@ class RepositorioFacturasImpl implements RepositorioFacturas {
             tecnicoId:      data['tecnico_id'] as int?,
             descripcion:    data['servicio_nombre'] as String? ?? 'Servicio',
             cantidad:       1,
-            precioUnitario: (data['precio_pactado'] as num? ?? 0).toDouble(),
+            precioUnitario: (data['precio_pactado'] as num? ?? 0).round(),
             costoUnitario:  0,
           ),
         );
@@ -311,8 +326,8 @@ class RepositorioFacturasImpl implements RepositorioFacturas {
             productoId:     data['producto_id'] as int,
             descripcion:    data['producto_nombre'] as String? ?? 'Producto',
             cantidad:       (data['cantidad'] as num).toDouble(),
-            precioUnitario: (data['precio_unitario'] as num? ?? 0).toDouble(),
-            costoUnitario:  (data['precio_compra'] as num? ?? 0).toDouble(),
+            precioUnitario: (data['precio_unitario'] as num? ?? 0).round(),
+            costoUnitario:  (data['precio_compra'] as num? ?? 0).round(),
           ),
         );
       }
@@ -336,8 +351,8 @@ class RepositorioFacturasImpl implements RepositorioFacturas {
     required int id,
     required MetodoPago metodoPago,
     required EstadoPago estadoPago,
-    double? iva,
-    double? descuento,
+    int? iva,
+    int? descuento,
     bool actualizarCliente = false,
     int? clienteId,
   }) async {
@@ -352,7 +367,7 @@ class RepositorioFacturasImpl implements RepositorioFacturas {
 
     await (_db.update(_tablaVentas)..where((t) => t.id.equals(id))).write(
       TablaVentasCompanion(
-        metodoPago:    Value(metodoPago.aTexto),
+        metodoPago:    Value(metodoPago.codigo),
         estadoPago:    Value(estadoPago.aTexto),
         iva:           iva != null ? Value(iva) : const Value.absent(),
         descuento:     descuento != null ? Value(descuento) : const Value.absent(),
@@ -375,16 +390,20 @@ class RepositorioFacturasImpl implements RepositorioFacturas {
   }
 
   @override
-  Future<void> eliminar(int id) async {
+  Future<void> anular(int id) async {
     await _db.transaction(() async {
       final factura = await (_db.select(_tablaVentas)
             ..where((t) => t.id.equals(id)))
           .getSingleOrNull();
       if (factura == null) throw Exception('Factura #$id no existe.');
 
+      if (factura.estadoPago == EstadoPago.anulada.aTexto) {
+        throw Exception('La factura ${factura.numeroFactura} ya está anulada.');
+      }
+
       // Las facturas ligadas a una orden no gestionan el stock directamente
       // (fue descontado al agregar el repuesto a la orden).
-      // Solo se restaura el stock para facturas sin orden asociada.
+      // Solo se devuelve el stock de las facturas sin orden asociada.
       if (factura.ordenId == null) {
         final items = await (_db.select(_tablaItems)
               ..where((t) => t.ventaId.equals(id)))
@@ -393,19 +412,29 @@ class RepositorioFacturasImpl implements RepositorioFacturas {
         for (final item in items) {
           if (item.tipoItem == TipoItem.producto.aTexto &&
               item.productoId != null) {
-            await _db.customUpdate(
-              'UPDATE productos SET stock_actual = stock_actual + ? WHERE id = ?',
-              variables: [
-                Variable.withReal(item.cantidad),
-                Variable.withInt(item.productoId!),
-              ],
-              updates: {_db.tablaProducto},
+            await _inventario.registrar(
+              SolicitudMovimiento.entrada(
+                productoId: item.productoId!,
+                cantidad: item.cantidad,
+                tipo: TipoMovimiento.devolucionVenta,
+                ventaId: id,
+                notas: 'Factura anulada',
+              ),
             );
           }
         }
       }
 
-      await (_db.delete(_tablaVentas)..where((t) => t.id.equals(id))).go();
+      // La factura no se borra: es un documento contable. Se marca anulada y
+      // ahí queda, con su número y su historial. El `DELETE` lo impide además
+      // una guarda de la base (`guardas_sql.dart`), por si alguien lo intenta
+      // desde otro camino.
+      await (_db.update(_tablaVentas)..where((t) => t.id.equals(id))).write(
+        TablaVentasCompanion(
+          estadoPago: Value(EstadoPago.anulada.aTexto),
+          actualizadoEn: Value(DateTime.now()),
+        ),
+      );
     });
   }
 
@@ -420,28 +449,19 @@ class RepositorioFacturasImpl implements RepositorioFacturas {
     int? tecnicoId,
     required String descripcion,
     required double cantidad,
-    required double precioUnitario,
-    double costoUnitario = 0,
-  }) async {
-    // Validar stock si es producto
-    if (tipoItem == TipoItem.producto && productoId != null) {
-      final stockRow = await _db
-          .customSelect(
-            'SELECT stock_actual FROM productos WHERE id = ?',
-            variables: [Variable.withInt(productoId)],
-          )
-          .getSingleOrNull();
-      final stockActual =
-          (stockRow?.data['stock_actual'] as num?)?.toDouble() ?? 0;
-      if (stockActual < cantidad) {
-        final disp = stockActual % 1 == 0
-            ? stockActual.toInt().toString()
-            : stockActual.toStringAsFixed(2);
-        throw Exception('Stock insuficiente. Disponible: $disp unidades.');
+    required int precioUnitario,
+    int costoUnitario = 0,
+  }) {
+    // Cuatro escrituras que tienen que pasar juntas: la línea, la salida de
+    // inventario, los totales de la factura y —si viene de una orden— el
+    // precio pactado de la tarea. Antes iban sueltas, y un fallo a mitad
+    // dejaba la factura cobrando algo que nunca salió del inventario.
+    return _db.transaction(() async {
+      if (tipoItem == TipoItem.producto && productoId != null) {
+        await _verificarStock(productoId, cantidad);
       }
-    }
 
-    await _db.into(_tablaItems).insert(
+      await _db.into(_tablaItems).insert(
           FacturasMapper.itemCompanionNuevo(
             ventaId: ventaId,
             tipoItem: tipoItem,
@@ -455,42 +475,67 @@ class RepositorioFacturasImpl implements RepositorioFacturas {
           ),
         );
 
-    // Descontar stock
-    if (tipoItem == TipoItem.producto && productoId != null) {
-      await _db.customUpdate(
-        'UPDATE productos SET stock_actual = stock_actual - ? WHERE id = ?',
-        variables: [Variable.withReal(cantidad), Variable.withInt(productoId)],
-        updates: {_db.tablaProducto},
-      );
-    }
-
-    await _recalcularTotales(ventaId);
-
-    // Si la factura está ligada a una orden y el item es un servicio,
-    // sincronizar precio_pactado y tecnico_id en ordenes_tareas.
-    if (tipoItem == TipoItem.servicio && servicioId != null) {
-      final factura = await (_db.select(_tablaVentas)
-            ..where((t) => t.id.equals(ventaId)))
-          .getSingleOrNull();
-      final ordenId = factura?.ordenId;
-      if (ordenId != null) {
-        await (_db.update(_db.tablaOrdenesTarea)
-              ..where((t) =>
-                  t.ordenId.equals(ordenId) &
-                  t.servicioId.equals(servicioId)))
-            .write(TablaOrdenesTareaCompanion(
-          precioPactado: Value(precioUnitario),
-          tecnicoId: tecnicoId != null ? Value(tecnicoId) : const Value.absent(),
-        ));
+      if (tipoItem == TipoItem.producto && productoId != null) {
+        await _inventario.registrar(
+          SolicitudMovimiento.salida(
+            productoId: productoId,
+            cantidad: cantidad,
+            tipo: TipoMovimiento.salidaVenta,
+            ventaId: ventaId,
+          ),
+        );
       }
-    }
+
+      await _recalcularTotales(ventaId);
+
+      // Si la factura viene de una orden y el ítem es un servicio, el precio
+      // que se cobró se refleja en la tarea: es el mismo trabajo.
+      if (tipoItem == TipoItem.servicio && servicioId != null) {
+        final factura = await (_db.select(_tablaVentas)
+              ..where((t) => t.id.equals(ventaId)))
+            .getSingleOrNull();
+        final ordenId = factura?.ordenId;
+        if (ordenId != null) {
+          await (_db.update(_db.tablaOrdenesTarea)
+                ..where((t) =>
+                    t.ordenId.equals(ordenId) &
+                    t.servicioId.equals(servicioId)))
+              .write(TablaOrdenesTareaCompanion(
+            precioPactado: Value(precioUnitario),
+            tecnicoId:
+                tecnicoId != null ? Value(tecnicoId) : const Value.absent(),
+          ));
+        }
+      }
+    });
+  }
+
+  /// Lanza si no alcanza el stock, con el mensaje que ve el usuario.
+  ///
+  /// La base también lo impediría, pero su error no se le puede enseñar a
+  /// nadie.
+  Future<void> _verificarStock(int productoId, double cantidad) async {
+    final fila = await _db
+        .customSelect(
+          'SELECT stock_actual FROM productos WHERE id = ?',
+          variables: [Variable.withInt(productoId)],
+        )
+        .getSingleOrNull();
+
+    final disponible = (fila?.data['stock_actual'] as num?)?.toDouble() ?? 0;
+    if (disponible >= cantidad) return;
+
+    final texto = disponible % 1 == 0
+        ? disponible.toInt().toString()
+        : disponible.toStringAsFixed(2);
+    throw Exception('Stock insuficiente. Disponible: $texto unidades.');
   }
 
   @override
   Future<void> actualizarItem(
     int itemId, {
     double? cantidad,
-    double? precioUnitario,
+    int? precioUnitario,
   }) async {
     final current = await (_db.select(_tablaItems)
           ..where((t) => t.id.equals(itemId)))
@@ -501,17 +546,21 @@ class RepositorioFacturasImpl implements RepositorioFacturas {
     final precioNuevo = precioUnitario ?? current.precioUnitario;
     final delta = cantidadNueva - current.cantidad;
 
-    // Ajustar stock si es producto
+    // Solo se mueve la diferencia: positivo = se cobró más y sale del
+    // inventario, negativo = se devolvió parte.
     if (current.tipoItem == TipoItem.producto.aTexto &&
         current.productoId != null &&
         delta != 0) {
-      await _db.customUpdate(
-        'UPDATE productos SET stock_actual = stock_actual - ? WHERE id = ?',
-        variables: [
-          Variable.withReal(delta),
-          Variable.withInt(current.productoId!),
-        ],
-        updates: {_db.tablaProducto},
+      await _inventario.registrar(
+        SolicitudMovimiento(
+          productoId: current.productoId!,
+          cantidad: -delta,
+          tipo: delta > 0
+              ? TipoMovimiento.salidaVenta
+              : TipoMovimiento.devolucionVenta,
+          ventaId: current.ventaId,
+          notas: 'Cambio de cantidad en la factura',
+        ),
       );
     }
 
@@ -519,7 +568,8 @@ class RepositorioFacturasImpl implements RepositorioFacturas {
       TablaVentaDetallesCompanion(
         cantidad: Value(cantidadNueva),
         precioUnitario: Value(precioNuevo),
-        subtotal: Value(cantidadNueva * precioNuevo),
+        // El importe cobrado es entero aunque la cantidad no lo sea.
+        subtotal: Value((cantidadNueva * precioNuevo).round()),
       ),
     );
 
@@ -547,34 +597,39 @@ class RepositorioFacturasImpl implements RepositorioFacturas {
   }
 
   @override
-  Future<void> eliminarItem(int itemId) async {
-    final current = await (_db.select(_tablaItems)
-          ..where((t) => t.id.equals(itemId)))
-        .getSingleOrNull();
-    if (current == null) return;
+  Future<void> eliminarItem(int itemId) {
+    // Tres escrituras que van juntas. Si el recálculo del total falla —por
+    // ejemplo, porque dejaría la factura cobrando más de lo que suma— la
+    // línea tiene que volver y el stock también.
+    return _db.transaction(() async {
+      final current = await (_db.select(_tablaItems)
+            ..where((t) => t.id.equals(itemId)))
+          .getSingleOrNull();
+      if (current == null) return;
 
-    await (_db.delete(_tablaItems)..where((t) => t.id.equals(itemId))).go();
+      await (_db.delete(_tablaItems)..where((t) => t.id.equals(itemId))).go();
 
-    // Restaurar stock si era producto
-    if (current.tipoItem == TipoItem.producto.aTexto &&
-        current.productoId != null) {
-      await _db.customUpdate(
-        'UPDATE productos SET stock_actual = stock_actual + ? WHERE id = ?',
-        variables: [
-          Variable.withReal(current.cantidad),
-          Variable.withInt(current.productoId!),
-        ],
-        updates: {_db.tablaProducto},
-      );
-    }
+      if (current.tipoItem == TipoItem.producto.aTexto &&
+          current.productoId != null) {
+        await _inventario.registrar(
+          SolicitudMovimiento.entrada(
+            productoId: current.productoId!,
+            cantidad: current.cantidad,
+            tipo: TipoMovimiento.devolucionVenta,
+            ventaId: current.ventaId,
+            notas: 'Línea eliminada de la factura',
+          ),
+        );
+      }
 
-    await _recalcularTotales(current.ventaId);
+      await _recalcularTotales(current.ventaId);
+    });
   }
 
   @override
   Future<FacturaResumen> actualizarPago({
     required int id,
-    required double totalPagado,
+    required int totalPagado,
     required EstadoPago estadoPago,
     required MetodoPago metodoPago,
   }) async {
@@ -582,7 +637,7 @@ class RepositorioFacturasImpl implements RepositorioFacturas {
       TablaVentasCompanion(
         totalPagado:   Value(totalPagado),
         estadoPago:    Value(estadoPago.aTexto),
-        metodoPago:    Value(metodoPago.aTexto),
+        metodoPago:    Value(metodoPago.codigo),
         actualizadoEn: Value(DateTime.now()),
       ),
     );
@@ -603,7 +658,7 @@ class RepositorioFacturasImpl implements RepositorioFacturas {
           variables: [Variable.withInt(ventaId)],
         )
         .getSingleOrNull();
-    final subtotal  = (subtotalRow?.data['sub'] as num? ?? 0).toDouble();
+    final subtotal  = (subtotalRow?.data['sub'] as num? ?? 0).round();
     final iva       = ventaRow.iva;
     final descuento = ventaRow.descuento;
     final total     = subtotal - descuento + iva;

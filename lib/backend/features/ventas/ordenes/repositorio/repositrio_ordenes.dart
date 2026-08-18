@@ -41,7 +41,7 @@ abstract interface class RepositorioOrdenes {
     required int ordenId,
     required int servicioId,
     required int tecnicoId,
-    required double precioPactado,
+    required int precioPactado,
     String? notas,
   });
 
@@ -51,7 +51,7 @@ abstract interface class RepositorioOrdenes {
     int tareaId, {
     int? servicioId,
     int? tecnicoId,
-    double? precioPactado,
+    int? precioPactado,
     String? notas,
     bool? completado,
   });
@@ -64,14 +64,14 @@ abstract interface class RepositorioOrdenes {
     required int ordenId,
     required int productoId,
     required double cantidad,
-    required double precioUnitario,
+    required int precioUnitario,
   });
 
   // Elimina y re-inserta para que los triggers de stock actúen correctamente.
   Future<void> actualizarRepuesto(
     int repuestoId, {
     double? cantidad,
-    double? precioUnitario,
+    int? precioUnitario,
   });
 
   Future<void> eliminarRepuesto(int repuestoId);

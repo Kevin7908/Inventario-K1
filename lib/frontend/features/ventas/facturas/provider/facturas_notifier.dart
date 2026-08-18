@@ -53,8 +53,8 @@ class FacturasNotifier extends AsyncNotifier<FacturasState> {
     int?                clienteId,
     required MetodoPago metodoPago,
     required EstadoPago estadoPago,
-    double              iva       = 0,
-    double              descuento = 0,
+    int iva       = 0,
+    int descuento = 0,
   }) async {
     try {
       await _repo.crear(
@@ -77,7 +77,7 @@ class FacturasNotifier extends AsyncNotifier<FacturasState> {
     required int        clienteId,
     required MetodoPago metodoPago,
     required EstadoPago estadoPago,
-    double              iva = 0,
+    int iva = 0,
   }) async {
     try {
       await _repo.crearDesdeOrden(
@@ -99,8 +99,8 @@ class FacturasNotifier extends AsyncNotifier<FacturasState> {
     int?                clienteId,
     required MetodoPago metodoPago,
     required EstadoPago estadoPago,
-    double              iva       = 0,
-    double              descuento = 0,
+    int iva       = 0,
+    int descuento = 0,
   }) async {
     try {
       final factura = await _repo.actualizarDesdeOrden(
@@ -123,8 +123,8 @@ class FacturasNotifier extends AsyncNotifier<FacturasState> {
     required int        id,
     required MetodoPago metodoPago,
     required EstadoPago estadoPago,
-    double?             iva,
-    double?             descuento,
+    int? iva,
+    int? descuento,
     bool                actualizarCliente = false,
     int?                clienteId,
   }) async {
@@ -153,14 +153,14 @@ class FacturasNotifier extends AsyncNotifier<FacturasState> {
   /// y si el pago es parcial crea automáticamente una deuda vinculada.
   Future<String?> cobrar({
     required int         id,
-    required double      totalPagado,
-    required double      totalFactura,
+    required int totalPagado,
+    required int totalFactura,
     required EstadoPago  estadoPago,
     required MetodoPago  metodoPago,
     int?     clienteId,
     String?  concepto,
-    String?  metodoPagoDeuda,
-    String?  fechaVencimiento,
+    MetodoPago? metodoPagoDeuda,
+    DateTime? fechaVencimiento,
     String?  notasDeuda,
   }) async {
     try {
@@ -188,7 +188,7 @@ class FacturasNotifier extends AsyncNotifier<FacturasState> {
             fechaVencimiento:  fechaVencimiento,
             notas:             notasDeuda,
             pagoInicial:       0,
-            metodoPagoInicial: metodoPagoDeuda ?? 'Efectivo',
+            metodoPagoInicial: metodoPagoDeuda ?? MetodoPago.efectivo,
           );
         }
       }
@@ -198,21 +198,16 @@ class FacturasNotifier extends AsyncNotifier<FacturasState> {
     }
   }
 
-  Future<String?> eliminar(int id) async {
-    final actual = state.value;
-    if (actual == null) return null;
-
-    final snapshot = actual.facturas;
-    state = AsyncData(
-      actual.copyWith(
-        facturas: snapshot.where((f) => f.id != id).toList(growable: false),
-      ),
-    );
+  /// Anula la factura. No la quita de la lista: sigue estando, en `ANULADA`.
+  ///
+  /// Por eso no hay actualización optimista como en el resto de operaciones —
+  /// no hay fila que retirar de la pantalla. El `observarTodas()` de `build`
+  /// re-emite con el estado nuevo.
+  Future<String?> anular(int id) async {
     try {
-      await _repo.eliminar(id);
+      await _repo.anular(id);
       return null;
     } catch (e) {
-      state = AsyncData(actual.copyWith(facturas: snapshot));
       return e.toString();
     }
   }
@@ -227,8 +222,8 @@ class FacturasNotifier extends AsyncNotifier<FacturasState> {
     int?                tecnicoId,
     required String     descripcion,
     required double     cantidad,
-    required double     precioUnitario,
-    double              costoUnitario = 0,
+    required int precioUnitario,
+    int costoUnitario = 0,
   }) async {
     try {
       await _repo.agregarItem(
@@ -254,7 +249,7 @@ class FacturasNotifier extends AsyncNotifier<FacturasState> {
     int itemId,
     int ventaId, {
     double? cantidad,
-    double? precioUnitario,
+    int? precioUnitario,
   }) async {
     try {
       await _repo.actualizarItem(

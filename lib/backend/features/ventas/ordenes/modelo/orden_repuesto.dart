@@ -17,11 +17,14 @@ class OrdenRepuesto extends Equatable {
   final int productoId;
   final String productoNombre;
   final double cantidad;
-  final double precioUnitario;
-  final double costoUnitario;
+  /// Los dos, en pesos enteros (ver `TablaOrdenesRepuesto`).
+  final int precioUnitario;
+  final int costoUnitario;
   final DateTime? creadoEn;
 
-  double get subtotal => cantidad * precioUnitario;
+  /// La cantidad puede ser fraccionaria (litros, metros), así que el
+  /// subtotal se redondea al peso: es lo que se va a cobrar.
+  int get subtotal => (cantidad * precioUnitario).round();
 
   @override
   List<Object?> get props =>

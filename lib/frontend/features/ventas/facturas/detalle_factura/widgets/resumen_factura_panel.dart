@@ -1,3 +1,4 @@
+import 'package:inventario_k1/core/formato.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
@@ -349,7 +350,7 @@ class _DeudaInfoBloque extends StatelessWidget {
                 const SizedBox(width: 12),
                 _InfoItem(
                   label: 'VENCE',
-                  valor: deuda.fechaVencimiento!,
+                  valor: formatearFecha(deuda.fechaVencimiento!),
                   color: deuda.estaVencida ? _kRed : ColoresApp.textMedium,
                 ),
               ],
@@ -545,7 +546,7 @@ class _DialogoDeudaDetalle extends StatelessWidget {
                       const Divider(height: 1, color: ColoresApp.border),
                       _FilaDetalle(
                         label: 'Vencimiento',
-                        valor: deuda.fechaVencimiento!,
+                        valor: formatearFecha(deuda.fechaVencimiento!),
                         valorColor:
                             deuda.estaVencida ? _kRed : ColoresApp.textDark,
                       ),
@@ -696,7 +697,7 @@ class _FilaDetalle extends StatelessWidget {
 class _Item {
   const _Item(this.label, this.valor);
   final String label;
-  final double valor;
+  final num valor;
 }
 
 class _ResumenBloque extends StatelessWidget {
@@ -756,7 +757,7 @@ class _ResumenBloque extends StatelessWidget {
 class _FilaTotal extends StatelessWidget {
   const _FilaTotal(this.etiqueta, this.valor, this.esTotal, {this.color});
   final String etiqueta;
-  final double valor;
+  final num valor;
   final bool   esTotal;
   final Color? color;
 

@@ -5,7 +5,7 @@ import '../../../../../backend/features/ventas/facturas/enum/enum_facturas.dart'
 import '../../../../../backend/features/ventas/facturas/modelo/factura_resumen.dart';
 import '../../../../../core/currency_ext.dart';
 import '../../../../share/temas/colores_app.dart';
-import '../../../../share/widgets/dialogos/dialogo_confirmar_eliminar_widget.dart';
+import '../../../../share2/feedback/dialogo_confirmacion.dart';
 import '../../../../share/widgets/input/barra_busqueda_widget.dart';
 import '../../../../share/widgets/output/estado_error_widget.dart';
 import '../../../../share/widgets/output/estado_vacio_widget.dart';
@@ -116,21 +116,24 @@ class _ContenidoFacturas extends ConsumerWidget {
 
   void _confirmarEliminar(
       BuildContext context, WidgetRef ref, FacturaResumen f) {
-    DialogoConfirmarEliminar.mostrar(
-      context: context,
-      nombreElemento: f.numeroFactura,
-      tipoElemento: 'factura',
-      onConfirmar: () async {
-        final error =
-            await ref.read(facturasProvider.notifier).eliminar(f.id);
-        if (!context.mounted) return;
-        if (error != null) {
-          SnackBarMensaje.error(context, error);
-        } else {
-          SnackBarMensaje.success(context, 'Factura eliminada.');
-        }
-      },
-    );
+    // No se ofrece «eliminar»: una factura es un documento contable y solo se
+    // anula. Queda en la lista, marcada, con su número.
+    DialogoConfirmacion.mostrar(
+      context,
+      titulo: '¿Anular la factura ${f.numeroFactura}?',
+      mensaje: 'Se devolverá al inventario lo que había salido. La factura no '
+          'se borra: queda registrada como anulada.',
+      textoConfirmar: 'Anular factura',
+    ).then((confirmado) async {
+      if (confirmado != true) return;
+      final error = await ref.read(facturasProvider.notifier).anular(f.id);
+      if (!context.mounted) return;
+      if (error != null) {
+        SnackBarMensaje.error(context, error);
+      } else {
+        SnackBarMensaje.success(context, 'Factura anulada.');
+      }
+    });
   }
 }
 

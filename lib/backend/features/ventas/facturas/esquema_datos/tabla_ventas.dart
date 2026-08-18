@@ -1,54 +1,81 @@
 import 'package:drift/drift.dart';
 
+import '../../../../share/dominio/metodo_pago.dart';
 import '../../../clientes/esquema_datos/tabla_cliente.dart';
 import '../../ordenes/esquema_datos/tabla_ordenes_servicio.dart';
 
+/// La factura: el cierre contable de una venta.
+///
+/// Es un **documento**, no un registro de trabajo: una vez emitida no se
+/// borra, se anula. `RepositorioFacturas.anular` la deja en `ANULADA` y
+/// devuelve el stock; el `DELETE` lo impide una guarda en la propia base
+/// (ver `guardas_sql.dart`), porque una factura borrada rompe la
+/// consecutividad del numerador y deja el inventario sin explicación.
+///
+/// `subtotal` y `total` son **caché** de las líneas: `subtotal` es
+/// `SUM(venta_detalles.subtotal)` y `total` es `subtotal − descuento + iva`.
+/// Se guardan porque la lista de facturas los muestra sin abrir el detalle, y
+/// `RepositorioFacturas` es el único que los recalcula.
+@TableIndex(name: 'idx_ventas_cliente', columns: {#clienteId})
+@TableIndex(name: 'idx_ventas_orden', columns: {#ordenId})
+@TableIndex(name: 'idx_ventas_estado', columns: {#estadoPago})
+@TableIndex(name: 'idx_ventas_creado', columns: {#creadoEn})
 class TablaVentas extends Table {
   @override
   String get tableName => 'ventas';
 
   IntColumn get id => integer().autoIncrement()();
 
-  TextColumn get numeroFactura =>
-      text().named('numero_factura').unique()();
+  /// Consecutivo del documento. `UNIQUE` en el esquema: es la referencia con
+  /// la que el cliente reclama.
+  TextColumn get numeroFactura => text().unique()();
 
-  // 'SERVICIO' | 'MOSTRADOR'
-  TextColumn get tipo =>
-      text().withDefault(const Constant('SERVICIO'))();
+  /// 'SERVICIO' | 'MOSTRADOR'.
+  TextColumn get tipo => text().withDefault(const Constant('SERVICIO'))();
 
-  // NULL para ventas mostrador
-  IntColumn get ordenId =>
-      integer().nullable().named('orden_id').references(TablaOrdenesServicio, #id)();
+  /// NULL para ventas de mostrador. `restrict`: una orden ya facturada no
+  /// puede desaparecer y dejar la factura sin su trabajo.
+  IntColumn get ordenId => integer()
+      .nullable()
+      .references(TablaOrdenesServicio, #id, onDelete: KeyAction.restrict)();
 
-  IntColumn get clienteId =>
-      integer().nullable().named('cliente_id').references(TablaCliente, #id)();
+  /// NULL para ventas de mostrador sin cliente identificado. `restrict`: no se
+  /// borra a quien tiene facturas.
+  IntColumn get clienteId => integer()
+      .nullable()
+      .references(TablaCliente, #id, onDelete: KeyAction.restrict)();
 
-  RealColumn get subtotal =>
-      real().withDefault(const Constant(0.0))();
+  /// Los cinco importes en **pesos enteros**, como el resto del sistema.
+  IntColumn get subtotal => integer().withDefault(const Constant(0))();
+  IntColumn get iva => integer().withDefault(const Constant(0))();
+  IntColumn get descuento => integer().withDefault(const Constant(0))();
+  IntColumn get total => integer().withDefault(const Constant(0))();
+  IntColumn get totalPagado => integer().withDefault(const Constant(0))();
 
-  RealColumn get iva =>
-      real().withDefault(const Constant(0.0))();
-
-  RealColumn get descuento =>
-      real().withDefault(const Constant(0.0))();
-
-  RealColumn get total =>
-      real().withDefault(const Constant(0.0))();
-
-  RealColumn get totalPagado =>
-      real().named('total_pagado').withDefault(const Constant(0.0))();
-
-  // 'EFECTIVO' | 'TARJETA' | 'TRANSFERENCIA' | 'CREDITO'
+  /// Uno de [MetodoPago]. El `CHECK` sale del propio enum: agregar un método
+  /// no obliga a acordarse de esta tabla.
   TextColumn get metodoPago =>
-      text().named('metodo_pago').withDefault(const Constant('EFECTIVO'))();
+      text().withDefault(const Constant('EFECTIVO'))();
 
-  // 'PAGADO' | 'PENDIENTE' | 'ANULADA'
+  /// 'PAGADO' | 'PENDIENTE' | 'ANULADA'.
   TextColumn get estadoPago =>
-      text().named('estado_pago').withDefault(const Constant('PENDIENTE'))();
+      text().withDefault(const Constant('PENDIENTE'))();
 
-  DateTimeColumn get creadoEn =>
-      dateTime().nullable().named('creado_en')();
-
+  DateTimeColumn get creadoEn => dateTime().withDefault(currentDateAndTime)();
   DateTimeColumn get actualizadoEn =>
-      dateTime().nullable().named('actualizado_en')();
+      dateTime().withDefault(currentDateAndTime)();
+
+  @override
+  List<String> get customConstraints => [
+        "CHECK (tipo IN ('SERVICIO', 'MOSTRADOR'))",
+        "CHECK (metodo_pago IN (${MetodoPago.listaSql}))",
+        "CHECK (estado_pago IN ('PAGADO', 'PENDIENTE', 'ANULADA'))",
+        'CHECK (length(trim(numero_factura)) > 0)',
+        'CHECK (subtotal >= 0 AND iva >= 0 AND descuento >= 0)',
+        'CHECK (total >= 0 AND total_pagado >= 0)',
+        // Cobrar más de lo facturado es siempre un error de captura.
+        'CHECK (total_pagado <= total)',
+        // Una venta de mostrador no tiene orden; una de servicio, sí.
+        "CHECK ((tipo = 'MOSTRADOR' AND orden_id IS NULL) OR tipo = 'SERVICIO')",
+      ];
 }

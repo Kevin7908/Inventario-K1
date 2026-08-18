@@ -1,41 +1,41 @@
 import 'package:drift/drift.dart';
-import 'package:inventario_k1/backend/features/ventas/ordenes/esquema_datos/tabla_ordenes_servicio.dart';
-import 'package:inventario_k1/backend/features/ventas/servicios/esquema_datos/tabla_servicio.dart';
 
 import '../../../tecnicos/esquema_datos/tabla_tecnico.dart';
+import '../../servicios/esquema_datos/tabla_servicio.dart';
+import 'tabla_ordenes_servicio.dart';
 
+/// La mano de obra de una orden: qué trabajo, quién lo hizo y cuánto cobró.
+@TableIndex(name: 'idx_ordenes_tareas_orden', columns: {#ordenId})
+@TableIndex(name: 'idx_ordenes_tareas_tecnico', columns: {#tecnicoId})
 class TablaOrdenesTarea extends Table {
   @override
   String get tableName => 'ordenes_tareas';
 
   IntColumn get id => integer().autoIncrement()();
 
-  // FK ordenes_servicio(id) ON DELETE CASCADE
+  /// `cascade`: una tarea no existe sin su orden.
   IntColumn get ordenId => integer()
-      .named('orden_id')
       .references(TablaOrdenesServicio, #id, onDelete: KeyAction.cascade)();
 
-  // FK servicios(id)
+  /// `restrict`: un servicio con trabajos hechos no se borra del catálogo.
   IntColumn get servicioId => integer()
-      .named('servicio_id')
-      .references(TablaServicio, #id)();
+      .references(TablaServicio, #id, onDelete: KeyAction.restrict)();
 
-  // FK tecnicos(id)
+  /// `restrict`: borrar al técnico dejaría trabajos sin autor.
   IntColumn get tecnicoId => integer()
-      .named('tecnico_id')
-      .references(TablaTecnico, #id)();
+      .references(TablaTecnico, #id, onDelete: KeyAction.restrict)();
 
-  // Precio que cobró el técnico esta vez
-  RealColumn get precioPactado =>
-      real().named('precio_pactado').withDefault(const Constant(0.0))();
+  /// Lo que cobró el técnico **esta vez**, en pesos enteros. Es un dato
+  /// propio de la tarea, no una copia del catálogo: `servicios.precio_sugerido`
+  /// solo precarga el campo.
+  IntColumn get precioPactado => integer().withDefault(const Constant(0))();
 
-  // Notas específicas de esta tarea
   TextColumn get notas => text().nullable()();
 
-  // 1 = completado, 0 = pendiente
-  BoolColumn get completado =>
-      boolean().withDefault(const Constant(false))();
+  BoolColumn get completado => boolean().withDefault(const Constant(false))();
 
-  DateTimeColumn get creadoEn =>
-      dateTime().nullable().named('creado_en')();
+  DateTimeColumn get creadoEn => dateTime().withDefault(currentDateAndTime)();
+
+  @override
+  List<String> get customConstraints => ['CHECK (precio_pactado >= 0)'];
 }

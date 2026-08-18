@@ -10,7 +10,7 @@ class Servicio extends Equatable {
   final int precioSugerido;
 
   final bool activo;
-  final String? creadoEn;
+  final DateTime? creadoEn;
 
   const Servicio({
     required this.id,
@@ -27,7 +27,7 @@ class Servicio extends Equatable {
     String? descripcion,
     int? precioSugerido,
     bool? activo,
-    String? creadoEn,
+    DateTime? creadoEn,
   }) {
     return Servicio(
       id: id ?? this.id,

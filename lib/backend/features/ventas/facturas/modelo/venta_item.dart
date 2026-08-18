@@ -25,9 +25,10 @@ class VentaItem extends Equatable {
   final int? tecnicoId;
   final String descripcion;
   final double cantidad;
-  final double precioUnitario;
-  final double costoUnitario;
-  final double subtotal;
+  /// Los tres, en pesos enteros (ver `TablaVentaDetalles`).
+  final int precioUnitario;
+  final int costoUnitario;
+  final int subtotal;
 
   @override
   List<Object?> get props => [

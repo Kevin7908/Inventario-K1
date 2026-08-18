@@ -108,7 +108,7 @@ abstract final class OrdenMapper {
     required int ordenId,
     required int servicioId,
     required int tecnicoId,
-    required double precioPactado,
+    required int precioPactado,
     String? notas,
   }) => TablaOrdenesTareaCompanion.insert(
     ordenId: ordenId,
@@ -124,7 +124,7 @@ abstract final class OrdenMapper {
     required int ordenId,
     required int productoId,
     required double cantidad,
-    required double precioUnitario,
+    required int precioUnitario,
   }) => TablaOrdenesRepuestoCompanion.insert(
     ordenId: ordenId,
     productoId: productoId,
@@ -150,7 +150,7 @@ abstract final class OrdenMapper {
       servicioNombre:
           row['servicio_nombre'] as String? ?? 'Servicio desconocido',
       tecnicoNombre: row['tecnico_nombre'] as String? ?? 'Sin asignar',
-      precioPactado: (row['precio_pactado'] as num? ?? 0.0).toDouble(),
+      precioPactado: (row['precio_pactado'] as num? ?? 0).round(),
       notas: row['notas'] as String?,
       completado: completado,
       creadoEn: _parseFecha(row['creado_en']),
@@ -165,8 +165,8 @@ abstract final class OrdenMapper {
         productoNombre:
             row['producto_nombre'] as String? ?? 'Producto desconocido',
         cantidad: (row['cantidad'] as num? ?? 0.0).toDouble(),
-        precioUnitario: (row['precio_unitario'] as num? ?? 0.0).toDouble(),
-        costoUnitario: (row['precio_compra'] as num? ?? 0.0).toDouble(),
+        precioUnitario: (row['precio_unitario'] as num? ?? 0).round(),
+        costoUnitario: (row['precio_compra'] as num? ?? 0).round(),
         creadoEn: _parseFecha(row['creado_en']),
       );
 

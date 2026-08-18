@@ -126,7 +126,9 @@ class _DialogoAgregarEditarTareaState
     setState(() => _guardando = true);
 
     final notifier = ref.read(ordenesProvider.notifier);
-    final precio = double.tryParse(_precioCtrl.text.trim()) ?? 0.0;
+    // Los importes se guardan en pesos enteros: el redondeo va aquí, al
+    // leer el campo, no en el repositorio.
+    final precio = (double.tryParse(_precioCtrl.text.trim()) ?? 0).round();
     final notas  = _notasCtrl.text.trim().isEmpty ? null : _notasCtrl.text.trim();
     String? error;
 

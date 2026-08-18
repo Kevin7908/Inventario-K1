@@ -138,7 +138,7 @@ class OrdenesNotifier extends AsyncNotifier<OrdenesState> {
     int ordenId, {
     required int    servicioId,
     required int    tecnicoId,
-    required double precioPactado,
+    required int precioPactado,
     String?         notas,
   }) async {
     try {
@@ -161,7 +161,7 @@ class OrdenesNotifier extends AsyncNotifier<OrdenesState> {
     int ordenId, {
     int?    servicioId,
     int?    tecnicoId,
-    double? precioPactado,
+    int? precioPactado,
     String? notas,
     bool?   completado,
   }) async {
@@ -197,7 +197,7 @@ class OrdenesNotifier extends AsyncNotifier<OrdenesState> {
     int ordenId, {
     required int    productoId,
     required double cantidad,
-    required double precioUnitario,
+    required int precioUnitario,
   }) async {
     try {
       await _repo.agregarRepuesto(
@@ -217,7 +217,7 @@ class OrdenesNotifier extends AsyncNotifier<OrdenesState> {
     int repuestoId,
     int ordenId, {
     double? cantidad,
-    double? precioUnitario,
+    int? precioUnitario,
   }) async {
     try {
       await _repo.actualizarRepuesto(

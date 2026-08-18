@@ -39,13 +39,14 @@ class OrdenDetalle extends Equatable {
   final List<OrdenTarea> tareas;
   final List<OrdenRepuesto> repuestos;
 
-  double get subtotalManoObra =>
+  /// Los tres, en pesos enteros: se suman importes que ya lo son.
+  int get subtotalManoObra =>
       tareas.fold(0, (s, t) => s + t.precioPactado);
 
-  double get subtotalRepuestos =>
+  int get subtotalRepuestos =>
       repuestos.fold(0, (s, r) => s + r.subtotal);
 
-  double get totalEstimado => subtotalManoObra + subtotalRepuestos;
+  int get totalEstimado => subtotalManoObra + subtotalRepuestos;
 
   @override
   List<Object?> get props => [

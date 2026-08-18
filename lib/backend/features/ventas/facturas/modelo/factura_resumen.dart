@@ -24,9 +24,10 @@ class FacturaResumen extends Equatable {
   final String clienteNombre;
   final int? ordenId;
   final String? numeroOrden;
-  final double total;
-  final double iva;
-  final double descuento;
+  /// Los tres, en pesos enteros (ver `TablaVentas`).
+  final int total;
+  final int iva;
+  final int descuento;
   final EstadoPago estadoPago;
   final MetodoPago metodoPago;
   final DateTime? creadoEn;

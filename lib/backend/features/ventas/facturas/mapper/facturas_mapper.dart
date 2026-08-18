@@ -20,11 +20,11 @@ abstract final class FacturasMapper {
       numeroOrden: ordenId != null
           ? '#ORD-${ordenId.toString().padLeft(4, '0')}'
           : null,
-      total: (row['total'] as num? ?? 0).toDouble(),
-      iva: (row['iva'] as num? ?? 0).toDouble(),
-      descuento: (row['descuento'] as num? ?? 0).toDouble(),
+      total: _pesos(row['total']),
+      iva: _pesos(row['iva']),
+      descuento: _pesos(row['descuento']),
       estadoPago: EstadoPago.desdeTexto(row['estado_pago'] as String? ?? 'PENDIENTE'),
-      metodoPago: MetodoPago.desdeTexto(row['metodo_pago'] as String? ?? 'EFECTIVO'),
+      metodoPago: MetodoPago.desdeCodigo(row['metodo_pago'] as String? ?? 'EFECTIVO'),
       creadoEn: _parseFecha(row['creado_en']),
     );
   }
@@ -51,12 +51,12 @@ abstract final class FacturasMapper {
           : null,
       clienteId: ventaRow['cliente_id'] as int?,
       clienteNombre: ventaRow['cliente_nombre'] as String? ?? '— Sin cliente —',
-      subtotal: (ventaRow['subtotal'] as num? ?? 0).toDouble(),
-      iva: (ventaRow['iva'] as num? ?? 0).toDouble(),
-      descuento: (ventaRow['descuento'] as num? ?? 0).toDouble(),
-      total: (ventaRow['total'] as num? ?? 0).toDouble(),
-      totalPagado: (ventaRow['total_pagado'] as num? ?? 0).toDouble(),
-      metodoPago: MetodoPago.desdeTexto(ventaRow['metodo_pago'] as String? ?? 'EFECTIVO'),
+      subtotal: _pesos(ventaRow['subtotal']),
+      iva: _pesos(ventaRow['iva']),
+      descuento: _pesos(ventaRow['descuento']),
+      total: _pesos(ventaRow['total']),
+      totalPagado: _pesos(ventaRow['total_pagado']),
+      metodoPago: MetodoPago.desdeCodigo(ventaRow['metodo_pago'] as String? ?? 'EFECTIVO'),
       estadoPago: EstadoPago.desdeTexto(ventaRow['estado_pago'] as String? ?? 'PENDIENTE'),
       creadoEn: _parseFecha(ventaRow['creado_en']),
       items: itemsRows.map(_itemDesdeMap).toList(growable: false),
@@ -72,15 +72,15 @@ abstract final class FacturasMapper {
     int? clienteId,
     required MetodoPago metodoPago,
     required EstadoPago estadoPago,
-    double iva = 0,
-    double descuento = 0,
+    int iva = 0,
+    int descuento = 0,
   }) =>
       TablaVentasCompanion.insert(
         numeroFactura: numeroFactura,
         tipo: Value(tipo.aTexto),
         ordenId: Value(ordenId),
         clienteId: Value(clienteId),
-        metodoPago: Value(metodoPago.aTexto),
+        metodoPago: Value(metodoPago.codigo),
         estadoPago: Value(estadoPago.aTexto),
         iva: Value(iva),
         descuento: Value(descuento),
@@ -96,8 +96,8 @@ abstract final class FacturasMapper {
     int? tecnicoId,
     required String descripcion,
     required double cantidad,
-    required double precioUnitario,
-    double costoUnitario = 0,
+    required int precioUnitario,
+    int costoUnitario = 0,
   }) =>
       TablaVentaDetallesCompanion.insert(
         ventaId: ventaId,
@@ -109,7 +109,10 @@ abstract final class FacturasMapper {
         cantidad: Value(cantidad),
         precioUnitario: precioUnitario,
         costoUnitario: Value(costoUnitario),
-        subtotal: cantidad * precioUnitario,
+        // La cantidad puede ser fraccionaria (litros, metros); el importe
+        // que se cobra, no. El redondeo va aquí, en el único punto por el
+        // que pasa toda línea de factura.
+        subtotal: (cantidad * precioUnitario).round(),
       );
 
   // Helpers privados
@@ -123,10 +126,17 @@ abstract final class FacturasMapper {
         tecnicoId: row['tecnico_id'] as int?,
         descripcion: row['descripcion'] as String? ?? '',
         cantidad: (row['cantidad'] as num? ?? 1).toDouble(),
-        precioUnitario: (row['precio_unitario'] as num? ?? 0).toDouble(),
-        costoUnitario: (row['costo_unitario'] as num? ?? 0).toDouble(),
-        subtotal: (row['subtotal'] as num? ?? 0).toDouble(),
+        precioUnitario: _pesos(row['precio_unitario']),
+        costoUnitario: _pesos(row['costo_unitario']),
+        subtotal: _pesos(row['subtotal']),
       );
+
+  /// Lee un importe de una fila cruda.
+  ///
+  /// Redondea en vez de castear porque las filas vienen de `customSelect`, y
+  /// un `SUM` sobre una columna entera puede llegar como `num`. Truncar
+  /// perdería el peso; redondear es lo que espera quien lo va a cobrar.
+  static int _pesos(dynamic valor) => (valor as num? ?? 0).round();
 
   static DateTime? _parseFecha(dynamic valor) {
     if (valor == null) return null;
@@ -136,6 +146,4 @@ abstract final class FacturasMapper {
     return null;
   }
 
-  static String formatearNumero(int id) =>
-      'FAC-${id.toString().padLeft(4, '0')}';
 }
