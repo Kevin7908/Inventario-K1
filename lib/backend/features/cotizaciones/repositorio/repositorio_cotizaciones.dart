@@ -88,7 +88,7 @@ abstract class RepositorioCotizaciones {
   Future<int> crear({
     int? clienteId,
     int? motoId,
-    required String vigenciaHasta,
+    required DateTime vigenciaHasta,
     String? notas,
     required List<ItemDraft> items,
   });
@@ -97,7 +97,7 @@ abstract class RepositorioCotizaciones {
     required int id,
     int? clienteId,
     int? motoId,
-    required String vigenciaHasta,
+    required DateTime vigenciaHasta,
     String? notas,
     required List<ItemDraft> items,
   });

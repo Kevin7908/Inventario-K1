@@ -1,8 +1,8 @@
+import 'package:inventario_k1/backend/share/dominio/metodo_pago.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../../../backend/features/cotizaciones/modelo/cotizacion_resumen.dart';
-import '../../../../../backend/features/reservas/enum/enum_reserva.dart';
 import '../../../../../backend/features/reservas/repositorio/repositorio_reservas.dart';
 import '../../../../../core/formato.dart';
 import '../../../../share2/share2.dart';
@@ -60,10 +60,14 @@ class DialogoReservarCotizacion extends ConsumerStatefulWidget {
 class _DialogoReservarCotizacionState
     extends ConsumerState<DialogoReservarCotizacion> {
   final _abono = TextEditingController();
+  /// La reserva hereda el plazo de la cotización si todavía sirve; si ya
+  /// venció, arranca con un mes por delante.
   late DateTime _fechaLimite =
-      DateTime.tryParse(widget.cotizacion.vigenciaHasta) ??
-          DateTime.now().add(const Duration(days: 30));
-  String _metodoPago = kMetodosPago.first;
+      widget.cotizacion.vigenciaHasta.isAfter(DateTime.now())
+          ? widget.cotizacion.vigenciaHasta
+          : DateTime.now().add(const Duration(days: 30));
+
+  MetodoPago _metodoPago = MetodoPago.efectivo;
   bool _creando = false;
 
   @override
@@ -98,7 +102,7 @@ class _DialogoReservarCotizacionState
           cotizacionId: widget.cotizacion.id,
           totalReserva: widget.totalReserva,
           items: widget.items,
-          fechaLimite: _comoTexto(_fechaLimite),
+          fechaLimite: _fechaLimite,
           abonoInicial: abono,
           metodoPago: _metodoPago,
         );
@@ -112,9 +116,6 @@ class _DialogoReservarCotizacionState
     Navigator.of(context).pop(true);
   }
 
-  static String _comoTexto(DateTime fecha) =>
-      '${fecha.year}-${fecha.month.toString().padLeft(2, '0')}-'
-      '${fecha.day.toString().padLeft(2, '0')}';
 
   @override
   Widget build(BuildContext context) {
@@ -174,11 +175,11 @@ class _DialogoReservarCotizacionState
                           placeholder: '0',
                           soloEnteros: true,
                         ),
-                        SelectorWidget<String>(
+                        SelectorWidget<MetodoPago>(
                           etiqueta: 'Método de pago',
                           valor: _metodoPago,
-                          opciones: kMetodosPago,
-                          constructorEtiqueta: (m) => m,
+                          opciones: MetodoPago.paraAbonos,
+                          constructorEtiqueta: (m) => m.etiqueta,
                           alCambiar: (m) => setState(() => _metodoPago = m),
                         ),
                       ],

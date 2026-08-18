@@ -13,8 +13,8 @@ class CotizacionResumen extends Equatable {
   final String nombreMoto;
   final int subtotal;
   final int iva;
-  final int total;
-  final String vigenciaHasta; // "YYYY-MM-DD"
+  /// Hasta cuándo se respeta el precio, a medianoche.
+  final DateTime vigenciaHasta;
   final String? notas;
   final DateTime creadoEn;
 
@@ -32,24 +32,38 @@ class CotizacionResumen extends Equatable {
     this.nombreMoto = '',
     required this.subtotal,
     required this.iva,
-    required this.total,
     required this.vigenciaHasta,
     this.notas,
     required this.creadoEn,
     this.cantidadItems = 0,
   });
 
-  /// Estado calculado a partir de vigenciaHasta vs. hoy.
-  EstadoCotizacion get estado {
+  /// Lo que se cobraría: la suma de las líneas más el IVA de ese día.
+  ///
+  /// No es una columna. Era `subtotal + iva`, dos campos de su misma fila, y
+  /// guardarlo solo abría la puerta a que se desincronizara.
+  int get total => subtotal + iva;
+
+  /// Vigente, por vencer o vencida, según cuánto falta para [vigenciaHasta].
+  ///
+  /// Tampoco es una columna: un estado que depende de la fecha de hoy caduca
+  /// solo, y guardarlo obligaría a recalcularlo todas las noches. La misma
+  /// regla vive en SQL —`RepositorioCotizaciones` la usa en el `WHERE` y en
+  /// los conteos—, y las dos salen de [diasParaVencer].
+  EstadoCotizacion get estado => switch (diasParaVencer) {
+        < 0 => EstadoCotizacion.vencida,
+        <= 3 => EstadoCotizacion.porVencer,
+        _ => EstadoCotizacion.vigente,
+      };
+
+  /// Días que faltan para que venza. Negativo si ya venció.
+  int get diasParaVencer {
     final hoy = DateTime.now();
-    final vigencia = DateTime.tryParse(vigenciaHasta);
-    if (vigencia == null) return EstadoCotizacion.vencida;
-    final hoySinHora = DateTime(hoy.year, hoy.month, hoy.day);
-    final vigSinHora = DateTime(vigencia.year, vigencia.month, vigencia.day);
-    final diff = vigSinHora.difference(hoySinHora).inDays;
-    if (diff < 0) return EstadoCotizacion.vencida;
-    if (diff <= 3) return EstadoCotizacion.porVencer;
-    return EstadoCotizacion.vigente;
+    return DateTime(
+      vigenciaHasta.year,
+      vigenciaHasta.month,
+      vigenciaHasta.day,
+    ).difference(DateTime(hoy.year, hoy.month, hoy.day)).inDays;
   }
 
   CotizacionResumen copyWith({
@@ -62,8 +76,7 @@ class CotizacionResumen extends Equatable {
     String? nombreMoto,
     int? subtotal,
     int? iva,
-    int? total,
-    String? vigenciaHasta,
+    DateTime? vigenciaHasta,
     String? notas,
     DateTime? creadoEn,
     int? cantidadItems,
@@ -78,7 +91,6 @@ class CotizacionResumen extends Equatable {
       nombreMoto: nombreMoto ?? this.nombreMoto,
       subtotal: subtotal ?? this.subtotal,
       iva: iva ?? this.iva,
-      total: total ?? this.total,
       vigenciaHasta: vigenciaHasta ?? this.vigenciaHasta,
       notas: notas ?? this.notas,
       creadoEn: creadoEn ?? this.creadoEn,
@@ -94,7 +106,6 @@ class CotizacionResumen extends Equatable {
         motoId,
         subtotal,
         iva,
-        total,
         vigenciaHasta,
         creadoEn,
         cantidadItems,

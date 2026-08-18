@@ -1,3 +1,4 @@
+import '../../../../../backend/share/dominio/metodo_pago.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:inventario_k1/backend/features/reservas/repositorio/repositorio_reservas.dart';
 import 'package:inventario_k1/frontend/features/reservas/provider/reservas_provider.dart';
@@ -38,9 +39,9 @@ final class CotizarAReservaUseCase {
     required int cotizacionId,
     required int totalReserva,
     required List<ItemReservaDraft> items,
-    required String fechaLimite,
+    required DateTime? fechaLimite,
     int abonoInicial = 0,
-    String metodoPago = 'Efectivo',
+    MetodoPago metodoPago = MetodoPago.efectivo,
     String? referencia,
   }) {
     return _ref.read(reservasProvider.notifier).crear(

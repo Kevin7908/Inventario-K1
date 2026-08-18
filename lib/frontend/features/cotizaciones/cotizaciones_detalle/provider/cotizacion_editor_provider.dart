@@ -69,8 +69,7 @@ class CotizacionEditorNotifier extends AsyncNotifier<CotizacionEditorState> {
       numero: resumen.numero,
       cliente: cliente,
       moto: moto,
-      vigenciaHasta:
-          DateTime.tryParse(resumen.vigenciaHasta) ?? _vigenciaPorDefecto,
+      vigenciaHasta: resumen.vigenciaHasta,
       notas: resumen.notas ?? '',
       items: detalle.items
           .map(

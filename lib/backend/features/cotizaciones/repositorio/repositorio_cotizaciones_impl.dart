@@ -1,3 +1,5 @@
+import '../../../share/consecutivos/documento_consecutivo.dart';
+import '../../../share/consecutivos/repositorio_consecutivos.dart';
 import 'package:drift/drift.dart';
 import 'package:inventario_k1/backend/share/database/app_db.dart';
 
@@ -9,9 +11,14 @@ import '../modelo/cotizacion_resumen.dart';
 import 'repositorio_cotizaciones.dart';
 
 class RepositorioCotizacionesImpl implements RepositorioCotizaciones {
-  const RepositorioCotizacionesImpl(this._db);
+  RepositorioCotizacionesImpl(this._db);
 
   final AppDb _db;
+
+  /// Los números de documento salen de la tabla `consecutivos`, no de `MAX+1`
+  /// ni del `id`: ver `RepositorioConsecutivos`.
+  late final RepositorioConsecutivos _consecutivos =
+      RepositorioConsecutivos(_db);
 
   // ── JOIN base ─────────────────────────────────────────────────────────────
 
@@ -20,6 +27,11 @@ class RepositorioCotizacionesImpl implements RepositorioCotizaciones {
       leftOuterJoin(
         _db.tablaCliente,
         _db.tablaCliente.id.equalsExp(_db.tablaCotizacion.clienteId),
+      ),
+      // El nombre y el teléfono del cliente viven en `personas`.
+      leftOuterJoin(
+        _db.tablaPersona,
+        _db.tablaPersona.id.equalsExp(_db.tablaCliente.personaId),
       ),
       leftOuterJoin(
         _db.tablaMoto,
@@ -43,7 +55,7 @@ class RepositorioCotizacionesImpl implements RepositorioCotizaciones {
 
   CotizacionResumen _rowToResumen(TypedResult row) {
     final cot = row.readTable(_db.tablaCotizacion);
-    final cli = row.readTableOrNull(_db.tablaCliente);
+    final cli = row.readTableOrNull(_db.tablaPersona);
     final moto = row.readTableOrNull(_db.tablaMoto);
 
     final nombreCliente = cli != null
@@ -73,19 +85,27 @@ class RepositorioCotizacionesImpl implements RepositorioCotizaciones {
 
   // ── Paginación — WHERE, COUNT y LIMIT los resuelve SQLite ─────────────────
 
-  /// Días que faltan para que venza, en SQL.
+  /// Días que faltan para que venza, calculado en SQL.
   ///
-  /// `vigencia_hasta` es texto 'YYYY-MM-DD', así que se compara con
-  /// `julianday`: negativo = vencida, 0..3 = por vencer, más = vigente. Es la
-  /// misma regla que `CotizacionResumen.estado` aplica en Dart, pero aquí
-  /// puede entrar en el `WHERE` y en el `COUNT`.
-  static const _diasParaVencer =
-      "CAST(julianday(cotizaciones.vigencia_hasta) - julianday(date('now')) AS INTEGER)";
+  /// `vigencia_hasta` es un `DateTime`, y Drift lo guarda como segundos desde
+  /// la época; la resta contra la medianoche de hoy y la división por 86400
+  /// dan los días. Negativo = vencida.
+  ///
+  /// Es un `CustomExpression` y no texto suelto a propósito: así se compone
+  /// con el resto del query builder —entra en un `where`, en un `count(filter:)`
+  /// o en un `sum(filter:)`— en vez de obligar a escribir la consulta entera
+  /// a mano. Es la misma regla que `CotizacionResumen.diasParaVencer` aplica
+  /// en Dart.
+  static final Expression<int> _diasParaVencer = const CustomExpression<int>(
+    "CAST((cotizaciones.vigencia_hasta - "
+    "unixepoch(date('now', 'localtime'))) / 86400 AS INTEGER)",
+  );
 
-  static String _condicionEstado(EstadoCotizacion estado) => switch (estado) {
-        EstadoCotizacion.vencida => '$_diasParaVencer < 0',
-        EstadoCotizacion.porVencer => '$_diasParaVencer BETWEEN 0 AND 3',
-        EstadoCotizacion.vigente => '$_diasParaVencer > 3',
+  static Expression<bool> _condicionEstado(EstadoCotizacion estado) =>
+      switch (estado) {
+        EstadoCotizacion.vencida => _diasParaVencer.isSmallerThanValue(0),
+        EstadoCotizacion.porVencer => _diasParaVencer.isBetweenValues(0, 3),
+        EstadoCotizacion.vigente => _diasParaVencer.isBiggerThanValue(3),
       };
 
   /// La más reciente primero. El `id` desempata: dos cotizaciones creadas en el
@@ -104,13 +124,13 @@ class RepositorioCotizacionesImpl implements RepositorioCotizaciones {
       final patron = '%${busqueda.toLowerCase()}%';
       acumulado = acumulado &
           (_db.tablaCotizacion.numero.lower().like(patron) |
-              _db.tablaCliente.nombres.lower().like(patron) |
-              _db.tablaCliente.apellidos.lower().like(patron));
+              _db.tablaPersona.nombres.lower().like(patron) |
+              _db.tablaPersona.apellidos.lower().like(patron));
     }
 
     final estado = filtro.estado;
     if (estado != null) {
-      acumulado = acumulado & CustomExpression<bool>(_condicionEstado(estado));
+      acumulado = acumulado & _condicionEstado(estado);
     }
 
     return acumulado;
@@ -137,6 +157,10 @@ class RepositorioCotizacionesImpl implements RepositorioCotizaciones {
         _db.tablaCliente,
         _db.tablaCliente.id.equalsExp(_db.tablaCotizacion.clienteId),
       ),
+      leftOuterJoin(
+        _db.tablaPersona,
+        _db.tablaPersona.id.equalsExp(_db.tablaCliente.personaId),
+      ),
     ])
       ..addColumns([total])
       ..where(condicion);
@@ -152,31 +176,32 @@ class RepositorioCotizacionesImpl implements RepositorioCotizaciones {
 
   @override
   Stream<ResumenCotizaciones> observarResumen() {
-    return _db
-        .customSelect(
-          '''
-          SELECT
-            COUNT(*) AS total,
-            COUNT(*) FILTER (WHERE ${_condicionEstado(EstadoCotizacion.vigente)})
-              AS vigentes,
-            COUNT(*) FILTER (WHERE ${_condicionEstado(EstadoCotizacion.porVencer)})
-              AS por_vencer,
-            COUNT(*) FILTER (WHERE ${_condicionEstado(EstadoCotizacion.vencida)})
-              AS vencidas,
-            COALESCE(SUM(total) FILTER (WHERE $_diasParaVencer >= 0), 0)
-              AS monto_vigente
-          FROM cotizaciones
-          ''',
-          readsFrom: {_db.tablaCotizacion},
-        )
-        .watchSingleOrNull()
-        .map(
+    // Todo en una consulta y con el query builder: antes era SQL crudo con
+    // cinco `COUNT(*) FILTER` interpolados a mano, que el analizador no podía
+    // revisar y que se rompía en silencio si cambiaba una columna.
+    final t = _db.tablaCotizacion;
+    final total = t.id.count();
+    final vigentes =
+        t.id.count(filter: _condicionEstado(EstadoCotizacion.vigente));
+    final porVencer =
+        t.id.count(filter: _condicionEstado(EstadoCotizacion.porVencer));
+    final vencidas =
+        t.id.count(filter: _condicionEstado(EstadoCotizacion.vencida));
+    // El total de cada cotización es `subtotal + iva`: no hay columna `total`
+    // porque se deduce de esas dos.
+    final montoVigente = (t.subtotal + t.iva)
+        .sum(filter: _diasParaVencer.isBiggerOrEqualValue(0));
+
+    final consulta = _db.selectOnly(t)
+      ..addColumns([total, vigentes, porVencer, vencidas, montoVigente]);
+
+    return consulta.watchSingleOrNull().map(
           (fila) => (
-            total: fila?.read<int>('total') ?? 0,
-            vigentes: fila?.read<int>('vigentes') ?? 0,
-            porVencer: fila?.read<int>('por_vencer') ?? 0,
-            vencidas: fila?.read<int>('vencidas') ?? 0,
-            montoVigente: fila?.read<int>('monto_vigente') ?? 0,
+            total: fila?.read(total) ?? 0,
+            vigentes: fila?.read(vigentes) ?? 0,
+            porVencer: fila?.read(porVencer) ?? 0,
+            vencidas: fila?.read(vencidas) ?? 0,
+            montoVigente: fila?.read(montoVigente) ?? 0,
           ),
         );
   }
@@ -221,15 +246,14 @@ class RepositorioCotizacionesImpl implements RepositorioCotizaciones {
   Future<int> crear({
     int? clienteId,
     int? motoId,
-    required String vigenciaHasta,
+    required DateTime vigenciaHasta,
     String? notas,
     required List<ItemDraft> items,
   }) {
     return _db.transaction(() async {
-      final numero = await _generarNumero();
+      final numero = await _consecutivos.siguiente(DocumentoConsecutivo.cotizacion);
       final subtotal = items.fold(0, (s, d) => s + d.subtotal);
       final iva = ivaDe(subtotal);
-      final total = subtotal + iva;
 
       final id = await _db.into(_db.tablaCotizacion).insert(
             CotizacionMapper.nuevaACompanion(
@@ -238,7 +262,6 @@ class RepositorioCotizacionesImpl implements RepositorioCotizaciones {
               motoId: motoId,
               subtotal: subtotal,
               iva: iva,
-              total: total,
               vigenciaHasta: vigenciaHasta,
               notas: notas,
             ),
@@ -248,7 +271,7 @@ class RepositorioCotizacionesImpl implements RepositorioCotizaciones {
         await _db.into(_db.tablaCotizacionItem).insert(
               CotizacionMapper.itemACompanion(
                 cotizacionId: id,
-                tipoItem: draft.tipo.valor,
+                tipo: draft.tipo,
                 referenciaId: draft.referenciaId,
                 descripcion: draft.descripcion,
                 cantidad: draft.cantidad,
@@ -266,22 +289,21 @@ class RepositorioCotizacionesImpl implements RepositorioCotizaciones {
     required int id,
     int? clienteId,
     int? motoId,
-    required String vigenciaHasta,
+    required DateTime vigenciaHasta,
     String? notas,
     required List<ItemDraft> items,
   }) {
     return _db.transaction(() async {
       final subtotal = items.fold(0, (s, d) => s + d.subtotal);
       final iva = ivaDe(subtotal);
-      final total = subtotal + iva;
       await (_db.update(_db.tablaCotizacion)..where((t) => t.id.equals(id)))
           .write(TablaCotizacionCompanion(
         clienteId: Value(clienteId),
         motoId: Value(motoId),
         subtotal: Value(subtotal),
         iva: Value(iva),
-        total: Value(total),
         vigenciaHasta: Value(vigenciaHasta),
+        actualizadoEn: Value(DateTime.now()),
         notas: Value(notas),
       ));
 
@@ -294,7 +316,7 @@ class RepositorioCotizacionesImpl implements RepositorioCotizaciones {
         await _db.into(_db.tablaCotizacionItem).insert(
               CotizacionMapper.itemACompanion(
                 cotizacionId: id,
-                tipoItem: draft.tipo.valor,
+                tipo: draft.tipo,
                 referenciaId: draft.referenciaId,
                 descripcion: draft.descripcion,
                 cantidad: draft.cantidad,
@@ -324,7 +346,7 @@ class RepositorioCotizacionesImpl implements RepositorioCotizaciones {
       await _db.into(_db.tablaCotizacionItem).insert(
             CotizacionMapper.itemACompanion(
               cotizacionId: cotizacionId,
-              tipoItem: tipo.valor,
+              tipo: tipo,
               referenciaId: referenciaId,
               descripcion: descripcion,
               cantidad: cantidad,
@@ -349,37 +371,18 @@ class RepositorioCotizacionesImpl implements RepositorioCotizaciones {
   // ── Helpers privados ──────────────────────────────────────────────────────
 
   /// O(1): una sola consulta MAX() en lugar de cargar todas las filas.
-  Future<String> _generarNumero() async {
-    final anio = DateTime.now().year;
-    final prefix = 'COT-$anio-';
-
-    final maxExpr = _db.tablaCotizacion.numero.max();
-    final query = _db.selectOnly(_db.tablaCotizacion)
-      ..addColumns([maxExpr])
-      ..where(_db.tablaCotizacion.numero.like('$prefix%'));
-
-    final row = await query.getSingleOrNull();
-    final maxNumero = row?.read(maxExpr);
-    final maxSeq = maxNumero != null
-        ? (int.tryParse(maxNumero.replaceFirst(prefix, '')) ?? 0)
-        : 0;
-
-    return '$prefix${(maxSeq + 1).toString().padLeft(4, '0')}';
-  }
 
   Future<void> _recalcularTotales(int cotizacionId) async {
     final filas = await (_db.select(_db.tablaCotizacionItem)
           ..where((t) => t.cotizacionId.equals(cotizacionId)))
         .get();
     final subtotal = filas.fold(0, (s, i) => s + i.subtotal);
-    final iva = ivaDe(subtotal);
-    final total = subtotal + iva;
     await (_db.update(_db.tablaCotizacion)
           ..where((t) => t.id.equals(cotizacionId)))
         .write(TablaCotizacionCompanion(
       subtotal: Value(subtotal),
-      iva: Value(iva),
-      total: Value(total),
+      iva: Value(ivaDe(subtotal)),
+      actualizadoEn: Value(DateTime.now()),
     ));
   }
 }

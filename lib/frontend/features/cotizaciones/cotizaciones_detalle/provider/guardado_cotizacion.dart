@@ -26,7 +26,6 @@ class GuardadoCotizacion {
     required List<ItemCotizacionEditor> items,
   }) async {
     final drafts = items.map((i) => i.aDraft()).toList(growable: false);
-    final fecha = _comoTexto(vigenciaHasta);
     final limpias = notas.trim().isEmpty ? null : notas.trim();
 
     if (id != null) {
@@ -34,7 +33,7 @@ class GuardadoCotizacion {
         id: id,
         clienteId: clienteId,
         motoId: motoId,
-        vigenciaHasta: fecha,
+        vigenciaHasta: vigenciaHasta,
         notas: limpias,
         items: drafts,
       );
@@ -44,7 +43,7 @@ class GuardadoCotizacion {
     final nuevo = await _repo.crear(
       clienteId: clienteId,
       motoId: motoId,
-      vigenciaHasta: fecha,
+      vigenciaHasta: vigenciaHasta,
       notas: limpias,
       items: drafts,
     );
@@ -54,8 +53,4 @@ class GuardadoCotizacion {
     return (id: nuevo, numero: creada.resumen.numero);
   }
 
-  /// La columna `vigencia_hasta` guarda texto 'YYYY-MM-DD'.
-  static String _comoTexto(DateTime fecha) =>
-      '${fecha.year}-${fecha.month.toString().padLeft(2, '0')}-'
-      '${fecha.day.toString().padLeft(2, '0')}';
 }
