@@ -15,6 +15,7 @@ class CotizacionMapper {
     required String nombreCliente,
     String? telefonoCliente,
     required String nombreMoto,
+    int cantidadItems = 0,
   }) {
     return CotizacionResumen(
       id: row.id,
@@ -30,6 +31,7 @@ class CotizacionMapper {
       vigenciaHasta: row.vigenciaHasta,
       notas: row.notas,
       creadoEn: row.creadoEn,
+      cantidadItems: cantidadItems,
     );
   }
 

@@ -25,8 +25,21 @@ class RepositorioCotizacionesImpl implements RepositorioCotizaciones {
         _db.tablaMoto,
         _db.tablaMoto.id.equalsExp(_db.tablaCotizacion.motoId),
       ),
-    ]);
+    ])
+      ..addColumns([_cantidadItems]);
   }
+
+  /// Cuántas líneas tiene cada cotización, sin traerlas.
+  ///
+  /// Va como subconsulta y no como `GROUP BY` para no alterar el `JOIN` ni el
+  /// `COUNT` del total de la paginación. El stream no observa
+  /// `cotizacion_items`, pero no hace falta: toda ruta que agrega o quita una
+  /// línea reescribe también los totales de la cotización, así que la fila
+  /// padre cambia y el `watch` vuelve a emitir.
+  static const _cantidadItems = CustomExpression<int>(
+    '(SELECT COUNT(*) FROM cotizacion_items '
+    'WHERE cotizacion_items.cotizacion_id = cotizaciones.id)',
+  );
 
   CotizacionResumen _rowToResumen(TypedResult row) {
     final cot = row.readTable(_db.tablaCotizacion);
@@ -45,6 +58,7 @@ class RepositorioCotizacionesImpl implements RepositorioCotizaciones {
       nombreCliente: nombreCliente,
       telefonoCliente: cli?.telefono,
       nombreMoto: nombreMoto,
+      cantidadItems: row.read(_cantidadItems) ?? 0,
     );
   }
 
@@ -196,6 +210,12 @@ class RepositorioCotizacionesImpl implements RepositorioCotizaciones {
   }
 
   // ── Escrituras ────────────────────────────────────────────────────────────
+  //
+  // Una cotización **no toca el inventario**. Es una propuesta: el stock se
+  // compromete recién al pasarla a reserva o al facturarla. Antes `crear` lo
+  // descontaba y `actualizar` lo restauraba para volver a descontarlo, pero
+  // `eliminar` no lo devolvía nunca: borrar una cotización dejaba el stock
+  // hundido para siempre.
 
   @override
   Future<int> crear({
@@ -236,11 +256,6 @@ class RepositorioCotizacionesImpl implements RepositorioCotizaciones {
                 subtotal: draft.subtotal,
               ),
             );
-        // Descontar stock del producto al crear la cotización.
-        if (draft.tipo == TipoItemCotizacion.producto &&
-            draft.referenciaId != null) {
-          await _ajustarStockProducto(draft.referenciaId!, -draft.cantidad);
-        }
       }
       return id;
     });
@@ -256,18 +271,6 @@ class RepositorioCotizacionesImpl implements RepositorioCotizaciones {
     required List<ItemDraft> items,
   }) {
     return _db.transaction(() async {
-      // 1. Restaurar stock de los ítems que había en BD antes de la edición.
-      final anteriores = await (_db.select(_db.tablaCotizacionItem)
-            ..where((t) => t.cotizacionId.equals(id)))
-          .get();
-      for (final item in anteriores) {
-        if (item.referenciaId != null &&
-            item.tipoItem == TipoItemCotizacion.producto.valor) {
-          await _ajustarStockProducto(item.referenciaId!, item.cantidad);
-        }
-      }
-
-      // 2. Actualizar cabecera de la cotización.
       final subtotal = items.fold(0, (s, d) => s + d.subtotal);
       final iva = ivaDe(subtotal);
       final total = subtotal + iva;
@@ -282,7 +285,8 @@ class RepositorioCotizacionesImpl implements RepositorioCotizaciones {
         notas: Value(notas),
       ));
 
-      // 3. Reemplazar ítems y descontar stock de los nuevos.
+      // Los ítems se reemplazan enteros: es más simple que diferenciar altas,
+      // bajas y cambios de cantidad, y no hay stock que conciliar.
       await (_db.delete(_db.tablaCotizacionItem)
             ..where((t) => t.cotizacionId.equals(id)))
           .go();
@@ -298,10 +302,6 @@ class RepositorioCotizacionesImpl implements RepositorioCotizaciones {
                 subtotal: draft.subtotal,
               ),
             );
-        if (draft.tipo == TipoItemCotizacion.producto &&
-            draft.referenciaId != null) {
-          await _ajustarStockProducto(draft.referenciaId!, -draft.cantidad);
-        }
       }
     });
   }
@@ -366,22 +366,6 @@ class RepositorioCotizacionesImpl implements RepositorioCotizaciones {
 
     return '$prefix${(maxSeq + 1).toString().padLeft(4, '0')}';
   }
-
-  /// Ajusta `stock_actual` del producto [productoId] sumando [delta]
-  /// (positivo para restaurar, negativo para descontar).
-  /// Debe llamarse siempre dentro de una transacción abierta.
-  Future<void> _ajustarStockProducto(int productoId, double delta) =>
-      _db.customUpdate(
-        'UPDATE productos '
-        'SET stock_actual = stock_actual + ?, actualizado_en = ? '
-        'WHERE id = ?',
-        variables: [
-          Variable.withReal(delta),
-          Variable.withDateTime(DateTime.now()),
-          Variable.withInt(productoId),
-        ],
-        updates: {_db.tablaProducto},
-      );
 
   Future<void> _recalcularTotales(int cotizacionId) async {
     final filas = await (_db.select(_db.tablaCotizacionItem)

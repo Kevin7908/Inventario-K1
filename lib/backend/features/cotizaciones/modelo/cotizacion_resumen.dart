@@ -18,6 +18,10 @@ class CotizacionResumen extends Equatable {
   final String? notas;
   final DateTime creadoEn;
 
+  /// Cuántas líneas tiene la cotización. Lo cuenta SQLite con un `COUNT`
+  /// correlacionado: el listado no carga los ítems para saber cuántos son.
+  final int cantidadItems;
+
   const CotizacionResumen({
     required this.id,
     required this.numero,
@@ -32,6 +36,7 @@ class CotizacionResumen extends Equatable {
     required this.vigenciaHasta,
     this.notas,
     required this.creadoEn,
+    this.cantidadItems = 0,
   });
 
   /// Estado calculado a partir de vigenciaHasta vs. hoy.
@@ -61,6 +66,7 @@ class CotizacionResumen extends Equatable {
     String? vigenciaHasta,
     String? notas,
     DateTime? creadoEn,
+    int? cantidadItems,
   }) {
     return CotizacionResumen(
       id: id ?? this.id,
@@ -76,6 +82,7 @@ class CotizacionResumen extends Equatable {
       vigenciaHasta: vigenciaHasta ?? this.vigenciaHasta,
       notas: notas ?? this.notas,
       creadoEn: creadoEn ?? this.creadoEn,
+      cantidadItems: cantidadItems ?? this.cantidadItems,
     );
   }
 
@@ -90,5 +97,6 @@ class CotizacionResumen extends Equatable {
         total,
         vigenciaHasta,
         creadoEn,
+        cantidadItems,
       ];
 }

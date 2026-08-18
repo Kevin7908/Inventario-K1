@@ -13,12 +13,15 @@ import 'package:inventario_k1/backend/features/cotizaciones/enum/enum_cotizacion
 import 'package:inventario_k1/backend/features/cotizaciones/modelo/cotizacion_resumen.dart';
 import 'package:inventario_k1/backend/features/cotizaciones/repositorio/repositorio_cotizaciones.dart';
 import 'package:inventario_k1/backend/features/cotizaciones/repositorio/repositorio_cotizaciones_impl.dart';
+import 'package:inventario_k1/backend/features/productos/modelo/producto.dart';
+import 'package:inventario_k1/backend/features/productos/repositorio/repositorio_producto_impl.dart';
 import 'package:inventario_k1/backend/share/database/app_db.dart';
 import 'package:inventario_k1/core/iva_app.dart';
 
 late AppDb db;
 late RepositorioCotizacionesImpl repo;
 late RepositorioClientesImpl clientes;
+late RepositorioProductosImpl productos;
 
 /// Fecha a [dias] de hoy, en el formato 'YYYY-MM-DD' que guarda la columna.
 String _enDias(int dias) {
@@ -57,6 +60,7 @@ void main() {
     db = AppDb(NativeDatabase.memory());
     repo = RepositorioCotizacionesImpl(db);
     clientes = RepositorioClientesImpl(db);
+    productos = RepositorioProductosImpl(db);
   });
 
   tearDown(() async => db.close());
@@ -215,6 +219,181 @@ void main() {
       expect(detalle.resumen.subtotal, 100000);
       expect(detalle.resumen.iva, ivaDe(100000));
       expect(detalle.resumen.total, 100000 + ivaDe(100000));
+    });
+  });
+
+  group('conteo de ítems', () {
+    // La columna "ÍTEMS" del listado. Sale de un COUNT correlacionado: si se
+    // resolviera cargando el detalle de cada fila, pintar una página de doce
+    // costaría doce consultas más.
+    test('cada fila informa cuántas líneas tiene', () async {
+      await repo.crear(
+        vigenciaHasta: _enDias(30),
+        items: const [
+          ItemDraft(
+            tipo: TipoItemCotizacion.producto,
+            descripcion: 'Aceite',
+            cantidad: 2,
+            precioUnitario: 32000,
+          ),
+          ItemDraft(
+            tipo: TipoItemCotizacion.servicio,
+            descripcion: 'Cambio de aceite',
+            cantidad: 1,
+            precioUnitario: 25000,
+          ),
+          ItemDraft(
+            tipo: TipoItemCotizacion.libre,
+            descripcion: 'Guardabarros',
+            cantidad: 1,
+            precioUnitario: 80000,
+          ),
+        ],
+      );
+
+      final pagina = await repo
+          .observarPagina(
+            filtro: const FiltroCotizaciones(),
+            pagina: 0,
+            tamano: 10,
+          )
+          .first;
+
+      expect(pagina.items.single.cantidadItems, 3);
+    });
+
+    test('el conteo baja al quitarle líneas a la cotización', () async {
+      final id = await repo.crear(
+        vigenciaHasta: _enDias(30),
+        items: const [
+          ItemDraft(
+            tipo: TipoItemCotizacion.libre,
+            descripcion: 'Uno',
+            cantidad: 1,
+            precioUnitario: 1000,
+          ),
+          ItemDraft(
+            tipo: TipoItemCotizacion.libre,
+            descripcion: 'Dos',
+            cantidad: 1,
+            precioUnitario: 1000,
+          ),
+        ],
+      );
+
+      await repo.actualizar(
+        id: id,
+        vigenciaHasta: _enDias(30),
+        items: const [
+          ItemDraft(
+            tipo: TipoItemCotizacion.libre,
+            descripcion: 'Uno',
+            cantidad: 1,
+            precioUnitario: 1000,
+          ),
+        ],
+      );
+
+      final pagina = await repo
+          .observarPagina(
+            filtro: const FiltroCotizaciones(),
+            pagina: 0,
+            tamano: 10,
+          )
+          .first;
+
+      expect(pagina.items.single.cantidadItems, 1);
+    });
+  });
+
+  group('inventario', () {
+    // Una cotización es una propuesta: no compromete stock. Antes `crear` lo
+    // descontaba y `eliminar` no lo devolvía, así que borrar una cotización
+    // dejaba el inventario hundido sin que nadie lo notara.
+    test('cotizar un producto no mueve su stock', () async {
+      final producto = await productos.crear(
+        const Producto(
+          sku: 'SKU-1123',
+          nombre: 'Aceite Motul 20W50',
+          precioCompra: 20000,
+          precioVenta: 32000,
+          stockActual: 12,
+          stockMinimo: 2,
+          aplicaIva: false,
+          activo: true,
+        ),
+      );
+
+      final id = await repo.crear(
+        vigenciaHasta: _enDias(30),
+        items: [
+          ItemDraft(
+            tipo: TipoItemCotizacion.producto,
+            referenciaId: producto.id,
+            descripcion: producto.nombre,
+            cantidad: 5,
+            precioUnitario: 32000,
+          ),
+        ],
+      );
+      expect(
+        (await productos.obtenerPorId(producto.id!))!.stockActual,
+        12,
+        reason: 'crear no descuenta',
+      );
+
+      await repo.actualizar(
+        id: id,
+        vigenciaHasta: _enDias(30),
+        items: [
+          ItemDraft(
+            tipo: TipoItemCotizacion.producto,
+            referenciaId: producto.id,
+            descripcion: producto.nombre,
+            cantidad: 9,
+            precioUnitario: 32000,
+          ),
+        ],
+      );
+      expect(
+        (await productos.obtenerPorId(producto.id!))!.stockActual,
+        12,
+        reason: 'editar no descuenta ni restaura',
+      );
+
+      await repo.eliminar(id);
+      expect((await productos.obtenerPorId(producto.id!))!.stockActual, 12);
+    });
+
+    test('se puede cotizar un producto sin stock', () async {
+      final agotado = await productos.crear(
+        const Producto(
+          sku: 'SKU-1201',
+          nombre: 'Pastilla de freno',
+          precioCompra: 30000,
+          precioVenta: 45000,
+          stockActual: 0,
+          stockMinimo: 1,
+          aplicaIva: false,
+          activo: true,
+        ),
+      );
+
+      await repo.crear(
+        vigenciaHasta: _enDias(30),
+        items: [
+          ItemDraft(
+            tipo: TipoItemCotizacion.producto,
+            referenciaId: agotado.id,
+            descripcion: agotado.nombre,
+            cantidad: 3,
+            precioUnitario: 45000,
+          ),
+        ],
+      );
+
+      // Sin negativos: cotizar lo que hay que pedir es normal en un taller.
+      expect((await productos.obtenerPorId(agotado.id!))!.stockActual, 0);
     });
   });
 
