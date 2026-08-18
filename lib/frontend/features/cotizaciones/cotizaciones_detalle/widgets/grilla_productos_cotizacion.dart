@@ -16,6 +16,9 @@ import '../provider/cotizacion_editor_provider.dart';
 /// El **stock se muestra pero no bloquea**: una cotización no mueve inventario,
 /// y cotizar lo que hay que pedirle al proveedor es parte del trabajo. El color
 /// avisa igual, para que quien cotiza sepa que ese repuesto no está en bodega.
+///
+/// Muestra **una página**, no el catálogo: el recorte lo hace SQLite y el
+/// paginador vive en el pie del panel.
 class GrillaProductosCotizacion extends ConsumerWidget {
   const GrillaProductosCotizacion({super.key, required this.cotizacionId});
 
@@ -34,7 +37,16 @@ class GrillaProductosCotizacion extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final productos = ref.watch(productosCotizacionProvider(cotizacionId));
+    // `.value` conserva la página anterior mientras llega la nueva: sin eso,
+    // cada tecla del buscador parpadearía en blanco.
+    final pagina = ref.watch(paginaProductosCotizacionProvider(cotizacionId));
+    final productos = pagina.value?.items;
+
+    if (productos == null) {
+      return const Center(
+        child: CircularProgressIndicator(color: ColoresApp.goGreen),
+      );
+    }
 
     if (productos.isEmpty) {
       return const Center(

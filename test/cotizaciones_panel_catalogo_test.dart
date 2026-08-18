@@ -15,8 +15,10 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:inventario_k1/backend/features/categorias/modelo/categoria.dart';
 import 'package:inventario_k1/backend/features/cotizaciones/enum/enum_cotizacion.dart';
 import 'package:inventario_k1/backend/features/productos/modelo/producto.dart';
+import 'package:inventario_k1/backend/features/productos/repositorio/repositorio_producto.dart';
 import 'package:inventario_k1/backend/features/ventas/servicios/modelo/servicio.dart';
 import 'package:inventario_k1/frontend/features/categorias/provider/categorias_provider.dart';
+import 'package:inventario_k1/frontend/features/cotizaciones/cotizaciones_detalle/provider/catalogo_cotizacion_providers.dart';
 import 'package:inventario_k1/frontend/features/cotizaciones/cotizaciones_detalle/provider/cotizacion_editor_provider.dart';
 import 'package:inventario_k1/frontend/features/cotizaciones/cotizaciones_detalle/widgets/panel_catalogo.dart';
 import 'package:inventario_k1/frontend/features/productos/provider/productos_provider.dart';
@@ -80,7 +82,15 @@ Future<ProviderContainer> _montar(WidgetTester tester) async {
   final container = ProviderContainer(
     overrides: [
       catalogoCategoriasProvider.overrideWith((_) => Stream.value(_categorias)),
+      // La rejilla ya no lee el catálogo entero: pide una página al
+      // repositorio. `catalogoCompletoProvider` sigue overrideado porque de él
+      // salen las fotos de las líneas ya agregadas.
       catalogoCompletoProvider.overrideWith((_) => Stream.value(_productos)),
+      paginaProductosCotizacionProvider.overrideWith(
+        (_, _) => Stream.value(
+          PaginaProductos(items: _productos, total: _productos.length),
+        ),
+      ),
       serviciosProvider.overrideWith(_ServiciosFalsos.new),
       // El editor guarda solo: sin esto, el temporizador del autoguardado
       // escribiría en la base real del desarrollador desde un test.

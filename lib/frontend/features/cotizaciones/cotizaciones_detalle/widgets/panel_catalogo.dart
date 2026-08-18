@@ -3,6 +3,8 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../../../backend/features/cotizaciones/enum/enum_cotizacion.dart';
 import '../../../../share2/share2.dart';
+import '../modelo/cotizacion_editor_state.dart';
+import '../provider/catalogo_cotizacion_providers.dart';
 import '../provider/cotizacion_editor_provider.dart';
 import 'grilla_productos_cotizacion.dart';
 import 'linea_libre_form.dart';
@@ -57,6 +59,10 @@ class PanelCatalogo extends ConsumerWidget {
                 // Sin botón de alta de producto: el catálogo se administra
                 // desde su propia pantalla, no desde una cotización.
                 Expanded(child: _contenido(context, ref, tipo)),
+                // Solo los productos vienen paginados: servicios y línea libre
+                // no pasan por el repositorio de productos.
+                if (tipo == TipoItemCotizacion.producto)
+                  _Paginador(cotizacionId: cotizacionId),
               ],
             ),
           ),
@@ -81,6 +87,45 @@ class PanelCatalogo extends ConsumerWidget {
                 .agregarLibre(descripcion: descripcion, precio: precio),
           ),
       };
+}
+
+/// Paginador de la rejilla de productos.
+///
+/// Observa solo el total y la página actual, así que pasar de página no lo
+/// reconstruye por lo que se esté escribiendo ni por las líneas agregadas.
+class _Paginador extends ConsumerWidget {
+  const _Paginador({required this.cotizacionId});
+
+  final int? cotizacionId;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final totalPaginas = ref.watch(totalPaginasCotizacionProvider(cotizacionId));
+    final actual = ref.watch(
+      cotizacionEditorProvider(cotizacionId)
+          .select((s) => s.value?.paginaCatalogo ?? 0),
+    );
+    final total = ref.watch(
+      paginaProductosCotizacionProvider(cotizacionId)
+          .select((p) => p.value?.total ?? 0),
+    );
+
+    // Con una sola página el paginador no dice nada que no se vea.
+    if (totalPaginas <= 1) return const SizedBox.shrink();
+
+    return Padding(
+      padding: const EdgeInsets.only(top: 12),
+      child: PaginacionWidget(
+        paginaActual: actual,
+        totalPaginas: totalPaginas,
+        totalItems: total,
+        itemsPorPagina: CotizacionEditorState.tamanoPaginaCatalogo,
+        alCambiarPagina: ref
+            .read(cotizacionEditorProvider(cotizacionId).notifier)
+            .irAPaginaCatalogo,
+      ),
+    );
+  }
 }
 
 /// Selector de tipo y buscador.

@@ -1,6 +1,7 @@
 import '../../../../../backend/features/clientes/modelo/cliente.dart';
 import '../../../../../backend/features/cotizaciones/enum/enum_cotizacion.dart';
 import '../../../../../backend/features/motos/modelo/moto.dart';
+import '../../../../../backend/features/productos/repositorio/repositorio_producto.dart';
 import '../../../../../core/iva_app.dart';
 import 'item_cotizacion_editor.dart';
 
@@ -49,7 +50,11 @@ final class CotizacionEditorState {
     this.tipoActivo = TipoItemCotizacion.producto,
     this.busquedaCatalogo = '',
     this.categoriaId,
+    this.paginaCatalogo = 0,
   });
+
+  /// Cuántas tarjetas trae cada página de la rejilla de productos.
+  static const int tamanoPaginaCatalogo = 12;
 
   final int? cotizacionId;
 
@@ -75,6 +80,19 @@ final class CotizacionEditorState {
 
   /// `null` = todas las categorías. Solo aplica en modo producto.
   final int? categoriaId;
+
+  /// Página de la rejilla de productos, de base cero.
+  final int paginaCatalogo;
+
+  /// Traduce los filtros del panel a los que entiende el repositorio.
+  ///
+  /// `soloActivos` va fijo: un producto dado de baja no se cotiza. El recorte
+  /// lo hace SQLite, no la vista (§7).
+  FiltroProductos get filtroProductos => FiltroProductos(
+        busqueda: busquedaCatalogo,
+        categoriaId: categoriaId,
+        soloActivos: true,
+      );
 
   bool get esEdicion => cotizacionId != null;
 
@@ -141,6 +159,7 @@ final class CotizacionEditorState {
     TipoItemCotizacion? tipoActivo,
     String? busquedaCatalogo,
     Object? categoriaId = _sinCambio,
+    int? paginaCatalogo,
     int? cotizacionId,
     String? numero,
   }) =>
@@ -163,5 +182,6 @@ final class CotizacionEditorState {
         categoriaId: identical(categoriaId, _sinCambio)
             ? this.categoriaId
             : categoriaId as int?,
+        paginaCatalogo: paginaCatalogo ?? this.paginaCatalogo,
       );
 }

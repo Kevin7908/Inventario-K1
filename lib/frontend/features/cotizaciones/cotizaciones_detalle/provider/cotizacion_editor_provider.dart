@@ -150,14 +150,25 @@ class CotizacionEditorNotifier extends AsyncNotifier<CotizacionEditorState> {
   // Catálogo de la izquierda
 
   void cambiarTipo(TipoItemCotizacion tipo) => _actualizar(
-        (a) => a.copyWith(tipoActivo: tipo, busquedaCatalogo: ''),
+        (a) => a.copyWith(
+          tipoActivo: tipo,
+          busquedaCatalogo: '',
+          paginaCatalogo: 0,
+        ),
       );
 
-  void buscarEnCatalogo(String texto) =>
-      _actualizar((a) => a.copyWith(busquedaCatalogo: texto.trim()));
+  /// Buscar y filtrar **vuelven a la primera página**: quedarse en la cuarta
+  /// después de acotar el catálogo deja la rejilla vacía sin explicar por qué.
+  void buscarEnCatalogo(String texto) => _actualizar(
+        (a) => a.copyWith(busquedaCatalogo: texto.trim(), paginaCatalogo: 0),
+      );
 
-  void filtrarPorCategoria(int? categoriaId) =>
-      _actualizar((a) => a.copyWith(categoriaId: categoriaId));
+  void filtrarPorCategoria(int? categoriaId) => _actualizar(
+        (a) => a.copyWith(categoriaId: categoriaId, paginaCatalogo: 0),
+      );
+
+  void irAPaginaCatalogo(int pagina) =>
+      _actualizar((a) => a.copyWith(paginaCatalogo: pagina < 0 ? 0 : pagina));
 
   // Líneas
 

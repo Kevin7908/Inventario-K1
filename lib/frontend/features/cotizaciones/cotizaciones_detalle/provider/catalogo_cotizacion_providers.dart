@@ -1,38 +1,60 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../../../backend/features/productos/modelo/producto.dart';
+import '../../../../../backend/features/productos/repositorio/repositorio_producto.dart';
 import '../../../../../backend/features/ventas/servicios/modelo/servicio.dart';
 import '../../../productos/provider/productos_provider.dart';
 import '../../../ventas/servicios/provider/servicios_provider.dart';
+import '../modelo/cotizacion_editor_state.dart';
 import 'cotizacion_editor_provider.dart';
 
 /// Catálogos del panel izquierdo, ya filtrados por lo que el editor tiene
 /// activo. Viven aparte del notifier porque son lectura derivada: filtrar
 /// dentro de `build()` repetiría el trabajo en cada repintado.
 
-/// Productos del catálogo ya filtrados por el buscador y la categoría activa.
+/// La página de productos que muestra la rejilla, con su total real.
 ///
-/// El editor es uno de los casos que el §7 de las reglas contempla: necesita
-/// todo el catálogo para buscar, así que lo pide a [catalogoCompletoProvider] y
-/// no al estado paginado de Productos.
-final productosCotizacionProvider =
-    Provider.autoDispose.family<List<Producto>, int?>(
-  name: 'productosCotizacionProvider',
+/// El `WHERE`, el `COUNT` y el `LIMIT` los resuelve SQLite (§7). Se
+/// re-suscribe solo cuando cambia algo de la consulta —búsqueda, categoría o
+/// página—, no ante cualquier movimiento de la cotización: el `select`
+/// devuelve un record, que solo notifica si sus campos cambiaron.
+final paginaProductosCotizacionProvider =
+    StreamProvider.autoDispose.family<PaginaProductos, int?>(
+  name: 'paginaProductosCotizacionProvider',
   (ref, id) {
-    final todos = ref.watch(catalogoCompletoProvider).value ?? const <Producto>[];
-    final estado = ref.watch(cotizacionEditorProvider(id)).value;
-    if (estado == null) return const [];
+    final repositorio = ref.watch(repositorioProductosProvider);
+    final consulta = ref.watch(
+      cotizacionEditorProvider(id).select((s) => (
+            busqueda: s.value?.busquedaCatalogo ?? '',
+            categoriaId: s.value?.categoriaId,
+            pagina: s.value?.paginaCatalogo ?? 0,
+          )),
+    );
 
-    final texto = estado.busquedaCatalogo.toLowerCase();
-    return todos.where((p) {
-      if (!p.activo) return false;
-      if (estado.categoriaId != null && p.categoriaId != estado.categoriaId) {
-        return false;
-      }
-      if (texto.isEmpty) return true;
-      return p.nombre.toLowerCase().contains(texto) ||
-          p.sku.toLowerCase().contains(texto);
-    }).toList(growable: false);
+    return repositorio.observarPagina(
+      filtro: FiltroProductos(
+        busqueda: consulta.busqueda,
+        categoriaId: consulta.categoriaId,
+        soloActivos: true,
+      ),
+      pagina: consulta.pagina,
+      tamano: CotizacionEditorState.tamanoPaginaCatalogo,
+    );
+  },
+);
+
+/// Cuántas páginas hay con el filtro vigente. Mínimo 1, para que el paginador
+/// no desaparezca cuando la búsqueda no encuentra nada.
+final totalPaginasCotizacionProvider =
+    Provider.autoDispose.family<int, int?>(
+  name: 'totalPaginasCotizacionProvider',
+  (ref, id) {
+    final total = ref.watch(
+      paginaProductosCotizacionProvider(id).select((p) => p.value?.total ?? 0),
+    );
+    if (total <= 0) return 1;
+    const tamano = CotizacionEditorState.tamanoPaginaCatalogo;
+    return (total + tamano - 1) ~/ tamano;
   },
 );
 
