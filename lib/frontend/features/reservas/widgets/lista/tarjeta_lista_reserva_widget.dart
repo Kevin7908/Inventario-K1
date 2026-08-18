@@ -1,3 +1,4 @@
+import 'package:inventario_k1/core/formato.dart';
 import 'package:flutter/material.dart';
 import 'package:inventario_k1/core/currency_ext.dart';
 import 'package:inventario_k1/frontend/share/temas/colores_app.dart';
@@ -76,7 +77,9 @@ class _Fila1 extends StatelessWidget {
                 size: 13, color: ColoresApp.statusDebt),
           ),
         Text(
-          reserva.fechaLimite ?? '—',
+          reserva.fechaLimite == null
+              ? '—'
+              : formatearFecha(reserva.fechaLimite!),
           style: TextStyle(
             fontSize: 10,
             color: reserva.estaVencida

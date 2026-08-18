@@ -1,3 +1,4 @@
+import '../../../share/dominio/metodo_pago.dart';
 import '../enum/enum_reserva.dart';
 import '../modelo/reserva_detalle.dart';
 import '../modelo/reserva_resumen.dart';
@@ -13,11 +14,11 @@ abstract class RepositorioReservas {
     required int clienteId,
     int? motoId,
     int? cotizacionId,
-    required String fechaLimite,
+    required DateTime? fechaLimite,
     required int totalReserva,
     required List<ItemReservaDraft> items,
     int abonoInicial = 0,
-    String metodoPagoInicial = 'Efectivo',
+    MetodoPago metodoPagoInicial = MetodoPago.efectivo,
     String? referenciaInicial,
   });
 
@@ -25,7 +26,7 @@ abstract class RepositorioReservas {
     required int id,
     int? motoId,
     int? cotizacionId,
-    required String fechaLimite,
+    required DateTime? fechaLimite,
     required int totalReserva,
     required List<ItemReservaDraft> items,
   });
@@ -33,13 +34,21 @@ abstract class RepositorioReservas {
   Future<void> registrarAbono({
     required int reservaId,
     required int monto,
-    required String metodoPago,
+    required MetodoPago metodoPago,
     String? referenciaPago,
   });
 
   Future<void> cambiarEstado(int id, EstadoReserva nuevoEstado);
 
   Future<void> eliminar(int id);
+
+  /// Las reservas cuyo `pagado_acumulado` no cuadra con la suma de sus abonos,
+  /// indexadas por id y con la diferencia (`caché − suma`).
+  ///
+  /// Vacío es lo esperado. Existe por el mismo motivo que
+  /// `RepositorioInventario.descuadres`: un caché solo está justificado si
+  /// algo puede afirmar que coincide con aquello de lo que es caché.
+  Future<Map<int, int>> descuadres();
 }
 
 class ItemReservaDraft {

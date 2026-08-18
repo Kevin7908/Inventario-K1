@@ -1,8 +1,8 @@
+import 'package:inventario_k1/backend/share/dominio/metodo_pago.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:inventario_k1/frontend/share/temas/colores_app.dart';
 
-import '../../../../../backend/features/reservas/enum/enum_reserva.dart';
 import '../../reserva_editor/provider/reserva_editor_provider.dart';
 
 class SeccionAbonoInicialWidget extends ConsumerStatefulWidget {
@@ -183,8 +183,8 @@ class _CampoLabeled extends StatelessWidget {
 class _SelectorMetodoPago extends StatelessWidget {
   const _SelectorMetodoPago({required this.valor, required this.onCambio});
 
-  final String valor;
-  final ValueChanged<String?> onCambio;
+  final MetodoPago valor;
+  final ValueChanged<MetodoPago?> onCambio;
 
   @override
   Widget build(BuildContext context) {
@@ -201,7 +201,7 @@ class _SelectorMetodoPago extends StatelessWidget {
           ),
         ),
         const SizedBox(height: 4),
-        DropdownButtonFormField<String>(
+        DropdownButtonFormField<MetodoPago>(
           initialValue: valor,
           onChanged: onCambio,
           style: const TextStyle(fontSize: 13.5, color: ColoresApp.textDark),
@@ -224,8 +224,8 @@ class _SelectorMetodoPago extends StatelessWidget {
                   color: ColoresApp.primary, width: 1.5),
             ),
           ),
-          items: kMetodosPago
-              .map((m) => DropdownMenuItem(value: m, child: Text(m)))
+          items: MetodoPago.paraAbonos
+              .map((m) => DropdownMenuItem(value: m, child: Text(m.etiqueta)))
               .toList(),
         ),
       ],

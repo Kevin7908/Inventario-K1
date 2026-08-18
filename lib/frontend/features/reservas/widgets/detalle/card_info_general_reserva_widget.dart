@@ -1,3 +1,4 @@
+import 'package:inventario_k1/core/formato.dart';
 import 'package:flutter/material.dart';
 import 'package:inventario_k1/frontend/share/temas/colores_app.dart';
 
@@ -32,7 +33,9 @@ class CardInfoGeneralReservaWidget extends StatelessWidget {
             children: [
               _InfoItem(
                 label: 'Fecha límite',
-                valor: resumen.fechaLimite ?? '—',
+                valor: resumen.fechaLimite == null
+                    ? '—'
+                    : formatearFecha(resumen.fechaLimite!),
                 alerta: resumen.estaVencida,
                 mono: true,
               ),

@@ -1,3 +1,4 @@
+import 'package:inventario_k1/core/formato.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:inventario_k1/backend/features/motos/modelo/moto.dart';
@@ -193,23 +194,20 @@ class _SelectorFecha extends StatelessWidget {
     required this.onFechaCambiada,
   });
 
-  final String fechaActual;
-  final ValueChanged<String> onFechaCambiada;
+  /// `null` mientras el usuario no elija plazo.
+  final DateTime? fechaActual;
+  final ValueChanged<DateTime> onFechaCambiada;
 
   Future<void> _abrirPicker(BuildContext context) async {
     final ahora = DateTime.now();
-    final inicial = DateTime.tryParse(fechaActual) ?? ahora.add(const Duration(days: 30));
+    final inicial = fechaActual ?? ahora.add(const Duration(days: 30));
     final picked = await showDatePicker(
       context: context,
       initialDate: inicial,
       firstDate: ahora,
       lastDate: ahora.add(const Duration(days: 365 * 3)),
     );
-    if (picked != null) {
-      onFechaCambiada(
-        '${picked.year}-${picked.month.toString().padLeft(2, '0')}-${picked.day.toString().padLeft(2, '0')}',
-      );
-    }
+    if (picked != null) onFechaCambiada(picked);
   }
 
   @override
@@ -220,9 +218,13 @@ class _SelectorFecha extends StatelessWidget {
         child: TextFormField(
           readOnly: true,
           decoration: InputDecoration(
-            hintText: fechaActual.isEmpty ? 'Seleccionar fecha…' : fechaActual,
+            hintText: fechaActual == null
+                ? 'Seleccionar fecha…'
+                : formatearFecha(fechaActual!),
             hintStyle: TextStyle(
-              color: fechaActual.isEmpty ? ColoresApp.textLight : ColoresApp.textDark,
+              color: fechaActual == null
+                  ? ColoresApp.textLight
+                  : ColoresApp.textDark,
               fontSize: 13.5,
             ),
             filled: true,
@@ -244,7 +246,9 @@ class _SelectorFecha extends StatelessWidget {
                   const BorderSide(color: ColoresApp.primary, width: 1.5),
             ),
           ),
-          controller: TextEditingController(text: fechaActual),
+          controller: TextEditingController(
+            text: fechaActual == null ? '' : formatearFecha(fechaActual!),
+          ),
         ),
       ),
     );

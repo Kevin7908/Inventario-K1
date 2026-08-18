@@ -1,3 +1,4 @@
+import '../../../../../backend/share/dominio/metodo_pago.dart';
 import 'package:flutter/material.dart';
 import 'package:inventario_k1/core/currency_ext.dart';
 import 'package:inventario_k1/frontend/share/temas/colores_app.dart';
@@ -127,7 +128,7 @@ class _FilaAbono extends StatelessWidget {
 class _ChipMetodo extends StatelessWidget {
   const _ChipMetodo({required this.metodo});
 
-  final String metodo;
+  final MetodoPago metodo;
 
   @override
   Widget build(BuildContext context) {
@@ -138,7 +139,7 @@ class _ChipMetodo extends StatelessWidget {
         borderRadius: BorderRadius.circular(20),
       ),
       child: Text(
-        metodo,
+        metodo.etiqueta,
         style: const TextStyle(
           fontSize: 10,
           fontWeight: FontWeight.w700,

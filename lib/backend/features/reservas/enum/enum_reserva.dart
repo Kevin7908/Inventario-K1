@@ -9,11 +9,3 @@ enum EstadoReserva {
   static EstadoReserva desdeValor(String v) =>
       EstadoReserva.values.firstWhere((e) => e.valor == v);
 }
-
-const List<String> kMetodosPago = [
-  'Efectivo',
-  'Transferencia',
-  'Tarjeta',
-  'Nequi',
-  'Daviplata',
-];

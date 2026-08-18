@@ -1,16 +1,40 @@
 import 'package:drift/drift.dart';
-import 'package:inventario_k1/backend/features/reservas/esquema_datos/tabla_reserva.dart';
 
+import '../../../share/dominio/metodo_pago.dart';
+import 'tabla_reserva.dart';
+
+/// Cada entrega de dinero contra una reserva.
+///
+/// Es la fuente de verdad de `reservas.pagado_acumulado`, que solo es su suma
+/// cacheada. Como el libro mayor del inventario, esta tabla se escribe y no se
+/// corrige: devolver un abono es registrar otro, no editar el de ayer.
+@TableIndex(name: 'idx_reserva_abonos_reserva_fecha',
+    columns: {#reservaId, #fechaPago})
 class TablaReservaAbono extends Table {
   @override
   String get tableName => 'reserva_abonos';
 
   IntColumn get id => integer().autoIncrement()();
-  IntColumn get reservaId =>
-      integer().references(TablaReserva, #id, onDelete: KeyAction.cascade)();
+
+  /// `cascade`: un abono no existe sin su reserva.
+  IntColumn get reservaId => integer()
+      .references(TablaReserva, #id, onDelete: KeyAction.cascade)();
+
+  /// En pesos enteros. Siempre positivo: no hay abonos de cero ni negativos.
   IntColumn get monto => integer()();
+
+  /// Uno de [MetodoPago], sin `CREDITO`: quien abona está entregando dinero.
   TextColumn get metodoPago => text()();
+
+  /// Número de transacción, últimos dígitos de la tarjeta… lo que permita
+  /// reconocer el pago en el extracto.
   TextColumn get referenciaPago => text().nullable()();
-  DateTimeColumn get fechaPago =>
-      dateTime().withDefault(currentDateAndTime)();
+
+  DateTimeColumn get fechaPago => dateTime().withDefault(currentDateAndTime)();
+
+  @override
+  List<String> get customConstraints => [
+        'CHECK (monto > 0)',
+        'CHECK (metodo_pago IN (${MetodoPago.listaSqlAbonos}))',
+      ];
 }

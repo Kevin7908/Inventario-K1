@@ -1,3 +1,4 @@
+import 'package:inventario_k1/backend/share/dominio/metodo_pago.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:inventario_k1/backend/features/motos/repositorio/repositorio_moto_impl.dart';
 import 'package:inventario_k1/backend/features/motos/modelo/moto.dart';
@@ -156,11 +157,11 @@ class ReservasNotifier extends AsyncNotifier<ReservasState> {
     required int clienteId,
     int? motoId,
     int? cotizacionId,
-    required String fechaLimite,
+    required DateTime? fechaLimite,
     required int totalReserva,
     required List<ItemReservaDraft> items,
     int abonoInicial = 0,
-    String metodoPagoInicial = 'Efectivo',
+    MetodoPago metodoPagoInicial = MetodoPago.efectivo,
     String? referenciaInicial,
   }) async {
     try {
@@ -189,7 +190,7 @@ class ReservasNotifier extends AsyncNotifier<ReservasState> {
     required int id,
     int? motoId,
     int? cotizacionId,
-    required String fechaLimite,
+    required DateTime? fechaLimite,
     required int totalReserva,
     required List<ItemReservaDraft> items,
   }) async {
@@ -215,7 +216,7 @@ class ReservasNotifier extends AsyncNotifier<ReservasState> {
   Future<String?> registrarAbono({
     required int reservaId,
     required int monto,
-    required String metodoPago,
+    required MetodoPago metodoPago,
     String? referenciaPago,
   }) async {
     try {

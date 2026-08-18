@@ -1,3 +1,4 @@
+import '../../../../../backend/share/dominio/metodo_pago.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:inventario_k1/backend/features/motos/modelo/moto.dart';
 import 'package:inventario_k1/backend/features/productos/modelo/producto.dart';
@@ -45,10 +46,10 @@ final class ReservaEditorState {
     this.reservaId,
     this.reservaOriginal,
     this.moto,
-    this.fechaLimite = '',
+    this.fechaLimite,
     this.items = const [],
     this.abonoInicial = 0,
-    this.metodoPago = 'Efectivo',
+    this.metodoPago = MetodoPago.efectivo,
     this.referenciaPago = '',
     this.busquedaProductos = '',
     this.paginaProductos = 0,
@@ -58,10 +59,11 @@ final class ReservaEditorState {
   final int? reservaId;
   final ReservaResumen? reservaOriginal;
   final Moto? moto;
-  final String fechaLimite;
+  /// Hasta cuándo se guarda la mercancía. `null` = sin plazo.
+  final DateTime? fechaLimite;
   final List<ReservaItemDraft> items;
   final int abonoInicial;
-  final String metodoPago;
+  final MetodoPago metodoPago;
   final String referenciaPago;
   final String busquedaProductos;
   final int paginaProductos;
@@ -109,10 +111,10 @@ final class ReservaEditorState {
     int? reservaId,
     Object? reservaOriginal = _sentinel,
     Object? moto = _sentinel,
-    String? fechaLimite,
+    DateTime? fechaLimite,
     List<ReservaItemDraft>? items,
     int? abonoInicial,
-    String? metodoPago,
+    MetodoPago? metodoPago,
     String? referenciaPago,
     String? busquedaProductos,
     int? paginaProductos,
@@ -151,7 +153,7 @@ class ReservaEditorNotifier extends Notifier<ReservaEditorState> {
     state = state.copyWith(
       reservaId: reserva.id,
       reservaOriginal: reserva,
-      fechaLimite: reserva.fechaLimite ?? '',
+      fechaLimite: reserva.fechaLimite,
     );
     _preCargarItems(reserva);
   }
@@ -185,7 +187,7 @@ class ReservaEditorNotifier extends Notifier<ReservaEditorState> {
     state = state.copyWith(moto: moto);
   }
 
-  void cambiarFecha(String fecha) {
+  void cambiarFecha(DateTime fecha) {
     state = state.copyWith(fechaLimite: fecha);
   }
 
@@ -201,7 +203,7 @@ class ReservaEditorNotifier extends Notifier<ReservaEditorState> {
     state = state.copyWith(abonoInicial: monto.clamp(0, state.total));
   }
 
-  void cambiarMetodoPago(String metodo) {
+  void cambiarMetodoPago(MetodoPago metodo) {
     state = state.copyWith(metodoPago: metodo);
   }
 
@@ -260,7 +262,7 @@ class ReservaEditorNotifier extends Notifier<ReservaEditorState> {
     if (state.moto == null && !state.esEdicion) {
       return 'Selecciona una moto para continuar.';
     }
-    if (state.fechaLimite.isEmpty) {
+    if (state.fechaLimite == null) {
       return 'Ingresa la fecha límite de la reserva.';
     }
     if (state.items.isEmpty) {

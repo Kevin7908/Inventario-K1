@@ -1,9 +1,9 @@
+import 'package:inventario_k1/backend/share/dominio/metodo_pago.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:inventario_k1/frontend/share/temas/colores_app.dart';
 import 'package:inventario_k1/frontend/share/widgets/output/snack_bar_mensaje.dart';
 
-import '../../../../../backend/features/reservas/enum/enum_reserva.dart';
 import '../../provider/reservas_provider.dart';
 
 class FormAbonoInlineWidget extends ConsumerStatefulWidget {
@@ -25,7 +25,7 @@ class _FormAbonoInlineWidgetState
     extends ConsumerState<FormAbonoInlineWidget> {
   final _montoCtrl = TextEditingController();
   final _refCtrl = TextEditingController();
-  String _metodoPago = kMetodosPago.first;
+  MetodoPago _metodoPago = MetodoPago.efectivo;
   bool _guardando = false;
 
   @override
@@ -173,20 +173,20 @@ class _CampoMonto extends StatelessWidget {
 class _SelectorMetodo extends StatelessWidget {
   const _SelectorMetodo({required this.valor, required this.onCambio});
 
-  final String valor;
-  final ValueChanged<String?> onCambio;
+  final MetodoPago valor;
+  final ValueChanged<MetodoPago?> onCambio;
 
   @override
   Widget build(BuildContext context) {
     return _CampoFormAbono(
       label: 'Método',
-      child: DropdownButtonFormField<String>(
+      child: DropdownButtonFormField<MetodoPago>(
         initialValue: valor,
         onChanged: onCambio,
         style: const TextStyle(fontSize: 13, color: ColoresApp.textDark),
         decoration: _decor(),
-        items: kMetodosPago
-            .map((m) => DropdownMenuItem(value: m, child: Text(m)))
+        items: MetodoPago.paraAbonos
+            .map((m) => DropdownMenuItem(value: m, child: Text(m.etiqueta)))
             .toList(),
       ),
     );

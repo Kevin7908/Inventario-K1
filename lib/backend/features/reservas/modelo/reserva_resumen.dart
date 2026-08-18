@@ -29,15 +29,20 @@ class ReservaResumen {
   final int totalReserva;
   final int pagadoAcumulado;
   final DateTime creadoEn;
-  final String? fechaLimite;
+  /// Hasta cuándo se guarda la mercancía, a medianoche. `null` = sin plazo.
+  final DateTime? fechaLimite;
 
   int get saldo => (totalReserva - pagadoAcumulado).clamp(0, totalReserva);
 
   double get porcentajePagado =>
       totalReserva > 0 ? (pagadoAcumulado / totalReserva).clamp(0.0, 1.0) : 0.0;
 
+  /// Solo una reserva **activa** vence: una completada o cancelada ya no
+  /// espera nada.
   bool get estaVencida {
-    if (fechaLimite == null || estado != EstadoReserva.activa) return false;
-    return fechaLimite!.compareTo(DateTime.now().toIso8601String().substring(0, 10)) < 0;
+    final limite = fechaLimite;
+    if (limite == null || estado != EstadoReserva.activa) return false;
+    final hoy = DateTime.now();
+    return limite.isBefore(DateTime(hoy.year, hoy.month, hoy.day));
   }
 }

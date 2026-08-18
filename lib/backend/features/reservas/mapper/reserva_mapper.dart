@@ -1,3 +1,4 @@
+import '../../../share/dominio/metodo_pago.dart';
 import 'package:drift/drift.dart';
 import 'package:inventario_k1/backend/share/database/app_db.dart';
 
@@ -55,7 +56,7 @@ class ReservaMapper {
       id: row.id,
       reservaId: row.reservaId,
       monto: row.monto,
-      metodoPago: row.metodoPago,
+      metodoPago: MetodoPago.desdeCodigo(row.metodoPago),
       referenciaPago: row.referenciaPago,
       fechaPago: row.fechaPago,
     );
@@ -67,7 +68,7 @@ class ReservaMapper {
     int? motoId,
     int? cotizacionId,
     required int totalReserva,
-    required String fechaLimite,
+    required DateTime? fechaLimite,
   }) {
     return TablaReservaCompanion.insert(
       numero: numero,
@@ -96,13 +97,13 @@ class ReservaMapper {
   static TablaReservaAbonoCompanion abonoACompanion({
     required int reservaId,
     required int monto,
-    required String metodoPago,
+    required MetodoPago metodoPago,
     String? referenciaPago,
   }) {
     return TablaReservaAbonoCompanion.insert(
       reservaId: reservaId,
       monto: monto,
-      metodoPago: metodoPago,
+      metodoPago: metodoPago.codigo,
       referenciaPago: Value(referenciaPago),
     );
   }
