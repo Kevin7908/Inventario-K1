@@ -1,22 +1,22 @@
 import 'dart:async';
 
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:inventario_k1/frontend/share/temas/colores_app.dart';
-import 'package:inventario_k1/frontend/share/widgets/dialogos/dialogo_confirmar_eliminar_widget.dart';
-import 'package:inventario_k1/frontend/share/widgets/output/estado_error_widget.dart';
-import 'package:inventario_k1/frontend/share/widgets/output/estado_vacio_widget.dart';
-import 'package:inventario_k1/frontend/share/widgets/output/snack_bar_mensaje.dart';
-import 'package:inventario_k1/frontend/share/widgets/paginacion_widget.dart';
-import 'package:inventario_k1/frontend/share/widgets/top_bar_widget.dart';
 
 import '../../../../backend/features/cotizaciones/modelo/cotizacion_resumen.dart';
-import '../provider/cotizaciones_provider.dart';
+import '../../../../core/formato.dart';
+import '../../../layout/encabezado_con_cuenta.dart';
+import '../../../share2/share2.dart';
 import '../cotizaciones_detalle/vista/cotizacion_detalle_vista.dart';
-import '../widgets/tabla/cotizacion_fila_widget.dart';
-import '../widgets/tabla/resumen_cards_cotizacion.dart';
-import '../widgets/tabla/seccion_filtros_cot.dart';
+import '../provider/cotizaciones_provider.dart';
+import '../widgets/tabla/tabla_cotizaciones.dart';
 
+/// Pantalla de Cotizaciones: presupuestos previos para clientes.
+///
+/// Hospeda la navegación interna del módulo —listado y editor— sin rutas
+/// globales, igual que Clientes y Productos, para que la barra lateral no
+/// desaparezca al abrir una cotización.
 class CotizacionesVista extends ConsumerStatefulWidget {
   const CotizacionesVista({super.key});
 
@@ -24,231 +24,177 @@ class CotizacionesVista extends ConsumerStatefulWidget {
   ConsumerState<CotizacionesVista> createState() => _CotizacionesVistaState();
 }
 
+/// Vista activa dentro del módulo.
+enum _Pantalla { lista, editor }
+
 class _CotizacionesVistaState extends ConsumerState<CotizacionesVista> {
+  final _busquedaController = TextEditingController();
+  final _focoBusqueda = FocusNode();
   Timer? _debounce;
+
+  _Pantalla _pantalla = _Pantalla.lista;
+  CotizacionResumen? _seleccionada;
 
   @override
   void dispose() {
     _debounce?.cancel();
+    _busquedaController.dispose();
+    _focoBusqueda.dispose();
     super.dispose();
   }
 
-  void _onBuscar(String valor) {
+  void _alBuscar(String texto) {
     _debounce?.cancel();
     _debounce = Timer(const Duration(milliseconds: 280), () {
-      ref.read(cotizacionesProvider.notifier).buscar(valor);
+      if (!mounted) return;
+      ref.read(cotizacionesProvider.notifier).buscar(texto);
     });
   }
 
-  void _abrirNueva() {
-    Navigator.push(
-      context,
-      MaterialPageRoute(
-        builder: (_) => const CotizacionDetalleVista(),
-      ),
-    );
-  }
+  void _nueva() => setState(() {
+        _seleccionada = null;
+        _pantalla = _Pantalla.editor;
+      });
 
-  void _abrirDetalle(CotizacionResumen cot) {
-    Navigator.push(
-      context,
-      MaterialPageRoute(
-        builder: (_) => CotizacionDetalleVista(cotizacion: cot),
-      ),
-    );
-  }
+  void _abrir(CotizacionResumen cotizacion) => setState(() {
+        _seleccionada = cotizacion;
+        _pantalla = _Pantalla.editor;
+      });
 
-  void _confirmarEliminar(CotizacionResumen cot) {
-    DialogoConfirmarEliminar.mostrar(
-      context: context,
-      nombreElemento: cot.numero,
-      tipoElemento: 'cotización',
-      onConfirmar: () async {
-        final error =
-            await ref.read(cotizacionesProvider.notifier).eliminar(cot.id);
-        if (!mounted) return;
-        if (error != null) {
-          SnackBarMensaje.error(context, error);
-        } else {
-          SnackBarMensaje.success(context, 'Cotización eliminada.');
-        }
-      },
-    );
-  }
+  void _volverALista() => setState(() {
+        _seleccionada = null;
+        _pantalla = _Pantalla.lista;
+      });
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      backgroundColor: ColoresApp.bgContent,
-      body: Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          TopBarConBoton(
-            titulo: 'Cotizaciones',
-            etiquetaBoton: 'Nueva Cotización',
-            alPresionarBoton: _abrirNueva,
-          ),
-          Expanded(
-            child: _CuerpoCotizaciones(
-              onBuscar: _onBuscar,
-              onDetalle: _abrirDetalle,
-              onEliminar: _confirmarEliminar,
-            ),
-          ),
-        ],
-      ),
-    );
+    return switch (_pantalla) {
+      _Pantalla.lista => _lista(),
+      _Pantalla.editor => CotizacionDetalleVista(
+          cotizacion: _seleccionada,
+          alCerrar: _volverALista,
+        ),
+    };
   }
-}
 
-// ── Shell asíncrono ───────────────────────────────────────────────────────────
-//
-// Usa .select para que solo reaccione a transiciones loading/error,
-// no a cada actualización de datos o cambio de filtro/página.
-
-class _CuerpoCotizaciones extends ConsumerWidget {
-  const _CuerpoCotizaciones({
-    required this.onBuscar,
-    required this.onDetalle,
-    required this.onEliminar,
-  });
-
-  final ValueChanged<String> onBuscar;
-  final ValueChanged<CotizacionResumen> onDetalle;
-  final ValueChanged<CotizacionResumen> onEliminar;
-
-  @override
-  Widget build(BuildContext context, WidgetRef ref) {
-    final isLoading = ref.watch(
-      cotizacionesProvider.select((s) => !s.hasValue && !s.hasError),
-    );
-    final error = ref.watch(
-      cotizacionesProvider.select((s) => s.hasError ? s.error : null),
-    );
-
-    if (isLoading) {
-      return const Center(
-        child: CircularProgressIndicator(color: ColoresApp.primary),
-      );
-    }
-    if (error != null) {
-      return EstadoErrorWidget(
-        mensaje: error.toString(),
-        alReintentar: () => ref.invalidate(cotizacionesProvider),
-      );
-    }
-
-    return Padding(
-      padding: const EdgeInsets.all(24),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          const ResumenCardsCotizacion(),
-          const SizedBox(height: 20),
-          SeccionFiltrosCot(onBuscar: onBuscar),
-          const SizedBox(height: 12),
-          Expanded(
-            child: Container(
-              decoration: BoxDecoration(
-                color: ColoresApp.bgCard,
-                borderRadius: BorderRadius.circular(14),
-                boxShadow: const [
-                  BoxShadow(
-                    color: ColoresApp.shadow,
-                    blurRadius: 8,
-                    offset: Offset(0, 2),
-                  ),
-                ],
-              ),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.stretch,
-                children: [
-                  const CotizacionTablaEncabezado(),
-                  Expanded(
-                    child: _TablaCotizaciones(
-                      onDetalle: onDetalle,
-                      onEliminar: onEliminar,
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          ),
-          const SizedBox(height: 8),
-          const _PaginacionCotizaciones(),
-        ],
-      ),
-    );
-  }
-}
-
-// ── Tabla paginada ────────────────────────────────────────────────────────────
-//
-// Solo se reconstruye cuando cambia la slice de cotizaciones visible.
-
-class _TablaCotizaciones extends ConsumerWidget {
-  const _TablaCotizaciones({
-    required this.onDetalle,
-    required this.onEliminar,
-  });
-
-  final ValueChanged<CotizacionResumen> onDetalle;
-  final ValueChanged<CotizacionResumen> onEliminar;
-
-  @override
-  Widget build(BuildContext context, WidgetRef ref) {
-    final paginadas = ref.watch(
-      paginacionProvider.select((p) => p.paginadas),
-    );
-
-    if (paginadas.isEmpty) {
-      return const EstadoVacioWidget(
-        icono: Icons.description_outlined,
-        textoSinDatos: 'Sin cotizaciones',
-        textoSinResultados: 'No hay cotizaciones que coincidan.',
-        textoCTA: '',
-      );
-    }
-
-    return ListView.separated(
-      itemCount: paginadas.length,
-      separatorBuilder: (_, _) => const Divider(
-        height: 1,
-        color: ColoresApp.border,
-      ),
-      itemBuilder: (_, i) {
-        final cot = paginadas[i];
-        return CotizacionFilaWidget(
-          key: ValueKey(cot.id),
-          cotizacion: cot,
-          seleccionada: false,
-          onTap: () => onDetalle(cot),
-          onEliminar: () => onEliminar(cot),
-        );
+  /// La raíz no observa ningún provider: cada bloque se suscribe al suyo, así
+  /// que escribir en el buscador no reconstruye el encabezado ni los chips.
+  Widget _lista() {
+    return CallbackShortcuts(
+      bindings: {
+        const SingleActivator(LogicalKeyboardKey.keyF, control: true): () =>
+            _focoBusqueda.requestFocus(),
       },
+      child: Padding(
+        padding: const EdgeInsets.fromLTRB(32, 28, 32, 28),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const _EncabezadoCotizaciones(),
+            const SizedBox(height: 20),
+            Row(
+              children: [
+                Expanded(
+                  child: BarraBusqueda(
+                    controlador: _busquedaController,
+                    focoTeclado: _focoBusqueda,
+                    placeholder: 'Buscar por código o cliente...',
+                    alCambiar: _alBuscar,
+                  ),
+                ),
+                const SizedBox(width: 20),
+                BotonPrimario(
+                  etiqueta: 'Nueva cotización',
+                  icono: Icons.add,
+                  alPresionar: _nueva,
+                ),
+              ],
+            ),
+            const SizedBox(height: 16),
+            const _ChipsEstado(),
+            const SizedBox(height: 16),
+            Expanded(child: TablaCotizaciones(alAbrir: _abrir)),
+          ],
+        ),
+      ),
     );
   }
 }
 
-// ── Barra de paginación ───────────────────────────────────────────────────────
-//
-// Solo se reconstruye cuando cambia el número de página, total o páginas.
-
-class _PaginacionCotizaciones extends ConsumerWidget {
-  const _PaginacionCotizaciones();
+/// Encabezado con los conteos del listado.
+///
+/// El monto vigente va aquí y no en tarjetas sueltas —como en Clientes y
+/// Motos—: es un solo número y no justifica una fila de cards que le robe
+/// altura a la tabla.
+class _EncabezadoCotizaciones extends ConsumerWidget {
+  const _EncabezadoCotizaciones();
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final pag = ref.watch(paginacionProvider);
+    final resumen = ref.watch(cotizacionesResumenProvider).value;
+    final total = resumen?.total ?? 0;
 
-    return PaginacionWidget(
-      paginaActual: pag.paginaActual,
-      totalPaginas: pag.totalPaginas,
-      totalItems: pag.totalFiltradas,
-      itemsPorPagina: CotizacionesState.itemsPorPagina,
-      alCambiarPagina: (p) =>
-          ref.read(cotizacionesProvider.notifier).cambiarPagina(p),
-      labelEntidad: 'cotizaciones',
+    final buffer = StringBuffer('Presupuestos previos para clientes');
+    if (total > 0) {
+      buffer.write(total == 1 ? ' · 1 cotización' : ' · $total cotizaciones');
+      final montoVigente = resumen?.montoVigente ?? 0;
+      if (montoVigente > 0) {
+        buffer.write(' · ${formatearPrecio(montoVigente)} en juego');
+      }
+    }
+
+    return EncabezadoConCuenta(
+      titulo: 'Cotizaciones',
+      subtitulo: buffer.toString(),
+    );
+  }
+}
+
+/// Chips de filtro por vigencia, con el conteo de cada estado.
+class _ChipsEstado extends ConsumerWidget {
+  const _ChipsEstado();
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final estado = ref.watch(
+      cotizacionesProvider.select((s) => s.value?.filtroEstado),
+    );
+    final resumen = ref.watch(cotizacionesResumenProvider).value;
+
+    void filtrar(EstadoCotizacion? valor) =>
+        ref.read(cotizacionesProvider.notifier).filtrarPorEstado(valor);
+
+    String con(String etiqueta, int? cuenta) =>
+        cuenta == null || cuenta == 0 ? etiqueta : '$etiqueta ($cuenta)';
+
+    return Wrap(
+      spacing: 9,
+      runSpacing: 9,
+      children: [
+        ChipFiltro(
+          etiqueta: con('Todas', resumen?.total),
+          seleccionado: estado == null,
+          alPresionar: () => filtrar(null),
+        ),
+        ChipFiltro(
+          etiqueta: con('Vigentes', resumen?.vigentes),
+          seleccionado: estado == EstadoCotizacion.vigente,
+          colorActivo: ColoresApp.statusSuccess,
+          alPresionar: () => filtrar(EstadoCotizacion.vigente),
+        ),
+        ChipFiltro(
+          etiqueta: con('Por vencer', resumen?.porVencer),
+          seleccionado: estado == EstadoCotizacion.porVencer,
+          colorActivo: ColoresApp.statusWarning,
+          alPresionar: () => filtrar(EstadoCotizacion.porVencer),
+        ),
+        ChipFiltro(
+          etiqueta: con('Vencidas', resumen?.vencidas),
+          seleccionado: estado == EstadoCotizacion.vencida,
+          colorActivo: ColoresApp.statusDanger,
+          alPresionar: () => filtrar(EstadoCotizacion.vencida),
+        ),
+      ],
     );
   }
 }
