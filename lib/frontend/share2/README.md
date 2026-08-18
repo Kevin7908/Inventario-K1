@@ -74,6 +74,9 @@ share2/
 │   ├── interruptor_campo.dart
 │   ├── atajos_formulario.dart
 │   ├── barra_busqueda.dart
+│   ├── campo_busqueda.dart
+│   ├── campo_fecha.dart
+│   ├── control_cantidad.dart
 │   └── inputs.dart
 │
 ├── tablas/                         ← visualización de colecciones
@@ -87,6 +90,7 @@ share2/
 ├── cards/                          ← contenedores de información
 │   ├── tarjeta_info.dart
 │   ├── tarjeta_catalogo.dart
+│   ├── tarjeta_producto.dart
 │   ├── marcador_identidad.dart
 │   ├── fila_dato.dart
 │   ├── panel_seccion.dart
@@ -148,6 +152,9 @@ Widgets para formularios y entrada de datos. Aplican el estilo visual del proyec
 | `SelectorWidget` | Dropdown de opciones predefinidas |
 | `CheckboxApp` | Selección booleana estilizada |
 | `BarraBusqueda` | Campo de búsqueda con ícono, para filtrar listas o tablas |
+| `CampoBusqueda` | Selector con buscador, para listas largas (clientes, motos) |
+| `CampoFecha` | Fecha con etiqueta que abre el calendario del sistema |
+| `ControlCantidad` | Cantidad de una línea: `–`, `+` y el número editable a mano |
 | `FilaCampos` | Reparte campos en una fila y los apila cuando falta ancho |
 | `InterruptorCampo` | Switch con etiqueta y una línea que explica qué implica el estado |
 | `AtajosFormulario` | Esc cancela, Ctrl/Cmd+Enter guarda |
@@ -176,6 +183,7 @@ Widgets para agrupar y presentar información con estilos consistentes.
 |---|---|
 | `TarjetaInfo` | Muestra un KPI o dato destacado (ej: total ventas del día) |
 | `TarjetaCatalogo` | Ítem de catálogo en grilla o fila: marcador, título, subtítulo, acciones y `pie` opcional |
+| `TarjetaProducto` | Tarjeta de las rejillas de venta: foto, SKU, stock, precio y botón de agregar |
 | `MarcadorIdentidad` | Cuadro con el ícono de la entidad o la inicial de su nombre sobre su color |
 | `FilaDato` | Línea "ícono + texto" dentro de una tarjeta (contacto, teléfono, ciudad) |
 | `PanelSeccion` | Agrupa un bloque de contenido con título y borde |

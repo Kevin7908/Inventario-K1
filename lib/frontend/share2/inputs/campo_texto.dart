@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 
 import '../temas/colores_app.dart';
 import '../temas/tipografia_app.dart';
@@ -19,6 +20,9 @@ import '../temas/tipografia_app.dart';
 /// - [autofocus]: pone el foco en el campo al construirse.
 /// - [monoespaciado]: usa fuente monoespaciada para el valor. Útil en códigos
 ///   donde alinear dígitos ayuda a leerlos (NIT, SKU, cédula).
+/// - [soloEnteros]: rechaza todo lo que no sea un dígito mientras se escribe.
+///   Para importes en pesos y cantidades, que en este sistema no llevan
+///   decimales.
 ///
 /// Ejemplo:
 /// ```dart
@@ -34,8 +38,19 @@ import '../temas/tipografia_app.dart';
 ///   validador: (v) =>
 ///       (v == null || v.trim().isEmpty) ? 'El nombre es obligatorio.' : null,
 /// )
+///
+/// CampoTexto(
+///   etiqueta: 'Precio *',
+///   controlador: _precioCtrl,
+///   soloEnteros: true,
+/// )
 /// ```
 class CampoTexto extends StatelessWidget {
+  /// Fuera del `build` para no crear la lista en cada reconstrucción.
+  static final List<TextInputFormatter> _soloDigitos = [
+    FilteringTextInputFormatter.digitsOnly,
+  ];
+
   const CampoTexto({
     super.key,
     required this.etiqueta,
@@ -46,6 +61,7 @@ class CampoTexto extends StatelessWidget {
     this.lineas = 1,
     this.autofocus = false,
     this.monoespaciado = false,
+    this.soloEnteros = false,
   });
 
   final String etiqueta;
@@ -56,6 +72,7 @@ class CampoTexto extends StatelessWidget {
   final int lineas;
   final bool autofocus;
   final bool monoespaciado;
+  final bool soloEnteros;
 
   @override
   Widget build(BuildContext context) {
@@ -76,6 +93,8 @@ class CampoTexto extends StatelessWidget {
           validator: validador,
           maxLines: lineas,
           autofocus: autofocus,
+          keyboardType: soloEnteros ? TextInputType.number : null,
+          inputFormatters: soloEnteros ? _soloDigitos : null,
           style: monoespaciado
               ? TipografiaApp.monoespaciada(TipografiaApp.cuerpo)
               : TipografiaApp.cuerpo,
