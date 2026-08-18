@@ -8,7 +8,7 @@ import '../../../../../share/formateadores/moneda_formateador.dart';
 import '../../../../../share/temas/colores_app.dart';
 import '../../../../../share/widgets/output/snack_bar_mensaje.dart';
 import '../../../../deudores/provider/deudores_provider.dart';
-import '../../../venta_rapida/widgets/dialogo_cobro_pos.dart';
+import '../../widgets/dialogo_cobro_pos.dart';
 import '../../provider/facturas_provider.dart';
 import 'detalle_shared_widgets_factura.dart';
 

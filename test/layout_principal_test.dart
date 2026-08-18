@@ -7,7 +7,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:inventario_k1/frontend/features/categorias/vista/categorias_vistas.dart';
 import 'package:inventario_k1/frontend/features/productos/vista/producto_vista.dart';
-import 'package:inventario_k1/frontend/features/ventas/principal/vista/venta_vista.dart';
+import 'package:inventario_k1/frontend/features/pos/vista/punto_venta_vista.dart';
 import 'package:inventario_k1/frontend/layout/layout_principal.dart';
 import 'package:inventario_k1/frontend/share2/nav/barra_lateral.dart';
 
@@ -30,7 +30,7 @@ void main() {
     // construyera, además pediría base de datos y reventaría el test.
     expect(find.byType(ProductosVista), findsNothing);
     expect(find.byType(CategoriasVista), findsNothing);
-    expect(find.byType(VentasVista), findsNothing);
+    expect(find.byType(PuntoVentaVista), findsNothing);
     expect(tester.takeException(), isNull);
   });
 

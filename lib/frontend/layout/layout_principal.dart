@@ -5,11 +5,13 @@ import '../features/clientes/vista/cliente_vista.dart';
 import '../features/configuracion/vista/configuracion_vista.dart';
 import '../features/cotizaciones/vista/cotizaciones_vista.dart';
 import '../features/deudores/vista/deudores_vista.dart';
+import '../features/pos/vista/punto_venta_vista.dart';
 import '../features/productos/vista/producto_vista.dart';
 import '../features/proveedores/vista/proveedores_vista.dart';
 import '../features/reservas/vista/reservas_vista.dart';
 import '../features/tecnicos/vista/tecnico_vista.dart';
-import '../features/ventas/principal/vista/venta_vista.dart';
+import '../features/ventas/facturas/vista/facturas_vista.dart';
+import '../features/ventas/ordenes/vista/ordenes_vista.dart';
 import '../share2/nav/barra_lateral.dart';
 import '../share2/nav/item_nav_dato.dart';
 import '../share2/nav/seccion_nav_dato.dart';
@@ -39,11 +41,13 @@ class _LayoutPrincipalState extends State<LayoutPrincipal> {
     '/productos',
     '/categorias',
     '/proveedores',
+    '/ordenes',
     '/cotizaciones',
     '/reservas',
     '/tecnicos',
     '/clientes',
     '/deudores',
+    '/facturacion',
     '/configuracion',
   ];
 
@@ -51,15 +55,17 @@ class _LayoutPrincipalState extends State<LayoutPrincipal> {
   /// nada: lo que cuesta es construirlas, y eso solo pasa al visitarlas.
   static const List<Widget> _vistas = [
     _PlaceholderVista(etiqueta: 'Dashboard'),
-    VentasVista(),
+    PuntoVentaVista(),
     ProductosVista(),
     CategoriasVista(),
     ProveedoresVista(),
+    OrdenesVista(),
     CotizacionesVista(),
     ReservasVista(),
     TecnicosVista(),
     ClientesVista(),
     DeudoresVista(),
+    FacturasVista(),
     ConfiguracionVista(),
   ];
 
@@ -122,6 +128,12 @@ class _LayoutPrincipalState extends State<LayoutPrincipal> {
       titulo: 'Taller',
       items: [
         ItemNavDato(
+          icono: Icons.build_outlined,
+          etiqueta: 'Órdenes de servicio',
+          ruta: '/ordenes',
+          alPresionar: () => _navegar('/ordenes'),
+        ),
+        ItemNavDato(
           icono: Icons.request_quote_outlined,
           etiqueta: 'Cotizaciones',
           ruta: '/cotizaciones',
@@ -155,6 +167,12 @@ class _LayoutPrincipalState extends State<LayoutPrincipal> {
           etiqueta: 'Cuentas por cobrar',
           ruta: '/deudores',
           alPresionar: () => _navegar('/deudores'),
+        ),
+        ItemNavDato(
+          icono: Icons.receipt_long_outlined,
+          etiqueta: 'Facturación',
+          ruta: '/facturacion',
+          alPresionar: () => _navegar('/facturacion'),
         ),
       ],
     ),
