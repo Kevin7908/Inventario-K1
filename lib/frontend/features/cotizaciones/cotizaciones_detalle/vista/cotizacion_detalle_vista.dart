@@ -1,38 +1,31 @@
-import 'dart:async';
-
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:inventario_k1/backend/features/motos/modelo/moto.dart';
-import 'package:inventario_k1/backend/features/productos/modelo/producto.dart';
-import 'package:inventario_k1/frontend/features/motos/widgets/dialogo_motos.dart';
-import 'package:inventario_k1/frontend/features/productos/widgets/dialogo_detalle_producto_widget.dart';
-import 'package:inventario_k1/frontend/features/productos/widgets/dialogo_producto_widget.dart';
-import 'package:inventario_k1/frontend/features/productos/widgets/tarjeta_producto_widget.dart';
-import 'package:inventario_k1/frontend/share/temas/colores_app.dart';
-import 'package:inventario_k1/frontend/share/widgets/botones/boton_mas_widget.dart';
-import 'package:inventario_k1/frontend/share/widgets/dialogos/dialogo_confirmar_eliminar_widget.dart';
-import 'package:inventario_k1/frontend/share/widgets/input/barra_busqueda_widget.dart';
-import 'package:inventario_k1/frontend/share/widgets/output/estado_vacio_widget.dart';
-import 'package:inventario_k1/frontend/share/widgets/output/snack_bar_mensaje.dart';
-import 'package:inventario_k1/frontend/share/widgets/top_bar_widget.dart';
 
-import '../../../../../../backend/features/cotizaciones/modelo/cotizacion_resumen.dart';
-import '../../provider/cotizaciones_provider.dart';
-import '../../widgets/dialogo/dialogo_cot_form_fields.dart';
+import '../../../../../backend/features/cotizaciones/modelo/cotizacion_resumen.dart';
+import '../../../../../core/resultado.dart';
+import '../../../../share2/share2.dart';
+import '../modelo/cotizacion_editor_state.dart';
 import '../provider/cotizacion_editor_provider.dart';
 import '../provider/cotizar_a_reserva_provider.dart';
-import '../widgets/dialogo_cantidad_widget.dart';
 import '../widgets/dialogo_reservar_cotizacion_widget.dart';
-import '../widgets/panel_resumen_widget.dart';
-import '../widgets/seccion_datos_cliente_widget.dart';
+import '../widgets/panel_catalogo.dart';
+import '../widgets/panel_cotizacion.dart';
 
-/// Vista de detalle / creación de cotización.
+/// Editor de cotización: dos paneles, como el punto de venta.
 ///
-/// [cotizacion] == null → nueva. != null → editar; ítems se cargan async.
+/// A la izquierda, de dónde salen las líneas —productos, servicios o líneas
+/// libres—; a la derecha, la cotización que se está armando. [cotizacion] en
+/// `null` abre una nueva.
 class CotizacionDetalleVista extends ConsumerStatefulWidget {
-  const CotizacionDetalleVista({super.key, this.cotizacion});
+  const CotizacionDetalleVista({
+    super.key,
+    this.cotizacion,
+    required this.alCerrar,
+  });
 
   final CotizacionResumen? cotizacion;
+  final VoidCallback alCerrar;
 
   @override
   ConsumerState<CotizacionDetalleVista> createState() =>
@@ -41,421 +34,244 @@ class CotizacionDetalleVista extends ConsumerStatefulWidget {
 
 class _CotizacionDetalleVistaState
     extends ConsumerState<CotizacionDetalleVista> {
-  // ── Controladores UI (ciclo de vida del widget) ────────────────────────────
-  late final ValueNotifier<Moto?> _motoNotifier;
-  late final TextEditingController _vigenciaCtrl;
-  late final TextEditingController _notasCtrl;
-  Timer? _debounce;
+  final _notas = TextEditingController();
+  final _focoBusqueda = FocusNode();
 
-  @override
-  void initState() {
-    super.initState();
-    _motoNotifier = ValueNotifier(null);
-    final cot = widget.cotizacion;
-    _vigenciaCtrl = TextEditingController(text: cot?.vigenciaHasta ?? '');
-    _notasCtrl = TextEditingController(text: cot?.notas ?? '');
+  /// Las notas se copian una sola vez, cuando el editor termina de cargar.
+  /// Copiarlas en cada emisión pisaría lo que el usuario esté escribiendo.
+  bool _notasCargadas = false;
 
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      ref.read(cotizacionEditorProvider.notifier).inicializar(widget.cotizacion);
-    });
-  }
+  int? get _id => widget.cotizacion?.id;
 
   @override
   void dispose() {
-    _motoNotifier.dispose();
-    _vigenciaCtrl.dispose();
-    _notasCtrl.dispose();
-    _debounce?.cancel();
+    _notas.dispose();
+    _focoBusqueda.dispose();
     super.dispose();
   }
 
-  // ── Diálogos / navegación (responsabilidades exclusivas del widget) ─────────
-
-  Future<void> _abrirFecha() async {
-    final ahora = DateTime.now();
-    final inicial = DateTime.tryParse(_vigenciaCtrl.text) ??
-        ahora.add(const Duration(days: 30));
-    final picked = await showDatePicker(
-      context: context,
-      initialDate: inicial,
-      firstDate: ahora,
-      lastDate: ahora.add(const Duration(days: 365 * 3)),
+  void _avisar(String mensaje, {bool esError = false}) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(
+          mensaje,
+          style: TipografiaApp.sobrePrimario(TipografiaApp.cuerpo),
+        ),
+        backgroundColor:
+            esError ? ColoresApp.statusDanger : ColoresApp.statusSuccess,
+      ),
     );
-    if (picked != null && mounted) {
-      _vigenciaCtrl.text =
-          '${picked.year}-${picked.month.toString().padLeft(2, '0')}-${picked.day.toString().padLeft(2, '0')}';
+  }
+
+  /// Fuerza el guardado sin esperar el retardo. Lo usan `Ctrl+Enter` y el
+  /// cierre del editor.
+  Future<void> _guardarAhora() async {
+    final resultado =
+        await ref.read(cotizacionEditorProvider(_id).notifier).guardarAhora();
+    if (!mounted) return;
+    if (resultado case Fallo(:final mensaje)) _avisar(mensaje, esError: true);
+  }
+
+  /// Al salir se vacía el temporizador pendiente: si no, el último cambio se
+  /// perdería junto con el provider. Si lo que queda no se puede guardar, se
+  /// avisa en vez de cerrar en silencio.
+  Future<void> _cerrar() async {
+    final resultado =
+        await ref.read(cotizacionEditorProvider(_id).notifier).guardarAhora();
+    if (!mounted) return;
+    if (resultado case Fallo(:final mensaje)) {
+      _avisar('No se guardó el último cambio: $mensaje', esError: true);
     }
+    widget.alCerrar();
   }
 
-  void _onBusquedaProductos(String q) {
-    _debounce?.cancel();
-    _debounce = Timer(const Duration(milliseconds: 300), () {
-      if (mounted) ref.read(cotizacionEditorProvider.notifier).buscarProductos(q);
-    });
-  }
-
-  Future<void> _agregarProducto(Producto p) async {
-    final notifier = ref.read(cotizacionEditorProvider.notifier);
-    final error = notifier.validarAgregarProducto(p);
-    if (error != null) {
-      SnackBarMensaje.error(context, error);
-      return;
-    }
-    final datos = notifier.datosDialogoProducto(p);
-    final cantidad = await DialogoCantidad.mostrar(
-      context,
-      nombreProducto: p.nombre,
-      disponible: datos.disponible,
-      cantidadInicial: datos.cantidadInicial,
-      etiquetaConfirmar: datos.esActualizacion ? 'Actualizar' : 'Agregar',
-    );
-    if (cantidad == null || !mounted) return;
-    notifier.confirmarAgregarProducto(p, cantidad);
-  }
-
-  void _agregarNuevoProducto() {
-    DialogoProducto.mostrar(
-      context,
-    ).then((_) => ref.invalidate(productosParaCotizacionProvider));
-  }
-
-  void _verDetalleProducto(Producto p) =>
-      DialogoDetalleProductoWidget.mostrar(context, producto: p);
-
-  void _editarProducto(Producto p) {
-    DialogoProducto.mostrar(
-      context,
-      productoAEditar: p,
-    ).then((_) => ref.invalidate(productosParaCotizacionProvider));
-  }
-
-  Future<void> _eliminarProductoDelCatalogo(Producto p) async {
-    await DialogoConfirmarEliminar.mostrar(
-      context: context,
-      nombreElemento: p.nombre,
-      tipoElemento: 'producto',
-      onConfirmar: () async {
-        final error = await ref
-            .read(cotizacionEditorProvider.notifier)
-            .eliminarProductoCatalogo(p);
-        if (!mounted) return;
-        if (error != null) {
-          SnackBarMensaje.error(context, error);
-        } else {
-          SnackBarMensaje.success(
-              context, '"${p.nombre}" eliminado del catálogo.');
-        }
-      },
-    );
-  }
-
+  /// Solo se reserva lo que tiene stock detrás, y solo de una cotización ya
+  /// guardada: la reserva apunta a su id.
   Future<void> _reservar() async {
-    final estado = ref.read(cotizacionEditorProvider);
+    final cotizacion = widget.cotizacion;
+    final estado = ref.read(cotizacionEditorProvider(_id)).value;
+    if (estado == null) return;
 
-    if (!estado.esEdicion || estado.cotizacionOriginal == null) {
-      SnackBarMensaje.error(
-          context, 'Guarda la cotización antes de crear una reserva.');
+    if (cotizacion == null) {
+      _avisar('Guarda la cotización antes de crear una reserva.', esError: true);
       return;
     }
-    if (estado.cotizacionOriginal!.clienteId == null) {
-      SnackBarMensaje.error(context, 'La cotización no tiene cliente asignado.');
+    if (estado.cliente == null) {
+      _avisar('Elige un cliente para poder reservar.', esError: true);
       return;
     }
 
     final items = CotizarAReservaUseCase.mapearItems(estado.items);
     if (items.isEmpty) {
-      SnackBarMensaje.error(
-        context,
-        'No hay productos reservables. Solo los ítems de tipo Producto pueden reservarse.',
+      _avisar(
+        'No hay nada reservable: solo los productos descuentan inventario.',
+        esError: true,
       );
       return;
     }
 
     final creada = await DialogoReservarCotizacion.mostrar(
       context,
-      cotizacion: estado.cotizacionOriginal!,
+      cotizacion: cotizacion,
       items: items,
       totalReserva: estado.total,
     );
-
-    if (creada && mounted) {
-      SnackBarMensaje.success(
-        context,
-        'Reserva creada exitosamente. Encuéntrala en el módulo Reservas.',
-      );
-      Navigator.pop(context);
-    }
+    if (!creada || !mounted) return;
+    _avisar('Reserva creada. La encuentras en el módulo Reservas.');
+    await _cerrar();
   }
-
-  Future<void> _guardar() async {
-    final esNueva = !ref.read(cotizacionEditorProvider).esEdicion;
-    final notas =
-        _notasCtrl.text.trim().isEmpty ? null : _notasCtrl.text.trim();
-    final error = await ref.read(cotizacionEditorProvider.notifier).guardar(
-          vigencia: _vigenciaCtrl.text,
-          notas: notas,
-        );
-    if (!mounted) return;
-    if (error != null) {
-      SnackBarMensaje.error(context, error);
-    } else {
-      SnackBarMensaje.success(
-        context,
-        esNueva ? 'Cotización creada correctamente.' : 'Cotización actualizada.',
-      );
-    }
-  }
-
-  // ── Build ──────────────────────────────────────────────────────────────────
 
   @override
   Widget build(BuildContext context) {
-    // Sincroniza el AppSearch cuando el notifier carga la moto en modo edición.
-    ref.listen<CotizacionEditorState>(cotizacionEditorProvider, (prev, next) {
-      if (prev?.moto?.id != next.moto?.id) {
-        _motoNotifier.value = next.moto;
-      }
+    final provider = cotizacionEditorProvider(_id);
+
+    ref.listen(provider, (_, siguiente) {
+      if (_notasCargadas || !siguiente.hasValue) return;
+      _notas.text = siguiente.value!.notas;
+      _notasCargadas = true;
     });
 
-    final estado = ref.watch(cotizacionEditorProvider);
-    final motos =
-        ref.watch(motosParaCotizacionProvider).value ?? const <Moto>[];
-    final productosActivos =
-        ref.watch(productosParaCotizacionProvider).value ?? const <Producto>[];
-    final productosFiltrados = estado.filtrarProductos(productosActivos);
+    final cargando = ref.watch(provider.select((s) => !s.hasValue));
+    if (cargando) {
+      return const Center(
+        child: CircularProgressIndicator(color: ColoresApp.goGreen),
+      );
+    }
 
-    return Scaffold(
-      backgroundColor: ColoresApp.bgContent,
-      body: Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
+    return AtajosFormulario(
+      alGuardar: _guardarAhora,
+      alCancelar: _cerrar,
+      child: CallbackShortcuts(
+        bindings: {
+          const SingleActivator(LogicalKeyboardKey.keyF, control: true): () =>
+              _focoBusqueda.requestFocus(),
+        },
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            _BarraSuperior(cotizacionId: _id, alVolver: _cerrar),
+            const Divider(color: ColoresApp.border, height: 1),
+            Expanded(
+              child: Row(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  Expanded(
+                    child: PanelCatalogo(
+                      cotizacionId: _id,
+                      focoBusqueda: _focoBusqueda,
+                    ),
+                  ),
+                  PanelCotizacion(
+                    cotizacionId: _id,
+                    notasControlador: _notas,
+                    alReservar: _reservar,
+                    alImprimir: () =>
+                        _avisar('Próximamente: vista previa en PDF.'),
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+/// Vuelta al listado, número de la cotización y estado del guardado.
+///
+/// No hay botón de guardar: la cotización se persiste sola. Lo que sí hace
+/// falta es decir en qué punto va, porque sin botón el usuario no tiene otra
+/// forma de saber si su trabajo ya está a salvo.
+class _BarraSuperior extends ConsumerWidget {
+  const _BarraSuperior({required this.cotizacionId, required this.alVolver});
+
+  final int? cotizacionId;
+  final VoidCallback alVolver;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final datos = ref.watch(
+      cotizacionEditorProvider(cotizacionId).select((s) => (
+            numero: s.value?.numero ?? '',
+            guardado: s.value?.guardado ?? EstadoGuardado.sinCambios,
+            motivo: s.value?.motivoBloqueo,
+          )),
+    );
+
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(32, 20, 32, 16),
+      child: Row(
         children: [
-          _BarraSuperior(
-            guardando: estado.guardando,
-            onCancelar: () => Navigator.pop(context),
-            onGuardar: _guardar,
-          ),
+          BotonVolver(etiqueta: 'Cotizaciones', alPresionar: alVolver),
+          const SizedBox(width: 16),
           Expanded(
-            child: Row(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                // ── Izquierda: formulario + grid de productos ──────
-                Expanded(
-                  child: CustomScrollView(
-                    slivers: [
-                      SliverToBoxAdapter(
-                        child: Padding(
-                          padding: const EdgeInsets.fromLTRB(24, 20, 24, 0),
-                          child: SeccionDatosClienteWidget(
-                            motoNotifier: _motoNotifier,
-                            motos: motos,
-                            vigenciaCtrl: _vigenciaCtrl,
-                            notasCtrl: _notasCtrl,
-                            nombreCliente: estado.nombreCliente,
-                            telefono: estado.telefono,
-                            onMotoSeleccionada: (moto) => ref
-                                .read(cotizacionEditorProvider.notifier)
-                                .seleccionarMoto(moto),
-                            onAbrirFecha: _abrirFecha,
-                            onAgregarMoto: () => DialogoMoto.mostrar(context)
-                                .then((_) =>
-                                    ref.invalidate(motosParaCotizacionProvider)),
-                          ),
-                        ),
-                      ),
-                      SliverToBoxAdapter(
-                        child: Padding(
-                          padding:
-                              const EdgeInsets.fromLTRB(24, 20, 24, 12),
-                          child: _EncabezadoProductos(
-                            onBusqueda: _onBusquedaProductos,
-                            onAgregarNuevo: _agregarNuevoProducto,
-                          ),
-                        ),
-                      ),
-                      if (productosFiltrados.isEmpty)
-                        SliverToBoxAdapter(
-                          child: Padding(
-                            padding:
-                                const EdgeInsets.fromLTRB(24, 0, 24, 32),
-                            child: EstadoVacioWidget(
-                              icono: Icons.inventory_2_outlined,
-                              textoSinDatos: 'Sin productos activos',
-                              textoSinResultados:
-                                  'No hay productos que coincidan.',
-                              textoCTA:
-                                  'Usa el botón + para agregar un producto al catálogo.',
-                              hayFiltro: estado.busquedaProductos.isNotEmpty,
-                            ),
-                          ),
-                        )
-                      else
-                        _SliverGrillaProductos(
-                          productos: productosFiltrados,
-                          onAgregar: _agregarProducto,
-                          onVerDetalle: _verDetalleProducto,
-                          onEditar: _editarProducto,
-                          onEliminar: _eliminarProductoDelCatalogo,
-                        ),
-                    ],
-                  ),
-                ),
-
-                // ── Derecha: panel de ítems seleccionados ──────────
-                SizedBox(
-                  width: 300,
-                  child: PanelResumenWidget(
-                    items: List.unmodifiable(estado.items),
-                    subtotal: estado.subtotal,
-                    iva: estado.iva,
-                    total: estado.total,
-                    cargandoItems: estado.cargandoItems,
-                    onEliminarItem: (i) =>
-                        ref.read(cotizacionEditorProvider.notifier).eliminarItem(i),
-                    onImprimir: () => SnackBarMensaje.success(
-                        context, 'Próximamente: Vista previa PDF.'),
-                    onReservar: _reservar,
-                  ),
-                ),
-              ],
+            child: Text(
+              datos.numero.isEmpty ? 'Nueva cotización' : datos.numero,
+              style: TipografiaApp.heading3,
+              overflow: TextOverflow.ellipsis,
             ),
           ),
+          _EstadoGuardado(estado: datos.guardado, motivo: datos.motivo),
         ],
       ),
     );
   }
 }
 
-// ── Widgets privados de la vista ──────────────────────────────────────────────
+/// En qué punto va el guardado automático, en una línea.
+class _EstadoGuardado extends StatelessWidget {
+  const _EstadoGuardado({required this.estado, required this.motivo});
 
-class _BarraSuperior extends StatelessWidget {
-  const _BarraSuperior({
-    required this.guardando,
-    required this.onCancelar,
-    required this.onGuardar,
-  });
-
-  final bool guardando;
-  final VoidCallback onCancelar;
-  final VoidCallback onGuardar;
+  final EstadoGuardado estado;
+  final String? motivo;
 
   @override
   Widget build(BuildContext context) {
-    return TopBarWidget(
-      titulo: 'Cotizaciones',
-      mostrarBotonVolver: true,
-      alPresionarVolver: onCancelar,
-      accionesSufijo: ElevatedButton.icon(
-        onPressed: guardando ? null : onGuardar,
-        icon: guardando
-            ? const SizedBox(
-                width: 15,
-                height: 15,
-                child: CircularProgressIndicator(
-                  strokeWidth: 2,
-                  color: Colors.white,
-                ),
-              )
-            : const Icon(Icons.save_outlined, size: 18),
-        label: const Text('Guardar cotización'),
-        style: ElevatedButton.styleFrom(
-          backgroundColor: ColoresApp.primary,
-          foregroundColor: Colors.white,
-          padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 14),
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(10),
-          ),
-          textStyle: const TextStyle(
-            fontSize: 14.5,
-            fontWeight: FontWeight.w600,
-          ),
-          elevation: 0,
+    final (icono, texto, color) = switch (estado) {
+      EstadoGuardado.sinCambios => (
+          Icons.edit_note_rounded,
+          'Se guarda sola',
+          ColoresApp.textMuted,
         ),
-      ),
-    );
-  }
-}
-
-class _EncabezadoProductos extends StatelessWidget {
-  const _EncabezadoProductos({
-    required this.onBusqueda,
-    required this.onAgregarNuevo,
-  });
-
-  final ValueChanged<String> onBusqueda;
-  final VoidCallback onAgregarNuevo;
-
-  @override
-  Widget build(BuildContext context) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        const CotSeccionLabel(
-          icono: Icons.shopping_cart_outlined,
-          label: 'AGREGAR PRODUCTOS A LA COTIZACIÓN',
+      EstadoGuardado.pendiente => (
+          Icons.sync_rounded,
+          'Sin guardar…',
+          ColoresApp.textMuted,
         ),
-        const SizedBox(height: 12),
-        Row(
-          children: [
-            Expanded(
-              child: BarraBusquedaWidget(
-                placeholder: 'Buscar producto por nombre, SKU o categoría...',
-                alCambiar: onBusqueda,
-              ),
+      EstadoGuardado.guardando => (
+          Icons.sync_rounded,
+          'Guardando…',
+          ColoresApp.textSecondary,
+        ),
+      EstadoGuardado.guardado => (
+          Icons.cloud_done_outlined,
+          'Guardada',
+          ColoresApp.statusSuccess,
+        ),
+      EstadoGuardado.bloqueado => (
+          Icons.error_outline_rounded,
+          motivo ?? 'No se pudo guardar',
+          ColoresApp.statusDanger,
+        ),
+    };
+
+    return ConstrainedBox(
+      constraints: const BoxConstraints(maxWidth: 420),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(icono, size: 17, color: color),
+          const SizedBox(width: 7),
+          Flexible(
+            child: Text(
+              texto,
+              style: TipografiaApp.caption.copyWith(color: color),
+              maxLines: 2,
+              overflow: TextOverflow.ellipsis,
             ),
-            const SizedBox(width: 8),
-            BotonMasWidget(onPressed: onAgregarNuevo),
-          ],
-        ),
-      ],
-    );
-  }
-}
-
-/// Grid lazy de productos para seleccionar.
-class _SliverGrillaProductos extends StatelessWidget {
-  const _SliverGrillaProductos({
-    required this.productos,
-    required this.onAgregar,
-    required this.onVerDetalle,
-    required this.onEditar,
-    required this.onEliminar,
-  });
-
-  final List<Producto> productos;
-  final ValueChanged<Producto> onAgregar;
-  final ValueChanged<Producto> onVerDetalle;
-  final ValueChanged<Producto> onEditar;
-  final ValueChanged<Producto> onEliminar;
-
-  static const double _maxAncho = 220.0;
-  static const double _espaciado = 12.0;
-  static const double _altura = 310.0;
-
-  @override
-  Widget build(BuildContext context) {
-    return SliverPadding(
-      padding: const EdgeInsets.fromLTRB(24, 0, 24, 32),
-      sliver: SliverGrid(
-        gridDelegate: const SliverGridDelegateWithMaxCrossAxisExtent(
-          maxCrossAxisExtent: _maxAncho,
-          crossAxisSpacing: _espaciado,
-          mainAxisSpacing: _espaciado,
-          mainAxisExtent: _altura,
-        ),
-        delegate: SliverChildBuilderDelegate(
-          (_, i) {
-            final p = productos[i];
-            return TarjetaProductoWidget(
-              key: ValueKey(p.id),
-              producto: p,
-              alTap: () => onAgregar(p),
-              alVerDetalle: () => onVerDetalle(p),
-              alEditar: () => onEditar(p),
-              alEliminar: () => onEliminar(p),
-            );
-          },
-          childCount: productos.length,
-        ),
+          ),
+        ],
       ),
     );
   }

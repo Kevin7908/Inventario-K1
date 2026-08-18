@@ -1,12 +1,12 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:inventario_k1/backend/features/cotizaciones/enum/enum_cotizacion.dart';
 import 'package:inventario_k1/backend/features/reservas/repositorio/repositorio_reservas.dart';
-import 'package:inventario_k1/frontend/features/cotizaciones/widgets/dialogo/dialogo_cot_items_tabla.dart';
 import 'package:inventario_k1/frontend/features/reservas/provider/reservas_provider.dart';
+
+import '../modelo/item_cotizacion_editor.dart';
 
 /// Use-case de responsabilidad única: convertir una cotización guardada en reserva.
 ///
-/// Mapea [CotItemDraft] → [ItemReservaDraft] (solo ítems tipo PRODUCTO)
+/// Mapea [ItemCotizacionEditor] → [ItemReservaDraft] (solo ítems reservables)
 /// y delega la creación al [reservasProvider].
 final class CotizarAReservaUseCase {
   const CotizarAReservaUseCase(this._ref);
@@ -14,13 +14,13 @@ final class CotizarAReservaUseCase {
   final Ref _ref;
 
   /// Convierte los ítems de una cotización al formato que espera el repositorio
-  /// de reservas. Los servicios se omiten porque no tienen stock reservable.
-  static List<ItemReservaDraft> mapearItems(List<CotItemDraft> cotItems) {
+  /// de reservas. Los servicios y las líneas libres se omiten: no hay stock
+  /// detrás de ellos, y es lo que dice `TipoItemCotizacion.esReservable`.
+  static List<ItemReservaDraft> mapearItems(
+    List<ItemCotizacionEditor> cotItems,
+  ) {
     return cotItems
-        .where(
-          (i) =>
-              i.tipo == TipoItemCotizacion.producto && i.referenciaId != null,
-        )
+        .where((i) => i.tipo.esReservable && i.referenciaId != null)
         .map(
           (i) => ItemReservaDraft(
             productoId: i.referenciaId!,
