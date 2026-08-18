@@ -2,12 +2,12 @@
 //
 // Corre contra una base SQLite en memoria: es la única forma de comprobar que
 // el WHERE, el COUNT y el LIMIT se resuelven de verdad en SQL y no en Dart.
-import 'package:drift/native.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:inventario_k1/backend/features/tecnicos/modelo/tecnico.dart';
 import 'package:inventario_k1/backend/features/tecnicos/repositorio/repositorio_tecnico.dart';
 import 'package:inventario_k1/backend/features/tecnicos/repositorio/repositorio_tecnico_impl.dart';
 import 'package:inventario_k1/backend/share/database/app_db.dart';
+import 'soporte/base_en_memoria.dart';
 
 late AppDb db;
 late RepositorioTecnicoDrift repo;
@@ -15,14 +15,14 @@ late RepositorioTecnicoDrift repo;
 Tecnico _tecnico({
   required String nombres,
   String? apellidos,
-  String? cedula,
+  String? documento,
   String? telefono,
   bool activo = true,
 }) =>
     Tecnico(
       nombres: nombres,
       apellidos: apellidos,
-      cedula: cedula,
+      documento: documento,
       telefono: telefono,
       activo: activo,
       creadoEn: DateTime.now(),
@@ -36,7 +36,7 @@ Future<List<String>> _nombres(FiltroTecnicos filtro) async {
 
 void main() {
   setUp(() async {
-    db = AppDb(NativeDatabase.memory());
+    db = baseEnMemoria();
     repo = RepositorioTecnicoDrift(db);
   });
 
@@ -69,13 +69,13 @@ void main() {
     await repo.crear(_tecnico(
       nombres: 'Andrés',
       apellidos: 'Patiño',
-      cedula: '1020304050',
+      documento: '1020304050',
       telefono: '3001112233',
     ));
     await repo.crear(_tecnico(
       nombres: 'Camilo',
       apellidos: 'Ruiz',
-      cedula: '1030405060',
+      documento: '1030405060',
       telefono: '3002223344',
     ));
 
@@ -145,10 +145,10 @@ void main() {
 
   test('la cédula duplicada se detecta y se puede excluir al propio registro',
       () async {
-    final creado = await repo.crear(_tecnico(nombres: 'Uno', cedula: '111'));
+    final creado = await repo.crear(_tecnico(nombres: 'Uno', documento: '111'));
 
-    expect(await repo.existeCedula('111'), isTrue);
-    expect(await repo.existeCedula('111', excluirId: creado.id), isFalse);
-    expect(await repo.existeCedula('222'), isFalse);
+    expect(await repo.existeDocumento('111'), isTrue);
+    expect(await repo.existeDocumento('111', excluirId: creado.id), isFalse);
+    expect(await repo.existeDocumento('222'), isFalse);
   });
 }

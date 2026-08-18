@@ -5,7 +5,6 @@
 // comparando `vigencia_hasta` con la fecha de hoy: antes se calculaba en Dart
 // recorriendo la lista entera, así que ni el filtro ni el conteo podían
 // apoyarse en él.
-import 'package:drift/native.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:inventario_k1/backend/features/clientes/modelo/cliente.dart';
 import 'package:inventario_k1/backend/features/clientes/repositorio/repositorio_cliente_impl.dart';
@@ -17,18 +16,32 @@ import 'package:inventario_k1/backend/features/productos/modelo/producto.dart';
 import 'package:inventario_k1/backend/features/productos/repositorio/repositorio_producto_impl.dart';
 import 'package:inventario_k1/backend/share/database/app_db.dart';
 import 'package:inventario_k1/core/iva_app.dart';
+import 'soporte/base_en_memoria.dart';
 
 late AppDb db;
 late RepositorioCotizacionesImpl repo;
 late RepositorioClientesImpl clientes;
 late RepositorioProductosImpl productos;
 
-/// Fecha a [dias] de hoy, en el formato 'YYYY-MM-DD' que guarda la columna.
-String _enDias(int dias) {
+/// Medianoche del día que está a [dias] de hoy.
+///
+/// A medianoche y no «ahora + N días» porque `vigencia_hasta` es una fecha sin
+/// hora: si llevara la hora actual, una cotización que vence hoy contaría como
+/// vigente hasta la tarde.
+DateTime _enDias(int dias) {
   final f = DateTime.now().add(Duration(days: dias));
-  return '${f.year}-${f.month.toString().padLeft(2, '0')}-'
-      '${f.day.toString().padLeft(2, '0')}';
+  return DateTime(f.year, f.month, f.day);
 }
+
+/// Producto del catálogo al que apuntan las líneas de prueba.
+///
+/// No es decorativo: `cotizacion_items` exige que una línea `PRODUCTO` traiga
+/// un `producto_id` real, así que una cotización de prueba necesita catálogo.
+late int productoId;
+
+/// Servicio del catálogo, por el mismo motivo: una línea `SERVICIO` exige un
+/// `servicio_id` real.
+late int servicioId;
 
 Future<int> _cotizacion({
   required int diasDeVigencia,
@@ -42,6 +55,7 @@ Future<int> _cotizacion({
       items: [
         ItemDraft(
           tipo: TipoItemCotizacion.producto,
+          referenciaId: productoId,
           descripcion: 'Repuesto',
           cantidad: cantidad,
           precioUnitario: precio,
@@ -56,11 +70,27 @@ Future<List<String>> _numeros(FiltroCotizaciones filtro) async {
 }
 
 void main() {
-  setUp(() {
-    db = AppDb(NativeDatabase.memory());
+  setUp(() async {
+    db = baseEnMemoria();
     repo = RepositorioCotizacionesImpl(db);
     clientes = RepositorioClientesImpl(db);
     productos = RepositorioProductosImpl(db);
+    productoId = (await productos.crear(
+      const Producto(
+        sku: 'REP-1',
+        nombre: 'Repuesto',
+        precioCompra: 5000,
+        precioVenta: 10000,
+        stockActual: 0,
+        stockMinimo: 0,
+        aplicaIva: false,
+        activo: true,
+      ),
+    ))
+        .id!;
+    servicioId = await db
+        .into(db.tablaServicio)
+        .insert(TablaServicioCompanion.insert(nombre: 'Cambio de aceite'));
   });
 
   tearDown(() async => db.close());
@@ -229,20 +259,22 @@ void main() {
     test('cada fila informa cuántas líneas tiene', () async {
       await repo.crear(
         vigenciaHasta: _enDias(30),
-        items: const [
+        items: [
           ItemDraft(
             tipo: TipoItemCotizacion.producto,
+            referenciaId: productoId,
             descripcion: 'Aceite',
             cantidad: 2,
             precioUnitario: 32000,
           ),
           ItemDraft(
             tipo: TipoItemCotizacion.servicio,
+            referenciaId: servicioId,
             descripcion: 'Cambio de aceite',
             cantidad: 1,
             precioUnitario: 25000,
           ),
-          ItemDraft(
+          const ItemDraft(
             tipo: TipoItemCotizacion.libre,
             descripcion: 'Guardabarros',
             cantidad: 1,
@@ -265,14 +297,14 @@ void main() {
     test('el conteo baja al quitarle líneas a la cotización', () async {
       final id = await repo.crear(
         vigenciaHasta: _enDias(30),
-        items: const [
-          ItemDraft(
+        items: [
+          const ItemDraft(
             tipo: TipoItemCotizacion.libre,
             descripcion: 'Uno',
             cantidad: 1,
             precioUnitario: 1000,
           ),
-          ItemDraft(
+          const ItemDraft(
             tipo: TipoItemCotizacion.libre,
             descripcion: 'Dos',
             cantidad: 1,
@@ -284,8 +316,8 @@ void main() {
       await repo.actualizar(
         id: id,
         vigenciaHasta: _enDias(30),
-        items: const [
-          ItemDraft(
+        items: [
+          const ItemDraft(
             tipo: TipoItemCotizacion.libre,
             descripcion: 'Uno',
             cantidad: 1,
@@ -401,22 +433,22 @@ void main() {
     test('guarda servicios y líneas libres, no solo productos', () async {
       final id = await repo.crear(
         vigenciaHasta: _enDias(30),
-        items: const [
+        items: [
           ItemDraft(
             tipo: TipoItemCotizacion.producto,
-            referenciaId: 7,
+            referenciaId: productoId,
             descripcion: 'Aceite 20W50',
             cantidad: 2,
             precioUnitario: 32000,
           ),
           ItemDraft(
             tipo: TipoItemCotizacion.servicio,
-            referenciaId: 3,
+            referenciaId: servicioId,
             descripcion: 'Cambio de aceite',
             cantidad: 1,
             precioUnitario: 25000,
           ),
-          ItemDraft(
+          const ItemDraft(
             tipo: TipoItemCotizacion.libre,
             descripcion: 'Repuesto conseguido afuera',
             cantidad: 1,
@@ -436,6 +468,150 @@ void main() {
       // La línea libre no referencia ningún catálogo.
       expect(detalle.items.last.referenciaId, isNull);
       expect(detalle.resumen.subtotal, 64000 + 25000 + 80000);
+    });
+  });
+
+  group('la referencia al catálogo la verifica la base', () {
+    // Antes era un `referencia_id` suelto con un `tipo_item` al lado: nada
+    // impedía que una línea de producto apuntara al id de un servicio, ni que
+    // apuntara a nada. Ahora son dos columnas con FK y un CHECK.
+    test('cada tipo guarda su referencia en la columna que le toca', () async {
+      final id = await repo.crear(
+        vigenciaHasta: _enDias(30),
+        items: [
+          ItemDraft(
+            tipo: TipoItemCotizacion.producto,
+            referenciaId: productoId,
+            descripcion: 'Aceite',
+            cantidad: 1,
+            precioUnitario: 32000,
+          ),
+          ItemDraft(
+            tipo: TipoItemCotizacion.servicio,
+            referenciaId: servicioId,
+            descripcion: 'Cambio de aceite',
+            cantidad: 1,
+            precioUnitario: 25000,
+          ),
+        ],
+      );
+
+      final filas = await db
+          .customSelect('SELECT tipo_item, producto_id, servicio_id '
+              'FROM cotizacion_items WHERE cotizacion_id = $id '
+              'ORDER BY id')
+          .get();
+
+      expect(filas.first.read<int?>('producto_id'), productoId);
+      expect(filas.first.read<int?>('servicio_id'), isNull);
+      expect(filas.last.read<int?>('servicio_id'), servicioId);
+      expect(filas.last.read<int?>('producto_id'), isNull);
+    });
+
+    test('una línea de producto sin producto no se admite', () async {
+      expect(
+        () => repo.crear(
+          vigenciaHasta: _enDias(30),
+          items: const [
+            ItemDraft(
+              tipo: TipoItemCotizacion.producto,
+              descripcion: 'Fantasma',
+              cantidad: 1,
+              precioUnitario: 1000,
+            ),
+          ],
+        ),
+        throwsA(isA<Exception>()),
+      );
+    });
+
+    test('una línea de producto no puede apuntar a un producto inexistente',
+        () async {
+      expect(
+        () => repo.crear(
+          vigenciaHasta: _enDias(30),
+          items: const [
+            ItemDraft(
+              tipo: TipoItemCotizacion.producto,
+              referenciaId: 9999,
+              descripcion: 'Fantasma',
+              cantidad: 1,
+              precioUnitario: 1000,
+            ),
+          ],
+        ),
+        throwsA(isA<Exception>()),
+      );
+    });
+
+    test('no se borra un producto que está en una cotización', () async {
+      await _cotizacion(diasDeVigencia: 30);
+
+      expect(
+        () => db.customStatement(
+            'DELETE FROM productos WHERE id = $productoId'),
+        throwsA(isA<Exception>()),
+      );
+    });
+  });
+
+  group('lo que se deduce no se guarda', () {
+    test('el total sale de subtotal + iva, no de una columna', () async {
+      final id = await _cotizacion(diasDeVigencia: 30, precio: 50000);
+
+      final detalle = await repo.obtenerDetalle(id);
+      expect(detalle.resumen.total,
+          detalle.resumen.subtotal + detalle.resumen.iva);
+
+      final columnas = await db
+          .customSelect("SELECT name FROM pragma_table_info('cotizaciones')")
+          .get();
+      final nombres = columnas.map((c) => c.read<String>('name')).toList();
+      expect(nombres, isNot(contains('total')),
+          reason: 'era subtotal + iva, dos columnas de su misma fila');
+    });
+
+    test('el estado tampoco: depende de la fecha de hoy', () async {
+      final columnas = await db
+          .customSelect("SELECT name FROM pragma_table_info('cotizaciones')")
+          .get();
+      final nombres = columnas.map((c) => c.read<String>('name')).toList();
+      expect(nombres, isNot(contains('estado')));
+    });
+  });
+
+  group('los CHECK del esquema', () {
+    test('una línea con cantidad cero se rechaza', () async {
+      expect(
+        () => repo.crear(
+          vigenciaHasta: _enDias(30),
+          items: [
+            ItemDraft(
+              tipo: TipoItemCotizacion.producto,
+              referenciaId: productoId,
+              descripcion: 'Aceite',
+              cantidad: 0,
+              precioUnitario: 1000,
+            ),
+          ],
+        ),
+        throwsA(isA<Exception>()),
+      );
+    });
+
+    test('el número de cotización no se repite', () async {
+      final id = await _cotizacion(diasDeVigencia: 30);
+      final numero = (await repo.obtenerDetalle(id)).resumen.numero;
+
+      expect(
+        () => db.into(db.tablaCotizacion).insert(
+              TablaCotizacionCompanion.insert(
+                numero: numero,
+                vigenciaHasta: DateTime(2026, 12, 31),
+              ),
+            ),
+        throwsA(isA<Exception>()),
+      );
     });
   });
 }

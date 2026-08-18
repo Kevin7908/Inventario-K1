@@ -4,7 +4,6 @@
 // el WHERE, el COUNT, el GROUP BY y el LIMIT se resuelven de verdad en SQL y
 // no en Dart.
 import 'package:drift/drift.dart' hide isNull, isNotNull;
-import 'package:drift/native.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:inventario_k1/backend/features/clientes/modelo/cliente.dart';
 import 'package:inventario_k1/backend/features/clientes/repositorio/repositorio_cliente.dart';
@@ -12,6 +11,7 @@ import 'package:inventario_k1/backend/features/clientes/repositorio/repositorio_
 import 'package:inventario_k1/backend/features/motos/modelo/moto.dart';
 import 'package:inventario_k1/backend/features/motos/repositorio/repositorio_moto_impl.dart';
 import 'package:inventario_k1/backend/share/database/app_db.dart';
+import 'soporte/base_en_memoria.dart';
 
 late AppDb db;
 late RepositorioClientesImpl repo;
@@ -20,7 +20,7 @@ late RepositorioMotosImpl motos;
 Cliente _cliente({
   required String nombres,
   String? apellidos,
-  String? cedula,
+  String? documento,
   String? telefono,
   String? email,
   String? ciudad,
@@ -30,7 +30,7 @@ Cliente _cliente({
       id: 0,
       nombres: nombres,
       apellidos: apellidos,
-      cedula: cedula,
+      documento: documento,
       telefono: telefono,
       email: email,
       ciudad: ciudad,
@@ -84,7 +84,7 @@ Future<void> _deuda({
 
 void main() {
   setUp(() {
-    db = AppDb(NativeDatabase.memory());
+    db = baseEnMemoria();
     repo = RepositorioClientesImpl(db);
     motos = RepositorioMotosImpl(db);
   });
@@ -138,14 +138,14 @@ void main() {
       await repo.crear(_cliente(
         nombres: 'Carlos',
         apellidos: 'Ramírez',
-        cedula: '1020304050',
+        documento: '1020304050',
         telefono: '3005551234',
         ciudad: 'Medellín',
       ));
       await repo.crear(_cliente(
         nombres: 'María',
         apellidos: 'Gómez',
-        cedula: '1030405060',
+        documento: '1030405060',
         telefono: '3112228890',
         ciudad: 'Bogotá',
       ));
@@ -324,11 +324,19 @@ void main() {
   group('unicidad', () {
     test('la cédula duplicada se detecta y se excluye al propio registro',
         () async {
-      final id = await repo.crear(_cliente(nombres: 'Uno', cedula: '111'));
+      final id = await repo.crear(_cliente(nombres: 'Uno', documento: '111'));
 
-      expect(await repo.existeCedula('111'), isTrue);
-      expect(await repo.existeCedula('111', excluirId: id), isFalse);
-      expect(await repo.existeCedula('222'), isFalse);
+      expect(await repo.existeDocumento('111'), isTrue);
+      expect(await repo.existeDocumento('111', excluirId: id), isFalse);
+      expect(await repo.existeDocumento('222'), isFalse);
+    });
+
+    test('el documento se normaliza: «1.098.765» y «1098765» son el mismo',
+        () async {
+      await repo.crear(_cliente(nombres: 'Uno', documento: '1.098.765'));
+
+      expect(await repo.existeDocumento('1098765'), isTrue);
+      expect(await repo.existeDocumento('1.098-765'), isTrue);
     });
 
     test('duenoDePlaca dice quién tiene la moto, ignorando mayúsculas',

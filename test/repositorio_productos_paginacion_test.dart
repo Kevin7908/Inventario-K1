@@ -2,7 +2,6 @@
 //
 // Corre contra una base SQLite en memoria: es la única forma de comprobar que
 // el WHERE, el COUNT y el LIMIT se resuelven de verdad en SQL y no en Dart.
-import 'package:drift/native.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:inventario_k1/backend/features/categorias/modelo/categoria.dart';
 import 'package:inventario_k1/backend/features/categorias/repositorio/repositorio_categorias_impl.dart';
@@ -10,6 +9,7 @@ import 'package:inventario_k1/backend/features/productos/modelo/producto.dart';
 import 'package:inventario_k1/backend/features/productos/repositorio/repositorio_producto.dart';
 import 'package:inventario_k1/backend/features/productos/repositorio/repositorio_producto_impl.dart';
 import 'package:inventario_k1/backend/share/database/app_db.dart';
+import 'soporte/base_en_memoria.dart';
 
 late AppDb db;
 late RepositorioProductosImpl repo;
@@ -64,7 +64,7 @@ Future<int> _crearCategoria(String nombre) async {
 
 void main() {
   setUp(() async {
-    db = AppDb(NativeDatabase.memory());
+    db = baseEnMemoria();
     repo = RepositorioProductosImpl(db);
     repoCategorias = RepositorioCategoriasImpl(db);
   });
@@ -262,12 +262,16 @@ void main() {
   });
 
   test('el conteo por proveedor se resuelve con GROUP BY', () async {
-    await db.into(db.tablaProveedor).insert(
-          TablaProveedorCompanion.insert(nombre: 'Distrimotos'),
-        );
-    await db.into(db.tablaProveedor).insert(
-          TablaProveedorCompanion.insert(nombre: 'MotoPartes'),
-        );
+    // Un proveedor son dos filas: la identidad en `personas` y el rol en
+    // `proveedores`.
+    for (final razonSocial in ['Distrimotos', 'MotoPartes']) {
+      final personaId = await db.into(db.tablaPersona).insert(
+            TablaPersonaCompanion.insert(nombres: razonSocial),
+          );
+      await db.into(db.tablaProveedor).insert(
+            TablaProveedorCompanion.insert(personaId: personaId),
+          );
+    }
 
     await repo.crear(_conProveedor(nombre: 'A', sku: 'A-1', proveedorId: 1));
     await repo.crear(_conProveedor(nombre: 'B', sku: 'B-1', proveedorId: 1));

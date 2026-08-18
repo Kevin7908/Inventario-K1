@@ -4,7 +4,6 @@
 // Es un test de providers, no de widgets: `ProductosVista` arrastra
 // `EncabezadoConCuenta`, que lee la sesión desde `get_it`, y montar todo eso
 // no probaría nada que no cubra ya el widget test de share2.
-import 'package:drift/native.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:inventario_k1/backend/features/categorias/modelo/categoria.dart';
@@ -14,6 +13,7 @@ import 'package:inventario_k1/backend/features/productos/repositorio/repositorio
 import 'package:inventario_k1/backend/share/database/app_db.dart';
 import 'package:inventario_k1/backend/share/database/app_db_provider.dart';
 import 'package:inventario_k1/frontend/features/productos/provider/productos_provider.dart';
+import 'soporte/base_en_memoria.dart';
 
 late AppDb db;
 late ProviderContainer container;
@@ -41,7 +41,7 @@ void main() {
   late int motor;
 
   setUp(() async {
-    db = AppDb(NativeDatabase.memory());
+    db = baseEnMemoria();
     container = ProviderContainer(
       overrides: [appDatabaseProvider.overrideWithValue(db)],
     );

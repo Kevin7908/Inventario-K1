@@ -4,7 +4,6 @@
 // el WHERE, el COUNT y el LIMIT se resuelven de verdad en SQL —incluido el
 // JOIN con clientes, del que depende buscar una moto por el nombre del dueño—
 // y no en Dart.
-import 'package:drift/native.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:inventario_k1/backend/features/clientes/modelo/cliente.dart';
 import 'package:inventario_k1/backend/features/clientes/repositorio/repositorio_cliente_impl.dart';
@@ -12,6 +11,7 @@ import 'package:inventario_k1/backend/features/motos/modelo/moto.dart';
 import 'package:inventario_k1/backend/features/motos/repositorio/repositorio_moto_impl.dart';
 import 'package:inventario_k1/backend/features/motos/repositorio/repositorio_motos.dart';
 import 'package:inventario_k1/backend/share/database/app_db.dart';
+import 'soporte/base_en_memoria.dart';
 
 late AppDb db;
 late RepositorioMotosImpl repo;
@@ -52,7 +52,7 @@ Future<List<String>> _nombres(FiltroMotos filtro) async {
 
 void main() {
   setUp(() {
-    db = AppDb(NativeDatabase.memory());
+    db = baseEnMemoria();
     repo = RepositorioMotosImpl(db);
     clientes = RepositorioClientesImpl(db);
   });

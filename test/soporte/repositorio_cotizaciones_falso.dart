@@ -29,7 +29,7 @@ class RepositorioCotizacionesFalso implements RepositorioCotizaciones {
   Future<int> crear({
     int? clienteId,
     int? motoId,
-    required String vigenciaHasta,
+    required DateTime vigenciaHasta,
     String? notas,
     required List<ItemDraft> items,
   }) async {
@@ -43,7 +43,7 @@ class RepositorioCotizacionesFalso implements RepositorioCotizaciones {
     required int id,
     int? clienteId,
     int? motoId,
-    required String vigenciaHasta,
+    required DateTime vigenciaHasta,
     String? notas,
     required List<ItemDraft> items,
   }) async {
@@ -58,8 +58,7 @@ class RepositorioCotizacionesFalso implements RepositorioCotizaciones {
           numero: 'COT-2026-000$id',
           subtotal: 0,
           iva: 0,
-          total: 0,
-          vigenciaHasta: '2026-12-31',
+          vigenciaHasta: DateTime(2026, 12, 31),
           creadoEn: DateTime(2026, 8, 16),
         ),
         items: const [],

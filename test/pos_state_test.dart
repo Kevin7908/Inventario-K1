@@ -7,7 +7,7 @@ import 'package:inventario_k1/frontend/features/pos/modelo/pos_state.dart';
 Producto _producto({
   int id = 1,
   String nombre = 'Pastilla de freno',
-  double precioVenta = 32000,
+  int precioVenta = 32000,
   double stockActual = 10,
 }) =>
     Producto(

@@ -2,12 +2,12 @@
 //
 // Corre contra una base SQLite en memoria: es la única forma de comprobar que
 // el WHERE, el COUNT y el LIMIT se resuelven de verdad en SQL y no en Dart.
-import 'package:drift/native.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:inventario_k1/backend/features/proveedores/modelo/proveedor.dart';
 import 'package:inventario_k1/backend/features/proveedores/repositorio/repositorio_proveedor_impl.dart';
 import 'package:inventario_k1/backend/features/proveedores/repositorio/repositorio_proveedores.dart';
 import 'package:inventario_k1/backend/share/database/app_db.dart';
+import 'soporte/base_en_memoria.dart';
 
 late AppDb db;
 late RepositorioProveedoresImpl repo;
@@ -39,7 +39,7 @@ Future<List<String>> _nombres(FiltroProveedores filtro) async {
 
 void main() {
   setUp(() async {
-    db = AppDb(NativeDatabase.memory());
+    db = baseEnMemoria();
     repo = RepositorioProveedoresImpl(db);
   });
 

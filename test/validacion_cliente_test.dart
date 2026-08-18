@@ -3,7 +3,6 @@
 //
 // Corre contra una base en memoria porque la regla no se puede comprobar sin
 // consultar de verdad quién es el dueño actual.
-import 'package:drift/native.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:inventario_k1/backend/features/clientes/modelo/cliente.dart';
 import 'package:inventario_k1/backend/features/clientes/repositorio/repositorio_cliente_impl.dart';
@@ -12,13 +11,14 @@ import 'package:inventario_k1/backend/features/motos/repositorio/repositorio_mot
 import 'package:inventario_k1/backend/share/database/app_db.dart';
 import 'package:inventario_k1/core/resultado.dart';
 import 'package:inventario_k1/frontend/features/clientes/provider/validacion_cliente.dart';
+import 'soporte/base_en_memoria.dart';
 
 late AppDb db;
 late RepositorioClientesImpl clientes;
 late RepositorioMotosImpl motos;
 
-Cliente _cliente({int id = 0, String nombres = 'Nuevo', String? cedula}) =>
-    Cliente(id: id, nombres: nombres, cedula: cedula, activo: true);
+Cliente _cliente({int id = 0, String nombres = 'Nuevo', String? documento}) =>
+    Cliente(id: id, nombres: nombres, documento: documento, activo: true);
 
 Moto _moto({
   int id = 0,
@@ -48,7 +48,7 @@ Future<Resultado?> _validar(Cliente cliente, List<Moto> lista) => validarCliente
 
 void main() {
   setUp(() {
-    db = AppDb(NativeDatabase.memory());
+    db = baseEnMemoria();
     clientes = RepositorioClientesImpl(db);
     motos = RepositorioMotosImpl(db);
   });
@@ -172,13 +172,13 @@ void main() {
 
     test('la cédula duplicada se rechaza, salvo la del propio cliente',
         () async {
-      final id = await clientes.crear(_cliente(nombres: 'Carlos', cedula: '111'));
+      final id = await clientes.crear(_cliente(nombres: 'Carlos', documento: '111'));
 
-      final fallo = await _validar(_cliente(nombres: 'Otro', cedula: '111'), []);
+      final fallo = await _validar(_cliente(nombres: 'Otro', documento: '111'), []);
       expect((fallo! as Fallo).motivo, MotivoFallo.documentoDuplicado);
 
       expect(
-        await _validar(_cliente(id: id, nombres: 'Carlos', cedula: '111'), []),
+        await _validar(_cliente(id: id, nombres: 'Carlos', documento: '111'), []),
         isNull,
       );
     });

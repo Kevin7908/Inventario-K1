@@ -12,18 +12,17 @@
 // cuelga. Lo que se prueba aquí es el widget, no la consulta —esa la cubre
 // `repositorio_productos_paginacion_test.dart`—.
 import 'package:drift/drift.dart' show driftRuntimeOptions;
-import 'package:drift/native.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:inventario_k1/backend/features/categorias/modelo/categoria.dart';
 import 'package:inventario_k1/backend/features/productos/modelo/producto.dart';
 import 'package:inventario_k1/backend/features/proveedores/modelo/proveedor.dart';
-import 'package:inventario_k1/backend/share/database/app_db.dart';
 import 'package:inventario_k1/backend/share/database/app_db_provider.dart';
 import 'package:inventario_k1/frontend/features/categorias/provider/categorias_provider.dart';
 import 'package:inventario_k1/frontend/features/productos/widgets/formulario_producto.dart';
 import 'package:inventario_k1/frontend/features/proveedores/provider/proveedores_provider.dart';
+import 'soporte/base_en_memoria.dart';
 
 final _frenos = Categoria(
   id: 7,
@@ -73,7 +72,7 @@ void main() {
         overrides: [
           // Unidades de medida no se sustituye —es un AsyncNotifier— pero sí
           // necesita una base: la de memoria le basta para quedarse vacía.
-          appDatabaseProvider.overrideWithValue(AppDb(NativeDatabase.memory())),
+          appDatabaseProvider.overrideWithValue(baseEnMemoria()),
           catalogoCategoriasProvider.overrideWith((ref) => Stream.value([_frenos])),
           catalogoProveedoresProvider.overrideWith((ref) => Stream.value(proveedores)),
         ],
