@@ -406,7 +406,11 @@ class _PanelCategoriasState extends ConsumerState<_PanelCategorias> {
   }
 }
 
-/// Miniatura cuadrada del producto, con marcador cuando no hay imagen.
+/// Miniatura del producto, con marcador cuando no hay imagen.
+///
+/// Cuadrada por defecto —la de las filas de la tabla— y rectangular si se le
+/// pasa [ancho]: así sirve también para la franja superior de
+/// [TarjetaProducto], que es ancho completo por 120 de alto.
 ///
 /// Vive en el módulo (no en share2) porque lee un archivo del disco, y share2
 /// no toca dependencias externas ni el sistema de archivos.
@@ -415,12 +419,24 @@ class MiniaturaProducto extends StatelessWidget {
     super.key,
     required this.rutaImagen,
     this.lado = 44,
+    this.ancho,
     this.radio = 11,
+    this.conBorde = true,
   });
 
   final String? rutaImagen;
+
+  /// Alto de la miniatura, y también su ancho cuando [ancho] es `null`.
   final double lado;
+
+  /// Ancho explícito. `double.infinity` para ocupar todo el espacio del padre.
+  final double? ancho;
+
   final double radio;
+
+  /// El borde estorba cuando la miniatura ya va dentro de un cuadro con el
+  /// suyo, como en la tarjeta de producto.
+  final bool conBorde;
 
   @override
   Widget build(BuildContext context) {
@@ -428,12 +444,12 @@ class MiniaturaProducto extends StatelessWidget {
     final hayRuta = ruta != null && ruta.isNotEmpty;
 
     return Container(
-      width: lado,
+      width: ancho ?? lado,
       height: lado,
       decoration: BoxDecoration(
         color: ColoresApp.bgInput,
         borderRadius: BorderRadius.circular(radio),
-        border: Border.all(color: ColoresApp.border),
+        border: conBorde ? Border.all(color: ColoresApp.border) : null,
       ),
       clipBehavior: Clip.antiAlias,
       child: hayRuta ? _imagen(context, ruta) : _marcador(),
@@ -441,14 +457,18 @@ class MiniaturaProducto extends StatelessWidget {
   }
 
   Widget _imagen(BuildContext context, String ruta) {
-    // `cacheWidth` decodifica al tamaño en que se pinta: una foto de 4000 px no
-    // tiene por qué ocupar memoria completa para una miniatura de 44.
+    // Decodifica al tamaño en que se pinta: una foto de 4000 px no tiene por
+    // qué ocupar memoria completa para una miniatura de 44. Con ancho
+    // infinito no hay número que pasar, así que se acota por el alto.
     final escala = MediaQuery.devicePixelRatioOf(context);
+    final anchoReal = ancho ?? lado;
+    final acotaPorAncho = anchoReal.isFinite;
 
     return Image.file(
       File(ruta),
       fit: BoxFit.cover,
-      cacheWidth: (lado * escala).round(),
+      cacheWidth: acotaPorAncho ? (anchoReal * escala).round() : null,
+      cacheHeight: acotaPorAncho ? null : (lado * escala).round(),
       // Sin `existsSync()`: era I/O síncrono en el build de cada fila y de cada
       // hover de tarjeta. `errorBuilder` ya cubre el archivo que no está.
       errorBuilder: (_, _, _) => _marcador(),

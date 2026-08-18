@@ -35,6 +35,7 @@ class _DialogoServicioState extends ConsumerState<DialogoServicio> {
   final _formKey = GlobalKey<FormState>();
   late final TextEditingController _nombreCtrl;
   late final TextEditingController _descripcionCtrl;
+  late final TextEditingController _precioCtrl;
   late bool _activo;
 
   bool _guardando = false;
@@ -45,6 +46,10 @@ class _DialogoServicioState extends ConsumerState<DialogoServicio> {
     final s = widget.servicioAEditar;
     _nombreCtrl = TextEditingController(text: s?.nombre ?? '');
     _descripcionCtrl = TextEditingController(text: s?.descripcion ?? '');
+    // 0 es "sin definir": el campo se muestra vacío en vez de con un cero.
+    _precioCtrl = TextEditingController(
+      text: (s?.precioSugerido ?? 0) == 0 ? '' : '${s!.precioSugerido}',
+    );
     _activo = s?.activo ?? true;
   }
 
@@ -52,6 +57,7 @@ class _DialogoServicioState extends ConsumerState<DialogoServicio> {
   void dispose() {
     _nombreCtrl.dispose();
     _descripcionCtrl.dispose();
+    _precioCtrl.dispose();
     super.dispose();
   }
 
@@ -96,6 +102,7 @@ class _DialogoServicioState extends ConsumerState<DialogoServicio> {
 
     final notifier = ref.read(serviciosProvider.notifier);
     final descripcion = _descripcionCtrl.text.trim();
+    final precioSugerido = int.tryParse(_precioCtrl.text.trim()) ?? 0;
     final String? error;
 
     if (widget.esEdicion) {
@@ -103,12 +110,14 @@ class _DialogoServicioState extends ConsumerState<DialogoServicio> {
         id: widget.servicioAEditar!.id,
         nombre: _nombreCtrl.text.trim(),
         descripcion: descripcion.isEmpty ? null : descripcion,
+        precioSugerido: precioSugerido,
         activo: _activo,
       );
     } else {
       error = await notifier.agregar(
         nombre: _nombreCtrl.text.trim(),
         descripcion: descripcion.isEmpty ? null : descripcion,
+        precioSugerido: precioSugerido,
         activo: _activo,
       );
     }
@@ -220,13 +229,27 @@ class _DialogoServicioState extends ConsumerState<DialogoServicio> {
                         lineas: 3,
                       ),
                       const SizedBox(height: 18),
+                      CampoTexto(
+                        etiqueta: 'Precio sugerido (opcional)',
+                        controlador: _precioCtrl,
+                        placeholder: 'Ej: 25000',
+                        soloEnteros: true,
+                      ),
+                      const SizedBox(height: 6),
+                      const Text(
+                        'Precarga el precio al cotizar y al abrir una tarea de '
+                        'orden. Se puede ajustar en cada trabajo sin cambiar '
+                        'este valor.',
+                        style: TipografiaApp.caption,
+                      ),
+                      const SizedBox(height: 18),
                       Row(
                         children: [
                           Expanded(
                             child: Column(
                               crossAxisAlignment: CrossAxisAlignment.start,
                               children: [
-                                Text(
+                                const Text(
                                   'Estado',
                                   style: TipografiaApp.etiquetaCampo,
                                 ),

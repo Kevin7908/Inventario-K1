@@ -31,11 +31,17 @@ class ServiciosNotifier extends AsyncNotifier<List<Servicio>> {
   Future<String?> agregar({
     required String nombre,
     String? descripcion,
+    int precioSugerido = 0,
     bool activo = true,
   }) async {
     state = const AsyncLoading();
     final result = await AsyncValue.guard(
-      () => _repo.agregar(nombre: nombre, descripcion: descripcion, activo: activo),
+      () => _repo.agregar(
+        nombre: nombre,
+        descripcion: descripcion,
+        precioSugerido: precioSugerido,
+        activo: activo,
+      ),
     );
     if (result is AsyncError) {
       state = await AsyncValue.guard(_repo.obtenerTodos);
@@ -48,11 +54,18 @@ class ServiciosNotifier extends AsyncNotifier<List<Servicio>> {
     required int id,
     required String nombre,
     String? descripcion,
+    int precioSugerido = 0,
     required bool activo,
   }) async {
     state = const AsyncLoading();
     final result = await AsyncValue.guard(
-      () => _repo.actualizar(id: id, nombre: nombre, descripcion: descripcion, activo: activo),
+      () => _repo.actualizar(
+        id: id,
+        nombre: nombre,
+        descripcion: descripcion,
+        precioSugerido: precioSugerido,
+        activo: activo,
+      ),
     );
     if (result is AsyncError) {
       state = await AsyncValue.guard(_repo.obtenerTodos);

@@ -60,6 +60,11 @@ class _DialogoAgregarEditarTareaState
   bool _guardando = false;
   bool _preseleccionado = false;
 
+  /// Precio sugerido del servicio que hay puesto ahora mismo. Sirve para
+  /// distinguir "el campo trae lo que precargamos" de "el usuario tecleó un
+  /// precio", y no pisar lo segundo al cambiar de servicio.
+  int _ultimoSugerido = 0;
+
   @override
   void initState() {
     super.initState();
@@ -71,11 +76,36 @@ class _DialogoAgregarEditarTareaState
     );
     _notasCtrl  = TextEditingController(text: t?.notas ?? '');
     _completado = t?.completado ?? false;
+
+    // Editando, lo que manda es el precio ya pactado: -1 no coincide con
+    // ningún sugerido, así que la precarga nunca lo reemplaza.
+    if (t != null) _ultimoSugerido = -1;
+    _servicioNotifier.addListener(_precargarPrecioSugerido);
+  }
+
+  /// Trae el precio de referencia del servicio elegido.
+  ///
+  /// Solo rellena si el campo está vacío o si todavía tiene el sugerido del
+  /// servicio anterior: un precio escrito a mano no se pisa. El valor final
+  /// que se guarda sigue siendo `precio_pactado`; el catálogo no se toca.
+  void _precargarPrecioSugerido() {
+    final servicio = _servicioNotifier.value;
+    if (servicio == null) return;
+
+    final texto = _precioCtrl.text.trim();
+    final actual = int.tryParse(texto);
+    if (texto.isEmpty || actual == _ultimoSugerido) {
+      _precioCtrl.text =
+          servicio.precioSugerido == 0 ? '' : '${servicio.precioSugerido}';
+    }
+    _ultimoSugerido = servicio.precioSugerido;
   }
 
   @override
   void dispose() {
-    _servicioNotifier.dispose();
+    _servicioNotifier
+      ..removeListener(_precargarPrecioSugerido)
+      ..dispose();
     _tecnicoNotifier.dispose();
     _precioCtrl.dispose();
     _notasCtrl.dispose();
