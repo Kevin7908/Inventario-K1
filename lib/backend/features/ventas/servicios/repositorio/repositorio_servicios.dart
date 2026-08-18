@@ -12,6 +12,7 @@ abstract interface class RepositorioServicios {
   Future<Servicio> agregar({
     required String nombre,
     String? descripcion,
+    int precioSugerido = 0,
     bool activo,
   });
 
@@ -19,6 +20,7 @@ abstract interface class RepositorioServicios {
     required int id,
     required String nombre,
     String? descripcion,
+    int precioSugerido = 0,
     required bool activo,
   });
 

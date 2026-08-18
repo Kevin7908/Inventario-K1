@@ -53,11 +53,13 @@ class RepositorioServiciosImpl implements RepositorioServicios {
   Future<Servicio> agregar({
     required String nombre,
     String? descripcion,
+    int precioSugerido = 0,
     bool activo = true,
   }) async {
     final companion = ServicioMapper.aCompanionNuevo(
       nombre: nombre.trim(),
       descripcion: descripcion?.trim(),
+      precioSugerido: precioSugerido,
       activo: activo,
     );
     final id = await _db.into(_tabla).insert(companion);
@@ -69,12 +71,14 @@ class RepositorioServiciosImpl implements RepositorioServicios {
     required int id,
     required String nombre,
     String? descripcion,
+    int precioSugerido = 0,
     required bool activo,
   }) async {
     final companion = ServicioMapper.aCompanionActualizar(
       id: id,
       nombre: nombre.trim(),
       descripcion: descripcion?.trim(),
+      precioSugerido: precioSugerido,
       activo: activo,
     );
     await (_db.update(_tabla)..where((t) => t.id.equals(id))).write(companion);

@@ -14,6 +14,7 @@ abstract final class ServicioMapper {
       id: fila.id,
       nombre: fila.nombre,
       descripcion: fila.descripcion,
+      precioSugerido: fila.precioSugerido,
       activo: fila.activo,
       creadoEn: fila.creadoEn,
     );
@@ -26,11 +27,13 @@ abstract final class ServicioMapper {
   static TablaServicioCompanion aCompanionNuevo({
     required String nombre,
     String? descripcion,
+    int precioSugerido = 0,
     bool activo = true,
   }) {
     return TablaServicioCompanion.insert(
       nombre: nombre,
       descripcion: Value(descripcion),
+      precioSugerido: Value(precioSugerido),
       activo: Value(activo),
       creadoEn: Value(DateTime.now().toLocal().toIso8601String()),
     );
@@ -40,12 +43,14 @@ abstract final class ServicioMapper {
     required int id,
     required String nombre,
     String? descripcion,
+    required int precioSugerido,
     required bool activo,
   }) {
     return TablaServicioCompanion(
       id: Value(id),
       nombre: Value(nombre),
       descripcion: Value(descripcion),
+      precioSugerido: Value(precioSugerido),
       activo: Value(activo),
     );
   }
