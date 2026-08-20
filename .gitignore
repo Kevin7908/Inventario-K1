@@ -93,3 +93,5 @@ REGLAS_BD.md
 PLAN.md
 # Deuda técnica anterior al recorte del 18/08/2026 — solo referencia
 DEUDA_TECNICA.historico.md
+# Plan de migración de Órdenes — local, no sube al repositorio
+PLAN_ORDENES.md
