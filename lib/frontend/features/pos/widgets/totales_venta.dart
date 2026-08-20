@@ -15,9 +15,11 @@ import '../provider/pos_providers.dart';
 /// vive siempre, aunque el descuento sea 0, porque si no habría que descubrir
 /// dónde se pone.
 ///
-/// **Con `kIva` en 0 no se pinta el renglón de IVA**: sería un `$0` que solo
-/// estorba. El de subtotal sí se queda: con descuento, subtotal y total son
-/// números distintos.
+/// El renglón de IVA va **debajo del total y no encima**, porque no suma:
+/// los precios ya lo traen dentro (ver `iva_app.dart`), así que solo dice
+/// cuánto del total es impuesto. Con `kIva` en 0 no se pinta: sería un `$0`
+/// que solo estorba. El de subtotal sí se queda: con descuento, subtotal y
+/// total son números distintos.
 class TotalesVenta extends ConsumerWidget {
   const TotalesVenta({super.key});
 
@@ -36,10 +38,6 @@ class TotalesVenta extends ConsumerWidget {
       children: [
         _Renglon(etiqueta: 'Subtotal', valor: formatearPrecio(totales.subtotal)),
         const SizedBox(height: 8),
-        if (hayIva) ...[
-          _Renglon(etiqueta: etiquetaIva, valor: formatearPrecio(totales.iva)),
-          const SizedBox(height: 8),
-        ],
         _RenglonDescuento(descuento: totales.descuento),
         const SizedBox(height: 12),
         // Línea punteada sobre el total, como en el diseño.
@@ -58,6 +56,10 @@ class TotalesVenta extends ConsumerWidget {
             ),
           ],
         ),
+        if (hayIva) ...[
+          const SizedBox(height: 6),
+          _Renglon(etiqueta: etiquetaIva, valor: formatearPrecio(totales.iva)),
+        ],
       ],
     );
   }

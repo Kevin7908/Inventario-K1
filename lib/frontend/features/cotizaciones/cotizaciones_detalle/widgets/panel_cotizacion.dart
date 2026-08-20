@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../../../core/formato.dart';
 import '../../../../share2/share2.dart';
+import '../modelo/cotizacion_editor_state.dart';
 import '../provider/catalogo_cotizacion_providers.dart';
 import '../provider/cotizacion_editor_provider.dart';
 import 'dialogo_datos_cotizacion.dart';
@@ -131,8 +132,12 @@ class _Cabecera extends ConsumerWidget {
   }
 }
 
-/// Las líneas de la cotización. Es lo único del panel que cambia al agregar o
-/// quitar algo, así que va en su propio widget.
+/// Las líneas de la cotización, agrupadas por tipo. Es lo único del panel que
+/// cambia al agregar o quitar algo, así que va en su propio widget.
+///
+/// Los productos y los servicios van en bloques separados con su subtotal:
+/// mezclados, no había forma de ver de un vistazo cuánto es mano de obra y
+/// cuánto repuestos, que es justo lo que se discute con el cliente.
 class _Lineas extends ConsumerWidget {
   const _Lineas({required this.cotizacionId});
 
@@ -175,24 +180,81 @@ class _Lineas extends ConsumerWidget {
 
     final notifier = ref.read(provider.notifier);
     final fotos = ref.watch(imagenPorProductoProvider);
+    // El `select` de arriba es sobre `items`, que conserva identidad mientras
+    // las líneas no cambien: esta pasada solo corre cuando cambiaron de
+    // verdad, no en cada repintado. La regla de agrupación vive en el estado.
+    final grupos = CotizacionEditorState.agrupar(items);
 
-    return ListView.builder(
+    // `ListView` concreto y no `.builder`: los grupos son tres como mucho y
+    // aplanarlos a índices para el builder obligaría a recalcular a qué grupo
+    // pertenece cada fila en cada llamada.
+    return ListView(
       padding: const EdgeInsets.symmetric(horizontal: 22),
-      itemCount: items.length,
-      itemBuilder: (context, i) {
-        final item = items[i];
-        return LineaCotizacion(
-          // El tipo y la referencia identifican la línea; el índice solo, no:
-          // al borrar una de en medio reutilizaría el estado de la siguiente y
-          // el campo de precio mostraría el importe de otra línea.
-          key: ValueKey('${item.tipo.valor}-${item.referenciaId}-$i'),
-          item: item,
-          imagen: item.tipo.esReservable ? fotos[item.referenciaId] : null,
-          alCambiarCantidad: (cantidad) => notifier.cambiarCantidad(i, cantidad),
-          alCambiarPrecio: (precio) => notifier.cambiarPrecio(i, precio),
-          alEliminar: () => notifier.eliminarItem(i),
-        );
-      },
+      children: [
+        for (final grupo in grupos) ...[
+          _EncabezadoGrupo(grupo: grupo),
+          for (final (:indice, :item) in grupo.lineas)
+            LineaCotizacion(
+              // El tipo y la referencia identifican la línea; el índice solo,
+              // no: al borrar una de en medio reutilizaría el estado de la
+              // siguiente y el campo de precio mostraría el importe de otra.
+              key: ValueKey('${item.tipo.valor}-${item.referenciaId}-$indice'),
+              item: item,
+              imagen: item.tipo.esReservable ? fotos[item.referenciaId] : null,
+              // Los índices son los de `items`, no los del grupo: agrupar es
+              // cosa de la vista y no puede renumerar lo que espera el
+              // notifier.
+              alCambiarCantidad: (cantidad) =>
+                  notifier.cambiarCantidad(indice, cantidad),
+              alCambiarPrecio: (precio) =>
+                  notifier.cambiarPrecio(indice, precio),
+              alEliminar: () => notifier.eliminarItem(indice),
+            ),
+        ],
+      ],
+    );
+  }
+}
+
+/// Título de un bloque de líneas con su subtotal, como en el diseño: overline
+/// tenue a la izquierda, importe a la derecha.
+///
+/// Solo aparece cuando el grupo tiene líneas —`itemsAgrupados` ya descarta los
+/// vacíos—, así que una cotización de puros productos no muestra un encabezado
+/// "Servicios" en blanco.
+class _EncabezadoGrupo extends StatelessWidget {
+  const _EncabezadoGrupo({required this.grupo});
+
+  final GrupoLineas grupo;
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.only(top: 16, bottom: 4),
+      child: Row(
+        children: [
+          Icon(
+            LineaCotizacion.iconoDe(grupo.tipo),
+            size: 14,
+            color: ColoresApp.textMuted,
+          ),
+          const SizedBox(width: 7),
+          Expanded(
+            child: Text(
+              grupo.titulo,
+              style: TipografiaApp.overline.copyWith(
+                color: ColoresApp.textMuted,
+              ),
+            ),
+          ),
+          Text(
+            formatearPrecio(grupo.subtotal),
+            style: TipografiaApp.overline.copyWith(
+              color: ColoresApp.textSecondary,
+            ),
+          ),
+        ],
+      ),
     );
   }
 }

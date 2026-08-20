@@ -19,8 +19,10 @@ import 'tabla_servicios_cotizacion.dart';
 ///
 /// El selector de tipo es lo único que cambia entre los tres casos, y estar a
 /// la vista desde el principio deja ver que también se puede cotizar mano de
-/// obra. Los servicios van en filas y no en tarjetas porque no tienen foto ni
-/// categoría: una rejilla de cuadros vacíos no aportaría nada.
+/// obra: por eso son tres radios y no un desplegable, que escondía dos de las
+/// tres opciones detrás de un clic. Los servicios van en filas y no en
+/// tarjetas porque no tienen foto ni categoría: una rejilla de cuadros vacíos
+/// no aportaría nada.
 class PanelCatalogo extends ConsumerWidget {
   const PanelCatalogo({
     super.key,
@@ -40,10 +42,13 @@ class PanelCatalogo extends ConsumerWidget {
 
     return Row(
       children: [
-        // El panel de categorías solo aparece con productos: ni los servicios
-        // ni las líneas libres están categorizados.
-        if (tipo == TipoItemCotizacion.producto)
-          PanelCategoriasCotizacion(cotizacionId: cotizacionId),
+        // El panel se queda siempre, apagado cuando el filtro no aplica.
+        // Hacerlo desaparecer con los servicios y la línea libre corría la
+        // rejilla entera 208 px a la izquierda en cada cambio de tipo.
+        PanelCategoriasCotizacion(
+          cotizacionId: cotizacionId,
+          habilitado: tipo == TipoItemCotizacion.producto,
+        ),
         Expanded(
           child: Padding(
             padding: const EdgeInsets.fromLTRB(24, 20, 24, 24),
@@ -165,40 +170,41 @@ class _BarraState extends ConsumerState<_Barra> {
     _notifier.cambiarTipo(tipo);
   }
 
+  /// Cada tipo con su ícono: leerlos es más rápido que leer tres etiquetas.
+  static IconData _iconoDe(TipoItemCotizacion tipo) => switch (tipo) {
+        TipoItemCotizacion.producto => Icons.inventory_2_outlined,
+        TipoItemCotizacion.servicio => Icons.build_outlined,
+        TipoItemCotizacion.libre => Icons.edit_outlined,
+      };
+
   @override
   Widget build(BuildContext context) {
     final hayBuscador = widget.tipo != TipoItemCotizacion.libre;
 
-    return Row(
+    // Radio arriba y buscador debajo, en vez de lado a lado: las tres
+    // pastillas no dejan ancho útil para el buscador en la misma fila.
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        SizedBox(
-          width: 190,
-          child: SelectorWidget<TipoItemCotizacion>(
-            etiqueta: 'Qué agregar',
-            valor: widget.tipo,
-            opciones: TipoItemCotizacion.values,
-            constructorEtiqueta: (t) => t.etiqueta,
-            alCambiar: _cambiarTipo,
-          ),
+        GrupoRadio<TipoItemCotizacion>(
+          etiqueta: 'Qué agregar',
+          valor: widget.tipo,
+          opciones: TipoItemCotizacion.values,
+          constructorEtiqueta: (t) => t.etiqueta,
+          constructorIcono: _iconoDe,
+          alCambiar: _cambiarTipo,
         ),
-        const SizedBox(width: 16),
-        if (hayBuscador)
-          Expanded(
-            child: Padding(
-              // Alinea con el input del selector, que lleva etiqueta encima.
-              padding: const EdgeInsets.only(top: 22),
-              child: BarraBusqueda(
-                controlador: _busqueda,
-                focoTeclado: widget.focoBusqueda,
-                placeholder: widget.tipo == TipoItemCotizacion.producto
-                    ? 'Buscar producto por nombre o SKU...'
-                    : 'Buscar servicio...',
-                alCambiar: _notifier.buscarEnCatalogo,
-              ),
-            ),
-          )
-        else
-          const Spacer(),
+        if (hayBuscador) ...[
+          const SizedBox(height: 14),
+          BarraBusqueda(
+            controlador: _busqueda,
+            focoTeclado: widget.focoBusqueda,
+            placeholder: widget.tipo == TipoItemCotizacion.producto
+                ? 'Buscar producto por nombre o SKU...'
+                : 'Buscar servicio...',
+            alCambiar: _notifier.buscarEnCatalogo,
+          ),
+        ],
       ],
     );
   }

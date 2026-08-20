@@ -48,10 +48,12 @@ Future<int> _cotizacion({
   int? clienteId,
   int precio = 10000,
   double cantidad = 1,
+  int descuento = 0,
 }) =>
     repo.crear(
       clienteId: clienteId,
       vigenciaHasta: _enDias(diasDeVigencia),
+      descuento: descuento,
       items: [
         ItemDraft(
           tipo: TipoItemCotizacion.producto,
@@ -235,7 +237,7 @@ void main() {
       expect(resumen.vencidas, 1);
       expect(
         resumen.montoVigente,
-        150000 + ivaDe(100000) + ivaDe(50000),
+        150000,
         reason: 'la vencida no suma',
       );
     });
@@ -247,8 +249,9 @@ void main() {
       final detalle = await repo.obtenerDetalle(id);
 
       expect(detalle.resumen.subtotal, 100000);
-      expect(detalle.resumen.iva, ivaDe(100000));
-      expect(detalle.resumen.total, 100000 + ivaDe(100000));
+      expect(detalle.resumen.iva, ivaIncluidoEn(100000));
+      expect(detalle.resumen.total, 100000,
+          reason: 'el precio ya trae el IVA dentro');
     });
   });
 
@@ -612,6 +615,111 @@ void main() {
             ),
         throwsA(isA<Exception>()),
       );
+    });
+  });
+
+  group('descuento', () {
+    Future<CotizacionResumen> leer(int id) async =>
+        (await repo.obtenerDetalle(id)).resumen;
+
+    test('se guarda y el total lo resta', () async {
+      final id = await _cotizacion(
+        diasDeVigencia: 10,
+        precio: 50000,
+        cantidad: 2,
+        descuento: 15000,
+      );
+
+      final resumen = await leer(id);
+      expect(resumen.subtotal, 100000);
+      expect(resumen.descuento, 15000);
+      expect(resumen.total, 85000);
+    });
+
+    test('un descuento mayor que el subtotal se recorta al subtotal',
+        () async {
+      // El CHECK de la tabla lo rechazaría con un error críptico; el
+      // repositorio lo recorta antes para que nunca se llegue ahí.
+      final id = await _cotizacion(
+        diasDeVigencia: 10,
+        precio: 30000,
+        descuento: 500000,
+      );
+
+      final resumen = await leer(id);
+      expect(resumen.descuento, 30000);
+      expect(resumen.total, 0);
+    });
+
+    test('un descuento negativo se guarda como cero', () async {
+      final id = await _cotizacion(
+        diasDeVigencia: 10,
+        precio: 30000,
+        descuento: -9000,
+      );
+
+      expect((await leer(id)).descuento, 0);
+    });
+
+    test('quitar una línea recorta el descuento que dejó de caber', () async {
+      // Sin el recorte en `_recalcularTotales`, este `eliminarItem` se
+      // estrellaría contra el CHECK `descuento <= subtotal` y quitar una línea
+      // fallaría sin explicación.
+      final id = await repo.crear(
+        vigenciaHasta: _enDias(10),
+        descuento: 40000,
+        items: [
+          ItemDraft(
+            tipo: TipoItemCotizacion.producto,
+            referenciaId: productoId,
+            descripcion: 'Repuesto',
+            cantidad: 1,
+            precioUnitario: 30000,
+          ),
+          const ItemDraft(
+            tipo: TipoItemCotizacion.libre,
+            descripcion: 'Cargo suelto',
+            cantidad: 1,
+            precioUnitario: 20000,
+          ),
+        ],
+      );
+      expect((await leer(id)).descuento, 40000);
+
+      final detalle = await repo.obtenerDetalle(id);
+      final libre = detalle.items.firstWhere(
+        (i) => i.tipoItem == TipoItemCotizacion.libre,
+      );
+      await repo.eliminarItem(libre.id, id);
+
+      final resumen = await leer(id);
+      expect(resumen.subtotal, 30000);
+      expect(resumen.descuento, 30000, reason: 'recortado al nuevo subtotal');
+      expect(resumen.total, 0);
+    });
+
+    test('el CHECK rechaza un descuento mayor que el subtotal', () async {
+      final id = await _cotizacion(diasDeVigencia: 10, precio: 10000);
+
+      // Saltándose el repositorio, la base sigue diciendo que no.
+      expect(
+        () => db.customStatement(
+          'UPDATE cotizaciones SET descuento = 99999 WHERE id = ?',
+          [id],
+        ),
+        throwsA(isA<Exception>()),
+      );
+    });
+
+    test('el monto vigente del resumen descuenta la rebaja', () async {
+      await _cotizacion(
+        diasDeVigencia: 20,
+        precio: 100000,
+        descuento: 30000,
+      );
+
+      final resumen = await repo.observarResumen().first;
+      expect(resumen.montoVigente, 70000);
     });
   });
 }

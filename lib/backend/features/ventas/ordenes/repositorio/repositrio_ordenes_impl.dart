@@ -5,6 +5,8 @@ import 'package:inventario_k1/backend/share/database/app_db.dart';
 import '../../../inventario/modelo/movimiento_inventario.dart';
 import '../../../inventario/repositorio/repositorio_inventario.dart';
 import '../../../inventario/repositorio/repositorio_inventario_impl.dart';
+import '../../../../share/consecutivos/documento_consecutivo.dart';
+import '../../../../share/consecutivos/repositorio_consecutivos.dart';
 import '../enum/enum_ordenes.dart';
 import '../mapper/ordenes_mapper.dart';
 import '../modelo/orden_detalle.dart';
@@ -22,31 +24,72 @@ class RepositorioOrdenesImpl implements RepositorioOrdenes {
   $TablaOrdenesServicioTable get _tablaOrdenes => _db.tablaOrdenesServicio;
   $TablaOrdenesTareaTable get _tablaTareas => _db.tablaOrdenesTarea;
   $TablaOrdenesRepuestoTable get _tablaRepuestos => _db.tablaOrdenesRepuesto;
+  $TablaOrdenesCargoTable get _tablaCargos => _db.tablaOrdenesCargo;
 
-  // SQL base para resúmenes. El nombre del cliente sale de `personas`: la
-  // tabla `clientes` solo guarda lo propio del rol.
-  static const _sqlSelectResumen = '''
-    SELECT
-      os.*,
-      m.marca, m.modelo, m.anio, m.placa,
-      (pe.nombres || ' ' || COALESCE(pe.apellidos, '')) AS cliente_nombre
+  /// El número de orden sale de la tabla `consecutivos`, dentro de la misma
+  /// transacción que la crea (§7.1).
+  late final RepositorioConsecutivos _consecutivos =
+      RepositorioConsecutivos(_db);
+
+  // El `FROM` y sus tres JOIN, aparte para que la consulta de la página y la
+  // del `COUNT` filtren sobre exactamente las mismas filas. Si se separaran,
+  // el total podría contar órdenes que la página no muestra.
+  //
+  // El nombre del cliente sale de `personas`: la tabla `clientes` solo guarda
+  // lo propio del rol.
+  static const _sqlFromResumen = '''
     FROM ordenes_servicio os
     JOIN motos    m  ON m.id  = os.moto_id
     JOIN clientes c  ON c.id  = os.cliente_id
     JOIN personas pe ON pe.id = c.persona_id
   ''';
 
+  // Los tres subtotales y el técnico van en subconsultas correlacionadas y no
+  // en un JOIN + GROUP BY: con tres tablas hijas a la vez, el JOIN multiplica
+  // filas y las sumas salen infladas (dos tareas x tres repuestos = cada
+  // importe contado seis veces). Traerlos abriendo cada orden sería el N+1
+  // que prohíbe §5.
+  static const _sqlSelectResumen = '''
+    SELECT
+      os.*,
+      m.marca, m.modelo, m.anio, m.placa,
+      (pe.nombres || ' ' || COALESCE(pe.apellidos, '')) AS cliente_nombre,
+      (SELECT COALESCE(SUM(ot.precio_pactado), 0)
+         FROM ordenes_tareas ot WHERE ot.orden_id = os.id) AS sub_mano_obra,
+      (SELECT COALESCE(SUM(CAST(ROUND(orp.cantidad * orp.precio_unitario) AS INTEGER)), 0)
+         FROM ordenes_repuestos orp WHERE orp.orden_id = os.id) AS sub_repuestos,
+      (SELECT COALESCE(SUM(oc.precio), 0)
+         FROM ordenes_cargos oc WHERE oc.orden_id = os.id) AS sub_cargos,
+      (SELECT COUNT(DISTINCT ot.tecnico_id)
+         FROM ordenes_tareas ot WHERE ot.orden_id = os.id) AS tecnicos_distintos,
+      (SELECT tpe.nombres || ' ' || COALESCE(tpe.apellidos, '')
+         FROM ordenes_tareas ot
+         JOIN tecnicos tec ON tec.id = ot.tecnico_id
+         JOIN personas tpe ON tpe.id = tec.persona_id
+        WHERE ot.orden_id = os.id
+        ORDER BY ot.id LIMIT 1) AS tecnico_nombre
+  ''' '$_sqlFromResumen';
+
+  /// Las tablas que hay que vigilar para que el stream del listado se entere
+  /// de un cambio. Si falta una, la lista se queda desactualizada en silencio
+  /// (§5): las tres hijas están porque los subtotales salen de ellas.
+  Set<ResultSetImplementation<dynamic, dynamic>> get _fuentesResumen => {
+        _tablaOrdenes,
+        _tablaTareas,
+        _tablaRepuestos,
+        _tablaCargos,
+        _db.tablaMoto,
+        _db.tablaCliente,
+        _db.tablaPersona,
+        _db.tablaTecnico,
+      };
+
   @override
   Stream<List<OrdenResumen>> observarTodas() {
     return _db
         .customSelect(
           '$_sqlSelectResumen ORDER BY os.id DESC',
-          readsFrom: {
-            _tablaOrdenes,
-            _db.tablaMoto,
-            _db.tablaCliente,
-            _db.tablaPersona,
-          },
+          readsFrom: _fuentesResumen,
         )
         .watch()
         .map((rows) {
@@ -54,6 +97,83 @@ class RepositorioOrdenesImpl implements RepositorioOrdenes {
             rows.map((r) => r.data).toList(growable: false),
           );
         });
+  }
+
+  /// Traduce [FiltroOrdenes] al `WHERE` que comparten la consulta de la página
+  /// y la del total, junto a sus variables **en el mismo orden**.
+  ///
+  /// Va con parámetros y no interpolando el texto del buscador: una placa con
+  /// comilla simple rompería la consulta, y §5 avisa de que a este SQL no lo
+  /// revisa el analizador.
+  ({String sql, List<Variable<Object>> variables}) _whereListado(
+    FiltroOrdenes filtro,
+  ) {
+    final condiciones = <String>[];
+    final variables = <Variable<Object>>[];
+
+    final estado = filtro.estado;
+    if (estado != null) {
+      condiciones.add('os.estado = ?');
+      variables.add(Variable.withString(estado.aTexto));
+    }
+
+    final texto = filtro.busqueda.trim();
+    if (texto.isNotEmpty) {
+      // `LIKE '%x%'` no usa índice, y está bien: son las órdenes de un taller,
+      // no millones de filas (§5). Si dejara de estarlo, la respuesta es FTS5.
+      condiciones.add('''(
+        LOWER(os.numero) LIKE ?
+        OR LOWER(pe.nombres || ' ' || COALESCE(pe.apellidos, '')) LIKE ?
+        OR LOWER(m.marca || ' ' || m.modelo || ' ' ||
+                 COALESCE(CAST(m.anio AS TEXT), '')) LIKE ?
+        OR LOWER(COALESCE(m.placa, '')) LIKE ?
+      )''');
+      final patron = '%${texto.toLowerCase()}%';
+      for (var i = 0; i < 4; i++) {
+        variables.add(Variable.withString(patron));
+      }
+    }
+
+    return (
+      sql: condiciones.isEmpty ? '' : 'WHERE ${condiciones.join(' AND ')}',
+      variables: variables,
+    );
+  }
+
+  @override
+  Stream<PaginaOrdenes> observarPagina({
+    required FiltroOrdenes filtro,
+    required int pagina,
+    required int tamano,
+  }) {
+    final donde = _whereListado(filtro);
+
+    final consultaPagina = _db.customSelect(
+      '$_sqlSelectResumen ${donde.sql} ORDER BY os.id DESC LIMIT ? OFFSET ?',
+      variables: [
+        ...donde.variables,
+        Variable.withInt(tamano),
+        Variable.withInt(pagina * tamano),
+      ],
+      readsFrom: _fuentesResumen,
+    );
+
+    // El total va en su propia consulta: el `LIMIT` no debe afectarlo. Repite
+    // los JOIN porque la búsqueda mira el cliente y la moto.
+    final consultaTotal = _db.customSelect(
+      'SELECT COUNT(*) AS total $_sqlFromResumen ${donde.sql}',
+      variables: donde.variables,
+    );
+
+    return consultaPagina.watch().asyncMap((filas) async {
+      final fila = await consultaTotal.getSingleOrNull();
+      return PaginaOrdenes(
+        items: OrdenMapper.resumenesDesdeMapas(
+          filas.map((f) => f.data).toList(growable: false),
+        ),
+        total: fila?.read<int>('total') ?? 0,
+      );
+    });
   }
 
   @override
@@ -119,10 +239,18 @@ class RepositorioOrdenesImpl implements RepositorioOrdenes {
         )
         .get();
 
+    final cargosRows = await _db
+        .customSelect(
+          'SELECT * FROM ordenes_cargos WHERE orden_id = ? ORDER BY id',
+          variables: [Variable.withInt(id)],
+        )
+        .get();
+
     return OrdenMapper.detalleDesdeMapas(
       ordenRow: cabeceraRow.data,
       tareasRows: tareasRows.map((r) => r.data).toList(growable: false),
       repuestosRows: repuestosRows.map((r) => r.data).toList(growable: false),
+      cargosRows: cargosRows.map((r) => r.data).toList(growable: false),
     );
   }
 
@@ -133,19 +261,22 @@ class RepositorioOrdenesImpl implements RepositorioOrdenes {
     required int kilometrajeEntrada,
     String? diagnostico,
     String? observaciones,
-  }) async {
-    final id = await _db
-        .into(_tablaOrdenes)
-        .insert(
-          OrdenMapper.aCompanionNuevo(
-            motoId: motoId,
-            clienteId: clienteId,
-            kilometrajeEntrada: kilometrajeEntrada,
-            diagnostico: diagnostico,
-            observaciones: observaciones,
-          ),
-        );
-    return _obtenerResumenPorId(id);
+  }) {
+    // El número se pide dentro de la transacción que inserta la orden: si el
+    // `INSERT` falla, el consecutivo se devuelve y la serie sigue sin huecos.
+    return _db.transaction(() async {
+      final id = await _db.into(_tablaOrdenes).insert(
+            OrdenMapper.aCompanionNuevo(
+              numero: await _consecutivos.siguiente(DocumentoConsecutivo.orden),
+              motoId: motoId,
+              clienteId: clienteId,
+              kilometrajeEntrada: kilometrajeEntrada,
+              diagnostico: diagnostico,
+              observaciones: observaciones,
+            ),
+          );
+      return _obtenerResumenPorId(id);
+    });
   }
 
   @override
@@ -162,24 +293,50 @@ class RepositorioOrdenesImpl implements RepositorioOrdenes {
         ? DateTime.now()
         : null;
 
-    final companion = OrdenMapper.aCompanionActualizar(
-      id: id,
-      estado: estado,
-      kilometrajeEntrada: kilometrajeEntrada,
-      motoId: motoId,
-      clienteId: clienteId,
-      diagnostico: diagnostico,
-      observaciones: observaciones,
-      fechaSalida: fechaSalida,
-    );
+    // Cerrar la orden es lo que mueve el inventario, y anularla lo devuelve.
+    // Va en la misma transacción que el cambio de estado: si el stock no
+    // alcanza, la orden **no** cambia de estado. Dejarla cerrada con las
+    // piezas sin descontar sería peor que no cerrarla.
+    await _db.transaction(() async {
+      final antes = await (_db.select(_tablaOrdenes)
+            ..where((t) => t.id.equals(id)))
+          .getSingleOrNull();
+      if (antes == null) {
+        throw Exception('No se pudo actualizar la orden #$id.');
+      }
 
-    final updatedCount = await (_db.update(
-      _tablaOrdenes,
-    )..where((t) => t.id.equals(id))).write(companion);
+      final cierra = estado == EstadoOrden.lista ||
+          estado == EstadoOrden.entregada;
 
-    if (updatedCount == 0) {
-      throw Exception('No se pudo actualizar la orden #$id.');
-    }
+      var inventarioAplicado = antes.inventarioAplicado;
+      if (cierra && !inventarioAplicado) {
+        await _aplicarInventario(id);
+        inventarioAplicado = true;
+      } else if (estado == EstadoOrden.anulada && inventarioAplicado) {
+        await _devolverInventario(id);
+        inventarioAplicado = false;
+      }
+
+      final companion = OrdenMapper.aCompanionActualizar(
+        id: id,
+        estado: estado,
+        kilometrajeEntrada: kilometrajeEntrada,
+        motoId: motoId,
+        clienteId: clienteId,
+        diagnostico: diagnostico,
+        observaciones: observaciones,
+        fechaSalida: fechaSalida,
+        inventarioAplicado: inventarioAplicado,
+      );
+
+      final updatedCount = await (_db.update(
+        _tablaOrdenes,
+      )..where((t) => t.id.equals(id))).write(companion);
+
+      if (updatedCount == 0) {
+        throw Exception('No se pudo actualizar la orden #$id.');
+      }
+    });
 
     // Propagar cambio de cliente a la factura vinculada (si existe)
     if (clienteId != null) {
@@ -250,11 +407,22 @@ class RepositorioOrdenesImpl implements RepositorioOrdenes {
         completado:   completado   != null ? Value(completado)   : const Value.absent(),
       ),
     );
+    // Bajar el precio pactado baja el subtotal, y la rebaja que antes cabía
+    // puede dejar de caber.
+    if (precioPactado != null) await _reajustarDescuentoDeTarea(tareaId);
   }
 
   @override
   Future<void> eliminarTarea(int tareaId) async {
-    await (_db.delete(_tablaTareas)..where((t) => t.id.equals(tareaId))).go();
+    await _db.transaction(() async {
+      final actual = await (_db.select(_tablaTareas)
+            ..where((t) => t.id.equals(tareaId)))
+          .getSingleOrNull();
+      if (actual == null) return;
+
+      await (_db.delete(_tablaTareas)..where((t) => t.id.equals(tareaId))).go();
+      await _reajustarDescuento(actual.ordenId);
+    });
   }
 
   @override
@@ -264,11 +432,13 @@ class RepositorioOrdenesImpl implements RepositorioOrdenes {
     required double cantidad,
     required int precioUnitario,
   }) {
-    // Línea y descuento van en la misma transacción: antes eran dos
-    // escrituras sueltas y un fallo entre ellas dejaba el repuesto cobrado
-    // sin descontar del inventario.
+    // Mientras la orden está abierta, el repuesto solo se **anota**: el stock
+    // se mueve al cerrarla. Si ya está cerrada —se le agrega algo a una orden
+    // LISTA— el inventario de esta orden ya salió, así que esta línea tiene
+    // que descontar sola para no quedar fuera del libro mayor.
     return _db.transaction(() async {
-      await _verificarStock(productoId, cantidad);
+      final aplicado = await _inventarioAplicado(ordenId);
+      if (aplicado) await _verificarStock(productoId, cantidad);
 
       await _db.into(_tablaRepuestos).insert(
         OrdenMapper.repuestoCompanionNuevo(
@@ -278,6 +448,10 @@ class RepositorioOrdenesImpl implements RepositorioOrdenes {
           precioUnitario: precioUnitario,
         ),
       );
+
+      // Agregar sube el subtotal, así que la rebaja no puede dejar de caber:
+      // no hace falta reajustarla.
+      if (!aplicado) return;
 
       await _inventario.registrar(
         SolicitudMovimiento.salida(
@@ -294,10 +468,15 @@ class RepositorioOrdenesImpl implements RepositorioOrdenes {
   ///
   /// La base también lo impediría —`productos.stock_actual` no puede quedar
   /// negativo—, pero el error de SQLite no se le puede enseñar a nadie.
+  ///
+  /// **Nombra el producto**, y no es un adorno: cerrar una orden verifica
+  /// todos sus repuestos de una vez, así que un «Stock insuficiente,
+  /// disponible: 2» a secas obliga a revisar las ocho líneas a mano para
+  /// averiguar cuál falló.
   Future<void> _verificarStock(int productoId, double cantidad) async {
     final fila = await _db
         .customSelect(
-          'SELECT stock_actual FROM productos WHERE id = ?',
+          'SELECT stock_actual, nombre FROM productos WHERE id = ?',
           variables: [Variable.withInt(productoId)],
         )
         .getSingleOrNull();
@@ -305,11 +484,17 @@ class RepositorioOrdenesImpl implements RepositorioOrdenes {
     final disponible = (fila?.data['stock_actual'] as num?)?.toDouble() ?? 0;
     if (disponible >= cantidad) return;
 
-    final texto = disponible % 1 == 0
-        ? disponible.toInt().toString()
-        : disponible.toStringAsFixed(2);
-    throw Exception('Stock insuficiente. Disponible: $texto unidades.');
+    final nombre = fila?.data['nombre'] as String? ?? 'el repuesto';
+    throw Exception(
+      'No hay stock de "$nombre": se necesitan ${_cantidad(cantidad)} y '
+      'quedan ${_cantidad(disponible)}.',
+    );
   }
+
+  /// Una cantidad sin `.0` de más: los repuestos se cuentan por unidades, pero
+  /// el aceite va por litros.
+  static String _cantidad(double valor) =>
+      valor % 1 == 0 ? valor.toInt().toString() : valor.toStringAsFixed(2);
 
   @override
   Future<void> actualizarRepuesto(
@@ -326,9 +511,11 @@ class RepositorioOrdenesImpl implements RepositorioOrdenes {
       final cantidadNueva = cantidad ?? current.cantidad;
       final delta = cantidadNueva - current.cantidad;
 
-      // Solo se mueve la diferencia: positivo = usó más y sale del inventario,
-      // negativo = devolvió parte.
-      if (delta != 0) {
+      // Solo se mueve la diferencia, y solo si el inventario de esta orden ya
+      // salió: mientras está abierta, cambiar la cantidad es corregir lo que
+      // se piensa montar, no mover nada del estante.
+      final aplicado = await _inventarioAplicado(current.ordenId);
+      if (delta != 0 && aplicado) {
         if (delta > 0) await _verificarStock(current.productoId, delta);
         await _inventario.registrar(
           SolicitudMovimiento(
@@ -365,15 +552,21 @@ class RepositorioOrdenesImpl implements RepositorioOrdenes {
             ..where((t) => t.id.equals(repuestoId)))
           .go();
 
-      await _inventario.registrar(
-        SolicitudMovimiento.entrada(
-          productoId: current.productoId,
-          cantidad: current.cantidad,
-          tipo: TipoMovimiento.devolucionServicio,
-          ordenId: current.ordenId,
-          notas: 'Repuesto retirado de la orden',
-        ),
-      );
+      // Solo se devuelve lo que llegó a salir. Quitar una línea de una orden
+      // abierta no genera devolución: nunca hubo salida.
+      if (await _inventarioAplicado(current.ordenId)) {
+        await _inventario.registrar(
+          SolicitudMovimiento.entrada(
+            productoId: current.productoId,
+            cantidad: current.cantidad,
+            tipo: TipoMovimiento.devolucionServicio,
+            ordenId: current.ordenId,
+            notas: 'Repuesto retirado de la orden',
+          ),
+        );
+      }
+
+      await _reajustarDescuento(current.ordenId);
     });
   }
 
@@ -394,5 +587,219 @@ class RepositorioOrdenesImpl implements RepositorioOrdenes {
       }
       return conteo;
     });
+  }
+
+  @override
+  Future<OrdenResumen> fijarDescuento({
+    required int id,
+    required int valor,
+  }) async {
+    // El recorte va contra el subtotal real de las tres tablas hijas. Sin
+    // esto el total quedaría en negativo y ningún `CHECK` lo atajaría: el
+    // subtotal de una orden no es una columna.
+    final fila = await _db.customSelect(
+      '''
+      SELECT
+        (SELECT COALESCE(SUM(precio_pactado), 0)
+           FROM ordenes_tareas WHERE orden_id = ?) +
+        (SELECT COALESCE(SUM(CAST(ROUND(cantidad * precio_unitario) AS INTEGER)), 0)
+           FROM ordenes_repuestos WHERE orden_id = ?) +
+        (SELECT COALESCE(SUM(precio), 0)
+           FROM ordenes_cargos WHERE orden_id = ?) AS sub
+      ''',
+      variables: [
+        Variable.withInt(id),
+        Variable.withInt(id),
+        Variable.withInt(id),
+      ],
+    ).getSingle();
+
+    final subtotal = (fila.data['sub'] as num? ?? 0).round();
+    final recortado = valor < 0 ? 0 : (valor > subtotal ? subtotal : valor);
+
+    await (_db.update(_tablaOrdenes)..where((t) => t.id.equals(id))).write(
+      TablaOrdenesServicioCompanion(
+        descuento: Value(recortado),
+        actualizadoEn: Value(DateTime.now()),
+      ),
+    );
+    return _obtenerResumenPorId(id);
+  }
+
+  @override
+  Stream<ResumenOrdenes> observarResumen() {
+    // Un `COUNT` con `filter` por estado, todo en una pasada. "En proceso" es
+    // ABIERTA y "pendientes" LISTA —la moto ya está lista pero no se ha
+    // entregado—, que es lo que separan las tarjetas del diseño.
+    final t = _tablaOrdenes;
+    final total = t.id.count();
+    final enProceso =
+        t.id.count(filter: t.estado.equals(EstadoOrden.abierta.aTexto));
+    final pendientes =
+        t.id.count(filter: t.estado.equals(EstadoOrden.lista.aTexto));
+    final completadas =
+        t.id.count(filter: t.estado.equals(EstadoOrden.entregada.aTexto));
+
+    final consulta = _db.selectOnly(t)
+      ..addColumns([total, enProceso, pendientes, completadas]);
+
+    return consulta.watchSingleOrNull().map(
+          (fila) => (
+            total: fila?.read(total) ?? 0,
+            enProceso: fila?.read(enProceso) ?? 0,
+            pendientes: fila?.read(pendientes) ?? 0,
+            completadas: fila?.read(completadas) ?? 0,
+          ),
+        );
+  }
+
+  // Cargos
+
+  @override
+  Future<void> agregarCargo({
+    required int ordenId,
+    required String descripcion,
+    required int precio,
+  }) async {
+    final limpia = descripcion.trim();
+    if (limpia.isEmpty) {
+      throw Exception('El cargo necesita una descripción.');
+    }
+    await _db.into(_tablaCargos).insert(
+          OrdenMapper.cargoCompanionNuevo(
+            ordenId: ordenId,
+            descripcion: limpia,
+            precio: precio,
+          ),
+        );
+  }
+
+  @override
+  Future<void> actualizarCargo(
+    int cargoId, {
+    String? descripcion,
+    int? precio,
+  }) async {
+    // Cambiar el precio de un cargo puede dejar el descuento por encima del
+    // nuevo subtotal, así que las dos escrituras van juntas.
+    await _db.transaction(() async {
+      final actual = await (_db.select(_tablaCargos)
+            ..where((t) => t.id.equals(cargoId)))
+          .getSingleOrNull();
+      if (actual == null) return;
+
+      await (_db.update(_tablaCargos)..where((t) => t.id.equals(cargoId)))
+          .write(TablaOrdenesCargoCompanion(
+        descripcion: descripcion != null
+            ? Value(descripcion.trim())
+            : const Value.absent(),
+        precio: precio != null ? Value(precio) : const Value.absent(),
+      ));
+
+      await _reajustarDescuento(actual.ordenId);
+    });
+  }
+
+  @override
+  Future<void> eliminarCargo(int cargoId) async {
+    await _db.transaction(() async {
+      final actual = await (_db.select(_tablaCargos)
+            ..where((t) => t.id.equals(cargoId)))
+          .getSingleOrNull();
+      if (actual == null) return;
+
+      await (_db.delete(_tablaCargos)..where((t) => t.id.equals(cargoId))).go();
+      await _reajustarDescuento(actual.ordenId);
+    });
+  }
+
+  /// Vuelve a recortar el descuento contra el subtotal actual.
+  ///
+  /// Hace falta cada vez que una línea desaparece o baja de precio: la rebaja
+  /// que antes cabía puede dejar de caber, y aquí no hay `CHECK` que lo avise.
+  Future<void> _reajustarDescuentoDeTarea(int tareaId) async {
+    final tarea = await (_db.select(_tablaTareas)
+          ..where((t) => t.id.equals(tareaId)))
+        .getSingleOrNull();
+    if (tarea != null) await _reajustarDescuento(tarea.ordenId);
+  }
+
+  /// Si los repuestos de la orden ya salieron del inventario.
+  Future<bool> _inventarioAplicado(int ordenId) async {
+    final orden = await (_db.select(_tablaOrdenes)
+          ..where((t) => t.id.equals(ordenId)))
+        .getSingleOrNull();
+    return orden?.inventarioAplicado ?? false;
+  }
+
+  /// Descuenta de una vez todos los repuestos de la orden y la marca aplicada.
+  ///
+  /// Es el momento en que la orden deja de estar abierta. Se verifica **todo
+  /// el stock antes de mover nada**: si faltara para la última línea, hacerlo
+  /// de a uno dejaría media orden descontada y la otra media no.
+  ///
+  /// Aquí es donde se paga el precio de diferir el descuento: dos órdenes
+  /// abiertas pueden haber anotado el mismo último repuesto, y la segunda en
+  /// cerrarse se encuentra sin stock. Mejor eso que un inventario en negativo,
+  /// y el mensaje dice qué falta.
+  Future<void> _aplicarInventario(int ordenId) async {
+    final lineas = await (_db.select(_tablaRepuestos)
+          ..where((t) => t.ordenId.equals(ordenId)))
+        .get();
+    if (lineas.isEmpty) return;
+
+    // Un mismo producto puede estar en dos líneas: se verifica el total, no
+    // cada línea por separado, o dos líneas de 6 pasarían con stock 10.
+    final porProducto = <int, double>{};
+    for (final linea in lineas) {
+      porProducto[linea.productoId] =
+          (porProducto[linea.productoId] ?? 0) + linea.cantidad;
+    }
+    for (final entrada in porProducto.entries) {
+      await _verificarStock(entrada.key, entrada.value);
+    }
+
+    await _inventario.registrarVarios([
+      for (final entrada in porProducto.entries)
+        SolicitudMovimiento.salida(
+          productoId: entrada.key,
+          cantidad: entrada.value,
+          tipo: TipoMovimiento.salidaServicio,
+          ordenId: ordenId,
+        ),
+    ]);
+  }
+
+  /// Devuelve al inventario todo lo que había salido por esta orden.
+  Future<void> _devolverInventario(int ordenId) async {
+    final lineas = await (_db.select(_tablaRepuestos)
+          ..where((t) => t.ordenId.equals(ordenId)))
+        .get();
+    if (lineas.isEmpty) return;
+
+    final porProducto = <int, double>{};
+    for (final linea in lineas) {
+      porProducto[linea.productoId] =
+          (porProducto[linea.productoId] ?? 0) + linea.cantidad;
+    }
+
+    await _inventario.registrarVarios([
+      for (final entrada in porProducto.entries)
+        SolicitudMovimiento.entrada(
+          productoId: entrada.key,
+          cantidad: entrada.value,
+          tipo: TipoMovimiento.devolucionServicio,
+          ordenId: ordenId,
+          notas: 'Orden anulada',
+        ),
+    ]);
+  }
+
+  Future<void> _reajustarDescuento(int ordenId) async {
+    final orden = await (_db.select(_tablaOrdenes)
+          ..where((t) => t.id.equals(ordenId)))
+        .getSingleOrNull();
+    if (orden == null || orden.descuento == 0) return;
+    await fijarDescuento(id: ordenId, valor: orden.descuento);
   }
 }

@@ -62,14 +62,13 @@ final class PosState {
   /// Cuántas unidades hay en el carrito, no cuántas líneas.
   int get unidades => items.fold(0, (suma, i) => suma + i.cantidad);
 
-  /// El IVA se calcula sobre lo que se va a cobrar de verdad, ya rebajado el
-  /// descuento; cobrarlo sobre el subtotal cobraría impuesto por plata que
-  /// nadie pagó.
-  int get baseGravable => subtotal - descuento;
+  /// Lo que se cobra: el carrito menos la rebaja. Los precios ya traen el IVA
+  /// dentro (ver `iva_app.dart`), así que no hay nada que sumarle después y el
+  /// descuento se resta de lo que paga el cliente.
+  int get total => subtotal - descuento;
 
-  int get iva => ivaDe(baseGravable);
-
-  int get total => baseGravable + iva;
+  /// Cuánto del [total] es impuesto. Informativo: se extrae, no se suma.
+  int get iva => ivaIncluidoEn(total);
 
   bool get vacio => items.isEmpty;
 

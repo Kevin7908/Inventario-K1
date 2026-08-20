@@ -163,6 +163,7 @@ void main() {
       expect(find.text('Total'), findsOneWidget);
       expect(hayIva, isFalse, reason: 'el taller no factura IVA hoy');
       expect(find.text(etiquetaIva), findsNothing);
+      // Sin descuento, subtotal y total son el mismo número.
       expect(find.text('Subtotal'), findsNothing);
     });
   });
@@ -287,7 +288,7 @@ void main() {
       expect(items.single.precioUnitario, 0);
     });
 
-    test('el total sale de ivaDe(), no de multiplicar a mano', () async {
+    test('el total no le suma IVA: ya viene dentro del precio', () async {
       await container.read(cotizacionEditorProvider(null).future);
       container
           .read(cotizacionEditorProvider(null).notifier)
@@ -295,8 +296,8 @@ void main() {
 
       final estado = container.read(cotizacionEditorProvider(null)).value!;
       expect(estado.subtotal, 100000);
-      expect(estado.iva, ivaDe(100000));
-      expect(estado.total, 100000 + ivaDe(100000));
+      expect(estado.total, 100000);
+      expect(estado.iva, ivaIncluidoEn(100000));
     });
   });
 
@@ -411,6 +412,105 @@ void main() {
         EstadoGuardado.sinCambios,
         reason: 'los filtros son de pantalla, no de la cotización',
       );
+    });
+  });
+
+
+  group('descuento', () {
+    test('se recorta al subtotal: el total nunca queda en negativo', () {
+      final estado = CotizacionEditorState(
+        vigenciaHasta: DateTime(2026, 12, 31),
+        items: [_item(TipoItemCotizacion.producto, cantidad: 2, precio: 30000)],
+      );
+
+      // 2 x 30.000 = 60.000 de subtotal.
+      expect(estado.subtotal, 60000);
+      expect(estado.conDescuento(200000).descuento, 60000);
+      expect(estado.conDescuento(-5000).descuento, 0);
+      expect(estado.conDescuento(10000).total, 50000);
+    });
+
+    test('quitar una línea recorta el descuento que ya no cabe', () {
+      final estado = CotizacionEditorState(
+        vigenciaHasta: DateTime(2026, 12, 31),
+        items: [
+          _item(TipoItemCotizacion.producto, cantidad: 1, precio: 30000),
+          _item(TipoItemCotizacion.servicio, cantidad: 1, precio: 50000),
+        ],
+      ).conDescuento(60000);
+
+      expect(estado.descuento, 60000);
+
+      // Se va el servicio: quedan 30.000 de subtotal y la rebaja no cabe.
+      // Sin el recorte, el total daría -30.000 y el CHECK de la tabla
+      // rechazaría el guardado con un error que nadie puede leer.
+      final sinServicio = estado.sinItem(1);
+      expect(sinServicio.subtotal, 30000);
+      expect(sinServicio.descuento, 30000);
+      expect(sinServicio.total, 0);
+    });
+
+    test('el descuento sale del precio con IVA, y el total no suma nada', () {
+      final estado = CotizacionEditorState(
+        vigenciaHasta: DateTime(2026, 12, 31),
+        items: [_item(TipoItemCotizacion.producto, cantidad: 1, precio: 100000)],
+      ).conDescuento(20000);
+
+      // Misma regla que el punto de venta: los precios ya traen el IVA dentro,
+      // así que rebajar 20.000 rebaja 20.000 de lo que paga el cliente.
+      expect(estado.total, 80000);
+      expect(estado.iva, ivaIncluidoEn(80000),
+          reason: 'el IVA se extrae del total, no se le suma');
+    });
+  });
+
+  group('agrupación de líneas', () {
+    test('separa productos de servicios y suma cada bloque', () {
+      final grupos = CotizacionEditorState.agrupar([
+        _item(TipoItemCotizacion.producto, cantidad: 1, precio: 60000),
+        _item(TipoItemCotizacion.servicio, cantidad: 1, precio: 50000),
+        _item(TipoItemCotizacion.servicio, cantidad: 1, precio: 30000),
+      ]);
+
+      expect(grupos, hasLength(2));
+      expect(grupos[0].tipo, TipoItemCotizacion.producto);
+      expect(grupos[0].titulo, 'Productos');
+      expect(grupos[0].subtotal, 60000);
+      expect(grupos[1].titulo, 'Servicios');
+      expect(grupos[1].subtotal, 80000);
+    });
+
+    test('no devuelve grupos vacíos', () {
+      final grupos = CotizacionEditorState.agrupar([
+        _item(TipoItemCotizacion.producto),
+      ]);
+
+      expect(grupos, hasLength(1));
+      expect(grupos.single.titulo, 'Productos');
+    });
+
+    test('cada línea conserva su índice en la lista original', () {
+      // Es lo que impide que borrar la primera línea de "Servicios" borre la
+      // primera de la cotización: el notifier indexa sobre `items`.
+      final grupos = CotizacionEditorState.agrupar([
+        _item(TipoItemCotizacion.servicio, precio: 10000),
+        _item(TipoItemCotizacion.producto, precio: 20000),
+        _item(TipoItemCotizacion.servicio, precio: 30000),
+      ]);
+
+      final productos = grupos.firstWhere(
+        (g) => g.tipo == TipoItemCotizacion.producto,
+      );
+      final servicios = grupos.firstWhere(
+        (g) => g.tipo == TipoItemCotizacion.servicio,
+      );
+
+      expect(productos.lineas.single.indice, 1);
+      expect(servicios.lineas.map((l) => l.indice), [0, 2]);
+    });
+
+    test('sin líneas no hay grupos', () {
+      expect(CotizacionEditorState.agrupar(const []), isEmpty);
     });
   });
 }

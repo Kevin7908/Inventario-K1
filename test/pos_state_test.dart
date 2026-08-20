@@ -2,6 +2,7 @@
 // recortado y base gravable ya rebajada.
 import 'package:flutter_test/flutter_test.dart';
 import 'package:inventario_k1/backend/features/productos/modelo/producto.dart';
+import 'package:inventario_k1/core/iva_app.dart';
 import 'package:inventario_k1/frontend/features/pos/modelo/pos_state.dart';
 
 Producto _producto({
@@ -100,15 +101,17 @@ void main() {
       expect(conUnaLinea.total, 0);
     });
 
-    test('la base gravable descuenta antes de calcular el IVA', () {
+    test('el descuento sale del precio con IVA: el total no le suma nada', () {
       final estado = const PosState()
           .conProducto(_producto(precioVenta: 100000))
           .conDescuento(20000);
 
-      expect(estado.baseGravable, 80000);
-      // Con `kIva` en 0 el impuesto es 0, pero el total sale de la base ya
-      // rebajada, no del subtotal.
-      expect(estado.total, 80000 + estado.iva);
+      // Los precios ya traen el IVA dentro, así que rebajar 20.000 rebaja
+      // exactamente eso de lo que paga el cliente. Antes el descuento salía de
+      // una base imponible y con IVA al 19% le quitaba 23.800.
+      expect(estado.total, 80000);
+      expect(estado.iva, ivaIncluidoEn(80000),
+          reason: 'el IVA se extrae del total, no se suma');
     });
   });
 }

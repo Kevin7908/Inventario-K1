@@ -85,14 +85,19 @@ abstract class RepositorioCotizaciones {
 
   Future<CotizacionDetalle> obtenerDetalle(int id);
 
+  /// [descuento] se recorta al subtotal de [items]: un descuento mayor
+  /// dejaría el total en negativo, y el `CHECK` de la tabla lo rechazaría con
+  /// un error que no se le puede enseñar a nadie.
   Future<int> crear({
     int? clienteId,
     int? motoId,
     required DateTime vigenciaHasta,
     String? notas,
     required List<ItemDraft> items,
+    int descuento,
   });
 
+  /// Ver [crear] para el recorte de [descuento].
   Future<void> actualizar({
     required int id,
     int? clienteId,
@@ -100,6 +105,7 @@ abstract class RepositorioCotizaciones {
     required DateTime vigenciaHasta,
     String? notas,
     required List<ItemDraft> items,
+    int descuento,
   });
 
   Future<void> eliminar(int id);

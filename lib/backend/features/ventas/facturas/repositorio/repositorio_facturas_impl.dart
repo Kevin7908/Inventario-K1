@@ -2,6 +2,7 @@ import '../../../../share/consecutivos/documento_consecutivo.dart';
 import '../../../../share/consecutivos/repositorio_consecutivos.dart';
 import 'package:drift/drift.dart';
 
+import '../../../../../core/iva_app.dart';
 import '../../../../share/database/app_db.dart';
 import '../enum/enum_facturas.dart';
 import '../../../inventario/modelo/movimiento_inventario.dart';
@@ -10,6 +11,7 @@ import '../../../inventario/repositorio/repositorio_inventario_impl.dart';
 import '../mapper/facturas_mapper.dart';
 import '../modelo/factura_detalle.dart';
 import '../modelo/factura_resumen.dart';
+import '../modelo/linea_venta_mostrador.dart';
 import 'repositorio_facturas.dart';
 
 class RepositorioFacturasImpl implements RepositorioFacturas {
@@ -123,6 +125,58 @@ class RepositorioFacturasImpl implements RepositorioFacturas {
           );
 
       return _obtenerResumenPorId(id);
+    });
+  }
+
+  @override
+  Future<FacturaResumen> registrarVentaMostrador({
+    required List<LineaVentaMostrador> lineas,
+    required MetodoPago metodoPago,
+    int? clienteId,
+    int iva = 0,
+    int descuento = 0,
+  }) {
+    if (lineas.isEmpty) {
+      throw Exception('La venta no tiene productos.');
+    }
+
+    // Las tres etapas se apoyan en los métodos que ya existen; lo que aporta
+    // este método es la transacción que las envuelve. Drift anida por
+    // savepoints, así que las transacciones internas de `crear` y
+    // `agregarItem` no confirman nada por su cuenta: manda esta.
+    return _db.transaction(() async {
+      final creada = await crear(
+        tipo: TipoVenta.mostrador,
+        clienteId: clienteId,
+        metodoPago: metodoPago,
+        estadoPago: EstadoPago.pagado,
+        iva: iva,
+        descuento: descuento,
+      );
+
+      for (final linea in lineas) {
+        await agregarItem(
+          ventaId: creada.id,
+          tipoItem: TipoItem.producto,
+          productoId: linea.productoId,
+          descripcion: linea.descripcion,
+          cantidad: linea.cantidad,
+          precioUnitario: linea.precioUnitario,
+          costoUnitario: linea.costoUnitario,
+        );
+      }
+
+      // `agregarItem` ya dejó los totales recalculados en la fila; leerlos de
+      // ahí es lo que garantiza que `total_pagado == total` y que el CHECK
+      // `total_pagado <= total` nunca se pueda romper desde la vista.
+      final conTotales = await _obtenerResumenPorId(creada.id);
+
+      return actualizarPago(
+        id: creada.id,
+        totalPagado: conTotales.total,
+        estadoPago: EstadoPago.pagado,
+        metodoPago: metodoPago,
+      );
     });
   }
 
@@ -658,14 +712,25 @@ class RepositorioFacturasImpl implements RepositorioFacturas {
           variables: [Variable.withInt(ventaId)],
         )
         .getSingleOrNull();
-    final subtotal  = (subtotalRow?.data['sub'] as num? ?? 0).round();
-    final iva       = ventaRow.iva;
-    final descuento = ventaRow.descuento;
-    final total     = subtotal - descuento + iva;
+    final subtotal = (subtotalRow?.data['sub'] as num? ?? 0).round();
+
+    // Al quitar una línea el subtotal baja y el descuento guardado puede
+    // quedar por encima; sin recortarlo, el `CHECK (total >= 0)` rechazaría
+    // el `UPDATE` y borrar una línea fallaría sin explicación.
+    final descuento = ventaRow.descuento > subtotal
+        ? subtotal
+        : (ventaRow.descuento < 0 ? 0 : ventaRow.descuento);
+
+    // Los precios ya traen el IVA dentro (`iva_app.dart`): el total no se lo
+    // suma, y la columna `iva` guarda cuánto va contenido en él. Aquí es donde
+    // se decide, no en el parámetro que recibió `crear`.
+    final total = subtotal - descuento;
 
     await (_db.update(_tablaVentas)..where((t) => t.id.equals(ventaId))).write(
       TablaVentasCompanion(
         subtotal: Value(subtotal),
+        descuento: Value(descuento),
+        iva: Value(ivaIncluidoEn(total)),
         total: Value(total),
         actualizadoEn: Value(DateTime.now()),
       ),

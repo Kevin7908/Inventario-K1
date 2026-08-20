@@ -13,9 +13,13 @@ import '../../ordenes/esquema_datos/tabla_ordenes_servicio.dart';
 /// consecutividad del numerador y deja el inventario sin explicación.
 ///
 /// `subtotal` y `total` son **caché** de las líneas: `subtotal` es
-/// `SUM(venta_detalles.subtotal)` y `total` es `subtotal − descuento + iva`.
-/// Se guardan porque la lista de facturas los muestra sin abrir el detalle, y
+/// `SUM(venta_detalles.subtotal)` y `total` es `subtotal − descuento`. Se
+/// guardan porque la lista de facturas los muestra sin abrir el detalle, y
 /// `RepositorioFacturas` es el único que los recalcula.
+///
+/// **`iva` no se suma al total**: los precios del sistema ya lo traen dentro
+/// (ver `iva_app.dart`), así que la columna guarda cuánto impuesto va
+/// contenido en `total`, con la tasa del día en que se facturó.
 @TableIndex(name: 'idx_ventas_cliente', columns: {#clienteId})
 @TableIndex(name: 'idx_ventas_orden', columns: {#ordenId})
 @TableIndex(name: 'idx_ventas_estado', columns: {#estadoPago})

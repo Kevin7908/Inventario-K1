@@ -11,7 +11,7 @@ import '../features/proveedores/vista/proveedores_vista.dart';
 import '../features/reservas/vista/reservas_vista.dart';
 import '../features/tecnicos/vista/tecnico_vista.dart';
 import '../features/ventas/facturas/vista/facturas_vista.dart';
-import '../features/ventas/ordenes/vista/ordenes_vista.dart';
+import '../features/ordenes/vista/ordenes_vista.dart';
 import '../share2/nav/barra_lateral.dart';
 import '../share2/nav/item_nav_dato.dart';
 import '../share2/nav/seccion_nav_dato.dart';

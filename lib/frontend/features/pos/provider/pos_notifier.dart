@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../../backend/features/clientes/modelo/cliente.dart';
 import '../../../../backend/features/productos/modelo/producto.dart';
 import '../../../../backend/features/ventas/facturas/enum/enum_facturas.dart';
+import '../../../../backend/features/ventas/facturas/modelo/linea_venta_mostrador.dart';
 import '../../../../core/resultado.dart';
 import '../../ventas/facturas/provider/facturas_providers.dart';
 import '../modelo/pos_state.dart';
@@ -46,12 +47,15 @@ class PosNotifier extends Notifier<PosState> {
 
   // ── Cobro ─────────────────────────────────────────────────────────────────
 
-  /// Crea la factura de mostrador con todas las líneas del carrito y la marca
-  /// pagada.
+  /// Cobra el carrito: crea la factura de mostrador con todas sus líneas y la
+  /// deja pagada.
   ///
-  /// **Toda venta de mostrador se cobra completa**: no hay pago parcial ni
-  /// deuda automática. Fiar es una decisión que se toma con el cliente
-  /// delante, no un botón del carrito; para eso está Cuentas por cobrar.
+  /// **Una sola llamada al repositorio.** Antes esto encadenaba `crear`, un
+  /// `agregarItem` por línea y `cobrar` desde aquí, y encima recuperaba el id
+  /// de la factura leyendo la más reciente de la lista: si algo fallaba a
+  /// mitad quedaba una factura con su consecutivo quemado, sin productos y sin
+  /// cobrar. La transacción vive donde tiene que vivir, en el repositorio
+  /// (§6 de las reglas de base de datos).
   ///
   /// Al terminar bien, el carrito queda vacío y listo para la siguiente venta.
   Future<Resultado> cobrar({required MetodoPago metodoPago}) async {
@@ -62,59 +66,41 @@ class PosNotifier extends Notifier<PosState> {
       return const Fallo(MotivoFallo.validacion, 'La venta ya se está cobrando.');
     }
 
+    // `Producto.id` es nulo hasta que el producto se guarda, así que el tipo
+    // obliga a descartar el caso. Un producto sin id no está en el catálogo y
+    // no se puede facturar: mejor no cobrar que cobrar una línea suelta.
+    if (state.items.any((i) => i.producto.id == null)) {
+      return const Fallo(
+        MotivoFallo.validacion,
+        'Hay un producto del carrito que ya no está en el catálogo.',
+      );
+    }
+
     state = state.copyWith(procesando: true);
     final venta = state;
 
     try {
-      final facturas = ref.read(facturasProvider.notifier);
+      final creada =
+          await ref.read(repositorioFacturasProvider).registrarVentaMostrador(
+                lineas: [
+                  for (final linea in venta.items)
+                    LineaVentaMostrador(
+                      productoId: linea.producto.id!,
+                      descripcion: linea.producto.nombre,
+                      cantidad: linea.cantidad.toDouble(),
+                      precioUnitario: linea.precioUnitario,
+                      costoUnitario: linea.producto.precioCompra,
+                    ),
+                ],
+                metodoPago: metodoPago,
+                clienteId: venta.cliente?.id,
+                iva: venta.iva,
+                descuento: venta.descuento,
+              );
 
-      final errorCrear = await facturas.crear(
-        tipo: TipoVenta.mostrador,
-        clienteId: venta.cliente?.id,
-        metodoPago: metodoPago,
-        estadoPago: EstadoPago.pagado,
-        iva: venta.iva,
-        descuento: venta.descuento,
-      );
-      if (errorCrear != null) {
-        return Fallo(MotivoFallo.persistencia, errorCrear);
-      }
-
-      // El repositorio devuelve las facturas más recientes primero, así que la
-      // recién creada es la primera. No hay forma de pedirle el id a `crear`.
-      final creada = ref.read(facturasProvider).value?.facturas.firstOrNull;
-      if (creada == null) {
-        return const Fallo(
-          MotivoFallo.persistencia,
-          'La venta se creó pero no se pudo leer para agregarle los productos.',
-        );
-      }
-
-      for (final linea in venta.items) {
-        final errorItem = await facturas.agregarItem(
-          ventaId: creada.id,
-          tipoItem: TipoItem.producto,
-          productoId: linea.producto.id,
-          descripcion: linea.producto.nombre,
-          cantidad: linea.cantidad.toDouble(),
-          precioUnitario: linea.precioUnitario,
-          costoUnitario: linea.producto.precioCompra,
-        );
-        if (errorItem != null) {
-          return Fallo(MotivoFallo.persistencia, errorItem);
-        }
-      }
-
-      final errorCobro = await facturas.cobrar(
-        id: creada.id,
-        totalPagado: venta.total,
-        totalFactura: venta.total,
-        estadoPago: EstadoPago.pagado,
-        metodoPago: metodoPago,
-      );
-      if (errorCobro != null) {
-        return Fallo(MotivoFallo.persistencia, errorCobro);
-      }
+      // La lista de facturas se refresca sola: `FacturasNotifier` escucha el
+      // stream de Drift. El detalle no, porque es un provider por id.
+      ref.invalidate(facturaDetalleProvider(creada.id));
 
       state = const PosState();
       return const Exito();

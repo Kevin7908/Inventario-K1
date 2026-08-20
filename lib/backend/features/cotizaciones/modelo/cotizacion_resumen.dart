@@ -12,6 +12,10 @@ class CotizacionResumen extends Equatable {
   final String? telefonoCliente;
   final String nombreMoto;
   final int subtotal;
+
+  /// Rebaja aplicada sobre el subtotal, en pesos.
+  final int descuento;
+
   final int iva;
   /// Hasta cuándo se respeta el precio, a medianoche.
   final DateTime vigenciaHasta;
@@ -31,6 +35,7 @@ class CotizacionResumen extends Equatable {
     this.telefonoCliente,
     this.nombreMoto = '',
     required this.subtotal,
+    this.descuento = 0,
     required this.iva,
     required this.vigenciaHasta,
     this.notas,
@@ -38,11 +43,18 @@ class CotizacionResumen extends Equatable {
     this.cantidadItems = 0,
   });
 
-  /// Lo que se cobraría: la suma de las líneas más el IVA de ese día.
+  /// Lo que se cobraría: las líneas menos el descuento.
+  ///
+  /// **No se le suma [iva]**: los precios del sistema ya lo traen dentro (ver
+  /// `iva_app.dart`), y la columna guarda cuánto impuesto va contenido en este
+  /// total, con la tasa del día en que se emitió.
   ///
   /// No es una columna. Era `subtotal + iva`, dos campos de su misma fila, y
   /// guardarlo solo abría la puerta a que se desincronizara.
-  int get total => subtotal + iva;
+  int get total => subtotal - descuento;
+
+  /// Lo que queda del total una vez discriminado el IVA.
+  int get baseSinIva => total - iva;
 
   /// Vigente, por vencer o vencida, según cuánto falta para [vigenciaHasta].
   ///
@@ -75,6 +87,7 @@ class CotizacionResumen extends Equatable {
     String? telefonoCliente,
     String? nombreMoto,
     int? subtotal,
+    int? descuento,
     int? iva,
     DateTime? vigenciaHasta,
     String? notas,
@@ -90,6 +103,7 @@ class CotizacionResumen extends Equatable {
       telefonoCliente: telefonoCliente ?? this.telefonoCliente,
       nombreMoto: nombreMoto ?? this.nombreMoto,
       subtotal: subtotal ?? this.subtotal,
+      descuento: descuento ?? this.descuento,
       iva: iva ?? this.iva,
       vigenciaHasta: vigenciaHasta ?? this.vigenciaHasta,
       notas: notas ?? this.notas,
@@ -105,6 +119,7 @@ class CotizacionResumen extends Equatable {
         clienteId,
         motoId,
         subtotal,
+        descuento,
         iva,
         vigenciaHasta,
         creadoEn,

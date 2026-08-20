@@ -17,9 +17,17 @@ import '../provider/cotizacion_editor_provider.dart';
 /// editor: es interfaz local, y tenerlo arriba haría que teclear una categoría
 /// reconstruyera también la rejilla y el panel de la cotización.
 class PanelCategoriasCotizacion extends ConsumerStatefulWidget {
-  const PanelCategoriasCotizacion({super.key, required this.cotizacionId});
+  const PanelCategoriasCotizacion({
+    super.key,
+    required this.cotizacionId,
+    this.habilitado = true,
+  });
 
   final int? cotizacionId;
+
+  /// En `false` el panel se ve pero no filtra: es lo que pasa con los
+  /// servicios y la línea libre, que no están categorizados.
+  final bool habilitado;
 
   @override
   ConsumerState<PanelCategoriasCotizacion> createState() =>
@@ -76,6 +84,7 @@ class _PanelCategoriasCotizacionState
       alAlternar: _alternar,
       controladorBusqueda: _controladorBusqueda,
       alBuscar: (texto) => setState(() => _busqueda = texto),
+      habilitado: widget.habilitado,
     );
   }
 }

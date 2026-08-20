@@ -187,9 +187,9 @@ class RepositorioCotizacionesImpl implements RepositorioCotizaciones {
         t.id.count(filter: _condicionEstado(EstadoCotizacion.porVencer));
     final vencidas =
         t.id.count(filter: _condicionEstado(EstadoCotizacion.vencida));
-    // El total de cada cotización es `subtotal + iva`: no hay columna `total`
-    // porque se deduce de esas dos.
-    final montoVigente = (t.subtotal + t.iva)
+    // El total de cada cotización es `subtotal - descuento`: no hay columna
+    // `total` porque se deduce de esas dos, y el IVA ya va dentro del precio.
+    final montoVigente = (t.subtotal - t.descuento)
         .sum(filter: _diasParaVencer.isBiggerOrEqualValue(0));
 
     final consulta = _db.selectOnly(t)
@@ -249,11 +249,14 @@ class RepositorioCotizacionesImpl implements RepositorioCotizaciones {
     required DateTime vigenciaHasta,
     String? notas,
     required List<ItemDraft> items,
+    int descuento = 0,
   }) {
     return _db.transaction(() async {
       final numero = await _consecutivos.siguiente(DocumentoConsecutivo.cotizacion);
       final subtotal = items.fold(0, (s, d) => s + d.subtotal);
-      final iva = ivaDe(subtotal);
+      final rebaja = _recortarDescuento(descuento, subtotal);
+      // Los precios ya traen el IVA dentro: se extrae del total, no se suma.
+      final iva = ivaIncluidoEn(subtotal - rebaja);
 
       final id = await _db.into(_db.tablaCotizacion).insert(
             CotizacionMapper.nuevaACompanion(
@@ -261,6 +264,7 @@ class RepositorioCotizacionesImpl implements RepositorioCotizaciones {
               clienteId: clienteId,
               motoId: motoId,
               subtotal: subtotal,
+              descuento: rebaja,
               iva: iva,
               vigenciaHasta: vigenciaHasta,
               notas: notas,
@@ -292,15 +296,19 @@ class RepositorioCotizacionesImpl implements RepositorioCotizaciones {
     required DateTime vigenciaHasta,
     String? notas,
     required List<ItemDraft> items,
+    int descuento = 0,
   }) {
     return _db.transaction(() async {
       final subtotal = items.fold(0, (s, d) => s + d.subtotal);
-      final iva = ivaDe(subtotal);
+      final rebaja = _recortarDescuento(descuento, subtotal);
+      // Los precios ya traen el IVA dentro: se extrae del total, no se suma.
+      final iva = ivaIncluidoEn(subtotal - rebaja);
       await (_db.update(_db.tablaCotizacion)..where((t) => t.id.equals(id)))
           .write(TablaCotizacionCompanion(
         clienteId: Value(clienteId),
         motoId: Value(motoId),
         subtotal: Value(subtotal),
+        descuento: Value(rebaja),
         iva: Value(iva),
         vigenciaHasta: Value(vigenciaHasta),
         actualizadoEn: Value(DateTime.now()),
@@ -377,12 +385,29 @@ class RepositorioCotizacionesImpl implements RepositorioCotizaciones {
           ..where((t) => t.cotizacionId.equals(cotizacionId)))
         .get();
     final subtotal = filas.fold(0, (s, i) => s + i.subtotal);
+
+    // Al quitar una línea el subtotal baja, y el descuento que ya estaba
+    // guardado puede quedar por encima. Sin recortarlo aquí, el `CHECK`
+    // rechazaría el `UPDATE` y quitar una línea fallaría sin explicación.
+    final cotizacion = await (_db.select(_db.tablaCotizacion)
+          ..where((t) => t.id.equals(cotizacionId)))
+        .getSingleOrNull();
+    final rebaja = _recortarDescuento(cotizacion?.descuento ?? 0, subtotal);
+
     await (_db.update(_db.tablaCotizacion)
           ..where((t) => t.id.equals(cotizacionId)))
         .write(TablaCotizacionCompanion(
       subtotal: Value(subtotal),
-      iva: Value(ivaDe(subtotal)),
+      descuento: Value(rebaja),
+      iva: Value(ivaIncluidoEn(subtotal - rebaja)),
       actualizadoEn: Value(DateTime.now()),
     ));
   }
+
+  /// Deja el descuento entre 0 y el subtotal.
+  ///
+  /// La validación de verdad es el `CHECK` de la tabla; esto evita llegar a
+  /// él, porque su error no se le puede mostrar al usuario.
+  static int _recortarDescuento(int valor, int subtotal) =>
+      valor < 0 ? 0 : (valor > subtotal ? subtotal : valor);
 }

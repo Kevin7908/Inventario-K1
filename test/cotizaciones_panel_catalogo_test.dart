@@ -160,7 +160,7 @@ void main() {
     expect(items.single.referenciaId, 8, reason: 'el agotado sí entra');
   });
 
-  testWidgets('en modo servicio no hay panel de categorías ni tarjetas',
+  testWidgets('en modo servicio el panel de categorías se queda, apagado',
       (tester) async {
     final container = await _montar(tester);
 
@@ -170,12 +170,16 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(tester.takeException(), isNull);
-    expect(find.byType(PanelCategorias), findsNothing);
+    // Antes desaparecía y la rejilla saltaba 208 px a la izquierda en cada
+    // cambio de tipo.
+    final panel = tester.widget<PanelCategorias>(find.byType(PanelCategorias));
+    expect(panel.habilitado, isFalse);
     expect(find.byType(TarjetaProducto), findsNothing);
     expect(find.text('Cambio de aceite'), findsOneWidget);
   });
 
-  testWidgets('en modo línea libre no hay buscador ni panel', (tester) async {
+  testWidgets('en modo línea libre no hay buscador, pero sí panel apagado',
+      (tester) async {
     final container = await _montar(tester);
 
     container
@@ -184,8 +188,32 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(tester.takeException(), isNull);
-    expect(find.byType(PanelCategorias), findsNothing);
-    expect(find.byType(BarraBusqueda), findsNothing);
+    final panel = tester.widget<PanelCategorias>(find.byType(PanelCategorias));
+    expect(panel.habilitado, isFalse);
+    // El buscador del catálogo sí se va: no hay catálogo que buscar. El del
+    // propio panel de categorías sigue ahí, pero deshabilitado.
     expect(find.text('Agregar a la cotización'), findsOneWidget);
+  });
+
+  testWidgets('el tipo se elige con radios, no con un desplegable',
+      (tester) async {
+    await _montar(tester);
+
+    // Las tres a la vista sin abrir nada: era lo que escondía el dropdown.
+    expect(find.byType(GrupoRadio<TipoItemCotizacion>), findsOneWidget);
+    expect(find.text('Producto'), findsOneWidget);
+    expect(find.text('Servicio'), findsOneWidget);
+    expect(find.text('Línea libre'), findsOneWidget);
+  });
+
+  testWidgets('tocar el radio de servicio cambia el contenido del panel',
+      (tester) async {
+    await _montar(tester);
+
+    await tester.tap(find.text('Servicio'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('Cambio de aceite'), findsOneWidget);
+    expect(find.byType(TarjetaProducto), findsNothing);
   });
 }

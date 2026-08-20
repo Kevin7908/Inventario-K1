@@ -24,6 +24,7 @@ class GuardadoCotizacion {
     required DateTime vigenciaHasta,
     required String notas,
     required List<ItemCotizacionEditor> items,
+    required int descuento,
   }) async {
     final drafts = items.map((i) => i.aDraft()).toList(growable: false);
     final limpias = notas.trim().isEmpty ? null : notas.trim();
@@ -36,6 +37,7 @@ class GuardadoCotizacion {
         vigenciaHasta: vigenciaHasta,
         notas: limpias,
         items: drafts,
+        descuento: descuento,
       );
       return (id: id, numero: '');
     }
@@ -46,6 +48,7 @@ class GuardadoCotizacion {
       vigenciaHasta: vigenciaHasta,
       notas: limpias,
       items: drafts,
+      descuento: descuento,
     );
     // El número lo arma el repositorio (`COT-2026-0001`), así que hay que
     // releerlo para poder mostrarlo en la barra.

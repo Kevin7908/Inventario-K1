@@ -3,6 +3,7 @@ import 'package:drift/drift.dart';
 import '../../../../share/database/app_db.dart';
 import '../enum/enum_ordenes.dart';
 import '../modelo/orden_detalle.dart';
+import '../modelo/orden_cargo.dart';
 import '../modelo/orden_repuesto.dart';
 import '../modelo/orden_resumen.dart';
 import '../modelo/orden_tarea.dart';
@@ -16,7 +17,15 @@ abstract final class OrdenMapper {
   static OrdenResumen resumenDesdeMap(Map<String, dynamic> row) {
     return OrdenResumen(
       id: row['id'] as int,
-      numeroOrden: _formatearNumero(row['id'] as int),
+      numeroOrden: row['numero'] as String,
+      descuento: row['descuento'] as int? ?? 0,
+      // Los tres los suma SQLite con subconsultas correlacionadas: recorrer
+      // las líneas en Dart sería un N+1 por cada fila del listado (§5).
+      subtotalManoObra: (row['sub_mano_obra'] as num? ?? 0).round(),
+      subtotalRepuestos: (row['sub_repuestos'] as num? ?? 0).round(),
+      subtotalCargos: (row['sub_cargos'] as num? ?? 0).round(),
+      tecnicoNombre: row['tecnico_nombre'] as String?,
+      tecnicosDistintos: (row['tecnicos_distintos'] as num? ?? 0).toInt(),
       // COALESCE en SQL o ?? en Dart para evitar strings como "null null null"
       motoDescripcion:
           '${row['marca'] ?? ''} ${row['modelo'] ?? ''} ${row['anio'] ?? ''}'
@@ -39,10 +48,12 @@ abstract final class OrdenMapper {
     required Map<String, dynamic> ordenRow,
     required List<Map<String, dynamic>> tareasRows,
     required List<Map<String, dynamic>> repuestosRows,
+    required List<Map<String, dynamic>> cargosRows,
   }) {
     return OrdenDetalle(
       id: ordenRow['id'] as int,
-      numeroOrden: _formatearNumero(ordenRow['id'] as int),
+      numeroOrden: ordenRow['numero'] as String,
+      descuento: ordenRow['descuento'] as int? ?? 0,
       motoId: ordenRow['moto_id'] as int? ?? 0,
       motoDescripcion:
           '${ordenRow['marca'] ?? ''} ${ordenRow['modelo'] ?? ''} ${ordenRow['anio'] ?? ''}'
@@ -61,18 +72,23 @@ abstract final class OrdenMapper {
       // Mapeo de listas internas
       tareas: tareasRows.map(_tareaDesdeMap).toList(growable: false),
       repuestos: repuestosRows.map(_repuestoDesdeMap).toList(growable: false),
+      cargos: cargosRows.map(_cargoDesdeMap).toList(growable: false),
     );
   }
 
   // Companions (Escritura en BD)
 
   static TablaOrdenesServicioCompanion aCompanionNuevo({
+    required String numero,
     required int motoId,
     required int clienteId,
     required int kilometrajeEntrada,
     String? diagnostico,
     String? observaciones,
+    int descuento = 0,
   }) => TablaOrdenesServicioCompanion.insert(
+    numero: numero,
+    descuento: Value(descuento),
     motoId: motoId,
     clienteId: clienteId,
     kilometrajeEntrada: kilometrajeEntrada,
@@ -92,8 +108,14 @@ abstract final class OrdenMapper {
     String? diagnostico,
     String? observaciones,
     DateTime? fechaSalida,
+    int? descuento,
+    bool? inventarioAplicado,
   }) => TablaOrdenesServicioCompanion(
     id: Value(id),
+    descuento: descuento != null ? Value(descuento) : const Value.absent(),
+    inventarioAplicado: inventarioAplicado != null
+        ? Value(inventarioAplicado)
+        : const Value.absent(),
     estado: Value(estado.name.toUpperCase()),
     kilometrajeEntrada: Value(kilometrajeEntrada),
     motoId: motoId != null ? Value(motoId) : const Value.absent(),
@@ -180,6 +202,22 @@ abstract final class OrdenMapper {
     return null;
   }
 
-  static String _formatearNumero(int id) =>
-      '#ORD-${id.toString().padLeft(4, '0')}';
+  static OrdenCargo _cargoDesdeMap(Map<String, dynamic> row) => OrdenCargo(
+        id: row['id'] as int,
+        ordenId: row['orden_id'] as int,
+        descripcion: row['descripcion'] as String,
+        precio: row['precio'] as int? ?? 0,
+        creadoEn: _parseFecha(row['creado_en']),
+      );
+
+  static TablaOrdenesCargoCompanion cargoCompanionNuevo({
+    required int ordenId,
+    required String descripcion,
+    required int precio,
+  }) =>
+      TablaOrdenesCargoCompanion.insert(
+        ordenId: ordenId,
+        descripcion: descripcion,
+        precio: Value(precio),
+      );
 }

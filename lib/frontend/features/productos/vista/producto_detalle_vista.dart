@@ -190,7 +190,7 @@ class _Ficha extends StatelessWidget {
         if (producto.aplicaIva) ...[
           const SizedBox(height: 6),
           Text(
-            'IVA incluido: ${formatearPrecio(producto.precioVentaConIva)}',
+            'Incluye ${formatearPrecio(producto.ivaDelPrecio)} de IVA',
             style: TipografiaApp.caption,
           ),
         ],

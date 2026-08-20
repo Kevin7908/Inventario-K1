@@ -21,6 +21,10 @@ class RepositorioCotizacionesFalso implements RepositorioCotizaciones {
   /// Una entrada por llamada a `actualizar`.
   final List<List<ItemDraft>> actualizaciones = [];
 
+  /// El descuento de la última escritura, para comprobar que el editor lo
+  /// manda y no se queda solo en pantalla.
+  int ultimoDescuento = 0;
+
   int _siguienteId = 1;
 
   int get vecesGuardado => creaciones.length + actualizaciones.length;
@@ -32,9 +36,11 @@ class RepositorioCotizacionesFalso implements RepositorioCotizaciones {
     required DateTime vigenciaHasta,
     String? notas,
     required List<ItemDraft> items,
+    int descuento = 0,
   }) async {
     if (fallaAlGuardar) throw Exception('base caída');
     creaciones.add(items);
+    ultimoDescuento = descuento;
     return _siguienteId++;
   }
 
@@ -46,9 +52,11 @@ class RepositorioCotizacionesFalso implements RepositorioCotizaciones {
     required DateTime vigenciaHasta,
     String? notas,
     required List<ItemDraft> items,
+    int descuento = 0,
   }) async {
     if (fallaAlGuardar) throw Exception('base caída');
     actualizaciones.add(items);
+    ultimoDescuento = descuento;
   }
 
   @override

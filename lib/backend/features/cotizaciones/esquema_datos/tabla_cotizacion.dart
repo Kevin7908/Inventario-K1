@@ -11,10 +11,10 @@ import '../../motos/esquema_datos/tabla_moto.dart';
 /// cálculo, no una columna.
 ///
 /// Tampoco lleva `total`: era `subtotal + iva`, dos columnas de su misma fila.
-/// Lo calcula `CotizacionResumen.total`. `subtotal` sí se guarda —es caché de
-/// la suma de las líneas, que la lista muestra sin abrirlas— e `iva` también,
-/// porque es la tasa que se aplicó ese día y no se recalcula al cambiar la
-/// del negocio.
+/// Lo calcula `CotizacionResumen.total`, que además resta el descuento.
+/// `subtotal` sí se guarda —es caché de la suma de las líneas, que la lista
+/// muestra sin abrirlas— e `iva` también, porque es la tasa que se aplicó ese
+/// día y no se recalcula al cambiar la del negocio.
 @TableIndex(name: 'idx_cotizaciones_cliente', columns: {#clienteId})
 @TableIndex(name: 'idx_cotizaciones_moto', columns: {#motoId})
 @TableIndex(name: 'idx_cotizaciones_creado', columns: {#creadoEn})
@@ -39,8 +39,13 @@ class TablaCotizacion extends Table {
       .nullable()
       .references(TablaMoto, #id, onDelete: KeyAction.setNull)();
 
-  /// Los dos en pesos enteros.
+  /// Los tres en pesos enteros.
   IntColumn get subtotal => integer().withDefault(const Constant(0))();
+
+  /// Rebaja sobre el subtotal, en pesos. Como los precios ya traen el IVA
+  /// dentro, rebajar aquí rebaja exactamente eso de lo que paga el cliente.
+  IntColumn get descuento => integer().withDefault(const Constant(0))();
+
   IntColumn get iva => integer().withDefault(const Constant(0))();
 
   /// Hasta cuándo se respeta el precio. Fecha sin hora, guardada a medianoche.
@@ -55,6 +60,9 @@ class TablaCotizacion extends Table {
   @override
   List<String> get customConstraints => [
         'CHECK (length(trim(numero)) > 0)',
-        'CHECK (subtotal >= 0 AND iva >= 0)',
+        'CHECK (subtotal >= 0 AND iva >= 0 AND descuento >= 0)',
+        // Un descuento mayor que el subtotal dejaría el total en negativo. El
+        // repositorio ya lo recorta; esto es la red que ninguna ruta se salta.
+        'CHECK (descuento <= subtotal)',
       ];
 }

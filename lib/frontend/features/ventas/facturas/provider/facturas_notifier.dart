@@ -3,7 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../../../backend/features/ventas/facturas/enum/enum_facturas.dart';
 import '../../../../../backend/features/ventas/facturas/repositorio/repositorio_facturas.dart';
 import '../../../deudores/provider/deudores_provider.dart';
-import '../../ordenes/provider/ordenes_providers.dart';
+import '../../../ordenes/provider/ordenes_providers.dart';
 import 'facturas_providers.dart';
 import 'facturas_state.dart';
 

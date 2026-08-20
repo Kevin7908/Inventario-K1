@@ -414,7 +414,7 @@ class _FormularioProductoState extends ConsumerState<FormularioProducto> {
                 child: InterruptorCampo(
                   etiqueta: 'Aplica IVA',
                   detalle: _aplicaIva
-                      ? 'Se suma ${(kIva * 100).toStringAsFixed(0)}% al precio'
+                      ? 'El precio ya incluye ${(kIva * 100).toStringAsFixed(0)}% de IVA'
                       : 'Precio sin IVA',
                   valor: _aplicaIva,
                   alCambiar: (v) => setState(() => _aplicaIva = v),

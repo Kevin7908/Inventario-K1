@@ -7,7 +7,7 @@ import '../../../../backend/features/tecnicos/repositorio/repositorio_tecnico.da
 import '../../../../backend/features/tecnicos/repositorio/repositorio_tecnico_impl.dart';
 import '../../../../backend/share/database/app_db_provider.dart';
 import '../../../../core/resultado.dart';
-import '../../ventas/ordenes/provider/ordenes_providers.dart';
+import '../../ordenes/provider/ordenes_providers.dart';
 
 // Repositorio
 

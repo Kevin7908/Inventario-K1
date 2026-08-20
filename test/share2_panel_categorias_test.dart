@@ -174,4 +174,51 @@ void main() {
     expect(find.text('Kits'), findsOneWidget);
     expect(find.text('Cadenas'), findsOneWidget);
   });
+
+
+  // El editor de cotizaciones y el de órdenes cambian entre productos,
+  // servicios y línea libre. Antes el panel desaparecía en los dos últimos y
+  // toda la rejilla saltaba de sitio; ahora se queda, apagado.
+  testWidgets('deshabilitado no deja elegir ninguna categoría',
+      (tester) async {
+    var toques = 0;
+
+    await tester.pumpWidget(_envolver(
+      PanelCategorias(
+        categorias: _categorias,
+        seleccionada: 1,
+        alSeleccionar: (_) => toques++,
+        expandido: true,
+        alAlternar: () {},
+        habilitado: false,
+      ),
+    ));
+
+    await tester.tap(find.text('Motor'));
+    await tester.tap(find.text('Todas'));
+    await tester.pump();
+
+    expect(toques, 0);
+    expect(find.text('Frenos'), findsOneWidget,
+        reason: 'sigue a la vista, solo que apagado');
+  });
+
+  testWidgets('deshabilitado se sigue pudiendo contraer y expandir',
+      (tester) async {
+    var alternado = 0;
+
+    await tester.pumpWidget(_envolver(
+      PanelCategorias(
+        categorias: _categorias,
+        seleccionada: null,
+        alSeleccionar: (_) {},
+        expandido: true,
+        alAlternar: () => alternado++,
+        habilitado: false,
+      ),
+    ));
+
+    await tester.tap(find.byTooltip('Contraer categorías'));
+    expect(alternado, 1);
+  });
 }

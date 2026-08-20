@@ -71,6 +71,7 @@ class CotizacionEditorNotifier extends AsyncNotifier<CotizacionEditorState> {
       moto: moto,
       vigenciaHasta: resumen.vigenciaHasta,
       notas: resumen.notas ?? '',
+      descuento: resumen.descuento,
       items: detalle.items
           .map(
             (i) => ItemCotizacionEditor(
@@ -217,6 +218,10 @@ class CotizacionEditorNotifier extends AsyncNotifier<CotizacionEditorState> {
 
   void eliminarItem(int indice) => _editar((a) => a.sinItem(indice));
 
+  /// El valor se recorta al subtotal en el estado, así que teclear de más no
+  /// deja el total en negativo ni llega al `CHECK` de la tabla.
+  void cambiarDescuento(int valor) => _editar((a) => a.conDescuento(valor));
+
   // Persistencia
 
   /// Guarda ya, sin esperar el retardo.
@@ -280,6 +285,7 @@ class CotizacionEditorNotifier extends AsyncNotifier<CotizacionEditorState> {
         vigenciaHasta: actual.vigenciaHasta,
         notas: actual.notas,
         items: actual.items,
+        descuento: actual.descuento,
       );
 
       if (actual.esEdicion) {

@@ -44,6 +44,7 @@ final class CotizacionEditorState {
     this.moto,
     required this.vigenciaHasta,
     this.notas = '',
+    this.descuento = 0,
     this.items = const [],
     this.guardado = EstadoGuardado.sinCambios,
     this.motivoBloqueo,
@@ -66,6 +67,11 @@ final class CotizacionEditorState {
   final Moto? moto;
   final DateTime vigenciaHasta;
   final String notas;
+
+  /// Rebaja en pesos sobre el subtotal. Nunca mayor que él: [conDescuento] lo
+  /// recorta, y el `CHECK` de la tabla es la red.
+  final int descuento;
+
   final List<ItemCotizacionEditor> items;
 
   final EstadoGuardado guardado;
@@ -102,8 +108,48 @@ final class CotizacionEditorState {
       guardado == EstadoGuardado.bloqueado;
 
   int get subtotal => items.fold(0, (suma, i) => suma + i.subtotal);
-  int get iva => ivaDe(subtotal);
-  int get total => subtotal + iva;
+
+  /// Lo que se cobra: las líneas menos la rebaja. Nada que sumar después
+  /// —los precios ya traen el IVA dentro (ver `iva_app.dart`)—, así que el
+  /// descuento sale directo de lo que paga el cliente.
+  int get total => subtotal - descuento;
+
+  /// Cuánto del [total] es impuesto. Informativo: se extrae, no se suma.
+  int get iva => ivaIncluidoEn(total);
+
+  /// Las líneas agrupadas por tipo, listas para pintar.
+  List<GrupoLineas> get itemsAgrupados => agrupar(items);
+
+  /// Agrupa [lineas] por tipo, en el orden del enum, con el subtotal de cada
+  /// grupo. Los grupos vacíos no salen.
+  ///
+  /// Es `static` y recibe la lista en vez de leer [items] para que la vista lo
+  /// pueda llamar sobre lo que ya observa con `select`: **el `select` sigue
+  /// siendo sobre `items`**, que conserva identidad cuando no cambia, así que
+  /// esta pasada solo corre cuando las líneas cambiaron de verdad. Devolverlo
+  /// desde un `select` propio no serviría: `List.==` compara identidad y una
+  /// lista nueva nunca es igual a la anterior, así que notificaría en todos los
+  /// cambios del editor —hasta al teclear en las notas.
+  ///
+  /// Cada línea viaja con **su índice original**: las operaciones del notifier
+  /// (cambiar cantidad, borrar) indexan sobre [items], así que agrupar no
+  /// puede renumerarlas.
+  static List<GrupoLineas> agrupar(List<ItemCotizacionEditor> lineas) {
+    final grupos = <GrupoLineas>[];
+    for (final tipo in TipoItemCotizacion.values) {
+      final delTipo = <({int indice, ItemCotizacionEditor item})>[];
+      for (var i = 0; i < lineas.length; i++) {
+        if (lineas[i].tipo == tipo) delTipo.add((indice: i, item: lineas[i]));
+      }
+      if (delTipo.isEmpty) continue;
+      grupos.add(GrupoLineas(
+        tipo: tipo,
+        lineas: delTipo,
+        subtotal: delTipo.fold(0, (suma, l) => suma + l.item.subtotal),
+      ));
+    }
+    return grupos;
+  }
 
   // Operaciones sobre las líneas. Van aquí y no en el notifier porque son
   // aritmética del estado: se pueden probar sin Riverpod de por medio, y el
@@ -143,7 +189,17 @@ final class CotizacionEditorState {
 
   CotizacionEditorState sinItem(int indice) {
     if (indice < 0 || indice >= items.length) return this;
-    return copyWith(items: [...items]..removeAt(indice));
+    // Al quitar una línea baja el subtotal, y un descuento que antes cabía
+    // puede quedar por encima: se recorta junto con la lista.
+    return copyWith(items: [...items]..removeAt(indice)).conDescuento(descuento);
+  }
+
+  /// Recorta el descuento a lo que se puede rebajar: nunca negativo, nunca
+  /// mayor que el subtotal.
+  CotizacionEditorState conDescuento(int valor) {
+    final tope = subtotal;
+    final ajustado = valor < 0 ? 0 : (valor > tope ? tope : valor);
+    return ajustado == descuento ? this : copyWith(descuento: ajustado);
   }
 
   static const Object _sinCambio = Object();
@@ -153,6 +209,7 @@ final class CotizacionEditorState {
     Object? moto = _sinCambio,
     DateTime? vigenciaHasta,
     String? notas,
+    int? descuento,
     List<ItemCotizacionEditor>? items,
     EstadoGuardado? guardado,
     Object? motivoBloqueo = _sinCambio,
@@ -172,6 +229,7 @@ final class CotizacionEditorState {
         moto: identical(moto, _sinCambio) ? this.moto : moto as Moto?,
         vigenciaHasta: vigenciaHasta ?? this.vigenciaHasta,
         notas: notas ?? this.notas,
+        descuento: descuento ?? this.descuento,
         items: items ?? this.items,
         guardado: guardado ?? this.guardado,
         motivoBloqueo: identical(motivoBloqueo, _sinCambio)
@@ -184,4 +242,29 @@ final class CotizacionEditorState {
             : categoriaId as int?,
         paginaCatalogo: paginaCatalogo ?? this.paginaCatalogo,
       );
+}
+
+/// Un bloque de líneas del mismo tipo, con su subtotal.
+///
+/// Cada línea viaja con el índice que ocupa en [CotizacionEditorState.items],
+/// porque es el que esperan `cambiarCantidad`, `cambiarPrecio` y
+/// `eliminarItem`. Si el grupo renumerara, borrar la primera línea de
+/// "Servicios" borraría la primera de la cotización.
+final class GrupoLineas {
+  const GrupoLineas({
+    required this.tipo,
+    required this.lineas,
+    required this.subtotal,
+  });
+
+  final TipoItemCotizacion tipo;
+  final List<({int indice, ItemCotizacionEditor item})> lineas;
+  final int subtotal;
+
+  /// Encabezado del bloque, en plural.
+  String get titulo => switch (tipo) {
+        TipoItemCotizacion.producto => 'Productos',
+        TipoItemCotizacion.servicio => 'Servicios',
+        TipoItemCotizacion.libre => 'Otros cargos',
+      };
 }

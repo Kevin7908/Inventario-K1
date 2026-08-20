@@ -23,6 +23,7 @@ import '../../features/unidades_medida/esquema_datos/tabla_unidades_medida.dart'
 import '../../features/proveedores/esquema_datos/tabla_proveedor.dart';
 import '../../features/ventas/facturas/esquema_datos/tabla_venta_detalles.dart';
 import '../../features/ventas/facturas/esquema_datos/tabla_ventas.dart';
+import '../../features/ventas/ordenes/esquema_datos/tabla_ordenes_cargo.dart';
 import '../../features/ventas/ordenes/esquema_datos/tabla_ordenes_repuesto.dart';
 import '../../features/ventas/ordenes/esquema_datos/tabla_ordenes_servicio.dart';
 import '../../features/ventas/ordenes/esquema_datos/tabla_ordenes_tarea.dart';
@@ -54,6 +55,7 @@ part 'app_db.g.dart';
     TablaOrdenesServicio,
     TablaOrdenesTarea,
     TablaOrdenesRepuesto,
+    TablaOrdenesCargo,
     TablaVentas,
     TablaVentaDetalles,
     TablaCotizacion,

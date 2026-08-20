@@ -7,6 +7,10 @@ enum DocumentoConsecutivo {
   factura('FACTURA', 'FAC', digitos: 4, porAnio: false),
   cotizacion('COTIZACION', 'COT', digitos: 4, porAnio: true),
   reserva('RESERVA', 'RES', digitos: 4, porAnio: true),
+  // Sin año y a 4 dígitos porque es el formato que ya se veía en pantalla
+  // (`ORD-0041`): cambiarlo rompería la referencia con la que el cliente
+  // reclama su moto.
+  orden('ORDEN', 'ORD', digitos: 4, porAnio: false),
   deuda('DEUDA', 'DEU', digitos: 3, porAnio: false);
 
   const DocumentoConsecutivo(
