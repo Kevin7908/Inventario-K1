@@ -21,6 +21,11 @@ import '../temas/tipografia_app.dart';
 /// - [nombre]: título del producto. Hasta dos líneas.
 /// - [precio]: precio ya formateado (`'$32.000'`).
 /// - [codigo]: se pinta como etiqueta sobre la foto (el SKU). Opcional.
+/// - [ubicacion]: dónde está guardado ("Estante A-3"). Se pinta como etiqueta
+///   sobre la foto, arriba a la derecha, con un ícono de pin. Va ahí y no en
+///   una línea propia porque quien arma un documento necesita el dato para ir
+///   a buscar la pieza, pero no puede costarle alto a la tarjeta: la rejilla
+///   reserva [altoSugerido] exacto. Opcional.
 /// - [detalle]: línea tenue bajo el nombre ("12 en stock"). Opcional.
 /// - [colorDetalle]: color de esa línea, para marcar stock bajo o agotado.
 /// - [imagen]: widget de la foto. Si es `null`, marcador con [iconoVacio].
@@ -49,6 +54,7 @@ class TarjetaProducto extends StatelessWidget {
     required this.precio,
     required this.etiquetaAgregar,
     this.codigo,
+    this.ubicacion,
     this.detalle,
     this.colorDetalle,
     this.imagen,
@@ -72,6 +78,7 @@ class TarjetaProducto extends StatelessWidget {
   final String precio;
   final String etiquetaAgregar;
   final String? codigo;
+  final String? ubicacion;
   final String? detalle;
   final Color? colorDetalle;
   final Widget? imagen;
@@ -101,6 +108,7 @@ class TarjetaProducto extends StatelessWidget {
                 imagen: imagen,
                 iconoVacio: iconoVacio,
                 codigo: codigo,
+                ubicacion: ubicacion,
               ),
               const SizedBox(height: 13),
               Text(
@@ -156,11 +164,13 @@ class _Foto extends StatelessWidget {
     required this.imagen,
     required this.iconoVacio,
     required this.codigo,
+    required this.ubicacion,
   });
 
   final Widget? imagen;
   final IconData iconoVacio;
   final String? codigo;
+  final String? ubicacion;
 
   @override
   Widget build(BuildContext context) {
@@ -199,6 +209,49 @@ class _Foto extends StatelessWidget {
                       fontSize: 10.5,
                       fontWeight: FontWeight.w600,
                     ),
+                  ),
+                ),
+              ),
+            ),
+          if (ubicacion != null && ubicacion!.isNotEmpty)
+            Positioned(
+              // Enfrentada al código, en la esquina libre: las dos etiquetas
+              // caben sin pisarse mientras la foto mida los 120 de siempre.
+              top: 9,
+              right: 9,
+              // Deja 12 px de aire hacia el SKU. Una ubicación larga se
+              // recorta antes que empujar a la otra etiqueta.
+              child: ConstrainedBox(
+                constraints: const BoxConstraints(maxWidth: 108),
+                child: Container(
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 7, vertical: 3),
+                  decoration: BoxDecoration(
+                    color: ColoresApp.bgCard,
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      const Icon(
+                        Icons.place_outlined,
+                        size: 11,
+                        color: ColoresApp.textMuted,
+                      ),
+                      const SizedBox(width: 3),
+                      Flexible(
+                        child: Text(
+                          ubicacion!,
+                          style: TipografiaApp.caption.copyWith(
+                            fontSize: 10.5,
+                            fontWeight: FontWeight.w600,
+                            color: ColoresApp.textSecondary,
+                          ),
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                      ),
+                    ],
                   ),
                 ),
               ),

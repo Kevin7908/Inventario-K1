@@ -137,4 +137,69 @@ void main() {
       ColoresApp.textDisabled,
     );
   });
+
+  testWidgets('la ubicación se pinta sobre la foto, junto al código',
+      (tester) async {
+    await tester.pumpWidget(
+      _envolver(
+        const TarjetaProducto(
+          nombre: 'Pastilla de freno',
+          codigo: 'SKU-1123',
+          ubicacion: 'Estante A-3',
+          precio: r'$45.000',
+          etiquetaAgregar: 'Agregar',
+        ),
+      ),
+    );
+
+    expect(find.text('Estante A-3'), findsOneWidget);
+    expect(find.byIcon(Icons.place_outlined), findsOneWidget);
+    // Convive con el SKU: son las dos esquinas de arriba de la foto.
+    expect(find.text('SKU-1123'), findsOneWidget);
+  });
+
+  testWidgets('sin ubicación no queda ni el ícono suelto', (tester) async {
+    // Un producto sin bodega asignada no debe pintar una etiqueta vacía.
+    await tester.pumpWidget(
+      _envolver(
+        const TarjetaProducto(
+          nombre: 'Pastilla de freno',
+          precio: r'$45.000',
+          etiquetaAgregar: 'Agregar',
+          ubicacion: '',
+        ),
+      ),
+    );
+
+    expect(find.byIcon(Icons.place_outlined), findsNothing);
+  });
+
+  testWidgets('la tarjeta con ubicación no desborda el alto reservado',
+      (tester) async {
+    // La rejilla le reserva `altoSugerido` exacto: la etiqueta va sobre la
+    // foto justamente para no costar alto. Si algún día se mueve a una línea
+    // propia, este test lo delata con la franja amarilla y negra.
+    await tester.pumpWidget(
+      const MaterialApp(
+        home: Scaffold(
+          body: Center(
+            child: SizedBox(
+              width: TarjetaProducto.anchoMinimo,
+              height: TarjetaProducto.altoSugerido,
+              child: TarjetaProducto(
+                nombre: 'Pastilla de freno delantera cerámica reforzada',
+                codigo: 'SKU-1123',
+                ubicacion: 'Estante A-3',
+                detalle: '12 en stock',
+                precio: r'$45.000',
+                etiquetaAgregar: 'Agregar',
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+
+    expect(tester.takeException(), isNull);
+  });
 }

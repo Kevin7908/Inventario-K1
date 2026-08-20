@@ -81,6 +81,9 @@ class GrillaProductosCotizacion extends ConsumerWidget {
           key: ValueKey(producto.id),
           nombre: producto.nombre,
           codigo: producto.sku,
+          // Quien cotiza suele tener que ir a mirar la pieza al estante: sin
+          // la ubicación hay que abrir el producto en otra pantalla.
+          ubicacion: producto.ubicacionBodega,
           detalle: _etiquetaStock(producto),
           colorDetalle: _colorStock(producto),
           precio: formatearPrecio(producto.precioVenta),
