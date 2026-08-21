@@ -37,6 +37,16 @@ class ReservaResumen {
   double get porcentajePagado =>
       totalReserva > 0 ? (pagadoAcumulado / totalReserva).clamp(0.0, 1.0) : 0.0;
 
+  /// Si ya no queda saldo por cobrar.
+  ///
+  /// **No es el estado de la reserva, es el del dinero**, y por eso se deriva
+  /// en vez de guardarse: `estado` cuenta el ciclo de vida —apartada, entregada
+  /// o cancelada— y esto cuenta si el cliente terminó de pagar. Son cosas
+  /// distintas: se puede deber la mitad de algo que ya se entregó, y se puede
+  /// tener pagado del todo algo que sigue en la bodega. El chip del listado
+  /// muestra esto; el ciclo de vida lo decide quien entrega la mercancía.
+  bool get pagada => totalReserva > 0 && pagadoAcumulado >= totalReserva;
+
   /// Solo una reserva **activa** vence: una completada o cancelada ya no
   /// espera nada.
   bool get estaVencida {

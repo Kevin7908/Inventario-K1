@@ -12,8 +12,10 @@ import '../../motos/esquema_datos/tabla_moto.dart';
 /// `RepositorioReservas.descuadres()` comprueba que caché y suma coincidan;
 /// sin esa comprobación el caché no estaría justificado.
 ///
-/// `total_reserva` sí es un dato propio: es el precio pactado, que puede no
-/// coincidir con la suma de las líneas si hubo rebaja.
+/// `total_reserva` es **otro caché**: la suma de `reserva_items`. Se guarda por
+/// lo mismo que el anterior —la lista lo muestra sin abrir las líneas— y lo
+/// recalcula entero `RepositorioReservas` cada vez que una línea entra, cambia
+/// o sale. `descuadresTotal()` es el que afirma que coincide.
 @TableIndex(name: 'idx_reservas_cliente', columns: {#clienteId})
 @TableIndex(name: 'idx_reservas_cotizacion', columns: {#cotizacionId})
 @TableIndex(name: 'idx_reservas_estado', columns: {#estado})
@@ -37,8 +39,13 @@ class TablaReserva extends Table {
       .nullable()
       .references(TablaMoto, #id, onDelete: KeyAction.setNull)();
 
+  /// `unique`: una cotización se reserva **una vez**. Sin esto, dos clics en
+  /// «Reservar» creaban dos reservas del mismo presupuesto y descontaban el
+  /// stock dos veces. En SQLite una columna `UNIQUE` admite todos los `NULL`
+  /// que quiera, así que las reservas que no vienen de cotización no chocan.
   IntColumn get cotizacionId => integer()
       .nullable()
+      .unique()
       .references(TablaCotizacion, #id, onDelete: KeyAction.setNull)();
 
   /// `ACTIVA` | `COMPLETADA` | `CANCELADA`.

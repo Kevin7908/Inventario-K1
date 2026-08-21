@@ -20,7 +20,12 @@ class TablaReservaAbono extends Table {
   IntColumn get reservaId => integer()
       .references(TablaReserva, #id, onDelete: KeyAction.cascade)();
 
-  /// En pesos enteros. Siempre positivo: no hay abonos de cero ni negativos.
+  /// En pesos enteros. **Positivo es un abono; negativo es una devolución.**
+  ///
+  /// La devolución aparece cuando se quita mercancía de una reserva ya abonada
+  /// y el total cae por debajo de lo entregado: hay que regresarle plata al
+  /// cliente, y eso se registra como un movimiento más y no editando el abono
+  /// de ayer. Cero no: un movimiento de dinero que no mueve dinero no existe.
   IntColumn get monto => integer()();
 
   /// Uno de [MetodoPago], sin `CREDITO`: quien abona está entregando dinero.
@@ -34,7 +39,7 @@ class TablaReservaAbono extends Table {
 
   @override
   List<String> get customConstraints => [
-        'CHECK (monto > 0)',
+        'CHECK (monto <> 0)',
         'CHECK (metodo_pago IN (${MetodoPago.listaSqlAbonos}))',
       ];
 }
