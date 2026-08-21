@@ -233,56 +233,51 @@ void main() {
     });
   });
 
-  group('el inventario se mueve al cerrar, y el editor lo refleja', () {
-    test('mientras está abierta los repuestos solo se anotan', () async {
+  group('el inventario se mueve al anotar, y el editor lo refleja', () {
+    test('agregar un repuesto descuenta en el acto', () async {
       final antes = await _stock();
+
       await _notifier.agregarProducto(_producto());
 
-      expect(await _stock(), antes);
-      expect(_estado.inventarioYaSalio, isFalse);
+      expect(await _stock(), antes - 1);
+      expect(_estado.inventarioDevuelto, isFalse);
     });
 
-    test('pasar a LISTA descuenta todo de una vez', () async {
+    test('pasar a LISTA ya no mueve nada', () async {
       final antes = await _stock();
       await _notifier.agregarProducto(_producto());
       await _notifier.agregarProducto(_producto());
+      expect(await _stock(), antes - 2, reason: 'salieron al agregarlas');
 
       await _cerrarOrden();
 
       expect(await _stock(), antes - 2);
       expect(_estado.estado, EstadoOrden.lista);
-      expect(_estado.inventarioYaSalio, isTrue);
     });
 
-    test('si el stock no alcanza, la orden no cambia de estado', () async {
-      // Stock 10, y dos líneas de 6: pasan una por una y revientan al mover.
+    test('si el stock no alcanza, la línea no entra y el editor lo dice',
+        () async {
+      // Stock 10. Se sube la línea a 10 y se intenta agregar una más.
       await _notifier.agregarProducto(_producto());
-      _notifier.cambiarCantidad(_estado.lineas.single, 6);
+      _notifier.cambiarCantidad(_estado.lineas.single, 10);
       await _notifier.guardarAhora();
-      await repo.agregarRepuesto(
-        ordenId: ordenId,
-        productoId: taller.productoId,
-        cantidad: 6,
-        precioUnitario: 30000,
-      );
+      expect(await _stock(), 0);
 
-      final resultado = await _cerrarOrden();
+      final resultado = await _notifier.agregarProducto(_producto());
 
       expect(resultado, isA<Fallo>());
-      expect(_estado.estado, EstadoOrden.abierta,
-          reason: 'mejor no cerrarla que dejarla sin descontar');
-      expect(await _stock(), 10, reason: 'la transacción revirtió entera');
+      expect(await _stock(), 0, reason: 'no se movió nada más');
+      expect(_estado.guardado, EstadoGuardadoOrden.bloqueado);
+      expect(_estado.lineas.single.cantidad, 10,
+          reason: 'la línea se queda como estaba');
     });
 
     test('el fallo dice qué repuesto faltó, no solo que faltó', () async {
       await _notifier.agregarProducto(_producto());
+
       _notifier.cambiarCantidad(_estado.lineas.single, 99);
-      await _notifier.guardarAhora();
+      final resultado = await _notifier.guardarAhora();
 
-      final resultado = await _cerrarOrden();
-
-      // Cerrar verifica todos los repuestos de una vez: sin el nombre habría
-      // que revisar las líneas a mano para saber cuál falló.
       expect(
         resultado,
         isA<Fallo>().having(
@@ -295,7 +290,34 @@ void main() {
       expect(_estado.guardado, EstadoGuardadoOrden.bloqueado);
     });
 
-    test('anular una orden cerrada devuelve el stock', () async {
+    test('una cantidad que la base rechaza vuelve a su valor real', () async {
+      // El estado se actualiza de forma optimista antes de escribir. Sin la
+      // relectura del fallo, el panel se quedaría mostrando 99 unidades que el
+      // taller no tiene, y el total mentiría con ellas.
+      await _notifier.agregarProducto(_producto());
+      final precio = _estado.lineas.single.precioUnitario;
+
+      _notifier.cambiarCantidad(_estado.lineas.single, 99);
+      expect(_estado.lineas.single.cantidad, 99, reason: 'optimista');
+
+      await _notifier.guardarAhora();
+
+      expect(_estado.lineas.single.cantidad, 1);
+      expect(_estado.subtotal, precio);
+      expect(await _stock(), 9);
+    });
+
+    test('quitar una línea devuelve la pieza al estante', () async {
+      final antes = await _stock();
+      await _notifier.agregarProducto(_producto());
+      expect(await _stock(), antes - 1);
+
+      await _notifier.eliminarLinea(_estado.lineas.single);
+
+      expect(await _stock(), antes);
+    });
+
+    test('anular devuelve el stock y el aviso cambia de sentido', () async {
       final antes = await _stock();
       await _notifier.agregarProducto(_producto());
       await _cerrarOrden();
@@ -305,6 +327,7 @@ void main() {
 
       expect(_estado.estado, EstadoOrden.anulada);
       expect(await _stock(), antes);
+      expect(_estado.inventarioDevuelto, isTrue);
     });
 
     test('LISTA → ENTREGADA no vuelve a descontar', () async {
@@ -329,16 +352,6 @@ void main() {
         () async {
       await _cerrarOrden();
       expect(_estado.editable, isTrue);
-    });
-
-    test('agregar un repuesto a una orden ya cerrada descuenta al instante',
-        () async {
-      await _cerrarOrden();
-      final antes = await _stock();
-
-      await _notifier.agregarProducto(_producto());
-
-      expect(await _stock(), antes - 1);
     });
 
     test('una orden anulada no se reabre', () async {

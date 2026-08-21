@@ -293,10 +293,10 @@ class RepositorioOrdenesImpl implements RepositorioOrdenes {
         ? DateTime.now()
         : null;
 
-    // Cerrar la orden es lo que mueve el inventario, y anularla lo devuelve.
-    // Va en la misma transacción que el cambio de estado: si el stock no
-    // alcanza, la orden **no** cambia de estado. Dejarla cerrada con las
-    // piezas sin descontar sería peor que no cerrarla.
+    // Cerrar la orden ya no mueve inventario: los repuestos salieron del
+    // estante cuando se anotaron. Lo único que queda es **anular**, que los
+    // devuelve, y va en la misma transacción que el cambio de estado: si la
+    // devolución falla, la orden no se queda anulada con el stock sin volver.
     await _db.transaction(() async {
       final antes = await (_db.select(_tablaOrdenes)
             ..where((t) => t.id.equals(id)))
@@ -305,16 +305,11 @@ class RepositorioOrdenesImpl implements RepositorioOrdenes {
         throw Exception('No se pudo actualizar la orden #$id.');
       }
 
-      final cierra = estado == EstadoOrden.lista ||
-          estado == EstadoOrden.entregada;
-
-      var inventarioAplicado = antes.inventarioAplicado;
-      if (cierra && !inventarioAplicado) {
-        await _aplicarInventario(id);
-        inventarioAplicado = true;
-      } else if (estado == EstadoOrden.anulada && inventarioAplicado) {
+      // Solo la **transición** a anulada devuelve. Reanular una orden ya
+      // anulada devolvería el stock por segunda vez e inflaría el inventario.
+      final yaAnulada = antes.estado == EstadoOrden.anulada.name.toUpperCase();
+      if (estado == EstadoOrden.anulada && !yaAnulada) {
         await _devolverInventario(id);
-        inventarioAplicado = false;
       }
 
       final companion = OrdenMapper.aCompanionActualizar(
@@ -326,7 +321,6 @@ class RepositorioOrdenesImpl implements RepositorioOrdenes {
         diagnostico: diagnostico,
         observaciones: observaciones,
         fechaSalida: fechaSalida,
-        inventarioAplicado: inventarioAplicado,
       );
 
       final updatedCount = await (_db.update(
@@ -432,13 +426,12 @@ class RepositorioOrdenesImpl implements RepositorioOrdenes {
     required double cantidad,
     required int precioUnitario,
   }) {
-    // Mientras la orden está abierta, el repuesto solo se **anota**: el stock
-    // se mueve al cerrarla. Si ya está cerrada —se le agrega algo a una orden
-    // LISTA— el inventario de esta orden ya salió, así que esta línea tiene
-    // que descontar sola para no quedar fuera del libro mayor.
+    // Anotar el repuesto **es** sacarlo del estante: la pieza queda apartada
+    // para esta moto aunque el mecánico todavía no la haya montado. Por eso
+    // se verifica y se descuenta aquí, y no al cerrar la orden: así el error
+    // llega pegado al gesto que lo causa y no media hora después.
     return _db.transaction(() async {
-      final aplicado = await _inventarioAplicado(ordenId);
-      if (aplicado) await _verificarStock(productoId, cantidad);
+      await _verificarStock(productoId, cantidad);
 
       await _db.into(_tablaRepuestos).insert(
         OrdenMapper.repuestoCompanionNuevo(
@@ -451,8 +444,6 @@ class RepositorioOrdenesImpl implements RepositorioOrdenes {
 
       // Agregar sube el subtotal, así que la rebaja no puede dejar de caber:
       // no hace falta reajustarla.
-      if (!aplicado) return;
-
       await _inventario.registrar(
         SolicitudMovimiento.salida(
           productoId: productoId,
@@ -469,10 +460,8 @@ class RepositorioOrdenesImpl implements RepositorioOrdenes {
   /// La base también lo impediría —`productos.stock_actual` no puede quedar
   /// negativo—, pero el error de SQLite no se le puede enseñar a nadie.
   ///
-  /// **Nombra el producto**, y no es un adorno: cerrar una orden verifica
-  /// todos sus repuestos de una vez, así que un «Stock insuficiente,
-  /// disponible: 2» a secas obliga a revisar las ocho líneas a mano para
-  /// averiguar cuál falló.
+  /// **Nombra el producto** porque el mismo mensaje sale en dos sitios: al
+  /// agregar la línea, donde el usuario sabe cuál es, y al anular, donde no.
   Future<void> _verificarStock(int productoId, double cantidad) async {
     final fila = await _db
         .customSelect(
@@ -511,11 +500,10 @@ class RepositorioOrdenesImpl implements RepositorioOrdenes {
       final cantidadNueva = cantidad ?? current.cantidad;
       final delta = cantidadNueva - current.cantidad;
 
-      // Solo se mueve la diferencia, y solo si el inventario de esta orden ya
-      // salió: mientras está abierta, cambiar la cantidad es corregir lo que
-      // se piensa montar, no mover nada del estante.
-      final aplicado = await _inventarioAplicado(current.ordenId);
-      if (delta != 0 && aplicado) {
+      // Se mueve solo la diferencia. Subir de 2 a 5 saca tres piezas más;
+      // bajar de 5 a 2 devuelve tres. Registrar la cantidad entera de nuevo
+      // duplicaría la salida.
+      if (delta != 0) {
         if (delta > 0) await _verificarStock(current.productoId, delta);
         await _inventario.registrar(
           SolicitudMovimiento(
@@ -552,19 +540,16 @@ class RepositorioOrdenesImpl implements RepositorioOrdenes {
             ..where((t) => t.id.equals(repuestoId)))
           .go();
 
-      // Solo se devuelve lo que llegó a salir. Quitar una línea de una orden
-      // abierta no genera devolución: nunca hubo salida.
-      if (await _inventarioAplicado(current.ordenId)) {
-        await _inventario.registrar(
-          SolicitudMovimiento.entrada(
-            productoId: current.productoId,
-            cantidad: current.cantidad,
-            tipo: TipoMovimiento.devolucionServicio,
-            ordenId: current.ordenId,
-            notas: 'Repuesto retirado de la orden',
-          ),
-        );
-      }
+      // La línea existía, así que su pieza había salido: quitarla la devuelve.
+      await _inventario.registrar(
+        SolicitudMovimiento.entrada(
+          productoId: current.productoId,
+          cantidad: current.cantidad,
+          tipo: TipoMovimiento.devolucionServicio,
+          ordenId: current.ordenId,
+          notas: 'Repuesto retirado de la orden',
+        ),
+      );
 
       await _reajustarDescuento(current.ordenId);
     });
@@ -724,53 +709,11 @@ class RepositorioOrdenesImpl implements RepositorioOrdenes {
     if (tarea != null) await _reajustarDescuento(tarea.ordenId);
   }
 
-  /// Si los repuestos de la orden ya salieron del inventario.
-  Future<bool> _inventarioAplicado(int ordenId) async {
-    final orden = await (_db.select(_tablaOrdenes)
-          ..where((t) => t.id.equals(ordenId)))
-        .getSingleOrNull();
-    return orden?.inventarioAplicado ?? false;
-  }
-
-  /// Descuenta de una vez todos los repuestos de la orden y la marca aplicada.
-  ///
-  /// Es el momento en que la orden deja de estar abierta. Se verifica **todo
-  /// el stock antes de mover nada**: si faltara para la última línea, hacerlo
-  /// de a uno dejaría media orden descontada y la otra media no.
-  ///
-  /// Aquí es donde se paga el precio de diferir el descuento: dos órdenes
-  /// abiertas pueden haber anotado el mismo último repuesto, y la segunda en
-  /// cerrarse se encuentra sin stock. Mejor eso que un inventario en negativo,
-  /// y el mensaje dice qué falta.
-  Future<void> _aplicarInventario(int ordenId) async {
-    final lineas = await (_db.select(_tablaRepuestos)
-          ..where((t) => t.ordenId.equals(ordenId)))
-        .get();
-    if (lineas.isEmpty) return;
-
-    // Un mismo producto puede estar en dos líneas: se verifica el total, no
-    // cada línea por separado, o dos líneas de 6 pasarían con stock 10.
-    final porProducto = <int, double>{};
-    for (final linea in lineas) {
-      porProducto[linea.productoId] =
-          (porProducto[linea.productoId] ?? 0) + linea.cantidad;
-    }
-    for (final entrada in porProducto.entries) {
-      await _verificarStock(entrada.key, entrada.value);
-    }
-
-    await _inventario.registrarVarios([
-      for (final entrada in porProducto.entries)
-        SolicitudMovimiento.salida(
-          productoId: entrada.key,
-          cantidad: entrada.value,
-          tipo: TipoMovimiento.salidaServicio,
-          ordenId: ordenId,
-        ),
-    ]);
-  }
-
   /// Devuelve al inventario todo lo que había salido por esta orden.
+  ///
+  /// Lo llama solo el paso a `ANULADA`. Va agrupado por producto y no línea a
+  /// línea: dos líneas del mismo repuesto son dos salidas pero una sola
+  /// devolución, y así el movimiento de vuelta se lee igual que la orden.
   Future<void> _devolverInventario(int ordenId) async {
     final lineas = await (_db.select(_tablaRepuestos)
           ..where((t) => t.ordenId.equals(ordenId)))

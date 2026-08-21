@@ -30,11 +30,11 @@ import 'validacion_orden.dart';
 ///   estado en el acto para que el campo responda, y programa la escritura con
 ///   un retardo. Sin eso, cada tecla del precio sería un `UPDATE`.
 ///
-/// Después de cada escritura se **relee el detalle** en vez de espejar en Dart
-/// lo que hizo el repositorio. Es lo que mantiene honesta la pantalla: los
-/// `id` de las líneas nuevas, el descuento que el repositorio recorta solo
-/// cuando una línea baja, y el stock que se movió al cerrar salen de la base y
-/// no de una copia. Son cuatro consultas sobre SQLite local con unas decenas
+/// Después de cada escritura —salga bien o mal— se **relee el detalle** en vez
+/// de espejar en Dart lo que hizo el repositorio. Es lo que mantiene honesta
+/// la pantalla: los `id` de las líneas nuevas, el descuento que el repositorio
+/// recorta solo cuando una línea baja, y la cantidad que el stock no permitió
+/// salen de la base y no de una copia. Son cuatro consultas sobre SQLite local con unas decenas
 /// de filas; el riesgo de duplicar la lógica de negocio en la vista era mucho
 /// más caro (§7 de `CLAUDE.md`).
 class OrdenEditorNotifier extends AsyncNotifier<OrdenEditorState> {
@@ -177,6 +177,13 @@ class OrdenEditorNotifier extends AsyncNotifier<OrdenEditorState> {
       return const Exito();
     } catch (e) {
       final mensaje = mensajeDeExcepcion(e);
+      // Releer **también** cuando falla. El estado se actualizó de forma
+      // optimista antes de escribir, así que un rechazo por falta de stock
+      // dejaría en pantalla una cantidad que la base no aceptó: el panel
+      // mostraría doce unidades que el taller no tiene y el total mentiría.
+      // La relectura devuelve la línea a lo que de verdad quedó guardado.
+      await _recargar();
+      if (!ref.mounted) return Fallo(MotivoFallo.persistencia, mensaje);
       _actualizar(
         (a) => a.copyWith(
           guardado: EstadoGuardadoOrden.bloqueado,

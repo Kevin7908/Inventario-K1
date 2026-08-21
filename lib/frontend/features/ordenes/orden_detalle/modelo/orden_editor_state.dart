@@ -121,14 +121,12 @@ final class OrdenEditorState {
   bool get editable =>
       estado == EstadoOrden.abierta || estado == EstadoOrden.lista;
 
-  /// Si los repuestos de esta orden ya salieron del inventario.
+  /// Si el inventario de esta orden ya volvió al estante.
   ///
-  /// Se deduce del estado y no de la columna `inventario_aplicado`: mientras
-  /// la orden está `ABIERTA` no ha salido nada, y en `LISTA` o `ENTREGADA` sí.
-  /// Le sirve a la vista para avisar de que agregar un repuesto ahora
-  /// **descuenta al instante**, que no es lo que pasaba hace un momento.
-  bool get inventarioYaSalio =>
-      estado == EstadoOrden.lista || estado == EstadoOrden.entregada;
+  /// Los repuestos salen al anotarlos, así que mientras la orden viva su stock
+  /// está afuera. Anularla es lo único que lo devuelve, y entonces el aviso
+  /// del diálogo tiene que decir lo contrario de lo que decía.
+  bool get inventarioDevuelto => estado == EstadoOrden.anulada;
 
   int get subtotal => lineas.fold(0, (suma, l) => suma + l.subtotal);
 

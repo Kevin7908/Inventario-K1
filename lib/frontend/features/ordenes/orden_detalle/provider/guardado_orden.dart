@@ -14,10 +14,9 @@ import '../modelo/linea_orden_editor.dart';
 ///
 /// - `ordenes_tareas.id` es la identidad de una tarea. Borrarla y reinsertarla
 ///   le cambia el id en cada tecleo, y con él se pierde `completado`.
-/// - En cuanto la orden está cerrada, `agregarRepuesto` descuenta stock al
-///   instante (§1.3): un `DELETE + INSERT` de todas las líneas escribiría un
-///   par de movimientos de inventario **por cada tecla**. Es justo la basura
-///   que el descuento diferido vino a evitar.
+/// - `agregarRepuesto` descuenta stock al instante: un `DELETE + INSERT` de
+///   todas las líneas escribiría un par de movimientos de inventario **por
+///   cada tecla**. Es justo la basura que el retardo del notifier evita.
 ///
 /// Por eso cada operación es su propia llamada al repositorio, y cada una es
 /// ya una transacción allá dentro.
@@ -41,8 +40,8 @@ class GuardadoOrden {
         precioPactado: precio,
       );
 
-  /// Puede lanzar «Stock insuficiente» si la orden ya está cerrada: ahí el
-  /// repuesto descuenta al instante en vez de esperar al cierre.
+  /// Puede lanzar «Stock insuficiente»: anotar el repuesto lo saca del
+  /// estante, así que si no hay, la línea no llega a existir.
   Future<void> agregarRepuesto({
     required int ordenId,
     required int productoId,

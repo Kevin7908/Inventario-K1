@@ -73,11 +73,12 @@ void main() {
     });
   });
 
-  group('el inventario se mueve al cerrar la orden, no al armarla', () {
-    // Regla de negocio: mientras la orden está ABIERTA los repuestos se
-    // **anotan** sin tocar stock. Se están eligiendo, y agregar y quitar
-    // mientras se arma llenaría el libro mayor de salidas y devoluciones que
-    // nunca ocurrieron. El descuento pasa entero al pasar a LISTA o ENTREGADA.
+  group('el inventario se mueve al anotar el repuesto', () {
+    // Regla de negocio: anotar un repuesto en una orden **es** sacarlo del
+    // estante, igual que en `reservas`. La pieza queda apartada para esa moto
+    // aunque el mecánico todavía no la haya montado, así que el error por
+    // falta de stock llega al agregar la línea y no media hora después, al
+    // cerrar. Anular la orden es lo único que devuelve las piezas.
 
     Future<void> cerrar(int ordenId, {EstadoOrden a = EstadoOrden.lista}) =>
         ordenes.actualizar(
@@ -86,7 +87,7 @@ void main() {
           kilometrajeEntrada: 15000,
         );
 
-    test('agregar un repuesto a una orden abierta no toca el stock', () async {
+    test('agregar un repuesto descuenta al instante', () async {
       final ordenId = await _orden();
 
       await ordenes.agregarRepuesto(
@@ -96,19 +97,65 @@ void main() {
         precioUnitario: 30000,
       );
 
-      expect(await _stock(), 10, reason: 'todavía no ha salido nada');
+      expect(await _stock(), 8);
       final movimientos =
           await inventario.observarPorProducto(taller.productoId).first;
-      expect(
-        movimientos.where((m) => m.ordenId == ordenId),
-        isEmpty,
-        reason: 'ni un movimiento hasta que se cierre',
+      expect(movimientos.where((m) => m.ordenId == ordenId), hasLength(1));
+      expect((await ordenes.obtenerDetalle(ordenId)).repuestos, hasLength(1));
+      expect(await inventario.descuadres(), isEmpty);
+    });
+
+    test('sin stock la línea no llega a existir', () async {
+      // Antes esto se dejaba anotar y explotaba al cerrar. Ahora se rechaza en
+      // el momento, con la orden todavía en la mano del usuario.
+      final ordenId = await _orden();
+
+      await expectLater(
+        () => ordenes.agregarRepuesto(
+          ordenId: ordenId,
+          productoId: taller.productoId,
+          cantidad: 99,
+          precioUnitario: 30000,
+        ),
+        throwsA(isA<Exception>()),
       );
-      // La línea sí quedó anotada.
+
+      expect(await _stock(), 10);
+      expect(
+        (await ordenes.obtenerDetalle(ordenId)).repuestos,
+        isEmpty,
+        reason: 'la transacción revierte la línea junto con el movimiento',
+      );
+    });
+
+    test('dos líneas del mismo producto se descuentan una tras otra', () async {
+      // Con stock 10, la primera de 6 pasa y deja 4; la segunda ya no cabe.
+      // Antes las dos se anotaban y el choque aparecía al cerrar.
+      final ordenId = await _orden();
+
+      await ordenes.agregarRepuesto(
+        ordenId: ordenId,
+        productoId: taller.productoId,
+        cantidad: 6,
+        precioUnitario: 30000,
+      );
+      expect(await _stock(), 4);
+
+      await expectLater(
+        () => ordenes.agregarRepuesto(
+          ordenId: ordenId,
+          productoId: taller.productoId,
+          cantidad: 6,
+          precioUnitario: 30000,
+        ),
+        throwsA(isA<Exception>()),
+      );
+
+      expect(await _stock(), 4, reason: 'la segunda no movió nada');
       expect((await ordenes.obtenerDetalle(ordenId)).repuestos, hasLength(1));
     });
 
-    test('cerrarla descuenta todo de una vez', () async {
+    test('cerrar la orden ya no descuenta nada', () async {
       final ordenId = await _orden();
       await ordenes.agregarRepuesto(
         ordenId: ordenId,
@@ -118,52 +165,14 @@ void main() {
       );
 
       await cerrar(ordenId);
+      expect(await _stock(), 8, reason: 'ya había salido al anotarlo');
 
-      expect(await _stock(), 8);
-      final movimientos =
-          await inventario.observarPorProducto(taller.productoId).first;
-      expect(movimientos.first.ordenId, ordenId);
-      expect(await inventario.descuadres(), isEmpty);
-    });
-
-    test('cerrar dos veces no descuenta dos veces', () async {
-      final ordenId = await _orden();
-      await ordenes.agregarRepuesto(
-        ordenId: ordenId,
-        productoId: taller.productoId,
-        cantidad: 2,
-        precioUnitario: 30000,
-      );
-
-      await cerrar(ordenId);
-      // LISTA -> ENTREGADA: la moto se entrega, pero las piezas ya salieron.
       await cerrar(ordenId, a: EstadoOrden.entregada);
-
       expect(await _stock(), 8);
       expect(await inventario.descuadres(), isEmpty);
     });
 
-    test('poner y quitar mientras está abierta no deja rastro', () async {
-      // Es justo lo que motivó el cambio: antes esto dejaba una salida y una
-      // devolución por algo que nunca se movió del estante.
-      final ordenId = await _orden();
-      await ordenes.agregarRepuesto(
-        ordenId: ordenId,
-        productoId: taller.productoId,
-        cantidad: 2,
-        precioUnitario: 30000,
-      );
-
-      final detalle = await ordenes.obtenerDetalle(ordenId);
-      await ordenes.eliminarRepuesto(detalle.repuestos.single.id);
-
-      expect(await _stock(), 10);
-      final movimientos =
-          await inventario.observarPorProducto(taller.productoId).first;
-      expect(movimientos.where((m) => m.ordenId == ordenId), isEmpty);
-    });
-
-    test('cambiar la cantidad antes de cerrar no mueve nada', () async {
+    test('subir la cantidad saca solo la diferencia', () async {
       final ordenId = await _orden();
       await ordenes.agregarRepuesto(
         ordenId: ordenId,
@@ -174,51 +183,88 @@ void main() {
       final detalle = await ordenes.obtenerDetalle(ordenId);
 
       await ordenes.actualizarRepuesto(detalle.repuestos.single.id, cantidad: 5);
-      expect(await _stock(), 10);
 
-      // Y al cerrar sale la cantidad final, no la inicial.
-      await cerrar(ordenId);
-      expect(await _stock(), 5);
+      expect(await _stock(), 5, reason: '10 - 2 - 3, no 10 - 2 - 5');
       expect(await inventario.descuadres(), isEmpty);
     });
 
-    test('sin stock la orden no se cierra y no se descuenta nada', () async {
-      // Aquí es donde se paga diferir el descuento: la orden pudo anotar más
-      // de lo que hay. Mejor no cerrarla que dejar el inventario en negativo.
+    test('bajar la cantidad devuelve la diferencia', () async {
       final ordenId = await _orden();
       await ordenes.agregarRepuesto(
         ordenId: ordenId,
         productoId: taller.productoId,
-        cantidad: 99,
+        cantidad: 5,
         precioUnitario: 30000,
       );
-
-      await expectLater(() => cerrar(ordenId), throwsA(isA<Exception>()));
-
-      expect(await _stock(), 10);
       final detalle = await ordenes.obtenerDetalle(ordenId);
-      expect(detalle.estado, EstadoOrden.abierta,
-          reason: 'el estado se revierte con la transacción');
+
+      await ordenes.actualizarRepuesto(detalle.repuestos.single.id, cantidad: 2);
+
+      expect(await _stock(), 8);
+      expect(await inventario.descuadres(), isEmpty);
     });
 
-    test('dos líneas del mismo producto se verifican sumadas', () async {
-      // Con stock 10, dos líneas de 6 no caben. Verificar línea por línea las
-      // dejaría pasar a las dos.
+    test('subir la cantidad más allá del stock se rechaza', () async {
       final ordenId = await _orden();
-      for (var i = 0; i < 2; i++) {
-        await ordenes.agregarRepuesto(
-          ordenId: ordenId,
-          productoId: taller.productoId,
-          cantidad: 6,
-          precioUnitario: 30000,
-        );
-      }
+      await ordenes.agregarRepuesto(
+        ordenId: ordenId,
+        productoId: taller.productoId,
+        cantidad: 2,
+        precioUnitario: 30000,
+      );
+      final detalle = await ordenes.obtenerDetalle(ordenId);
 
-      await expectLater(() => cerrar(ordenId), throwsA(isA<Exception>()));
+      await expectLater(
+        () => ordenes.actualizarRepuesto(
+          detalle.repuestos.single.id,
+          cantidad: 99,
+        ),
+        throwsA(isA<Exception>()),
+      );
+
+      expect(await _stock(), 8, reason: 'quedan las 2 de la línea original');
+      final vigente = await ordenes.obtenerDetalle(ordenId);
+      expect(vigente.repuestos.single.cantidad, 2,
+          reason: 'la cantidad tampoco se guardó');
+    });
+
+    test('quitar la línea devuelve la pieza', () async {
+      final ordenId = await _orden();
+      await ordenes.agregarRepuesto(
+        ordenId: ordenId,
+        productoId: taller.productoId,
+        cantidad: 2,
+        precioUnitario: 30000,
+      );
+      final detalle = await ordenes.obtenerDetalle(ordenId);
+
+      await ordenes.eliminarRepuesto(detalle.repuestos.single.id);
+
+      expect(await _stock(), 10);
+      expect(await inventario.descuadres(), isEmpty);
+    });
+
+    test('poner y quitar deja los dos movimientos en el libro mayor', () async {
+      // Es el precio aceptado del cambio: el estante se movió de verdad dos
+      // veces, así que el historial lo registra. A cambio, `stock_actual`
+      // nunca miente mientras la orden se arma.
+      final ordenId = await _orden();
+      await ordenes.agregarRepuesto(
+        ordenId: ordenId,
+        productoId: taller.productoId,
+        cantidad: 2,
+        precioUnitario: 30000,
+      );
+      final detalle = await ordenes.obtenerDetalle(ordenId);
+      await ordenes.eliminarRepuesto(detalle.repuestos.single.id);
+
+      final movimientos =
+          await inventario.observarPorProducto(taller.productoId).first;
+      expect(movimientos.where((m) => m.ordenId == ordenId), hasLength(2));
       expect(await _stock(), 10);
     });
 
-    test('anular una orden cerrada devuelve el stock', () async {
+    test('anular devuelve todo lo que la orden tenía anotado', () async {
       final ordenId = await _orden();
       await ordenes.agregarRepuesto(
         ordenId: ordenId,
@@ -226,7 +272,6 @@ void main() {
         cantidad: 3,
         precioUnitario: 30000,
       );
-      await cerrar(ordenId);
       expect(await _stock(), 7);
 
       await ordenes.actualizar(
@@ -239,7 +284,8 @@ void main() {
       expect(await inventario.descuadres(), isEmpty);
     });
 
-    test('anular una orden abierta no devuelve nada', () async {
+    test('anular una orden abierta también devuelve', () async {
+      // Antes no devolvía nada porque nada había salido. Ahora sí salió.
       final ordenId = await _orden();
       await ordenes.agregarRepuesto(
         ordenId: ordenId,
@@ -254,26 +300,30 @@ void main() {
         kilometrajeEntrada: 15000,
       );
 
-      // Nunca salió: devolverlo inflaría el inventario.
       expect(await _stock(), 10);
       expect(await inventario.descuadres(), isEmpty);
     });
 
-    test('a una orden ya cerrada, un repuesto nuevo descuenta al instante',
-        () async {
-      // Su inventario ya salió, así que esta línea tiene que descontar sola
-      // para no quedarse fuera del libro mayor.
+    test('anular dos veces no devuelve dos veces', () async {
+      // Sin la guarda de la transición, la segunda anulación inflaría el
+      // inventario con piezas que nunca existieron.
       final ordenId = await _orden();
-      await cerrar(ordenId);
-
       await ordenes.agregarRepuesto(
         ordenId: ordenId,
         productoId: taller.productoId,
-        cantidad: 2,
+        cantidad: 3,
         precioUnitario: 30000,
       );
 
-      expect(await _stock(), 8);
+      for (var i = 0; i < 2; i++) {
+        await ordenes.actualizar(
+          id: ordenId,
+          estado: EstadoOrden.anulada,
+          kilometrajeEntrada: 15000,
+        );
+      }
+
+      expect(await _stock(), 10);
       expect(await inventario.descuadres(), isEmpty);
     });
   });

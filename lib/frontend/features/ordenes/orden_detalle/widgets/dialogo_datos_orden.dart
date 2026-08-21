@@ -118,7 +118,7 @@ class _DialogoDatosOrdenState extends ConsumerState<DialogoDatosOrden> {
             numero: s.value?.numero ?? '',
             estado: s.value?.estado ?? EstadoOrden.abierta,
             editable: s.value?.editable ?? false,
-            yaSalio: s.value?.inventarioYaSalio ?? false,
+            devuelto: s.value?.inventarioDevuelto ?? false,
           )),
     );
 
@@ -163,7 +163,7 @@ class _DialogoDatosOrdenState extends ConsumerState<DialogoDatosOrden> {
                   alCambiar: _cambiarEstado,
                 ),
                 const SizedBox(height: 8),
-                _AvisoInventario(yaSalio: datos.yaSalio),
+                _AvisoInventario(devuelto: datos.devuelto),
                 const SizedBox(height: 14),
                 CampoTexto(
                   etiqueta: 'Kilometraje de entrada',
@@ -215,29 +215,28 @@ class _DialogoDatosOrdenState extends ConsumerState<DialogoDatosOrden> {
   }
 }
 
-/// Qué le va a pasar al inventario según el estado.
+/// Dónde está ahora mismo el inventario de esta orden.
 ///
-/// Es la regla menos evidente del módulo (§1.3) y la que más sorprende: pasar
-/// a `LISTA` descuenta de golpe todos los repuestos anotados. Decirlo junto al
-/// selector evita la sorpresa.
+/// Cambiar de estado ya no mueve stock —los repuestos salen al anotarlos—, así
+/// que lo único que hay que decir junto al selector es qué hace **anular**,
+/// que es el único estado que devuelve las piezas.
 class _AvisoInventario extends StatelessWidget {
-  const _AvisoInventario({required this.yaSalio});
+  const _AvisoInventario({required this.devuelto});
 
-  final bool yaSalio;
+  final bool devuelto;
 
   @override
   Widget build(BuildContext context) {
-    final texto = yaSalio
-        ? 'Los repuestos de esta orden ya salieron del inventario. Lo que se '
-            'agregue ahora descuenta al instante.'
-        : 'Los repuestos están solo anotados. Salen del inventario al pasar la '
-            'orden a Lista o Entregada.';
+    final texto = devuelto
+        ? 'Se devolvió al inventario todo lo que esta orden tenía anotado.'
+        : 'Cada repuesto sale del inventario al agregarlo. Anular la orden es '
+            'lo que lo devuelve.';
 
     return Row(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Icon(
-          yaSalio ? Icons.inventory_outlined : Icons.schedule_outlined,
+          devuelto ? Icons.undo_rounded : Icons.inventory_outlined,
           size: 14,
           color: ColoresApp.textMuted,
         ),

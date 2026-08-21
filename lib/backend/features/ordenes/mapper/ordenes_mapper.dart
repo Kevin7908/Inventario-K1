@@ -109,13 +109,9 @@ abstract final class OrdenMapper {
     String? observaciones,
     DateTime? fechaSalida,
     int? descuento,
-    bool? inventarioAplicado,
   }) => TablaOrdenesServicioCompanion(
     id: Value(id),
     descuento: descuento != null ? Value(descuento) : const Value.absent(),
-    inventarioAplicado: inventarioAplicado != null
-        ? Value(inventarioAplicado)
-        : const Value.absent(),
     estado: Value(estado.name.toUpperCase()),
     kilometrajeEntrada: Value(kilometrajeEntrada),
     motoId: motoId != null ? Value(motoId) : const Value.absent(),

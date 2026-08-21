@@ -13,6 +13,12 @@ import '../../motos/esquema_datos/tabla_moto.dart';
 /// editar mientras está `ABIERTA`. Una vez `ENTREGADA` o `ANULADA` queda
 /// cerrada, y una guarda de la base impide seguir agregándole tareas o
 /// repuestos (ver `guardas_sql.dart`).
+///
+/// **Los repuestos descuentan stock al anotarlos**, igual que en `reservas`:
+/// apartar una pieza para una moto la saca del inventario disponible aunque
+/// siga en la bodega. No hay columna que diga si el inventario ya salió,
+/// porque no hace falta: salió siempre, salvo que la orden esté `ANULADA`,
+/// que es lo único que lo devuelve.
 @TableIndex(name: 'idx_ordenes_moto', columns: {#motoId})
 @TableIndex(name: 'idx_ordenes_cliente', columns: {#clienteId})
 @TableIndex(name: 'idx_ordenes_estado', columns: {#estado})
@@ -58,19 +64,6 @@ class TablaOrdenesServicio extends Table {
 
   /// Notas del mecánico al recibir.
   TextColumn get observaciones => text().nullable()();
-
-  /// Si los repuestos de esta orden ya salieron del inventario.
-  ///
-  /// Mientras la orden está `ABIERTA` los repuestos se **anotan sin descontar
-  /// stock**: se están eligiendo, y agregar y quitar mientras se arma la orden
-  /// llenaría el libro mayor de salidas y devoluciones que nunca ocurrieron.
-  /// El descuento pasa entero al cerrarla (`LISTA` o `ENTREGADA`).
-  ///
-  /// Esta columna es la que permite saberlo. Sin ella no se puede distinguir
-  /// un paso `LISTA → ENTREGADA` —que no debe volver a descontar— de un
-  /// `ABIERTA → ENTREGADA`, ni saber si anular tiene que devolver algo.
-  BoolColumn get inventarioAplicado =>
-      boolean().withDefault(const Constant(false))();
 
   /// 'ABIERTA' | 'LISTA' | 'ENTREGADA' | 'ANULADA'.
   TextColumn get estado => text().withDefault(const Constant('ABIERTA'))();
