@@ -80,18 +80,48 @@ void main() {
       expect(await _stockCache(creado.id!), 12);
     });
 
-    test('guardar un producto no mueve su stock de rebote', () async {
+    test('guardar sin tocar el stock no mueve inventario de rebote', () async {
       final creado = await productos.crear(_producto(stock: 10));
 
-      // El formulario manda el modelo completo, con el stock que leyó. Si el
-      // mapper lo escribiera, editar el nombre duplicaría el inventario.
-      await productos.actualizar(
-        creado.copyWith(nombre: 'Pastilla trasera', stockActual: 999),
-      );
+      // El formulario manda el modelo completo, con el stock que leyó. Editar
+      // solo el nombre no puede dejar ningún renglón nuevo.
+      await productos.actualizar(creado.copyWith(nombre: 'Pastilla trasera'));
 
       expect(await _stockCache(creado.id!), 10);
       expect(await inventario.observarPorProducto(creado.id!).first,
           hasLength(1));
+    });
+
+    test('editar el stock en la ficha deja su ajuste y se queda', () async {
+      final creado = await productos.crear(_producto(stock: 10));
+
+      // El campo «stock actual» del formulario no escribía nada —el mapper
+      // excluye la columna— y el valor volvía al anterior en cuanto el stream
+      // reemitía. Ahora la diferencia entra como ajuste.
+      await productos.actualizar(creado.copyWith(stockActual: 14));
+
+      final movimientos =
+          await inventario.observarPorProducto(creado.id!).first;
+
+      expect(await _stockCache(creado.id!), 14);
+      expect(movimientos, hasLength(2));
+      expect(movimientos.first.tipo, TipoMovimiento.ajustePositivo);
+      expect(movimientos.first.cantidad, 4);
+      expect(await inventario.descuadres(), isEmpty);
+    });
+
+    test('bajar el stock desde la ficha entra como ajuste negativo', () async {
+      final creado = await productos.crear(_producto(stock: 10));
+
+      await productos.actualizar(creado.copyWith(stockActual: 6));
+
+      final movimientos =
+          await inventario.observarPorProducto(creado.id!).first;
+
+      expect(await _stockCache(creado.id!), 6);
+      expect(movimientos.first.tipo, TipoMovimiento.ajusteNegativo);
+      expect(movimientos.first.cantidad, -4);
+      expect(await inventario.descuadres(), isEmpty);
     });
   });
 

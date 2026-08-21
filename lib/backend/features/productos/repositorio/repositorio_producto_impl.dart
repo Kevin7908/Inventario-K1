@@ -153,13 +153,39 @@ class RepositorioProductosImpl implements RepositorioProducto {
   }
 
   @override
-  Future<Producto> actualizar(Producto producto) async {
-    final companion = ProductoMapper.modeloACompanion(producto);
-    await (_db.update(_db.tablaProducto)
-          ..where((t) => t.id.equals(producto.id!)))
-        .write(companion);
-    // No hay SELECT extra: el stream emite el resultado actualizado.
-    return producto;
+  Future<Producto> actualizar(Producto producto) {
+    // `stock_actual` no viaja en el companion —el mapper lo excluye a
+    // propósito, §7 de las reglas de base de datos—, así que editar el campo
+    // en la ficha no escribía nada y el valor volvía al de antes en cuanto el
+    // stream reemitía. La corrección no es escribir la columna: es registrar
+    // el ajuste que explica la diferencia, en la misma transacción que el
+    // resto de la edición.
+    return _db.transaction(() async {
+      final antes = await (_db.select(_db.tablaProducto)
+            ..where((t) => t.id.equals(producto.id!)))
+          .getSingleOrNull();
+
+      await (_db.update(_db.tablaProducto)
+            ..where((t) => t.id.equals(producto.id!)))
+          .write(ProductoMapper.modeloACompanion(producto));
+
+      final diferencia = producto.stockActual - (antes?.stockActual ?? 0);
+      if (diferencia != 0) {
+        await _inventario.registrar(
+          SolicitudMovimiento(
+            productoId: producto.id!,
+            cantidad: diferencia,
+            tipo: diferencia > 0
+                ? TipoMovimiento.ajustePositivo
+                : TipoMovimiento.ajusteNegativo,
+            notas: 'Ajuste desde la ficha del producto',
+          ),
+        );
+      }
+
+      // No hay SELECT extra: el stream emite el resultado actualizado.
+      return producto;
+    });
   }
 
   @override
