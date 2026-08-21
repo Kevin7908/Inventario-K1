@@ -30,6 +30,7 @@ class SelectorWidget<T> extends StatelessWidget {
     required this.opciones,
     required this.constructorEtiqueta,
     required this.alCambiar,
+    this.habilitado = true,
   });
 
   final String etiqueta;
@@ -37,6 +38,10 @@ class SelectorWidget<T> extends StatelessWidget {
   final List<T> opciones;
   final String Function(T opcion) constructorEtiqueta;
   final ValueChanged<T> alCambiar;
+
+  /// En `false` el desplegable se ve pero no se abre. Mismo motivo que en
+  /// `CampoTexto`: el dato se sigue leyendo, solo no se cambia.
+  final bool habilitado;
 
   @override
   Widget build(BuildContext context) {
@@ -67,9 +72,11 @@ class SelectorWidget<T> extends StatelessWidget {
               // (`SelectorWidget<Categoria?>`) la opción "sin selección" es un
               // valor válido y debe propagarse; con uno no nulable, null se
               // descarta igual que antes.
-              onChanged: (nuevo) {
-                if (nuevo is T) alCambiar(nuevo);
-              },
+              onChanged: habilitado
+                  ? (nuevo) {
+                      if (nuevo is T) alCambiar(nuevo);
+                    }
+                  : null,
               items: [
                 for (final opcion in opciones)
                   DropdownMenuItem<T>(

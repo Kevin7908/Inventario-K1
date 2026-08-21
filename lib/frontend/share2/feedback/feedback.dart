@@ -1,4 +1,5 @@
 export 'badge_contador.dart';
+export 'barra_progreso.dart';
 export 'dialogo_confirmacion.dart';
 export 'estado_vacio.dart';
 export 'icono_notificaciones.dart';

@@ -46,8 +46,8 @@ class FichaResumen extends StatelessWidget {
   const FichaResumen({
     super.key,
     required this.titulo,
-    required this.etiquetaAccion,
-    required this.alPresionar,
+    this.etiquetaAccion,
+    this.alPresionar,
     this.subtitulo,
     this.inicial,
     this.icono,
@@ -56,7 +56,11 @@ class FichaResumen extends StatelessWidget {
   });
 
   final String titulo;
-  final String etiquetaAccion;
+  /// Qué pasa al tocarla, para el tooltip. **Sin [alPresionar] la ficha es
+  /// solo lectura**: no lleva lápiz ni tooltip, porque prometer una acción que
+  /// no existe es peor que no ofrecerla. Así sirve igual de cabecera editable
+  /// que de bloque de contexto.
+  final String? etiquetaAccion;
   final VoidCallback? alPresionar;
   final String? subtitulo;
   final String? inicial;
@@ -68,9 +72,7 @@ class FichaResumen extends StatelessWidget {
   Widget build(BuildContext context) {
     final detalle = subtitulo;
 
-    return Tooltip(
-      message: etiquetaAccion,
-      child: Material(
+    final ficha = Material(
         color: Colors.transparent,
         child: InkWell(
           onTap: alPresionar,
@@ -121,13 +123,18 @@ class FichaResumen extends StatelessWidget {
                     ],
                   ),
                 ),
-                const SizedBox(width: 8),
-                Icon(iconoAccion, size: 16, color: ColoresApp.textDisabled),
+                if (alPresionar != null) ...[
+                  const SizedBox(width: 8),
+                  Icon(iconoAccion, size: 16, color: ColoresApp.textDisabled),
+                ],
               ],
             ),
           ),
         ),
-      ),
     );
+
+    final etiqueta = etiquetaAccion;
+    if (etiqueta == null || alPresionar == null) return ficha;
+    return Tooltip(message: etiqueta, child: ficha);
   }
 }

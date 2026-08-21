@@ -112,6 +112,7 @@ share2/
 │
 ├── feedback/                       ← respuesta visual al usuario
 │   ├── badge_contador.dart
+│   ├── barra_progreso.dart
 │   ├── mensaje_app.dart
 │   ├── dialogo_confirmacion.dart
 │   ├── estado_vacio.dart
@@ -221,6 +222,7 @@ Widgets para agrupar y presentar información con estilos consistentes.
 | `BadgeContador` | Círculo con número para conteos (notificaciones, ítems pendientes) |
 | `IndicadorEstado` | Badge/chip de color para mostrar un estado (Pagado, Pendiente, Anulado) |
 | `EstadoVacio` | El hueco de una lista sin nada: ícono, qué falta y cómo llenarlo |
+| `BarraProgreso` | Cuánto se lleva de un total: reservas abonadas, deudas cobradas |
 
 Todos los módulos deben usar estos widgets para feedback en lugar de implementar sus propios snackbars o loaders. Quedan pantallas legacy con su `_avisar` propio: se pasan a `MensajeApp` al tocarlas.
 

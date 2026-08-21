@@ -62,6 +62,7 @@ class CampoTexto extends StatelessWidget {
     this.autofocus = false,
     this.monoespaciado = false,
     this.soloEnteros = false,
+    this.habilitado = true,
   });
 
   final String etiqueta;
@@ -73,6 +74,11 @@ class CampoTexto extends StatelessWidget {
   final bool autofocus;
   final bool monoespaciado;
   final bool soloEnteros;
+
+  /// En `false` el campo se ve pero no se escribe. Se usa cuando el documento
+  /// que lo contiene está cerrado: quitarlo de la pantalla escondería el dato,
+  /// y lo que hace falta es poder leerlo sin poder cambiarlo.
+  final bool habilitado;
 
   @override
   Widget build(BuildContext context) {
@@ -89,6 +95,7 @@ class CampoTexto extends StatelessWidget {
         const SizedBox(height: 7),
         TextFormField(
           controller: controlador,
+          enabled: habilitado,
           onChanged: alCambiar,
           validator: validador,
           maxLines: lineas,

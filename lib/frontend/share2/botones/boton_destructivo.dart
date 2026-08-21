@@ -24,37 +24,71 @@ class BotonDestructivo extends StatelessWidget {
     required this.etiqueta,
     required this.alPresionar,
     this.icono,
+    this.expandido = false,
+    this.suave = false,
   });
 
   final String etiqueta;
   final VoidCallback? alPresionar;
   final IconData? icono;
 
+  /// Ocupa todo el ancho disponible en lugar de ajustarse al texto.
+  final bool expandido;
+
+  /// Rojo sobre fondo claro en vez de rojo macizo.
+  ///
+  /// Es para la acción destructiva que **convive con el contenido** —cancelar
+  /// una reserva desde su propio pie, anular una orden dentro de su diálogo—,
+  /// donde un bloque rojo sólido se lleva toda la atención de una pantalla que
+  /// no trata de eso. Sigue leyéndose como peligro, pero no grita.
+  final bool suave;
+
   @override
   Widget build(BuildContext context) {
     final bool deshabilitado = alPresionar == null;
 
+    final contenido = suave
+        ? (deshabilitado
+            ? ColoresApp.statusDanger.withValues(alpha: 0.5)
+            : ColoresApp.statusDanger)
+        : ColoresApp.textOnPrimary;
+
     return Material(
-      color: deshabilitado
-          ? ColoresApp.statusDanger.withValues(alpha: 0.5)
-          : ColoresApp.statusDanger,
+      color: suave
+          ? ColoresApp.statusDangerBg
+          : (deshabilitado
+              ? ColoresApp.statusDanger.withValues(alpha: 0.5)
+              : ColoresApp.statusDanger),
       borderRadius: BorderRadius.circular(8),
       child: InkWell(
         onTap: alPresionar,
         borderRadius: BorderRadius.circular(8),
-        hoverColor: Colors.black.withValues(alpha: 0.12),
-        child: Padding(
+        hoverColor: suave
+            ? ColoresApp.statusDanger.withValues(alpha: 0.08)
+            : Colors.black.withValues(alpha: 0.12),
+        child: Container(
           padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+          decoration: suave
+              ? BoxDecoration(
+                  borderRadius: BorderRadius.circular(8),
+                  border: Border.all(
+                    color: ColoresApp.statusDanger.withValues(alpha: 0.35),
+                  ),
+                )
+              : null,
           child: Row(
-            mainAxisSize: MainAxisSize.min,
+            mainAxisSize: expandido ? MainAxisSize.max : MainAxisSize.min,
+            mainAxisAlignment: MainAxisAlignment.center,
             children: [
               if (icono != null) ...[
-                Icon(icono, size: 18, color: ColoresApp.textOnPrimary),
+                Icon(icono, size: 18, color: contenido),
                 const SizedBox(width: 8),
               ],
               Text(
                 etiqueta,
-                style: TipografiaApp.sobrePrimario(TipografiaApp.cuerpoMedium),
+                style: suave
+                    ? TipografiaApp.cuerpoMedium.copyWith(color: contenido)
+                    : TipografiaApp.sobrePrimario(TipografiaApp.cuerpoMedium),
               ),
             ],
           ),
