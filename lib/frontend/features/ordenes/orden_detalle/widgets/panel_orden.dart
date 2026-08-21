@@ -6,6 +6,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../../../core/formato.dart';
 import '../../../../share2/share2.dart';
 import '../../widgets/estado_orden_ui.dart';
+import '../modelo/linea_orden_editor.dart';
 import '../modelo/orden_editor_state.dart';
 import '../provider/catalogo_orden_providers.dart';
 import '../provider/orden_editor_provider.dart';
@@ -30,27 +31,17 @@ class PanelOrden extends ConsumerWidget {
     required this.alImprimir,
   });
 
-  static const double ancho = 360;
+  static const double ancho = PanelDocumento.ancho;
 
   final int ordenId;
   final VoidCallback alImprimir;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    return Container(
-      width: ancho,
-      decoration: const BoxDecoration(
-        color: ColoresApp.bgCard,
-        border: Border(left: BorderSide(color: ColoresApp.border)),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          _Cabecera(ordenId: ordenId),
-          Expanded(child: _Lineas(ordenId: ordenId)),
-          _Pie(ordenId: ordenId, alImprimir: alImprimir),
-        ],
-      ),
+    return PanelDocumento(
+      cabecera: _Cabecera(ordenId: ordenId),
+      contenido: _Lineas(ordenId: ordenId),
+      pie: _Pie(ordenId: ordenId, alImprimir: alImprimir),
     );
   }
 }
@@ -154,37 +145,25 @@ class _Lineas extends ConsumerWidget {
     final editable = ref.watch(provider.select((s) => s.value?.editable ?? false));
 
     if (lineas.isEmpty) {
-      return const Center(
-        child: Padding(
-          padding: EdgeInsets.symmetric(horizontal: 24, vertical: 60),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Icon(
-                Icons.build_circle_outlined,
-                size: 40,
-                color: ColoresApp.textDisabled,
-              ),
-              SizedBox(height: 12),
-              Text(
-                'La orden está vacía',
-                textAlign: TextAlign.center,
-                style: TipografiaApp.cuerpo,
-              ),
-              SizedBox(height: 4),
-              Text(
-                'Toca un repuesto o un servicio de la izquierda.',
-                textAlign: TextAlign.center,
-                style: TipografiaApp.caption,
-              ),
-            ],
-          ),
-        ),
+      return const EstadoVacio(
+        icono: Icons.build_circle_outlined,
+        titulo: 'La orden está vacía',
+        pista: 'Toca un repuesto o un servicio de la izquierda.',
       );
     }
 
     final notifier = ref.read(provider.notifier);
-    final fotos = ref.watch(imagenPorProductoOrdenProvider);
+    final datos = ref.watch(datosProductoOrdenProvider);
+
+    /// Cuánto admite como máximo la línea: lo que queda en bodega **más** lo
+    /// que ella ya se llevó, porque eso último salió del estante al anotarlo.
+    /// `null` en lo que no mueve inventario y en el producto que no está en el
+    /// mapa: sin dato, el control no acota.
+    double? topeDe(LineaOrdenEditor linea) {
+      if (!linea.tipo.mueveInventario) return null;
+      final stock = datos[linea.referenciaId]?.stock;
+      return stock == null ? null : stock + linea.cantidad;
+    }
     // El `select` de arriba es sobre `lineas`, que conserva identidad mientras
     // no cambien: esta pasada solo corre cuando cambiaron de verdad. La regla
     // de agrupación vive en el estado.
@@ -197,7 +176,11 @@ class _Lineas extends ConsumerWidget {
       padding: const EdgeInsets.symmetric(horizontal: 22),
       children: [
         for (final grupo in grupos) ...[
-          _EncabezadoGrupo(grupo: grupo),
+          EncabezadoGrupoLineas(
+            icono: LineaOrden.iconoDe(grupo.tipo),
+            titulo: grupo.titulo,
+            subtotal: grupo.subtotal,
+          ),
           for (final linea in grupo.lineas)
             LineaOrden(
               // Tipo + id: los tres tipos viven en tablas distintas, así que
@@ -207,8 +190,9 @@ class _Lineas extends ConsumerWidget {
               linea: linea,
               editable: editable,
               imagen: linea.tipo.mueveInventario
-                  ? fotos[linea.referenciaId]
+                  ? datos[linea.referenciaId]?.imagen
                   : null,
+              disponible: topeDe(linea),
               alCambiarCantidad: (cantidad) =>
                   notifier.cambiarCantidad(linea, cantidad),
               alCambiarPrecio: (precio) =>
@@ -223,46 +207,6 @@ class _Lineas extends ConsumerWidget {
     );
   }
 }
-
-/// Título de un bloque de líneas con su subtotal, como en el diseño: overline
-/// tenue a la izquierda, importe a la derecha.
-class _EncabezadoGrupo extends StatelessWidget {
-  const _EncabezadoGrupo({required this.grupo});
-
-  final GrupoLineasOrden grupo;
-
-  @override
-  Widget build(BuildContext context) {
-    return Padding(
-      padding: const EdgeInsets.only(top: 16, bottom: 4),
-      child: Row(
-        children: [
-          Icon(
-            LineaOrden.iconoDe(grupo.tipo),
-            size: 14,
-            color: ColoresApp.textMuted,
-          ),
-          const SizedBox(width: 7),
-          Expanded(
-            child: Text(
-              grupo.titulo,
-              style: TipografiaApp.overline.copyWith(
-                color: ColoresApp.textMuted,
-              ),
-            ),
-          ),
-          Text(
-            formatearPrecio(grupo.subtotal),
-            style: TipografiaApp.overline.copyWith(
-              color: ColoresApp.textSecondary,
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
 /// Totales y acciones, sobre el fondo tenue del diseño.
 class _Pie extends StatelessWidget {
   const _Pie({required this.ordenId, required this.alImprimir});

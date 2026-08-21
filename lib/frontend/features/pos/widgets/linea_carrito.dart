@@ -2,19 +2,23 @@ import 'package:flutter/material.dart';
 
 import '../../../../core/formato.dart';
 import '../../../share2/share2.dart';
-import '../../productos/vista/producto_vista.dart' show MiniaturaProducto;
+import '../../productos/widgets/miniatura_linea.dart';
 import '../modelo/item_carrito.dart';
 
-/// Una línea del carrito, con la fila del diseño: miniatura de 48, nombre,
-/// precio en verde y el `– n +` a la derecha.
+/// Una línea del carrito, sobre la fila común de los tres documentos
+/// ([FilaDocumento]).
 ///
 /// No hay papelera, como en el diseño: el `–` con cantidad 1 quita la línea.
 /// Por eso [ControlCantidad] va con `minimo: 0` y la cantidad 0 se traduce a
 /// "quitar".
 ///
-/// El tope es el stock de bodega: escribir 50 unidades de algo de lo que hay 8
-/// deja 8, sin avisar con un error — el número que queda en el campo ya dice
-/// lo que pasó.
+/// **El tope es el stock de bodega**, y es lo único que esta línea hace y las
+/// otras dos no: escribir 50 unidades de algo de lo que hay 8 deja 8, sin
+/// avisar con un error —el número que queda en el campo ya dice lo que pasó—.
+/// Una cotización sí puede pedir lo que no hay; el mostrador no.
+///
+/// La cantidad va en unidades enteras: en el mostrador se venden piezas, no
+/// fracciones.
 class LineaCarrito extends StatelessWidget {
   const LineaCarrito({
     super.key,
@@ -29,53 +33,28 @@ class LineaCarrito extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.symmetric(vertical: 14),
-      decoration: const BoxDecoration(
-        border: Border(bottom: BorderSide(color: ColoresApp.borderFila)),
+    return FilaDocumento(
+      principal: MiniaturaLinea(
+        rutaImagen: item.producto.imagenUrl,
+        // El carrito solo lleva productos del catálogo, así que el ícono
+        // alterno solo sale cuando la foto falta.
+        iconoAlterno: Icons.inventory_2_outlined,
       ),
-      child: Row(
-        children: [
-          MiniaturaProducto(
-            rutaImagen: item.producto.imagenUrl,
-            lado: 48,
-            radio: 11,
-          ),
-          const SizedBox(width: 12),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Text(
-                  item.producto.nombre,
-                  style: TipografiaApp.cuerpoMedium.copyWith(fontSize: 13),
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                ),
-                const SizedBox(height: 2),
-                Text(
-                  formatearPrecio(item.precioUnitario),
-                  style: TipografiaApp.cuerpoMedium.copyWith(
-                    fontSize: 13,
-                    color: ColoresApp.castletonGreen,
-                  ),
-                ),
-              ],
-            ),
-          ),
-          const SizedBox(width: 12),
-          ControlCantidad(
-            cantidad: item.cantidad.toDouble(),
-            // 0 = quitar la línea: el diseño no tiene papelera.
-            minimo: 0,
-            maximo: item.disponible.toDouble(),
-            alCambiar: (valor) => valor <= 0
-                ? alEliminar()
-                : alCambiarCantidad(valor.round()),
-          ),
-        ],
+      titulo: item.producto.nombre,
+      precio: Text(
+        formatearPrecio(item.precioUnitario),
+        style: CampoPrecioLinea.estilo,
       ),
+      acciones: [
+        ControlCantidad(
+          cantidad: item.cantidad.toDouble(),
+          // 0 = quitar la línea: el diseño no tiene papelera.
+          minimo: 0,
+          maximo: item.disponible.toDouble(),
+          alCambiar: (valor) =>
+              valor <= 0 ? alEliminar() : alCambiarCantidad(valor.round()),
+        ),
+      ],
     );
   }
 }

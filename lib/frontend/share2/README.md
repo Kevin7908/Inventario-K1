@@ -76,6 +76,7 @@ share2/
 │   ├── barra_busqueda.dart
 │   ├── campo_busqueda.dart
 │   ├── campo_fecha.dart
+│   ├── campo_precio_linea.dart
 │   ├── control_cantidad.dart
 │   └── inputs.dart
 │
@@ -95,6 +96,9 @@ share2/
 │   └── tablas.dart
 │
 ├── cards/                          ← contenedores de información
+│   ├── fila_documento.dart
+│   ├── panel_documento.dart
+│   ├── encabezado_grupo_lineas.dart
 │   ├── tarjeta_info.dart
 │   ├── tarjeta_metrica.dart
 │   ├── tarjeta_catalogo.dart
@@ -110,6 +114,7 @@ share2/
 │   ├── badge_contador.dart
 │   ├── mensaje_app.dart
 │   ├── dialogo_confirmacion.dart
+│   ├── estado_vacio.dart
 │   ├── icono_notificaciones.dart
 │   ├── indicador_estado.dart
 │   └── feedback.dart
@@ -163,6 +168,7 @@ Widgets para formularios y entrada de datos. Aplican el estilo visual del proyec
 | `BarraBusqueda` | Campo de búsqueda con ícono, para filtrar listas o tablas |
 | `CampoBusqueda` | Selector con buscador, para listas largas (clientes, motos) |
 | `CampoFecha` | Fecha con etiqueta que abre el calendario del sistema |
+| `CampoPrecioLinea` | El precio tecleable de una línea, sin cajón, alineado con el precio fijo |
 | `ControlCantidad` | Cantidad de una línea: `–`, `+` y el número editable a mano |
 | `FilaCampos` | Reparte campos en una fila y los apila cuando falta ancho |
 | `InterruptorCampo` | Switch con etiqueta y una línea que explica qué implica el estado |
@@ -193,6 +199,9 @@ Widgets para agrupar y presentar información con estilos consistentes.
 | `TarjetaCatalogo` | Ítem de catálogo en grilla o fila: marcador, título, subtítulo, acciones y `pie` opcional |
 | `TarjetaProducto` | Tarjeta de las rejillas de venta: foto, SKU, stock, ubicación en bodega, precio y botón de agregar |
 | `TarjetaMetrica` | Contador grande que además filtra al tocarlo |
+| `FilaDocumento` | Una línea del documento que se arma: cuadro de 48, título, precio y controles. La usan el carrito, la cotización y la orden |
+| `PanelDocumento` | El aside de 360 px con cabecera, contenido y pie |
+| `EncabezadoGrupoLineas` | Separador de un bloque de líneas con su subtotal |
 | `FichaResumen` | Bloque de datos de una entidad, para cabeceras de detalle |
 | `PieTotales` | Pie de un documento: subtotal, descuento editable, total e IVA incluido |
 | `MarcadorIdentidad` | Cuadro con el ícono de la entidad o la inicial de su nombre sobre su color |
@@ -211,6 +220,7 @@ Widgets para agrupar y presentar información con estilos consistentes.
 | `DialogoConfirmacion` | Pide confirmación antes de una acción irreversible |
 | `BadgeContador` | Círculo con número para conteos (notificaciones, ítems pendientes) |
 | `IndicadorEstado` | Badge/chip de color para mostrar un estado (Pagado, Pendiente, Anulado) |
+| `EstadoVacio` | El hueco de una lista sin nada: ícono, qué falta y cómo llenarlo |
 
 Todos los módulos deben usar estos widgets para feedback en lugar de implementar sus propios snackbars o loaders. Quedan pantallas legacy con su `_avisar` propio: se pasan a `MensajeApp` al tocarlas.
 
@@ -348,6 +358,7 @@ módulo dueño del dato, y el resto las importa:
 |---|---|---|
 | `GrillaProductosCatalogo` | `features/productos/widgets/` | Conoce `Producto` y lee la foto del disco |
 | `PanelCategoriasCatalogo` | `features/categorias/widgets/` | Observa `catalogoCategoriasProvider` |
+| `MiniaturaLinea` | `features/productos/widgets/` | Lee la foto del disco vía `MiniaturaProducto` |
 
 La regla no cambia: **una tarea, un widget**. Que no quepa en `share2` no
 autoriza a tener tres copias con nombres distintos.

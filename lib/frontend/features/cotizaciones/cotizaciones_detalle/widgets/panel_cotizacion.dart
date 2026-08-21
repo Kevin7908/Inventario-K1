@@ -24,7 +24,7 @@ class PanelCotizacion extends ConsumerWidget {
     required this.alImprimir,
   });
 
-  static const double ancho = 360;
+  static const double ancho = PanelDocumento.ancho;
 
   final int? cotizacionId;
   final VoidCallback alReservar;
@@ -32,23 +32,13 @@ class PanelCotizacion extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    return Container(
-      width: ancho,
-      decoration: const BoxDecoration(
-        color: ColoresApp.bgCard,
-        border: Border(left: BorderSide(color: ColoresApp.border)),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          _Cabecera(cotizacionId: cotizacionId),
-          Expanded(child: _Lineas(cotizacionId: cotizacionId)),
-          _Pie(
-            cotizacionId: cotizacionId,
-            alReservar: alReservar,
-            alImprimir: alImprimir,
-          ),
-        ],
+    return PanelDocumento(
+      cabecera: _Cabecera(cotizacionId: cotizacionId),
+      contenido: _Lineas(cotizacionId: cotizacionId),
+      pie: _Pie(
+        cotizacionId: cotizacionId,
+        alReservar: alReservar,
+        alImprimir: alImprimir,
       ),
     );
   }
@@ -149,32 +139,10 @@ class _Lineas extends ConsumerWidget {
     final items = ref.watch(provider.select((s) => s.value?.items ?? const []));
 
     if (items.isEmpty) {
-      return const Center(
-        child: Padding(
-          padding: EdgeInsets.symmetric(horizontal: 24, vertical: 60),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Icon(
-                Icons.request_quote_outlined,
-                size: 40,
-                color: ColoresApp.textDisabled,
-              ),
-              SizedBox(height: 12),
-              Text(
-                'La cotización está vacía',
-                textAlign: TextAlign.center,
-                style: TipografiaApp.cuerpo,
-              ),
-              SizedBox(height: 4),
-              Text(
-                'Toca un producto o un servicio de la izquierda.',
-                textAlign: TextAlign.center,
-                style: TipografiaApp.caption,
-              ),
-            ],
-          ),
-        ),
+      return const EstadoVacio(
+        icono: Icons.request_quote_outlined,
+        titulo: 'La cotización está vacía',
+        pista: 'Toca un producto o un servicio de la izquierda.',
       );
     }
 
@@ -192,7 +160,11 @@ class _Lineas extends ConsumerWidget {
       padding: const EdgeInsets.symmetric(horizontal: 22),
       children: [
         for (final grupo in grupos) ...[
-          _EncabezadoGrupo(grupo: grupo),
+          EncabezadoGrupoLineas(
+            icono: LineaCotizacion.iconoDe(grupo.tipo),
+            titulo: grupo.titulo,
+            subtotal: grupo.subtotal,
+          ),
           for (final (:indice, :item) in grupo.lineas)
             LineaCotizacion(
               // El tipo y la referencia identifican la línea; el índice solo,
@@ -215,50 +187,6 @@ class _Lineas extends ConsumerWidget {
     );
   }
 }
-
-/// Título de un bloque de líneas con su subtotal, como en el diseño: overline
-/// tenue a la izquierda, importe a la derecha.
-///
-/// Solo aparece cuando el grupo tiene líneas —`itemsAgrupados` ya descarta los
-/// vacíos—, así que una cotización de puros productos no muestra un encabezado
-/// "Servicios" en blanco.
-class _EncabezadoGrupo extends StatelessWidget {
-  const _EncabezadoGrupo({required this.grupo});
-
-  final GrupoLineas grupo;
-
-  @override
-  Widget build(BuildContext context) {
-    return Padding(
-      padding: const EdgeInsets.only(top: 16, bottom: 4),
-      child: Row(
-        children: [
-          Icon(
-            LineaCotizacion.iconoDe(grupo.tipo),
-            size: 14,
-            color: ColoresApp.textMuted,
-          ),
-          const SizedBox(width: 7),
-          Expanded(
-            child: Text(
-              grupo.titulo,
-              style: TipografiaApp.overline.copyWith(
-                color: ColoresApp.textMuted,
-              ),
-            ),
-          ),
-          Text(
-            formatearPrecio(grupo.subtotal),
-            style: TipografiaApp.overline.copyWith(
-              color: ColoresApp.textSecondary,
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
 /// Totales y acciones, sobre el fondo tenue del diseño.
 class _Pie extends StatelessWidget {
   const _Pie({

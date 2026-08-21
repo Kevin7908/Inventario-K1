@@ -1,19 +1,21 @@
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
 
 import '../../../../../backend/features/cotizaciones/enum/enum_cotizacion.dart';
 import '../../../../../core/formato.dart';
-import '../../../../features/productos/vista/producto_vista.dart'
-    show MiniaturaProducto;
+import '../../../../features/productos/widgets/miniatura_linea.dart';
 import '../../../../share2/share2.dart';
 import '../modelo/item_cotizacion_editor.dart';
 
-/// Una línea de la cotización, con la fila del carrito del diseño: miniatura
-/// de 48, nombre, precio en verde y el `– n +` a la derecha.
+/// Una línea de la cotización, sobre la fila común de los tres documentos
+/// ([FilaDocumento]).
 ///
 /// No hay papelera, como en el diseño: el `–` con cantidad 1 quita la línea.
 /// Por eso [ControlCantidad] va con `minimo: 0` y la cantidad 0 se traduce a
 /// "quitar".
+///
+/// **No hay tope de stock**, a diferencia del carrito: se cotiza lo que el
+/// cliente pide, esté o no en bodega. Cuando la cotización se convierte en
+/// reserva es cuando el stock manda.
 ///
 /// El precio solo se puede escribir cuando el tipo lo permite
 /// ([TipoItemCotizacion.precioManual]); el de un producto lo pone el catálogo.
@@ -63,106 +65,30 @@ class _LineaCotizacionState extends State<LineaCotizacion> {
   Widget build(BuildContext context) {
     final item = widget.item;
 
-    return Container(
-      padding: const EdgeInsets.symmetric(vertical: 14),
-      decoration: const BoxDecoration(
-        border: Border(bottom: BorderSide(color: ColoresApp.borderFila)),
+    return FilaDocumento(
+      principal: MiniaturaLinea(
+        rutaImagen: widget.imagen,
+        iconoAlterno: LineaCotizacion.iconoDe(item.tipo),
       ),
-      child: Row(
-        children: [
-          _Miniatura(tipo: item.tipo, imagen: widget.imagen),
-          const SizedBox(width: 12),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Text(
-                  item.descripcion,
-                  style: TipografiaApp.cuerpoMedium.copyWith(fontSize: 13),
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                ),
-                const SizedBox(height: 2),
-                _precioWidget(),
-              ],
+      titulo: item.descripcion,
+      precio: item.tipo.precioManual
+          ? CampoPrecioLinea(
+              controlador: _precio,
+              alCambiar: widget.alCambiarPrecio,
+            )
+          : Text(
+              formatearPrecio(item.precioUnitario),
+              style: CampoPrecioLinea.estilo,
             ),
-          ),
-          const SizedBox(width: 12),
-          ControlCantidad(
-            cantidad: item.cantidad,
-            // 0 = quitar la línea: el diseño no tiene papelera.
-            minimo: 0,
-            alCambiar: (valor) => valor <= 0
-                ? widget.alEliminar()
-                : widget.alCambiarCantidad(valor),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _precioWidget() {
-    final estilo = TipografiaApp.cuerpoMedium.copyWith(
-      fontSize: 13,
-      color: ColoresApp.castletonGreen,
-    );
-
-    if (!widget.item.tipo.precioManual) {
-      return Text(formatearPrecio(widget.item.precioUnitario), style: estilo);
-    }
-
-    return SizedBox(
-      height: 22,
-      child: TextField(
-        controller: _precio,
-        keyboardType: TextInputType.number,
-        inputFormatters: [FilteringTextInputFormatter.digitsOnly],
-        style: estilo,
-        onChanged: (texto) => widget.alCambiarPrecio(int.tryParse(texto) ?? 0),
-        decoration: InputDecoration(
-          isDense: true,
-          prefixText: r'$',
-          prefixStyle: estilo,
-          hintText: 'Precio',
-          hintStyle: TipografiaApp.deshabilitado(estilo),
-          contentPadding: EdgeInsets.zero,
-          border: InputBorder.none,
-          enabledBorder: InputBorder.none,
-          focusedBorder: InputBorder.none,
+      acciones: [
+        ControlCantidad(
+          cantidad: item.cantidad,
+          // 0 = quitar la línea: el diseño no tiene papelera.
+          minimo: 0,
+          alCambiar: (valor) =>
+              valor <= 0 ? widget.alEliminar() : widget.alCambiarCantidad(valor),
         ),
-      ),
-    );
-  }
-}
-
-/// Cuadro de 48 del diseño: la foto del producto, o el ícono del tipo cuando
-/// no hay ninguna que mostrar.
-class _Miniatura extends StatelessWidget {
-  const _Miniatura({required this.tipo, required this.imagen});
-
-  final TipoItemCotizacion tipo;
-  final String? imagen;
-
-  @override
-  Widget build(BuildContext context) {
-    final ruta = imagen;
-    if (ruta != null && ruta.isNotEmpty) {
-      return MiniaturaProducto(rutaImagen: ruta, lado: 48, radio: 11);
-    }
-
-    return Container(
-      width: 48,
-      height: 48,
-      decoration: BoxDecoration(
-        color: ColoresApp.bgInput,
-        borderRadius: BorderRadius.circular(11),
-      ),
-      child: Icon(
-        LineaCotizacion.iconoDe(tipo),
-        size: 18,
-        color: ColoresApp.textDisabled,
-      ),
+      ],
     );
   }
 }

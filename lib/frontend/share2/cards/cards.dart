@@ -1,6 +1,9 @@
+export 'encabezado_grupo_lineas.dart';
 export 'ficha_resumen.dart';
+export 'fila_documento.dart';
 export 'fila_dato.dart';
 export 'marcador_identidad.dart';
+export 'panel_documento.dart';
 export 'panel_seccion.dart';
 export 'pie_totales.dart';
 export 'tarjeta_catalogo.dart';

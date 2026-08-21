@@ -81,19 +81,27 @@ final serviciosOrdenProvider =
   },
 );
 
-/// Foto de cada producto, por id.
+/// Foto y stock de cada producto, por id.
 ///
-/// Las líneas de la orden solo guardan el id del producto, y la fila del
-/// diseño lleva una miniatura de 48. Resolver la ruta aquí evita recorrer el
-/// catálogo entero dentro del `build` de cada línea.
-final imagenPorProductoOrdenProvider = Provider<Map<int, String?>>(
-  name: 'imagenPorProductoOrdenProvider',
+/// Las líneas de la orden solo guardan el id del producto, y la fila necesita
+/// dos cosas suyas: la miniatura de 48 y cuánto queda en bodega. Resolverlas
+/// aquí evita recorrer el catálogo entero dentro del `build` de cada línea.
+///
+/// El stock es el que acota la cantidad de la línea. Desde que anotar un
+/// repuesto lo descuenta, `stock_actual` ya **no** incluye lo que esta orden
+/// se llevó, así que el tope de una línea es lo que queda más lo que ella
+/// misma tiene anotado: eso lo suma quien la pinta, que es el único que sabe
+/// cuánto lleva.
+typedef DatosProductoLinea = ({String? imagen, double stock});
+
+final datosProductoOrdenProvider = Provider<Map<int, DatosProductoLinea>>(
+  name: 'datosProductoOrdenProvider',
   (ref) {
     final todos =
         ref.watch(catalogoCompletoProvider).value ?? const <Producto>[];
     return {
       for (final p in todos)
-        if (p.id != null) p.id!: p.imagenUrl,
+        if (p.id != null) p.id!: (imagen: p.imagenUrl, stock: p.stockActual),
     };
   },
 );

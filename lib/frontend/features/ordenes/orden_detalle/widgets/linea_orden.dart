@@ -1,19 +1,19 @@
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
 
 import '../../../../../core/formato.dart';
-import '../../../../features/productos/vista/producto_vista.dart'
-    show MiniaturaProducto;
+import '../../../../features/productos/widgets/miniatura_linea.dart';
 import '../../../../share2/share2.dart';
 import '../modelo/linea_orden_editor.dart';
 
-/// Una línea de la orden, con la fila del carrito del diseño: miniatura de 48,
-/// nombre, precio en verde y el control de la derecha.
+/// Una línea de la orden, sobre la fila común de los tres documentos
+/// ([FilaDocumento]).
 ///
 /// ## Qué cambia según el tipo, y por qué
 ///
 /// - **Repuesto**: lleva `– n +`, como en cotizaciones. El `–` con cantidad 1
-///   quita la línea, así que no hace falta papelera.
+///   quita la línea, así que no hace falta papelera. **Tope el stock**: desde
+///   que anotar un repuesto lo descuenta del inventario, pedir más de lo que
+///   hay lo rechaza el repositorio; recortar aquí evita el viaje.
 /// - **Servicio** y **cargo**: no tienen cantidad —`ordenes_tareas` y
 ///   `ordenes_cargos` ni siquiera tienen la columna—, así que llevan papelera.
 ///   Fingir un `– 1 +` que no se puede subir sería mentir sobre el modelo.
@@ -21,6 +21,8 @@ import '../modelo/linea_orden_editor.dart';
 /// El servicio muestra además **quién lo hace** y una casilla para marcarlo
 /// hecho: es el estado de completado de la tarea, que es lo que diferencia una
 /// orden de una cotización.
+///
+/// Las cantidades van en unidades enteras, como en el resto de la app.
 class LineaOrden extends StatefulWidget {
   const LineaOrden({
     super.key,
@@ -31,6 +33,7 @@ class LineaOrden extends StatefulWidget {
     required this.alEliminar,
     required this.alMarcarCompletada,
     this.imagen,
+    this.disponible,
   });
 
   final LineaOrdenEditor linea;
@@ -47,6 +50,11 @@ class LineaOrden extends StatefulWidget {
   /// Ruta de la foto del producto. `null` en servicios y cargos, que muestran
   /// el ícono de su tipo.
   final String? imagen;
+
+  /// Cuántas unidades más admite la línea: lo que queda en bodega **más** lo
+  /// que esta línea ya tiene anotado, porque eso último ya salió del estante.
+  /// `null` cuando no se sabe, y entonces el control no acota.
+  final double? disponible;
 
   static IconData iconoDe(TipoLineaOrden tipo) => switch (tipo) {
         TipoLineaOrden.repuesto => Icons.inventory_2_outlined,
@@ -81,59 +89,36 @@ class _LineaOrdenState extends State<LineaOrden> {
     final precioEditable =
         widget.editable && linea.tipo != TipoLineaOrden.repuesto;
 
-    return Container(
-      padding: const EdgeInsets.symmetric(vertical: 14),
-      decoration: const BoxDecoration(
-        border: Border(bottom: BorderSide(color: ColoresApp.borderFila)),
+    return FilaDocumento(
+      principal: MiniaturaLinea(
+        rutaImagen: widget.imagen,
+        iconoAlterno: LineaOrden.iconoDe(linea.tipo),
       ),
-      child: Row(
-        children: [
-          _Miniatura(tipo: linea.tipo, imagen: widget.imagen),
-          const SizedBox(width: 12),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Text(
-                  linea.descripcion,
-                  style: TipografiaApp.cuerpoMedium.copyWith(
-                    fontSize: 13,
-                    decoration:
-                        linea.completado ? TextDecoration.lineThrough : null,
-                    color: linea.completado ? ColoresApp.textMuted : null,
-                  ),
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                ),
-                if (linea.tecnicoNombre != null) ...[
-                  const SizedBox(height: 1),
-                  Text(
-                    linea.tecnicoNombre!,
-                    style: TipografiaApp.caption.copyWith(fontSize: 11),
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                  ),
-                ],
-                const SizedBox(height: 2),
-                _precioWidget(editable: precioEditable),
-              ],
+      titulo: linea.descripcion,
+      subtitulo: linea.tecnicoNombre,
+      tachado: linea.completado,
+      precio: precioEditable
+          ? CampoPrecioLinea(
+              controlador: _precio,
+              foco: _focoPrecio,
+              alCambiar: widget.alCambiarPrecio,
+            )
+          : Text(
+              formatearPrecio(linea.precioUnitario),
+              style: CampoPrecioLinea.estilo,
             ),
-          ),
-          const SizedBox(width: 8),
-          ..._controles(linea),
-        ],
-      ),
+      acciones: _acciones(linea),
     );
   }
 
-  List<Widget> _controles(LineaOrdenEditor linea) {
+  List<Widget> _acciones(LineaOrdenEditor linea) {
     if (linea.tipo.tieneCantidad) {
       return [
         ControlCantidad(
           cantidad: linea.cantidad,
           // 0 = quitar la línea: el diseño no tiene papelera.
           minimo: 0,
+          maximo: widget.disponible,
           alCambiar: widget.editable
               ? (valor) => valor <= 0
                   ? widget.alEliminar()
@@ -167,70 +152,5 @@ class _LineaOrdenState extends State<LineaOrden> {
         alPresionar: widget.editable ? widget.alEliminar : null,
       ),
     ];
-  }
-
-  Widget _precioWidget({required bool editable}) {
-    final estilo = TipografiaApp.cuerpoMedium.copyWith(
-      fontSize: 13,
-      color: ColoresApp.castletonGreen,
-    );
-
-    if (!editable) {
-      return Text(formatearPrecio(widget.linea.precioUnitario), style: estilo);
-    }
-
-    return SizedBox(
-      height: 22,
-      child: TextField(
-        controller: _precio,
-        focusNode: _focoPrecio,
-        keyboardType: TextInputType.number,
-        inputFormatters: [FilteringTextInputFormatter.digitsOnly],
-        style: estilo,
-        onChanged: (texto) => widget.alCambiarPrecio(int.tryParse(texto) ?? 0),
-        decoration: InputDecoration(
-          isDense: true,
-          prefixText: r'$',
-          prefixStyle: estilo,
-          hintText: 'Precio',
-          hintStyle: TipografiaApp.deshabilitado(estilo),
-          contentPadding: EdgeInsets.zero,
-          border: InputBorder.none,
-          enabledBorder: InputBorder.none,
-          focusedBorder: InputBorder.none,
-        ),
-      ),
-    );
-  }
-}
-
-/// Cuadro de 48 del diseño: la foto del repuesto, o el ícono del tipo cuando
-/// no hay ninguna que mostrar.
-class _Miniatura extends StatelessWidget {
-  const _Miniatura({required this.tipo, required this.imagen});
-
-  final TipoLineaOrden tipo;
-  final String? imagen;
-
-  @override
-  Widget build(BuildContext context) {
-    final ruta = imagen;
-    if (ruta != null && ruta.isNotEmpty) {
-      return MiniaturaProducto(rutaImagen: ruta, lado: 48, radio: 11);
-    }
-
-    return Container(
-      width: 48,
-      height: 48,
-      decoration: BoxDecoration(
-        color: ColoresApp.bgInput,
-        borderRadius: BorderRadius.circular(11),
-      ),
-      child: Icon(
-        LineaOrden.iconoDe(tipo),
-        size: 18,
-        color: ColoresApp.textDisabled,
-      ),
-    );
   }
 }

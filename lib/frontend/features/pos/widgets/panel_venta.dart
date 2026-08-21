@@ -16,26 +16,16 @@ import 'totales_venta.dart';
 class PanelVenta extends StatelessWidget {
   const PanelVenta({super.key, required this.alCobrar});
 
-  static const double ancho = 360;
+  static const double ancho = PanelDocumento.ancho;
 
   final VoidCallback alCobrar;
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      width: ancho,
-      decoration: const BoxDecoration(
-        color: ColoresApp.bgCard,
-        border: Border(left: BorderSide(color: ColoresApp.border)),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          const _Cabecera(),
-          const Expanded(child: _Lineas()),
-          _Pie(alCobrar: alCobrar),
-        ],
-      ),
+    return PanelDocumento(
+      cabecera: const _Cabecera(),
+      contenido: const _Lineas(),
+      pie: _Pie(alCobrar: alCobrar),
     );
   }
 }
@@ -133,32 +123,10 @@ class _Lineas extends ConsumerWidget {
     final items = ref.watch(posProvider.select((s) => s.items));
 
     if (items.isEmpty) {
-      return const Center(
-        child: Padding(
-          padding: EdgeInsets.symmetric(horizontal: 24, vertical: 60),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Icon(
-                Icons.shopping_cart_outlined,
-                size: 40,
-                color: ColoresApp.textDisabled,
-              ),
-              SizedBox(height: 12),
-              Text(
-                'El carrito está vacío',
-                textAlign: TextAlign.center,
-                style: TipografiaApp.cuerpo,
-              ),
-              SizedBox(height: 4),
-              Text(
-                'Toca un producto de la izquierda para agregarlo.',
-                textAlign: TextAlign.center,
-                style: TipografiaApp.caption,
-              ),
-            ],
-          ),
-        ),
+      return const EstadoVacio(
+        icono: Icons.shopping_cart_outlined,
+        titulo: 'El carrito está vacío',
+        pista: 'Toca un producto de la izquierda para agregarlo.',
       );
     }
 

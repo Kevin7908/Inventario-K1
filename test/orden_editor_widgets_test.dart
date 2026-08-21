@@ -48,6 +48,7 @@ Future<void> _pump(WidgetTester tester, Widget hijo) => tester.pumpWidget(
 Widget _lineaOrden(
   LineaOrdenEditor linea, {
   bool editable = true,
+  double? disponible,
   ValueChanged<double>? alCambiarCantidad,
   ValueChanged<int>? alCambiarPrecio,
   VoidCallback? alEliminar,
@@ -56,6 +57,7 @@ Widget _lineaOrden(
     LineaOrden(
       linea: linea,
       editable: editable,
+      disponible: disponible,
       alCambiarCantidad: alCambiarCantidad ?? (_) {},
       alCambiarPrecio: alCambiarPrecio ?? (_) {},
       alEliminar: alEliminar ?? () {},
@@ -199,6 +201,59 @@ void main() {
       final control =
           tester.widget<ControlCantidad>(find.byType(ControlCantidad));
       expect(control.alCambiar, isNull);
+    });
+  });
+
+  group('el repuesto no pasa del stock disponible', () {
+    // Desde que anotar un repuesto lo descuenta del inventario, pedir más de
+    // lo que hay lo rechaza el repositorio. Recortar aquí evita el viaje —y
+    // el mensaje rojo— igual que lleva haciendo el carrito del mostrador.
+
+    testWidgets('el + se apaga al llegar al tope', (tester) async {
+      // Quedan 2 en bodega y la línea ya se llevó 3: el tope son 5.
+      await _pump(
+        tester,
+        _lineaOrden(
+          _linea(TipoLineaOrden.repuesto, cantidad: 5),
+          disponible: 5,
+        ),
+      );
+
+      final mas = tester.widget<InkWell>(
+        find.ancestor(
+          of: find.byIcon(Icons.add_rounded),
+          matching: find.byType(InkWell),
+        ),
+      );
+      expect(mas.onTap, isNull);
+    });
+
+    testWidgets('escribir de más recorta al tope', (tester) async {
+      var avisada = 0.0;
+      await _pump(
+        tester,
+        _lineaOrden(
+          _linea(TipoLineaOrden.repuesto),
+          disponible: 8,
+          alCambiarCantidad: (c) => avisada = c,
+        ),
+      );
+
+      await tester.enterText(find.byType(TextField).first, '50');
+      await tester.testTextInput.receiveAction(TextInputAction.done);
+      await tester.pump();
+
+      expect(avisada, 8);
+    });
+
+    testWidgets('sin dato de stock no se acota', (tester) async {
+      // Es lo que pasa mientras el catálogo todavía no llegó: mejor dejar
+      // teclear y que el repositorio decida, que bloquear por no saber.
+      await _pump(tester, _lineaOrden(_linea(TipoLineaOrden.repuesto)));
+
+      final control =
+          tester.widget<ControlCantidad>(find.byType(ControlCantidad));
+      expect(control.maximo, isNull);
     });
   });
 
