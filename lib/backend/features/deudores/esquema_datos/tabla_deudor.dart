@@ -1,7 +1,7 @@
 import 'package:drift/drift.dart';
 
 import '../../clientes/esquema_datos/tabla_cliente.dart';
-import '../../ventas/facturas/esquema_datos/tabla_ventas.dart';
+import '../../pos/esquema_datos/tabla_ventas.dart';
 
 /// Lo que un cliente debe, con sus pagos.
 ///

@@ -2,17 +2,17 @@ import 'dart:async';
 
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
-import '../../../../backend/features/ventas/ordenes/enum/enum_ordenes.dart';
-import '../../../../backend/features/ventas/ordenes/modelo/orden_detalle.dart';
-import '../../../../backend/features/ventas/ordenes/modelo/orden_resumen.dart';
-import '../../../../backend/features/ventas/ordenes/repositorio/repositrio_ordenes.dart';
-import '../../../../backend/features/ventas/ordenes/repositorio/repositrio_ordenes_impl.dart';
+import '../../../../backend/features/ordenes/enum/enum_ordenes.dart';
+import '../../../../backend/features/ordenes/modelo/orden_detalle.dart';
+import '../../../../backend/features/ordenes/modelo/orden_resumen.dart';
+import '../../../../backend/features/ordenes/repositorio/repositorio_ordenes.dart';
+import '../../../../backend/features/ordenes/repositorio/repositorio_ordenes_impl.dart';
 import '../../../../backend/share/database/app_db_provider.dart';
 
 /// Providers del módulo de Órdenes de servicio (el nuevo, con el diseño del
 /// mockup).
 ///
-/// Convive con `features/ventas/ordenes/` mientras se termina la migración.
+/// Convive con `features/ordenes/` mientras se termina la migración.
 /// El repositorio es el mismo; lo que cambia es que aquí **nada se filtra, se
 /// cuenta ni se recorta en memoria**: el `WHERE`, el `COUNT` y el `LIMIT` los
 /// resuelve SQLite (§5 de `REGLAS_BD.md`).

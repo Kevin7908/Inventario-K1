@@ -1,4 +1,4 @@
-export '../../../../share/dominio/metodo_pago.dart';
+export '../../../share/dominio/metodo_pago.dart';
 
 enum TipoVenta {
   servicio,

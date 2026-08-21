@@ -41,18 +41,9 @@ class _OrdenDetalleVistaState extends ConsumerState<OrdenDetalleVista> {
     super.dispose();
   }
 
-  void _avisar(String mensaje, {bool esError = false}) {
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text(
-          mensaje,
-          style: TipografiaApp.sobrePrimario(TipografiaApp.cuerpo),
-        ),
-        backgroundColor:
-            esError ? ColoresApp.statusDanger : ColoresApp.statusSuccess,
-      ),
-    );
-  }
+  void _avisar(String mensaje, {bool esError = false}) => esError
+      ? MensajeApp.error(context, mensaje)
+      : MensajeApp.exito(context, mensaje);
 
   /// Fuerza la escritura sin esperar el retardo. Lo usan `Ctrl+Enter` y el
   /// cierre del editor: si no, el último cambio se perdería con el `Timer`

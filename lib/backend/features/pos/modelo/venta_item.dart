@@ -1,6 +1,6 @@
 import 'package:equatable/equatable.dart';
 
-import '../enum/enum_facturas.dart';
+import '../enum/enum_ventas.dart';
 
 class VentaItem extends Equatable {
   const VentaItem({

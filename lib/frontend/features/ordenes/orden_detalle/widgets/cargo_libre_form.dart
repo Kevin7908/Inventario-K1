@@ -6,7 +6,7 @@ import '../../../../share2/share2.dart';
 ///
 /// Para el repuesto que se compra en la esquina, el domicilio o el lavado que
 /// nadie dio de alta. **No mueve inventario a propósito**: si el repuesto
-/// estuviera en el catálogo, sería un repuesto (§1.1 de `PLAN_ORDENES.md`).
+/// estuviera en el catálogo, sería un repuesto.
 ///
 /// No hay lista que mostrar, así que el panel izquierdo se convierte en dos
 /// campos y un botón.

@@ -1,9 +1,9 @@
 import 'package:equatable/equatable.dart';
 
-import '../enum/enum_facturas.dart';
+import '../enum/enum_ventas.dart';
 
-class FacturaResumen extends Equatable {
-  const FacturaResumen({
+class VentaResumen extends Equatable {
+  const VentaResumen({
     required this.id,
     required this.numeroFactura,
     required this.tipo,

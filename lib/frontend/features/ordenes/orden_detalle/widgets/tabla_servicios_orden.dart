@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../../../backend/features/tecnicos/modelo/tecnico.dart';
-import '../../../../../backend/features/ventas/servicios/modelo/servicio.dart';
+import '../../../../../backend/features/servicios/modelo/servicio.dart';
 import '../../../../../core/formato.dart';
 import '../../../../share2/share2.dart';
 import '../../../tecnicos/provider/tecnico_provider.dart';

@@ -2,8 +2,8 @@ import 'package:drift/drift.dart';
 
 import '../../productos/esquema_datos/tabla_producto.dart';
 import '../../reservas/esquema_datos/tabla_reserva.dart';
-import '../../ventas/facturas/esquema_datos/tabla_ventas.dart';
-import '../../ventas/ordenes/esquema_datos/tabla_ordenes_servicio.dart';
+import '../../pos/esquema_datos/tabla_ventas.dart';
+import '../../ordenes/esquema_datos/tabla_ordenes_servicio.dart';
 
 /// El libro mayor del inventario: toda variación de stock deja aquí su
 /// renglón.

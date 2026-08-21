@@ -3,9 +3,9 @@ import 'dart:async';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../../../backend/features/productos/modelo/producto.dart';
-import '../../../../../backend/features/ventas/ordenes/enum/enum_ordenes.dart';
-import '../../../../../backend/features/ventas/ordenes/modelo/orden_detalle.dart';
-import '../../../../../backend/features/ventas/servicios/modelo/servicio.dart';
+import '../../../../../backend/features/ordenes/enum/enum_ordenes.dart';
+import '../../../../../backend/features/ordenes/modelo/orden_detalle.dart';
+import '../../../../../backend/features/servicios/modelo/servicio.dart';
 import '../../../../../core/resultado.dart';
 import '../../provider/ordenes_providers.dart';
 import '../modelo/linea_orden_editor.dart';

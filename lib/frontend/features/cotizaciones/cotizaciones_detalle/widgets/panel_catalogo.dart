@@ -3,12 +3,12 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../../../backend/features/cotizaciones/enum/enum_cotizacion.dart';
 import '../../../../share2/share2.dart';
+import '../../../categorias/widgets/panel_categorias_catalogo.dart';
 import '../modelo/cotizacion_editor_state.dart';
 import '../provider/catalogo_cotizacion_providers.dart';
 import '../provider/cotizacion_editor_provider.dart';
 import 'grilla_productos_cotizacion.dart';
 import 'linea_libre_form.dart';
-import 'panel_categorias_cotizacion.dart';
 import 'tabla_servicios_cotizacion.dart';
 
 /// Panel izquierdo del editor: de dónde salen las líneas de la cotización.
@@ -45,7 +45,7 @@ class PanelCatalogo extends ConsumerWidget {
         // El panel se queda siempre, apagado cuando el filtro no aplica.
         // Hacerlo desaparecer con los servicios y la línea libre corría la
         // rejilla entera 208 px a la izquierda en cada cambio de tipo.
-        PanelCategoriasCotizacion(
+        _PanelCategorias(
           cotizacionId: cotizacionId,
           habilitado: tipo == TipoItemCotizacion.producto,
         ),
@@ -206,6 +206,35 @@ class _BarraState extends ConsumerState<_Barra> {
           ),
         ],
       ],
+    );
+  }
+}
+
+/// El panel de categorías, atado al filtro del editor.
+///
+/// Es un `Consumer` propio y no un `ref.watch` en el panel entero para que
+/// elegir una categoría no reconstruya la barra ni la rejilla: cada uno
+/// observa lo suyo (§3).
+class _PanelCategorias extends ConsumerWidget {
+  const _PanelCategorias({
+    required this.cotizacionId,
+    required this.habilitado,
+  });
+
+  final int? cotizacionId;
+  final bool habilitado;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    return PanelCategoriasCatalogo(
+      seleccionada: ref.watch(
+        cotizacionEditorProvider(cotizacionId)
+            .select((s) => s.value?.categoriaId),
+      ),
+      alSeleccionar: (id) => ref
+          .read(cotizacionEditorProvider(cotizacionId).notifier)
+          .filtrarPorCategoria(id),
+      habilitado: habilitado,
     );
   }
 }

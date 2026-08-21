@@ -1,6 +1,6 @@
 import 'package:drift/drift.dart';
 
-import '../../../../share/database/app_db.dart';
+import '../../../share/database/app_db.dart';
 import '../enum/enum_ordenes.dart';
 import '../modelo/orden_detalle.dart';
 import '../modelo/orden_cargo.dart';

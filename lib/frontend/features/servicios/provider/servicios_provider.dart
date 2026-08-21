@@ -1,10 +1,10 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_riverpod/legacy.dart';
 
-import '../../../../../backend/features/ventas/servicios/modelo/servicio.dart';
-import '../../../../../backend/features/ventas/servicios/repositorio/repositorio_servicios.dart';
-import '../../../../../backend/features/ventas/servicios/repositorio/repositorio_servicios_impl.dart';
-import '../../../../../backend/share/database/app_db_provider.dart';
+import '../../../../backend/features/servicios/modelo/servicio.dart';
+import '../../../../backend/features/servicios/repositorio/repositorio_servicios.dart';
+import '../../../../backend/features/servicios/repositorio/repositorio_servicios_impl.dart';
+import '../../../../backend/share/database/app_db_provider.dart';
 
 final repositorioServiciosProvider = Provider<RepositorioServicios>(
   (ref) => RepositorioServiciosImpl(ref.watch(appDatabaseProvider)),

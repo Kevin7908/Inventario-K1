@@ -1,6 +1,6 @@
 import 'package:drift/drift.dart';
 
-import '../../../tecnicos/esquema_datos/tabla_tecnico.dart';
+import '../../tecnicos/esquema_datos/tabla_tecnico.dart';
 import '../../servicios/esquema_datos/tabla_servicio.dart';
 import 'tabla_ordenes_servicio.dart';
 

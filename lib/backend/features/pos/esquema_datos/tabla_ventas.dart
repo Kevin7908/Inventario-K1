@@ -1,13 +1,13 @@
 import 'package:drift/drift.dart';
 
-import '../../../../share/dominio/metodo_pago.dart';
-import '../../../clientes/esquema_datos/tabla_cliente.dart';
+import '../../../share/dominio/metodo_pago.dart';
+import '../../clientes/esquema_datos/tabla_cliente.dart';
 import '../../ordenes/esquema_datos/tabla_ordenes_servicio.dart';
 
 /// La factura: el cierre contable de una venta.
 ///
 /// Es un **documento**, no un registro de trabajo: una vez emitida no se
-/// borra, se anula. `RepositorioFacturas.anular` la deja en `ANULADA` y
+/// borra, se anula. `RepositorioVentas.anular` la deja en `ANULADA` y
 /// devuelve el stock; el `DELETE` lo impide una guarda en la propia base
 /// (ver `guardas_sql.dart`), porque una factura borrada rompe la
 /// consecutividad del numerador y deja el inventario sin explicación.
@@ -15,7 +15,7 @@ import '../../ordenes/esquema_datos/tabla_ordenes_servicio.dart';
 /// `subtotal` y `total` son **caché** de las líneas: `subtotal` es
 /// `SUM(venta_detalles.subtotal)` y `total` es `subtotal − descuento`. Se
 /// guardan porque la lista de facturas los muestra sin abrir el detalle, y
-/// `RepositorioFacturas` es el único que los recalcula.
+/// `RepositorioVentas` es el único que los recalcula.
 ///
 /// **`iva` no se suma al total**: los precios del sistema ya lo traen dentro
 /// (ver `iva_app.dart`), así que la columna guarda cuánto impuesto va

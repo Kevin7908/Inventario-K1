@@ -1,10 +1,10 @@
 import 'package:drift/drift.dart' show Value, Variable;
 import 'package:flutter_test/flutter_test.dart';
 import 'package:inventario_k1/backend/features/inventario/repositorio/repositorio_inventario_impl.dart';
-import 'package:inventario_k1/backend/features/ventas/ordenes/enum/enum_ordenes.dart';
-import 'package:inventario_k1/backend/features/ventas/ordenes/modelo/orden_resumen.dart';
-import 'package:inventario_k1/backend/features/ventas/ordenes/repositorio/repositrio_ordenes.dart';
-import 'package:inventario_k1/backend/features/ventas/ordenes/repositorio/repositrio_ordenes_impl.dart';
+import 'package:inventario_k1/backend/features/ordenes/enum/enum_ordenes.dart';
+import 'package:inventario_k1/backend/features/ordenes/modelo/orden_resumen.dart';
+import 'package:inventario_k1/backend/features/ordenes/repositorio/repositorio_ordenes.dart';
+import 'package:inventario_k1/backend/features/ordenes/repositorio/repositorio_ordenes_impl.dart';
 import 'package:inventario_k1/backend/share/database/app_db.dart';
 
 import 'soporte/base_en_memoria.dart';

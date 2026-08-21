@@ -6,7 +6,7 @@ import '../../../../../backend/features/clientes/modelo/cliente.dart';
 import '../../../../../backend/features/cotizaciones/enum/enum_cotizacion.dart';
 import '../../../../../backend/features/motos/modelo/moto.dart';
 import '../../../../../backend/features/productos/modelo/producto.dart';
-import '../../../../../backend/features/ventas/servicios/modelo/servicio.dart';
+import '../../../../../backend/features/servicios/modelo/servicio.dart';
 import '../../../../../core/resultado.dart';
 import '../../../clientes/provider/cliente_provider.dart';
 import '../../../motos/provider/motos_provider.dart';

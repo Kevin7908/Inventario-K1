@@ -4,7 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
-import '../../../../backend/features/ventas/ordenes/modelo/orden_resumen.dart';
+import '../../../../backend/features/ordenes/modelo/orden_resumen.dart';
 import '../../../layout/encabezado_con_cuenta.dart';
 import '../../../share2/share2.dart';
 import '../orden_detalle/vista/orden_detalle_vista.dart';
@@ -16,7 +16,7 @@ import '../widgets/tarjetas_ordenes.dart';
 /// Pantalla de Órdenes de servicio, con el diseño del mockup: encabezado,
 /// cuatro contadores y la tabla de seis columnas.
 ///
-/// Reemplaza a `features/ventas/ordenes/vista/ordenes_vista.dart`, que sigue
+/// Reemplaza a `features/ordenes/vista/ordenes_vista.dart`, que sigue
 /// en el árbol hasta que el editor esté migrado.
 ///
 /// El mockup no dibuja buscador. Se le agrega porque es una pantalla de uso

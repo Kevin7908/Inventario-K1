@@ -4,13 +4,13 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../../share2/share2.dart';
+import '../../../categorias/widgets/panel_categorias_catalogo.dart';
 import '../modelo/linea_orden_editor.dart';
 import '../modelo/orden_editor_state.dart';
 import '../provider/catalogo_orden_providers.dart';
 import '../provider/orden_editor_provider.dart';
 import 'cargo_libre_form.dart';
 import 'grilla_productos_orden.dart';
-import 'panel_categorias_orden.dart';
 import 'tabla_servicios_orden.dart';
 
 /// Panel izquierdo del editor: de dónde salen las líneas de la orden.
@@ -46,7 +46,7 @@ class PanelCatalogoOrden extends ConsumerWidget {
         // El panel se queda siempre, apagado cuando el filtro no aplica.
         // Hacerlo desaparecer con los servicios y el cargo corría la rejilla
         // entera 208 px a la izquierda en cada cambio de tipo.
-        PanelCategoriasOrden(
+        _PanelCategorias(
           ordenId: ordenId,
           habilitado: vista.tipo == TipoLineaOrden.repuesto,
         ),
@@ -249,6 +249,30 @@ class _BarraState extends ConsumerState<_Barra> {
           ),
         ],
       ],
+    );
+  }
+}
+
+/// El panel de categorías, atado al filtro del editor.
+///
+/// Es un `Consumer` propio y no un `ref.watch` en el panel entero para que
+/// elegir una categoría no reconstruya la barra ni la rejilla: cada uno
+/// observa lo suyo (§3).
+class _PanelCategorias extends ConsumerWidget {
+  const _PanelCategorias({required this.ordenId, required this.habilitado});
+
+  final int ordenId;
+  final bool habilitado;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    return PanelCategoriasCatalogo(
+      seleccionada: ref.watch(
+        ordenEditorProvider(ordenId).select((s) => s.value?.categoriaId),
+      ),
+      alSeleccionar: (id) =>
+          ref.read(ordenEditorProvider(ordenId).notifier).filtrarPorCategoria(id),
+      habilitado: habilitado,
     );
   }
 }

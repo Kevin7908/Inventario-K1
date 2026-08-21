@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 
-import '../../../../backend/features/ventas/ordenes/enum/enum_ordenes.dart';
+import '../../../../backend/features/ordenes/enum/enum_ordenes.dart';
 import '../../../share2/share2.dart';
 
 /// Cómo se ve cada estado de orden: color de texto y de fondo de la pastilla.

@@ -8,7 +8,15 @@ import 'package:inventario_k1/frontend/share2/share2.dart';
 
 Widget _envolver(Widget hijo) => MaterialApp(
       home: Scaffold(
-        body: Center(child: SizedBox(width: 240, height: 260, child: hijo)),
+        body: Center(
+          child: SizedBox(
+            width: 240,
+            // El mismo alto que le reserva la rejilla: si la tarjeta crece y
+            // no se actualiza `altoSugerido`, todos estos tests revientan.
+            height: TarjetaProducto.altoSugerido,
+            child: hijo,
+          ),
+        ),
       ),
     );
 
@@ -138,13 +146,14 @@ void main() {
     );
   });
 
-  testWidgets('la ubicación se pinta sobre la foto, junto al código',
+  testWidgets('la ubicación va en su propia línea, debajo del stock',
       (tester) async {
     await tester.pumpWidget(
       _envolver(
         const TarjetaProducto(
           nombre: 'Pastilla de freno',
           codigo: 'SKU-1123',
+          detalle: '12 en stock',
           ubicacion: 'Estante A-3',
           precio: r'$45.000',
           etiquetaAgregar: 'Agregar',
@@ -154,8 +163,13 @@ void main() {
 
     expect(find.text('Estante A-3'), findsOneWidget);
     expect(find.byIcon(Icons.place_outlined), findsOneWidget);
-    // Convive con el SKU: son las dos esquinas de arriba de la foto.
     expect(find.text('SKU-1123'), findsOneWidget);
+
+    // Estaba como etiqueta sobre la foto y se leía como parte de la imagen.
+    // Ahora es un dato más del producto: va debajo del stock.
+    final stock = tester.getTopLeft(find.text('12 en stock')).dy;
+    final ubicacion = tester.getTopLeft(find.text('Estante A-3')).dy;
+    expect(ubicacion, greaterThan(stock));
   });
 
   testWidgets('sin ubicación no queda ni el ícono suelto', (tester) async {
@@ -176,9 +190,9 @@ void main() {
 
   testWidgets('la tarjeta con ubicación no desborda el alto reservado',
       (tester) async {
-    // La rejilla le reserva `altoSugerido` exacto: la etiqueta va sobre la
-    // foto justamente para no costar alto. Si algún día se mueve a una línea
-    // propia, este test lo delata con la franja amarilla y negra.
+    // La rejilla le reserva `altoSugerido` exacto, y la ubicación ocupa una
+    // línea propia. Si el alto se queda corto, este test lo delata con la
+    // franja amarilla y negra.
     await tester.pumpWidget(
       const MaterialApp(
         home: Scaffold(

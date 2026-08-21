@@ -2,10 +2,10 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../share2/share2.dart';
+import '../../categorias/widgets/panel_categorias_catalogo.dart';
 import '../modelo/pos_state.dart';
 import '../provider/pos_providers.dart';
 import 'grilla_productos_pos.dart';
-import 'panel_categorias_pos.dart';
 
 /// Lado izquierdo del punto de venta: de dónde salen las líneas de la venta.
 ///
@@ -20,7 +20,7 @@ class PanelCatalogoPos extends StatelessWidget {
   Widget build(BuildContext context) {
     return Row(
       children: [
-        const PanelCategoriasPos(),
+        const _PanelCategorias(),
         Expanded(
           child: Padding(
             padding: const EdgeInsets.fromLTRB(28, 24, 28, 24),
@@ -106,6 +106,22 @@ class _BuscadorState extends ConsumerState<_Buscador> {
       focoTeclado: widget.foco,
       placeholder: 'Buscar producto por nombre o SKU…',
       alCambiar: ref.read(posProvider.notifier).buscar,
+    );
+  }
+}
+
+/// El panel de categorías del catálogo, atado al filtro del punto de venta.
+///
+/// Es un `Consumer` propio para que cambiar de categoría no reconstruya la
+/// pantalla entera, solo el panel y la rejilla que ya observa el filtro.
+class _PanelCategorias extends ConsumerWidget {
+  const _PanelCategorias();
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    return PanelCategoriasCatalogo(
+      seleccionada: ref.watch(posProvider.select((s) => s.categoriaId)),
+      alSeleccionar: ref.read(posProvider.notifier).filtrarPorCategoria,
     );
   }
 }

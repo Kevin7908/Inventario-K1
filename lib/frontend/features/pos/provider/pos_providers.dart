@@ -1,9 +1,21 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../../../backend/features/pos/repositorio/repositorio_ventas.dart';
+import '../../../../backend/features/pos/repositorio/repositorio_ventas_impl.dart';
 import '../../../../backend/features/productos/repositorio/repositorio_producto.dart';
+import '../../../../backend/share/database/app_db_provider.dart';
 import '../../productos/provider/productos_provider.dart';
 import '../modelo/pos_state.dart';
 import 'pos_notifier.dart';
+
+/// El repositorio donde queda registrada cada venta de mostrador.
+///
+/// Vivía en el módulo de Facturación; al borrarse esa pantalla se quedó donde
+/// tiene a su único usuario.
+final repositorioVentasProvider = Provider<RepositorioVentas>(
+  name: 'repositorioVentasProvider',
+  (ref) => RepositorioVentasImpl(ref.watch(appDatabaseProvider)),
+);
 
 final posProvider = NotifierProvider<PosNotifier, PosState>(
   PosNotifier.new,

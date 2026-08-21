@@ -13,10 +13,10 @@
 import 'package:drift/drift.dart' show Variable;
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:inventario_k1/backend/features/ventas/ordenes/enum/enum_ordenes.dart';
-import 'package:inventario_k1/backend/features/ventas/ordenes/repositorio/repositrio_ordenes_impl.dart';
+import 'package:inventario_k1/backend/features/ordenes/enum/enum_ordenes.dart';
+import 'package:inventario_k1/backend/features/ordenes/repositorio/repositorio_ordenes_impl.dart';
 import 'package:inventario_k1/backend/features/productos/modelo/producto.dart';
-import 'package:inventario_k1/backend/features/ventas/servicios/modelo/servicio.dart';
+import 'package:inventario_k1/backend/features/servicios/modelo/servicio.dart';
 import 'package:inventario_k1/backend/share/database/app_db.dart';
 import 'package:inventario_k1/backend/share/database/app_db_provider.dart';
 import 'package:inventario_k1/core/resultado.dart';

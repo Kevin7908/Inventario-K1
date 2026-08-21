@@ -10,9 +10,9 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:inventario_k1/backend/features/ventas/ordenes/enum/enum_ordenes.dart';
-import 'package:inventario_k1/backend/features/ventas/ordenes/modelo/orden_resumen.dart';
-import 'package:inventario_k1/backend/features/ventas/ordenes/repositorio/repositrio_ordenes.dart';
+import 'package:inventario_k1/backend/features/ordenes/enum/enum_ordenes.dart';
+import 'package:inventario_k1/backend/features/ordenes/modelo/orden_resumen.dart';
+import 'package:inventario_k1/backend/features/ordenes/repositorio/repositorio_ordenes.dart';
 import 'package:inventario_k1/core/formato.dart';
 import 'package:inventario_k1/frontend/features/ordenes/provider/ordenes_providers.dart';
 import 'package:inventario_k1/frontend/features/ordenes/widgets/tabla_ordenes.dart';

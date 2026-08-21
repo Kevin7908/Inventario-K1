@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
-import '../../../../../backend/features/ventas/ordenes/enum/enum_ordenes.dart';
+import '../../../../../backend/features/ordenes/enum/enum_ordenes.dart';
 import '../../../../../core/resultado.dart';
 import '../../../../share2/share2.dart';
 import '../provider/orden_editor_provider.dart';

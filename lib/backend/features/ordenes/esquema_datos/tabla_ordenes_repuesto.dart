@@ -1,6 +1,6 @@
 import 'package:drift/drift.dart';
 
-import '../../../productos/esquema_datos/tabla_producto.dart';
+import '../../productos/esquema_datos/tabla_producto.dart';
 import 'tabla_ordenes_servicio.dart';
 
 /// Los repuestos que se le montaron a la moto en una orden.

@@ -1,7 +1,7 @@
 import 'package:drift/drift.dart';
 
-import '../../../clientes/esquema_datos/tabla_cliente.dart';
-import '../../../motos/esquema_datos/tabla_moto.dart';
+import '../../clientes/esquema_datos/tabla_cliente.dart';
+import '../../motos/esquema_datos/tabla_moto.dart';
 
 /// La moto mientras está en el taller.
 ///

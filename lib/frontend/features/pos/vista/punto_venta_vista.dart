@@ -31,18 +31,9 @@ class _PuntoVentaVistaState extends ConsumerState<PuntoVentaVista> {
     super.dispose();
   }
 
-  void _avisar(String mensaje, {bool esError = false}) {
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text(
-          mensaje,
-          style: TipografiaApp.sobrePrimario(TipografiaApp.cuerpo),
-        ),
-        backgroundColor:
-            esError ? ColoresApp.statusDanger : ColoresApp.statusSuccess,
-      ),
-    );
-  }
+  void _avisar(String mensaje, {bool esError = false}) => esError
+      ? MensajeApp.error(context, mensaje)
+      : MensajeApp.exito(context, mensaje);
 
   Future<void> _cobrar() async {
     final total = ref.read(posProvider).total;
@@ -55,7 +46,7 @@ class _PuntoVentaVistaState extends ConsumerState<PuntoVentaVista> {
 
     switch (resultado) {
       case Exito():
-        _avisar('Venta cobrada. La factura quedó registrada.');
+        _avisar('Venta cobrada. Quedó registrada en el historial.');
       case Fallo(:final mensaje):
         _avisar(mensaje, esError: true);
     }

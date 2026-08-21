@@ -2,11 +2,11 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../../backend/features/clientes/modelo/cliente.dart';
 import '../../../../backend/features/productos/modelo/producto.dart';
-import '../../../../backend/features/ventas/facturas/enum/enum_facturas.dart';
-import '../../../../backend/features/ventas/facturas/modelo/linea_venta_mostrador.dart';
+import '../../../../backend/features/pos/enum/enum_ventas.dart';
+import '../../../../backend/features/pos/modelo/linea_venta_mostrador.dart';
 import '../../../../core/resultado.dart';
-import '../../ventas/facturas/provider/facturas_providers.dart';
 import '../modelo/pos_state.dart';
+import 'pos_providers.dart';
 
 /// El carrito del punto de venta y el cobro de la venta de mostrador.
 ///
@@ -47,15 +47,15 @@ class PosNotifier extends Notifier<PosState> {
 
   // ── Cobro ─────────────────────────────────────────────────────────────────
 
-  /// Cobra el carrito: crea la factura de mostrador con todas sus líneas y la
-  /// deja pagada.
+  /// Cobra el carrito: registra la venta de mostrador con todas sus líneas y
+  /// la deja pagada.
   ///
-  /// **Una sola llamada al repositorio.** Antes esto encadenaba `crear`, un
-  /// `agregarItem` por línea y `cobrar` desde aquí, y encima recuperaba el id
-  /// de la factura leyendo la más reciente de la lista: si algo fallaba a
-  /// mitad quedaba una factura con su consecutivo quemado, sin productos y sin
-  /// cobrar. La transacción vive donde tiene que vivir, en el repositorio
-  /// (§6 de las reglas de base de datos).
+  /// **Una sola llamada al repositorio.** Antes esto encadenaba la cabecera,
+  /// una línea por producto y el cobro desde aquí, y encima recuperaba el id
+  /// leyendo la venta más reciente de la lista: si algo fallaba a mitad
+  /// quedaba una venta con su consecutivo quemado, sin productos y sin cobrar.
+  /// La transacción vive donde tiene que vivir, en el repositorio (§6 de las
+  /// reglas de base de datos).
   ///
   /// Al terminar bien, el carrito queda vacío y listo para la siguiente venta.
   Future<Resultado> cobrar({required MetodoPago metodoPago}) async {
@@ -68,7 +68,7 @@ class PosNotifier extends Notifier<PosState> {
 
     // `Producto.id` es nulo hasta que el producto se guarda, así que el tipo
     // obliga a descartar el caso. Un producto sin id no está en el catálogo y
-    // no se puede facturar: mejor no cobrar que cobrar una línea suelta.
+    // no se puede vender: mejor no cobrar que cobrar una línea suelta.
     if (state.items.any((i) => i.producto.id == null)) {
       return const Fallo(
         MotivoFallo.validacion,
@@ -80,27 +80,22 @@ class PosNotifier extends Notifier<PosState> {
     final venta = state;
 
     try {
-      final creada =
-          await ref.read(repositorioFacturasProvider).registrarVentaMostrador(
-                lineas: [
-                  for (final linea in venta.items)
-                    LineaVentaMostrador(
-                      productoId: linea.producto.id!,
-                      descripcion: linea.producto.nombre,
-                      cantidad: linea.cantidad.toDouble(),
-                      precioUnitario: linea.precioUnitario,
-                      costoUnitario: linea.producto.precioCompra,
-                    ),
-                ],
-                metodoPago: metodoPago,
-                clienteId: venta.cliente?.id,
-                iva: venta.iva,
-                descuento: venta.descuento,
-              );
-
-      // La lista de facturas se refresca sola: `FacturasNotifier` escucha el
-      // stream de Drift. El detalle no, porque es un provider por id.
-      ref.invalidate(facturaDetalleProvider(creada.id));
+      await ref.read(repositorioVentasProvider).registrarVentaMostrador(
+            lineas: [
+              for (final linea in venta.items)
+                LineaVentaMostrador(
+                  productoId: linea.producto.id!,
+                  descripcion: linea.producto.nombre,
+                  cantidad: linea.cantidad.toDouble(),
+                  precioUnitario: linea.precioUnitario,
+                  costoUnitario: linea.producto.precioCompra,
+                ),
+            ],
+            metodoPago: metodoPago,
+            clienteId: venta.cliente?.id,
+            iva: venta.iva,
+            descuento: venta.descuento,
+          );
 
       state = const PosState();
       return const Exito();

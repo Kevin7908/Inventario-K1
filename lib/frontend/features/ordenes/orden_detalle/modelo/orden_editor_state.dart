@@ -1,5 +1,5 @@
 import '../../../../../backend/features/productos/repositorio/repositorio_producto.dart';
-import '../../../../../backend/features/ventas/ordenes/enum/enum_ordenes.dart';
+import '../../../../../backend/features/ordenes/enum/enum_ordenes.dart';
 import '../../../../../core/iva_app.dart';
 import 'linea_orden_editor.dart';
 

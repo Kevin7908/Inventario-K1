@@ -2,9 +2,9 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../../../backend/features/productos/modelo/producto.dart';
 import '../../../../../backend/features/productos/repositorio/repositorio_producto.dart';
-import '../../../../../backend/features/ventas/servicios/modelo/servicio.dart';
+import '../../../../../backend/features/servicios/modelo/servicio.dart';
 import '../../../productos/provider/productos_provider.dart';
-import '../../../ventas/servicios/provider/servicios_provider.dart';
+import '../../../servicios/provider/servicios_provider.dart';
 import '../modelo/orden_editor_state.dart';
 import 'orden_editor_provider.dart';
 

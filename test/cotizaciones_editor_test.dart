@@ -9,7 +9,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:inventario_k1/backend/features/cotizaciones/enum/enum_cotizacion.dart';
-import 'package:inventario_k1/backend/features/ventas/servicios/modelo/servicio.dart';
+import 'package:inventario_k1/backend/features/servicios/modelo/servicio.dart';
 import 'package:inventario_k1/core/iva_app.dart';
 import 'package:inventario_k1/core/resultado.dart';
 import 'package:inventario_k1/frontend/features/cotizaciones/cotizaciones_detalle/modelo/item_cotizacion_editor.dart';

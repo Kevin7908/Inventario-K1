@@ -1,6 +1,6 @@
 import 'package:drift/drift.dart';
 
-import '../../../../share/database/app_db.dart';
+import '../../../share/database/app_db.dart';
 import '../modelo/servicio.dart';
 
 // Alias legible para el tipo generado por Drift

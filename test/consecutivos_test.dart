@@ -1,6 +1,7 @@
 import 'package:flutter_test/flutter_test.dart';
-import 'package:inventario_k1/backend/features/ventas/facturas/enum/enum_facturas.dart';
-import 'package:inventario_k1/backend/features/ventas/facturas/repositorio/repositorio_facturas_impl.dart';
+import 'package:inventario_k1/backend/features/pos/enum/enum_ventas.dart';
+import 'package:inventario_k1/backend/features/pos/modelo/linea_venta_mostrador.dart';
+import 'package:inventario_k1/backend/features/pos/repositorio/repositorio_ventas_impl.dart';
 import 'package:inventario_k1/backend/share/consecutivos/documento_consecutivo.dart';
 import 'package:inventario_k1/backend/share/consecutivos/repositorio_consecutivos.dart';
 import 'package:inventario_k1/backend/share/database/app_db.dart';
@@ -10,14 +11,14 @@ import 'soporte/datos_taller.dart';
 
 late AppDb db;
 late RepositorioConsecutivos consecutivos;
-late RepositorioFacturasImpl facturas;
+late RepositorioVentasImpl ventas;
 late DatosTaller taller;
 
 void main() {
   setUp(() async {
     db = baseEnMemoria();
     consecutivos = RepositorioConsecutivos(db);
-    facturas = RepositorioFacturasImpl(db);
+    ventas = RepositorioVentasImpl(db);
     taller = await sembrarTaller(db);
   });
 
@@ -56,35 +57,32 @@ void main() {
       // Con `MAX(numero) + 1` —lo que hacían cotizaciones, reservas y
       // deudas— borrar el último hacía que el siguiente reutilizara su
       // número. En facturación eso es lo peor que puede pasar.
-      final primera = await facturas.crear(
-        tipo: TipoVenta.mostrador,
+      final primera = await ventas.registrarVentaMostrador(
+        lineas: [_unaLinea(taller.productoId)],
         clienteId: taller.clienteId,
         metodoPago: MetodoPago.efectivo,
-        estadoPago: EstadoPago.pendiente,
       );
       expect(primera.numeroFactura, 'FAC-0001');
 
-      // Una factura no se borra —hay una guarda—, así que se simula el caso
+      // Una venta no se borra —hay una guarda—, así que se simula el caso
       // sobre el contador directamente: el consecutivo no mira las filas.
-      final segunda = await facturas.crear(
-        tipo: TipoVenta.mostrador,
+      final segunda = await ventas.registrarVentaMostrador(
+        lineas: [_unaLinea(taller.productoId)],
         clienteId: taller.clienteId,
         metodoPago: MetodoPago.efectivo,
-        estadoPago: EstadoPago.pendiente,
       );
       expect(segunda.numeroFactura, 'FAC-0002');
     });
 
     test('una transacción revertida devuelve el número', () async {
-      await facturas.crear(
-        tipo: TipoVenta.mostrador,
+      await ventas.registrarVentaMostrador(
+        lineas: [_unaLinea(taller.productoId)],
         clienteId: taller.clienteId,
         metodoPago: MetodoPago.efectivo,
-        estadoPago: EstadoPago.pendiente,
       );
 
       // Se pide un número dentro de una transacción que falla: el contador
-      // tiene que volver atrás con ella, para que la siguiente factura no
+      // tiene que volver atrás con ella, para que la siguiente venta no
       // salte de FAC-0001 a FAC-0003.
       await expectLater(
         db.transaction(() async {
@@ -94,22 +92,20 @@ void main() {
         throwsA(isA<Exception>()),
       );
 
-      final siguiente = await facturas.crear(
-        tipo: TipoVenta.mostrador,
+      final siguiente = await ventas.registrarVentaMostrador(
+        lineas: [_unaLinea(taller.productoId)],
         clienteId: taller.clienteId,
         metodoPago: MetodoPago.efectivo,
-        estadoPago: EstadoPago.pendiente,
       );
       expect(siguiente.numeroFactura, 'FAC-0002');
     });
 
-    test('la factura nace con su número definitivo, no con uno temporal',
+    test('la venta nace con su número definitivo, no con uno temporal',
         () async {
-      final resumen = await facturas.crear(
-        tipo: TipoVenta.mostrador,
+      final resumen = await ventas.registrarVentaMostrador(
+        lineas: [_unaLinea(taller.productoId)],
         clienteId: taller.clienteId,
         metodoPago: MetodoPago.efectivo,
-        estadoPago: EstadoPago.pendiente,
       );
 
       expect(resumen.numeroFactura, isNot(contains('TEMP')));
@@ -146,3 +142,11 @@ void main() {
     });
   });
 }
+
+/// Una línea de un producto: lo mínimo para que la venta exista.
+LineaVentaMostrador _unaLinea(int productoId) => LineaVentaMostrador(
+      productoId: productoId,
+      descripcion: 'Pastilla de freno',
+      cantidad: 1,
+      precioUnitario: 30000,
+    );

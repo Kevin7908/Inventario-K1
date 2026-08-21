@@ -1,7 +1,7 @@
 import 'package:drift/drift.dart';
 
-import '../../../productos/esquema_datos/tabla_producto.dart';
-import '../../../tecnicos/esquema_datos/tabla_tecnico.dart';
+import '../../productos/esquema_datos/tabla_producto.dart';
+import '../../tecnicos/esquema_datos/tabla_tecnico.dart';
 import '../../servicios/esquema_datos/tabla_servicio.dart';
 import 'tabla_ventas.dart';
 

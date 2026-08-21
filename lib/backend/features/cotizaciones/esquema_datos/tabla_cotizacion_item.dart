@@ -1,7 +1,7 @@
 import 'package:drift/drift.dart';
 
 import '../../productos/esquema_datos/tabla_producto.dart';
-import '../../ventas/servicios/esquema_datos/tabla_servicio.dart';
+import '../../servicios/esquema_datos/tabla_servicio.dart';
 import 'tabla_cotizacion.dart';
 
 /// Una línea de la cotización.

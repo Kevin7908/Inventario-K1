@@ -1,30 +1,30 @@
-import '../../../../share/consecutivos/documento_consecutivo.dart';
-import '../../../../share/consecutivos/repositorio_consecutivos.dart';
 import 'package:drift/drift.dart';
 
-import '../../../../../core/iva_app.dart';
-import '../../../../share/database/app_db.dart';
-import '../enum/enum_facturas.dart';
-import '../../../inventario/modelo/movimiento_inventario.dart';
-import '../../../inventario/repositorio/repositorio_inventario.dart';
-import '../../../inventario/repositorio/repositorio_inventario_impl.dart';
-import '../mapper/facturas_mapper.dart';
-import '../modelo/factura_detalle.dart';
-import '../modelo/factura_resumen.dart';
+import '../../../../core/iva_app.dart';
+import '../../../share/consecutivos/documento_consecutivo.dart';
+import '../../../share/consecutivos/repositorio_consecutivos.dart';
+import '../../../share/database/app_db.dart';
+import '../../inventario/modelo/movimiento_inventario.dart';
+import '../../inventario/repositorio/repositorio_inventario.dart';
+import '../../inventario/repositorio/repositorio_inventario_impl.dart';
+import '../enum/enum_ventas.dart';
+import '../mapper/ventas_mapper.dart';
 import '../modelo/linea_venta_mostrador.dart';
-import 'repositorio_facturas.dart';
+import '../modelo/venta_detalle.dart';
+import '../modelo/venta_resumen.dart';
+import 'repositorio_ventas.dart';
 
-class RepositorioFacturasImpl implements RepositorioFacturas {
-  RepositorioFacturasImpl(this._db);
+class RepositorioVentasImpl implements RepositorioVentas {
+  RepositorioVentasImpl(this._db);
 
   final AppDb _db;
 
-  /// El número de factura sale de la tabla `consecutivos`, dentro de la misma
+  /// El número de la venta sale de la tabla `consecutivos`, dentro de la misma
   /// transacción: ver `RepositorioConsecutivos`.
   late final RepositorioConsecutivos _consecutivos =
       RepositorioConsecutivos(_db);
 
-  /// Facturar, corregir una línea y anular mueven stock. Todo por aquí.
+  /// Cobrar y anular mueven stock. Todo por aquí.
   late final RepositorioInventario _inventario = RepositorioInventarioImpl(_db);
 
   $TablaVentasTable get _tablaVentas => _db.tablaVentas;
@@ -42,8 +42,10 @@ class RepositorioFacturasImpl implements RepositorioFacturas {
     LEFT JOIN personas pe ON pe.id = c.persona_id
   ''';
 
+  // Lecturas
+
   @override
-  Stream<List<FacturaResumen>> observarTodas() {
+  Stream<List<VentaResumen>> observarTodas() {
     return _db
         .customSelect(
           '$_sqlSelectResumen ORDER BY v.id DESC',
@@ -51,36 +53,18 @@ class RepositorioFacturasImpl implements RepositorioFacturas {
         )
         .watch()
         .map((rows) =>
-            FacturasMapper.resumenesDesdeMapas(rows.map((r) => r.data).toList()));
+            VentasMapper.resumenesDesdeMapas(rows.map((r) => r.data).toList()));
   }
 
   @override
-  Future<List<FacturaResumen>> obtenerTodas() async {
-    final rows =
-        await _db.customSelect('$_sqlSelectResumen ORDER BY v.id DESC').get();
-    return FacturasMapper.resumenesDesdeMapas(rows.map((r) => r.data).toList());
-  }
-
-  Future<FacturaResumen> _obtenerResumenPorId(int id) async {
-    final row = await _db
-        .customSelect(
-          '$_sqlSelectResumen WHERE v.id = ?',
-          variables: [Variable.withInt(id)],
-        )
-        .getSingleOrNull();
-    if (row == null) throw Exception('Factura #$id no encontrada.');
-    return FacturasMapper.resumenDesdeMap(row.data);
-  }
-
-  @override
-  Future<FacturaDetalle> obtenerDetalle(int id) async {
+  Future<VentaDetalle> obtenerDetalle(int id) async {
     final ventaRow = await _db
         .customSelect(
           '$_sqlSelectResumen WHERE v.id = ?',
           variables: [Variable.withInt(id)],
         )
         .getSingleOrNull();
-    if (ventaRow == null) throw Exception('Factura #$id no encontrada.');
+    if (ventaRow == null) throw Exception('Venta #$id no encontrada.');
 
     final itemsRows = await _db
         .customSelect(
@@ -89,47 +73,27 @@ class RepositorioFacturasImpl implements RepositorioFacturas {
         )
         .get();
 
-    return FacturasMapper.detalleDesdeMapas(
+    return VentasMapper.detalleDesdeMapas(
       ventaRow: ventaRow.data,
       itemsRows: itemsRows.map((r) => r.data).toList(),
     );
   }
 
-  @override
-  Future<FacturaResumen> crear({
-    required TipoVenta tipo,
-    int? ordenId,
-    int? clienteId,
-    required MetodoPago metodoPago,
-    required EstadoPago estadoPago,
-    int iva = 0,
-    int descuento = 0,
-  }) {
-    // El número se pide antes de insertar. Antes se guardaba `'FAC-TEMP'` y
-    // se pisaba con el `id`: dos facturas a la vez chocaban contra el `UNIQUE`
-    // y cualquier `INSERT` fallido se saltaba un número para siempre.
-    return _db.transaction(() async {
-      final id = await _db.into(_tablaVentas).insert(
-            FacturasMapper.companionNuevo(
-              numeroFactura: await _consecutivos.siguiente(
-                DocumentoConsecutivo.factura,
-              ),
-              tipo: tipo,
-              ordenId: ordenId,
-              clienteId: clienteId,
-              metodoPago: metodoPago,
-              estadoPago: estadoPago,
-              iva: iva,
-              descuento: descuento,
-            ),
-          );
-
-      return _obtenerResumenPorId(id);
-    });
+  Future<VentaResumen> _obtenerResumenPorId(int id) async {
+    final row = await _db
+        .customSelect(
+          '$_sqlSelectResumen WHERE v.id = ?',
+          variables: [Variable.withInt(id)],
+        )
+        .getSingleOrNull();
+    if (row == null) throw Exception('Venta #$id no encontrada.');
+    return VentasMapper.resumenDesdeMap(row.data);
   }
 
+  // Escrituras
+
   @override
-  Future<FacturaResumen> registrarVentaMostrador({
+  Future<VentaResumen> registrarVentaMostrador({
     required List<LineaVentaMostrador> lineas,
     required MetodoPago metodoPago,
     int? clienteId,
@@ -140,325 +104,107 @@ class RepositorioFacturasImpl implements RepositorioFacturas {
       throw Exception('La venta no tiene productos.');
     }
 
-    // Las tres etapas se apoyan en los métodos que ya existen; lo que aporta
-    // este método es la transacción que las envuelve. Drift anida por
-    // savepoints, así que las transacciones internas de `crear` y
-    // `agregarItem` no confirman nada por su cuenta: manda esta.
+    // Una sola transacción para las tres etapas: cabecera, líneas y cobro.
     return _db.transaction(() async {
-      final creada = await crear(
-        tipo: TipoVenta.mostrador,
+      final ventaId = await _crearCabecera(
         clienteId: clienteId,
         metodoPago: metodoPago,
-        estadoPago: EstadoPago.pagado,
         iva: iva,
         descuento: descuento,
       );
 
       for (final linea in lineas) {
-        await agregarItem(
-          ventaId: creada.id,
-          tipoItem: TipoItem.producto,
-          productoId: linea.productoId,
-          descripcion: linea.descripcion,
-          cantidad: linea.cantidad,
-          precioUnitario: linea.precioUnitario,
-          costoUnitario: linea.costoUnitario,
-        );
+        await _agregarLinea(ventaId: ventaId, linea: linea);
       }
 
-      // `agregarItem` ya dejó los totales recalculados en la fila; leerlos de
-      // ahí es lo que garantiza que `total_pagado == total` y que el CHECK
-      // `total_pagado <= total` nunca se pueda romper desde la vista.
-      final conTotales = await _obtenerResumenPorId(creada.id);
+      await _recalcularTotales(ventaId);
 
-      return actualizarPago(
-        id: creada.id,
-        totalPagado: conTotales.total,
-        estadoPago: EstadoPago.pagado,
-        metodoPago: metodoPago,
-      );
-    });
-  }
+      // Los totales se leen de la fila, no del carrito: es lo que garantiza
+      // que `total_pagado == total` y que el CHECK `total_pagado <= total`
+      // nunca se pueda romper desde la vista.
+      final conTotales = await _obtenerResumenPorId(ventaId);
 
-  @override
-  Future<FacturaResumen> crearDesdeOrden({
-    required int ordenId,
-    required int clienteId,
-    required MetodoPago metodoPago,
-    required EstadoPago estadoPago,
-    int iva = 0,
-  }) async {
-    return _db.transaction(() async {
-      // Validar que la orden tenga al menos un servicio
-      final svcCount = await _db.customSelect(
-        'SELECT COUNT(*) AS cnt FROM ordenes_tareas WHERE orden_id = ?',
-        variables: [Variable.withInt(ordenId)],
-      ).getSingleOrNull();
-      if (((svcCount?.data['cnt'] as int?) ?? 0) == 0) {
-        throw Exception('La orden no tiene servicios. Agrega al menos uno antes de facturar.');
-      }
-
-      // 1. Crear cabecera, ya con su número definitivo.
-      final id = await _db.into(_tablaVentas).insert(
-            FacturasMapper.companionNuevo(
-              numeroFactura: await _consecutivos.siguiente(
-                DocumentoConsecutivo.factura,
-              ),
-              tipo: TipoVenta.servicio,
-              ordenId: ordenId,
-              clienteId: clienteId,
-              metodoPago: metodoPago,
-              estadoPago: estadoPago,
-              iva: iva,
-            ),
-          );
-
-      // 2. Importar tareas como ítems SERVICIO
-      final tareasRows = await _db.customSelect(
-        '''
-        SELECT ot.servicio_id, ot.tecnico_id, s.nombre AS servicio_nombre, ot.precio_pactado
-        FROM ordenes_tareas ot
-        JOIN servicios s ON s.id = ot.servicio_id
-        WHERE ot.orden_id = ?
-        ''',
-        variables: [Variable.withInt(ordenId)],
-      ).get();
-
-      for (final row in tareasRows) {
-        final data = row.data;
-        await _db.into(_tablaItems).insert(
-          FacturasMapper.itemCompanionNuevo(
-            ventaId: id,
-            tipoItem: TipoItem.servicio,
-            servicioId: data['servicio_id'] as int?,
-            tecnicoId: data['tecnico_id'] as int?,
-            descripcion: data['servicio_nombre'] as String? ?? 'Servicio',
-            cantidad: 1,
-            precioUnitario: (data['precio_pactado'] as num? ?? 0).round(),
-            costoUnitario: 0,
-          ),
-        );
-      }
-
-      // 3. Importar repuestos como ítems PRODUCTO
-      // El stock ya fue descontado cuando se agregó el repuesto a la orden,
-      // por eso aquí solo se registra el snapshot histórico sin tocar el stock.
-      final repuestosRows = await _db.customSelect(
-        '''
-        SELECT orp.producto_id, p.nombre AS producto_nombre,
-               orp.cantidad, orp.precio_unitario,
-               COALESCE(p.precio_compra, 0) AS precio_compra
-        FROM ordenes_repuestos orp
-        JOIN productos p ON p.id = orp.producto_id
-        WHERE orp.orden_id = ?
-        ''',
-        variables: [Variable.withInt(ordenId)],
-      ).get();
-
-      for (final row in repuestosRows) {
-        final data = row.data;
-        await _db.into(_tablaItems).insert(
-          FacturasMapper.itemCompanionNuevo(
-            ventaId: id,
-            tipoItem: TipoItem.producto,
-            productoId: data['producto_id'] as int,
-            descripcion: data['producto_nombre'] as String? ?? 'Producto',
-            cantidad: (data['cantidad'] as num).toDouble(),
-            precioUnitario: (data['precio_unitario'] as num? ?? 0).round(),
-            costoUnitario: (data['precio_compra'] as num? ?? 0).round(),
-          ),
-        );
-      }
-
-      await _recalcularTotales(id);
-
-      // Cambiar estado de la orden a LISTA automáticamente
-      await _db.customUpdate(
-        "UPDATE ordenes_servicio SET estado = 'LISTA', actualizado_en = datetime('now','localtime') WHERE id = ?",
-        variables: [Variable.withInt(ordenId)],
-        updates: {_db.tablaOrdenesServicio},
-      );
-
-      return _obtenerResumenPorId(id);
-    });
-  }
-
-  @override
-  Future<FacturaResumen?> obtenerPorOrden(int ordenId) async {
-    final row = await _db
-        .customSelect(
-          '$_sqlSelectResumen WHERE v.orden_id = ? LIMIT 1',
-          variables: [Variable.withInt(ordenId)],
-        )
-        .getSingleOrNull();
-    return row == null ? null : FacturasMapper.resumenDesdeMap(row.data);
-  }
-
-  @override
-  Future<FacturaResumen> actualizarDesdeOrden({
-    required int facturaId,
-    required int ordenId,
-    int?         clienteId,
-    required MetodoPago metodoPago,
-    required EstadoPago estadoPago,
-    int iva       = 0,
-    int descuento = 0,
-  }) async {
-    return _db.transaction(() async {
-      // 1. Validar que la orden tenga al menos un servicio
-      final svcCount = await _db.customSelect(
-        'SELECT COUNT(*) AS cnt FROM ordenes_tareas WHERE orden_id = ?',
-        variables: [Variable.withInt(ordenId)],
-      ).getSingleOrNull();
-      if (((svcCount?.data['cnt'] as int?) ?? 0) == 0) {
-        throw Exception('La orden no tiene servicios. Agrega al menos uno antes de facturar.');
-      }
-
-      // 2. Actualizar cabecera
-      await (_db.update(_tablaVentas)..where((t) => t.id.equals(facturaId))).write(
+      await (_db.update(_tablaVentas)..where((t) => t.id.equals(ventaId)))
+          .write(
         TablaVentasCompanion(
-          metodoPago:    Value(metodoPago.codigo),
-          estadoPago:    Value(estadoPago.aTexto),
-          iva:           Value(iva),
-          descuento:     Value(descuento),
-          clienteId:     clienteId != null ? Value(clienteId) : const Value.absent(),
+          totalPagado: Value(conTotales.total),
+          estadoPago: Value(EstadoPago.pagado.aTexto),
+          metodoPago: Value(metodoPago.codigo),
           actualizadoEn: Value(DateTime.now()),
         ),
       );
 
-      // 3. Borrar ítems anteriores (sin restaurar stock, gestionado en la orden)
-      await (_db.delete(_tablaItems)
-            ..where((t) => t.ventaId.equals(facturaId)))
-          .go();
-
-      // 4. Re-importar tareas
-      final tareasRows = await _db.customSelect(
-        '''
-        SELECT ot.servicio_id, ot.tecnico_id, s.nombre AS servicio_nombre, ot.precio_pactado
-        FROM ordenes_tareas ot
-        JOIN servicios s ON s.id = ot.servicio_id
-        WHERE ot.orden_id = ?
-        ''',
-        variables: [Variable.withInt(ordenId)],
-      ).get();
-
-      for (final row in tareasRows) {
-        final data = row.data;
-        await _db.into(_tablaItems).insert(
-          FacturasMapper.itemCompanionNuevo(
-            ventaId:        facturaId,
-            tipoItem:       TipoItem.servicio,
-            servicioId:     data['servicio_id'] as int?,
-            tecnicoId:      data['tecnico_id'] as int?,
-            descripcion:    data['servicio_nombre'] as String? ?? 'Servicio',
-            cantidad:       1,
-            precioUnitario: (data['precio_pactado'] as num? ?? 0).round(),
-            costoUnitario:  0,
-          ),
-        );
-      }
-
-      // 5. Re-importar repuestos (sin descontar stock)
-      final repuestosRows = await _db.customSelect(
-        '''
-        SELECT orp.producto_id, p.nombre AS producto_nombre,
-               orp.cantidad, orp.precio_unitario,
-               COALESCE(p.precio_compra, 0) AS precio_compra
-        FROM ordenes_repuestos orp
-        JOIN productos p ON p.id = orp.producto_id
-        WHERE orp.orden_id = ?
-        ''',
-        variables: [Variable.withInt(ordenId)],
-      ).get();
-
-      for (final row in repuestosRows) {
-        final data = row.data;
-        await _db.into(_tablaItems).insert(
-          FacturasMapper.itemCompanionNuevo(
-            ventaId:        facturaId,
-            tipoItem:       TipoItem.producto,
-            productoId:     data['producto_id'] as int,
-            descripcion:    data['producto_nombre'] as String? ?? 'Producto',
-            cantidad:       (data['cantidad'] as num).toDouble(),
-            precioUnitario: (data['precio_unitario'] as num? ?? 0).round(),
-            costoUnitario:  (data['precio_compra'] as num? ?? 0).round(),
-          ),
-        );
-      }
-
-      await _recalcularTotales(facturaId);
-      return _obtenerResumenPorId(facturaId);
+      return _obtenerResumenPorId(ventaId);
     });
   }
 
-  @override
-  Future<bool> tieneFactura(int ordenId) async {
-    final row = await _db.customSelect(
-      'SELECT COUNT(*) AS cnt FROM ventas WHERE orden_id = ?',
-      variables: [Variable.withInt(ordenId)],
-    ).getSingleOrNull();
-    return ((row?.data['cnt'] as int?) ?? 0) > 0;
+  /// Inserta la cabecera y devuelve su `id`.
+  ///
+  /// El número se pide **antes** de insertar. Antes se guardaba `'FAC-TEMP'` y
+  /// se pisaba con el `id`: dos ventas a la vez chocaban contra el `UNIQUE` y
+  /// cualquier `INSERT` fallido se saltaba un número para siempre.
+  Future<int> _crearCabecera({
+    int? clienteId,
+    required MetodoPago metodoPago,
+    required int iva,
+    required int descuento,
+  }) async {
+    return _db.into(_tablaVentas).insert(
+          VentasMapper.companionNuevo(
+            numeroFactura:
+                await _consecutivos.siguiente(DocumentoConsecutivo.factura),
+            clienteId: clienteId,
+            metodoPago: metodoPago,
+            iva: iva,
+            descuento: descuento,
+          ),
+        );
   }
 
-  @override
-  Future<FacturaResumen> actualizar({
-    required int id,
-    required MetodoPago metodoPago,
-    required EstadoPago estadoPago,
-    int? iva,
-    int? descuento,
-    bool actualizarCliente = false,
-    int? clienteId,
+  /// La línea y su salida de inventario, que tienen que pasar juntas: sin la
+  /// segunda la venta cobraría algo que nunca salió del estante.
+  Future<void> _agregarLinea({
+    required int ventaId,
+    required LineaVentaMostrador linea,
   }) async {
-    // Obtener orden vinculada antes de actualizar (para propagar cliente)
-    int? ordenVinculadaId;
-    if (actualizarCliente && clienteId != null) {
-      final ventaRow = await (_db.select(_tablaVentas)
-            ..where((t) => t.id.equals(id)))
-          .getSingleOrNull();
-      ordenVinculadaId = ventaRow?.ordenId;
-    }
+    await _verificarStock(linea.productoId, linea.cantidad);
 
-    await (_db.update(_tablaVentas)..where((t) => t.id.equals(id))).write(
-      TablaVentasCompanion(
-        metodoPago:    Value(metodoPago.codigo),
-        estadoPago:    Value(estadoPago.aTexto),
-        iva:           iva != null ? Value(iva) : const Value.absent(),
-        descuento:     descuento != null ? Value(descuento) : const Value.absent(),
-        clienteId:     actualizarCliente ? Value(clienteId) : const Value.absent(),
-        actualizadoEn: Value(DateTime.now()),
+    await _db.into(_tablaItems).insert(
+          VentasMapper.itemCompanionNuevo(
+            ventaId: ventaId,
+            productoId: linea.productoId,
+            descripcion: linea.descripcion,
+            cantidad: linea.cantidad,
+            precioUnitario: linea.precioUnitario,
+            costoUnitario: linea.costoUnitario,
+          ),
+        );
+
+    await _inventario.registrar(
+      SolicitudMovimiento.salida(
+        productoId: linea.productoId,
+        cantidad: linea.cantidad,
+        tipo: TipoMovimiento.salidaVenta,
+        ventaId: ventaId,
       ),
     );
-
-    // Propagar cambio de cliente a la orden vinculada (si existe)
-    if (ordenVinculadaId != null) {
-      await _db.customUpdate(
-        'UPDATE ordenes_servicio SET cliente_id = ? WHERE id = ?',
-        variables: [Variable.withInt(clienteId!), Variable.withInt(ordenVinculadaId)],
-        updates: {_db.tablaOrdenesServicio},
-      );
-    }
-
-    await _recalcularTotales(id);
-    return _obtenerResumenPorId(id);
   }
 
   @override
   Future<void> anular(int id) async {
     await _db.transaction(() async {
-      final factura = await (_db.select(_tablaVentas)
+      final venta = await (_db.select(_tablaVentas)
             ..where((t) => t.id.equals(id)))
           .getSingleOrNull();
-      if (factura == null) throw Exception('Factura #$id no existe.');
+      if (venta == null) throw Exception('La venta #$id no existe.');
 
-      if (factura.estadoPago == EstadoPago.anulada.aTexto) {
-        throw Exception('La factura ${factura.numeroFactura} ya está anulada.');
+      if (venta.estadoPago == EstadoPago.anulada.aTexto) {
+        throw Exception('La venta ${venta.numeroFactura} ya está anulada.');
       }
 
-      // Las facturas ligadas a una orden no gestionan el stock directamente
-      // (fue descontado al agregar el repuesto a la orden).
-      // Solo se devuelve el stock de las facturas sin orden asociada.
-      if (factura.ordenId == null) {
+      // Las ventas ligadas a una orden no gestionan el stock directamente: lo
+      // movió la orden al cerrarse. Solo se devuelve el de las de mostrador.
+      if (venta.ordenId == null) {
         final items = await (_db.select(_tablaItems)
               ..where((t) => t.ventaId.equals(id)))
             .get();
@@ -472,16 +218,16 @@ class RepositorioFacturasImpl implements RepositorioFacturas {
                 cantidad: item.cantidad,
                 tipo: TipoMovimiento.devolucionVenta,
                 ventaId: id,
-                notas: 'Factura anulada',
+                notas: 'Venta anulada',
               ),
             );
           }
         }
       }
 
-      // La factura no se borra: es un documento contable. Se marca anulada y
-      // ahí queda, con su número y su historial. El `DELETE` lo impide además
-      // una guarda de la base (`guardas_sql.dart`), por si alguien lo intenta
+      // La venta no se borra: es un documento contable. Se marca anulada y ahí
+      // queda, con su número y su historial. El `DELETE` lo impide además una
+      // guarda de la base (`guardas_sql.dart`), por si alguien lo intenta
       // desde otro camino.
       await (_db.update(_tablaVentas)..where((t) => t.id.equals(id))).write(
         TablaVentasCompanion(
@@ -492,77 +238,7 @@ class RepositorioFacturasImpl implements RepositorioFacturas {
     });
   }
 
-  // Items
-
-  @override
-  Future<void> agregarItem({
-    required int ventaId,
-    required TipoItem tipoItem,
-    int? productoId,
-    int? servicioId,
-    int? tecnicoId,
-    required String descripcion,
-    required double cantidad,
-    required int precioUnitario,
-    int costoUnitario = 0,
-  }) {
-    // Cuatro escrituras que tienen que pasar juntas: la línea, la salida de
-    // inventario, los totales de la factura y —si viene de una orden— el
-    // precio pactado de la tarea. Antes iban sueltas, y un fallo a mitad
-    // dejaba la factura cobrando algo que nunca salió del inventario.
-    return _db.transaction(() async {
-      if (tipoItem == TipoItem.producto && productoId != null) {
-        await _verificarStock(productoId, cantidad);
-      }
-
-      await _db.into(_tablaItems).insert(
-          FacturasMapper.itemCompanionNuevo(
-            ventaId: ventaId,
-            tipoItem: tipoItem,
-            productoId: productoId,
-            servicioId: servicioId,
-            tecnicoId: tecnicoId,
-            descripcion: descripcion,
-            cantidad: cantidad,
-            precioUnitario: precioUnitario,
-            costoUnitario: costoUnitario,
-          ),
-        );
-
-      if (tipoItem == TipoItem.producto && productoId != null) {
-        await _inventario.registrar(
-          SolicitudMovimiento.salida(
-            productoId: productoId,
-            cantidad: cantidad,
-            tipo: TipoMovimiento.salidaVenta,
-            ventaId: ventaId,
-          ),
-        );
-      }
-
-      await _recalcularTotales(ventaId);
-
-      // Si la factura viene de una orden y el ítem es un servicio, el precio
-      // que se cobró se refleja en la tarea: es el mismo trabajo.
-      if (tipoItem == TipoItem.servicio && servicioId != null) {
-        final factura = await (_db.select(_tablaVentas)
-              ..where((t) => t.id.equals(ventaId)))
-            .getSingleOrNull();
-        final ordenId = factura?.ordenId;
-        if (ordenId != null) {
-          await (_db.update(_db.tablaOrdenesTarea)
-                ..where((t) =>
-                    t.ordenId.equals(ordenId) &
-                    t.servicioId.equals(servicioId)))
-              .write(TablaOrdenesTareaCompanion(
-            precioPactado: Value(precioUnitario),
-            tecnicoId:
-                tecnicoId != null ? Value(tecnicoId) : const Value.absent(),
-          ));
-        }
-      }
-    });
-  }
+  // Helpers
 
   /// Lanza si no alcanza el stock, con el mensaje que ve el usuario.
   ///
@@ -571,7 +247,7 @@ class RepositorioFacturasImpl implements RepositorioFacturas {
   Future<void> _verificarStock(int productoId, double cantidad) async {
     final fila = await _db
         .customSelect(
-          'SELECT stock_actual FROM productos WHERE id = ?',
+          'SELECT nombre, stock_actual FROM productos WHERE id = ?',
           variables: [Variable.withInt(productoId)],
         )
         .getSingleOrNull();
@@ -579,126 +255,12 @@ class RepositorioFacturasImpl implements RepositorioFacturas {
     final disponible = (fila?.data['stock_actual'] as num?)?.toDouble() ?? 0;
     if (disponible >= cantidad) return;
 
+    final nombre = fila?.data['nombre'] as String? ?? 'El producto';
     final texto = disponible % 1 == 0
         ? disponible.toInt().toString()
         : disponible.toStringAsFixed(2);
-    throw Exception('Stock insuficiente. Disponible: $texto unidades.');
+    throw Exception('Stock insuficiente de «$nombre». Disponible: $texto.');
   }
-
-  @override
-  Future<void> actualizarItem(
-    int itemId, {
-    double? cantidad,
-    int? precioUnitario,
-  }) async {
-    final current = await (_db.select(_tablaItems)
-          ..where((t) => t.id.equals(itemId)))
-        .getSingleOrNull();
-    if (current == null) return;
-
-    final cantidadNueva = cantidad ?? current.cantidad;
-    final precioNuevo = precioUnitario ?? current.precioUnitario;
-    final delta = cantidadNueva - current.cantidad;
-
-    // Solo se mueve la diferencia: positivo = se cobró más y sale del
-    // inventario, negativo = se devolvió parte.
-    if (current.tipoItem == TipoItem.producto.aTexto &&
-        current.productoId != null &&
-        delta != 0) {
-      await _inventario.registrar(
-        SolicitudMovimiento(
-          productoId: current.productoId!,
-          cantidad: -delta,
-          tipo: delta > 0
-              ? TipoMovimiento.salidaVenta
-              : TipoMovimiento.devolucionVenta,
-          ventaId: current.ventaId,
-          notas: 'Cambio de cantidad en la factura',
-        ),
-      );
-    }
-
-    await (_db.update(_tablaItems)..where((t) => t.id.equals(itemId))).write(
-      TablaVentaDetallesCompanion(
-        cantidad: Value(cantidadNueva),
-        precioUnitario: Value(precioNuevo),
-        // El importe cobrado es entero aunque la cantidad no lo sea.
-        subtotal: Value((cantidadNueva * precioNuevo).round()),
-      ),
-    );
-
-    await _recalcularTotales(current.ventaId);
-
-    // Si la factura está ligada a una orden y el item es un producto,
-    // sincronizar precio/cantidad en ordenes_repuestos (sin tocar stock,
-    // ya fue ajustado arriba).
-    if (current.tipoItem == TipoItem.producto.aTexto &&
-        current.productoId != null) {
-      final factura = await (_db.select(_tablaVentas)
-            ..where((t) => t.id.equals(current.ventaId)))
-          .getSingleOrNull();
-      if (factura?.ordenId != null) {
-        await (_db.update(_db.tablaOrdenesRepuesto)
-              ..where((t) =>
-                  t.ordenId.equals(factura!.ordenId!) &
-                  t.productoId.equals(current.productoId!)))
-            .write(TablaOrdenesRepuestoCompanion(
-          cantidad: Value(cantidadNueva),
-          precioUnitario: Value(precioNuevo),
-        ));
-      }
-    }
-  }
-
-  @override
-  Future<void> eliminarItem(int itemId) {
-    // Tres escrituras que van juntas. Si el recálculo del total falla —por
-    // ejemplo, porque dejaría la factura cobrando más de lo que suma— la
-    // línea tiene que volver y el stock también.
-    return _db.transaction(() async {
-      final current = await (_db.select(_tablaItems)
-            ..where((t) => t.id.equals(itemId)))
-          .getSingleOrNull();
-      if (current == null) return;
-
-      await (_db.delete(_tablaItems)..where((t) => t.id.equals(itemId))).go();
-
-      if (current.tipoItem == TipoItem.producto.aTexto &&
-          current.productoId != null) {
-        await _inventario.registrar(
-          SolicitudMovimiento.entrada(
-            productoId: current.productoId!,
-            cantidad: current.cantidad,
-            tipo: TipoMovimiento.devolucionVenta,
-            ventaId: current.ventaId,
-            notas: 'Línea eliminada de la factura',
-          ),
-        );
-      }
-
-      await _recalcularTotales(current.ventaId);
-    });
-  }
-
-  @override
-  Future<FacturaResumen> actualizarPago({
-    required int id,
-    required int totalPagado,
-    required EstadoPago estadoPago,
-    required MetodoPago metodoPago,
-  }) async {
-    await (_db.update(_tablaVentas)..where((t) => t.id.equals(id))).write(
-      TablaVentasCompanion(
-        totalPagado:   Value(totalPagado),
-        estadoPago:    Value(estadoPago.aTexto),
-        metodoPago:    Value(metodoPago.codigo),
-        actualizadoEn: Value(DateTime.now()),
-      ),
-    );
-    return _obtenerResumenPorId(id);
-  }
-
-  // Helpers
 
   Future<void> _recalcularTotales(int ventaId) async {
     final ventaRow = await (_db.select(_tablaVentas)
@@ -714,16 +276,14 @@ class RepositorioFacturasImpl implements RepositorioFacturas {
         .getSingleOrNull();
     final subtotal = (subtotalRow?.data['sub'] as num? ?? 0).round();
 
-    // Al quitar una línea el subtotal baja y el descuento guardado puede
-    // quedar por encima; sin recortarlo, el `CHECK (total >= 0)` rechazaría
-    // el `UPDATE` y borrar una línea fallaría sin explicación.
+    // Un descuento mayor que el subtotal dejaría el total en negativo y el
+    // `CHECK (total >= 0)` rechazaría el `UPDATE` sin explicación.
     final descuento = ventaRow.descuento > subtotal
         ? subtotal
         : (ventaRow.descuento < 0 ? 0 : ventaRow.descuento);
 
     // Los precios ya traen el IVA dentro (`iva_app.dart`): el total no se lo
-    // suma, y la columna `iva` guarda cuánto va contenido en él. Aquí es donde
-    // se decide, no en el parámetro que recibió `crear`.
+    // suma, y la columna `iva` guarda cuánto va contenido en él.
     final total = subtotal - descuento;
 
     await (_db.update(_tablaVentas)..where((t) => t.id.equals(ventaId))).write(

@@ -1,17 +1,17 @@
 import 'package:drift/drift.dart';
 
-import '../../../../share/database/app_db.dart';
-import '../enum/enum_facturas.dart';
-import '../modelo/factura_detalle.dart';
-import '../modelo/factura_resumen.dart';
+import '../../../share/database/app_db.dart';
+import '../enum/enum_ventas.dart';
+import '../modelo/venta_detalle.dart';
+import '../modelo/venta_resumen.dart';
 import '../modelo/venta_item.dart';
 
-abstract final class FacturasMapper {
+abstract final class VentasMapper {
   // Resumen (lista)
 
-  static FacturaResumen resumenDesdeMap(Map<String, dynamic> row) {
+  static VentaResumen resumenDesdeMap(Map<String, dynamic> row) {
     final ordenId = row['orden_id'] as int?;
-    return FacturaResumen(
+    return VentaResumen(
       id: row['id'] as int,
       numeroFactura: row['numero_factura'] as String,
       tipo: TipoVenta.desdeTexto(row['tipo'] as String? ?? 'SERVICIO'),
@@ -29,19 +29,19 @@ abstract final class FacturasMapper {
     );
   }
 
-  static List<FacturaResumen> resumenesDesdeMapas(
+  static List<VentaResumen> resumenesDesdeMapas(
     List<Map<String, dynamic>> rows,
   ) =>
       rows.map(resumenDesdeMap).toList(growable: false);
 
   // Detalle
 
-  static FacturaDetalle detalleDesdeMapas({
+  static VentaDetalle detalleDesdeMapas({
     required Map<String, dynamic> ventaRow,
     required List<Map<String, dynamic>> itemsRows,
   }) {
     final ordenId = ventaRow['orden_id'] as int?;
-    return FacturaDetalle(
+    return VentaDetalle(
       id: ventaRow['id'] as int,
       numeroFactura: ventaRow['numero_factura'] as String,
       tipo: TipoVenta.desdeTexto(ventaRow['tipo'] as String? ?? 'SERVICIO'),
@@ -65,35 +65,34 @@ abstract final class FacturasMapper {
 
   // Companions (escritura)
 
+  /// Cabecera de una venta de mostrador: siempre `MOSTRADOR` y siempre
+  /// `PAGADO`. El mostrador no fía —para eso está Cuentas por cobrar— y la
+  /// única otra forma de venta que existía, la de una orden de servicio, se
+  /// fue con el módulo de Facturación.
   static TablaVentasCompanion companionNuevo({
     required String numeroFactura,
-    required TipoVenta tipo,
-    int? ordenId,
     int? clienteId,
     required MetodoPago metodoPago,
-    required EstadoPago estadoPago,
     int iva = 0,
     int descuento = 0,
   }) =>
       TablaVentasCompanion.insert(
         numeroFactura: numeroFactura,
-        tipo: Value(tipo.aTexto),
-        ordenId: Value(ordenId),
+        tipo: Value(TipoVenta.mostrador.aTexto),
         clienteId: Value(clienteId),
         metodoPago: Value(metodoPago.codigo),
-        estadoPago: Value(estadoPago.aTexto),
+        estadoPago: Value(EstadoPago.pagado.aTexto),
         iva: Value(iva),
         descuento: Value(descuento),
         creadoEn: Value(DateTime.now()),
         actualizadoEn: Value(DateTime.now()),
       );
 
+  /// Una línea de mostrador. Siempre es un producto: los servicios se cobran
+  /// por una orden.
   static TablaVentaDetallesCompanion itemCompanionNuevo({
     required int ventaId,
-    required TipoItem tipoItem,
-    int? productoId,
-    int? servicioId,
-    int? tecnicoId,
+    required int productoId,
     required String descripcion,
     required double cantidad,
     required int precioUnitario,
@@ -101,17 +100,15 @@ abstract final class FacturasMapper {
   }) =>
       TablaVentaDetallesCompanion.insert(
         ventaId: ventaId,
-        tipoItem: tipoItem.aTexto,
+        tipoItem: TipoItem.producto.aTexto,
         productoId: Value(productoId),
-        servicioId: Value(servicioId),
-        tecnicoId: Value(tecnicoId),
         descripcion: descripcion,
         cantidad: Value(cantidad),
         precioUnitario: precioUnitario,
         costoUnitario: Value(costoUnitario),
         // La cantidad puede ser fraccionaria (litros, metros); el importe
         // que se cobra, no. El redondeo va aquí, en el único punto por el
-        // que pasa toda línea de factura.
+        // que pasa toda línea de venta.
         subtotal: (cantidad * precioUnitario).round(),
       );
 

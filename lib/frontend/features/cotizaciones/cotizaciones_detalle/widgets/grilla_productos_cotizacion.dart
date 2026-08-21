@@ -1,17 +1,17 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
-import '../../../../../backend/features/productos/modelo/producto.dart';
-import '../../../../../core/formato.dart';
 import '../../../../share2/share2.dart';
-import '../../../productos/vista/producto_vista.dart' show MiniaturaProducto;
+import '../../../productos/widgets/grilla_productos_catalogo.dart';
 import '../provider/catalogo_cotizacion_providers.dart';
 import '../provider/cotizacion_editor_provider.dart';
 
-/// Rejilla de productos del editor, con las tarjetas del punto de venta.
+/// Rejilla de productos del editor de cotizaciones.
 ///
-/// Un clic en la tarjeta —o en su botón verde— agrega el producto con cantidad
-/// 1; si ya está en la cotización, le suma uno.
+/// Pone la página que devuelve SQLite dentro de [GrillaProductosCatalogo], la
+/// misma rejilla del punto de venta y del editor de órdenes. Un clic en la
+/// tarjeta —o en su botón verde— agrega el producto con cantidad 1; si ya está
+/// en la cotización, le suma uno.
 ///
 /// El **stock se muestra pero no bloquea**: una cotización no mueve inventario,
 /// y cotizar lo que hay que pedirle al proveedor es parte del trabajo. El color
@@ -23,17 +23,6 @@ class GrillaProductosCotizacion extends ConsumerWidget {
   const GrillaProductosCotizacion({super.key, required this.cotizacionId});
 
   final int? cotizacionId;
-
-  static Color _colorStock(Producto p) {
-    if (p.stockActual <= 0) return ColoresApp.stockOut;
-    if (p.stockActual <= p.stockMinimo) return ColoresApp.stockLow;
-    return ColoresApp.textMuted;
-  }
-
-  static String _etiquetaStock(Producto p) {
-    if (p.stockActual <= 0) return 'Sin stock · hay que pedirlo';
-    return '${formatearCantidad(p.stockActual)} en stock';
-  }
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -61,44 +50,11 @@ class GrillaProductosCotizacion extends ConsumerWidget {
       );
     }
 
-    final agregar =
-        ref.read(cotizacionEditorProvider(cotizacionId).notifier).agregarProducto;
-
-    return GridView.builder(
-      padding: const EdgeInsets.only(bottom: 4),
-      gridDelegate: const SliverGridDelegateWithMaxCrossAxisExtent(
-        // `minmax(210px, 1fr)` del diseño, con su gap de 16.
-        maxCrossAxisExtent: 260,
-        mainAxisExtent: TarjetaProducto.altoSugerido,
-        crossAxisSpacing: 16,
-        mainAxisSpacing: 16,
-      ),
-      itemCount: productos.length,
-      itemBuilder: (context, i) {
-        final producto = productos[i];
-
-        return TarjetaProducto(
-          key: ValueKey(producto.id),
-          nombre: producto.nombre,
-          codigo: producto.sku,
-          // Quien cotiza suele tener que ir a mirar la pieza al estante: sin
-          // la ubicación hay que abrir el producto en otra pantalla.
-          ubicacion: producto.ubicacionBodega,
-          detalle: _etiquetaStock(producto),
-          colorDetalle: _colorStock(producto),
-          precio: formatearPrecio(producto.precioVenta),
-          imagen: MiniaturaProducto(
-            rutaImagen: producto.imagenUrl,
-            lado: 120,
-            ancho: double.infinity,
-            radio: 13,
-            conBorde: false,
-          ),
-          etiquetaAgregar: 'Agregar a la cotización',
-          alAgregar: () => agregar(producto),
-          alPresionar: () => agregar(producto),
-        );
-      },
+    return GrillaProductosCatalogo(
+      productos: productos,
+      etiquetaAgregar: 'Agregar a la cotización',
+      alAgregar:
+          ref.read(cotizacionEditorProvider(cotizacionId).notifier).agregarProducto,
     );
   }
 }

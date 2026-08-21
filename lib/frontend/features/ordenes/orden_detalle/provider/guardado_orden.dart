@@ -1,5 +1,5 @@
-import '../../../../../backend/features/ventas/ordenes/enum/enum_ordenes.dart';
-import '../../../../../backend/features/ventas/ordenes/repositorio/repositrio_ordenes.dart';
+import '../../../../../backend/features/ordenes/enum/enum_ordenes.dart';
+import '../../../../../backend/features/ordenes/repositorio/repositorio_ordenes.dart';
 import '../modelo/linea_orden_editor.dart';
 
 /// Escribe la orden en la base, **una línea a la vez**.

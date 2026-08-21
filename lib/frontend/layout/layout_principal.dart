@@ -10,7 +10,6 @@ import '../features/productos/vista/producto_vista.dart';
 import '../features/proveedores/vista/proveedores_vista.dart';
 import '../features/reservas/vista/reservas_vista.dart';
 import '../features/tecnicos/vista/tecnico_vista.dart';
-import '../features/ventas/facturas/vista/facturas_vista.dart';
 import '../features/ordenes/vista/ordenes_vista.dart';
 import '../share2/nav/barra_lateral.dart';
 import '../share2/nav/item_nav_dato.dart';
@@ -47,7 +46,6 @@ class _LayoutPrincipalState extends State<LayoutPrincipal> {
     '/tecnicos',
     '/clientes',
     '/deudores',
-    '/facturacion',
     '/configuracion',
   ];
 
@@ -65,7 +63,6 @@ class _LayoutPrincipalState extends State<LayoutPrincipal> {
     TecnicosVista(),
     ClientesVista(),
     DeudoresVista(),
-    FacturasVista(),
     ConfiguracionVista(),
   ];
 
@@ -167,12 +164,6 @@ class _LayoutPrincipalState extends State<LayoutPrincipal> {
           etiqueta: 'Cuentas por cobrar',
           ruta: '/deudores',
           alPresionar: () => _navegar('/deudores'),
-        ),
-        ItemNavDato(
-          icono: Icons.receipt_long_outlined,
-          etiqueta: 'Facturación',
-          ruta: '/facturacion',
-          alPresionar: () => _navegar('/facturacion'),
         ),
       ],
     ),

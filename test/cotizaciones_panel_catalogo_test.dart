@@ -16,13 +16,13 @@ import 'package:inventario_k1/backend/features/categorias/modelo/categoria.dart'
 import 'package:inventario_k1/backend/features/cotizaciones/enum/enum_cotizacion.dart';
 import 'package:inventario_k1/backend/features/productos/modelo/producto.dart';
 import 'package:inventario_k1/backend/features/productos/repositorio/repositorio_producto.dart';
-import 'package:inventario_k1/backend/features/ventas/servicios/modelo/servicio.dart';
+import 'package:inventario_k1/backend/features/servicios/modelo/servicio.dart';
 import 'package:inventario_k1/frontend/features/categorias/provider/categorias_provider.dart';
 import 'package:inventario_k1/frontend/features/cotizaciones/cotizaciones_detalle/provider/catalogo_cotizacion_providers.dart';
 import 'package:inventario_k1/frontend/features/cotizaciones/cotizaciones_detalle/provider/cotizacion_editor_provider.dart';
 import 'package:inventario_k1/frontend/features/cotizaciones/cotizaciones_detalle/widgets/panel_catalogo.dart';
 import 'package:inventario_k1/frontend/features/productos/provider/productos_provider.dart';
-import 'package:inventario_k1/frontend/features/ventas/servicios/provider/servicios_provider.dart';
+import 'package:inventario_k1/frontend/features/servicios/provider/servicios_provider.dart';
 import 'package:inventario_k1/frontend/features/cotizaciones/provider/cotizaciones_provider.dart';
 import 'package:inventario_k1/frontend/share2/share2.dart';
 

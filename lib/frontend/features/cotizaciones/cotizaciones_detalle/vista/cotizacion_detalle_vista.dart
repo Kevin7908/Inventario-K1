@@ -44,18 +44,9 @@ class _CotizacionDetalleVistaState
     super.dispose();
   }
 
-  void _avisar(String mensaje, {bool esError = false}) {
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text(
-          mensaje,
-          style: TipografiaApp.sobrePrimario(TipografiaApp.cuerpo),
-        ),
-        backgroundColor:
-            esError ? ColoresApp.statusDanger : ColoresApp.statusSuccess,
-      ),
-    );
-  }
+  void _avisar(String mensaje, {bool esError = false}) => esError
+      ? MensajeApp.error(context, mensaje)
+      : MensajeApp.exito(context, mensaje);
 
   /// Fuerza el guardado sin esperar el retardo. Lo usan `Ctrl+Enter` y el
   /// cierre del editor.

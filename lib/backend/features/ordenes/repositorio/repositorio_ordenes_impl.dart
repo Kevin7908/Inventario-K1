@@ -1,12 +1,12 @@
 import 'package:drift/drift.dart';
-import 'package:inventario_k1/backend/features/ventas/ordenes/repositorio/repositrio_ordenes.dart';
+import 'package:inventario_k1/backend/features/ordenes/repositorio/repositorio_ordenes.dart';
 import 'package:inventario_k1/backend/share/database/app_db.dart';
 
-import '../../../inventario/modelo/movimiento_inventario.dart';
-import '../../../inventario/repositorio/repositorio_inventario.dart';
-import '../../../inventario/repositorio/repositorio_inventario_impl.dart';
-import '../../../../share/consecutivos/documento_consecutivo.dart';
-import '../../../../share/consecutivos/repositorio_consecutivos.dart';
+import '../../inventario/modelo/movimiento_inventario.dart';
+import '../../inventario/repositorio/repositorio_inventario.dart';
+import '../../inventario/repositorio/repositorio_inventario_impl.dart';
+import '../../../share/consecutivos/documento_consecutivo.dart';
+import '../../../share/consecutivos/repositorio_consecutivos.dart';
 import '../enum/enum_ordenes.dart';
 import '../mapper/ordenes_mapper.dart';
 import '../modelo/orden_detalle.dart';

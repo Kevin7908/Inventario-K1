@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
-import '../../../../backend/features/ventas/facturas/enum/enum_facturas.dart';
+import '../../../../backend/features/pos/enum/enum_ventas.dart';
 import '../../../../core/formato.dart';
 import '../../../share2/share2.dart';
 

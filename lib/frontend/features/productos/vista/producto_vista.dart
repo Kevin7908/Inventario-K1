@@ -10,8 +10,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../../backend/features/productos/modelo/producto.dart';
 import '../../../layout/encabezado_con_cuenta.dart';
 import '../../../share2/share2.dart';
-import '../../../../backend/features/categorias/modelo/categoria.dart';
-import '../../categorias/provider/categorias_provider.dart';
+import '../../categorias/widgets/panel_categorias_catalogo.dart';
 import '../provider/productos_provider.dart';
 import '../widgets/columnas_tabla_producto.dart';
 import 'producto_detalle_vista.dart';
@@ -334,74 +333,25 @@ class _TablaProductos extends ConsumerWidget {
   }
 }
 
-/// Adaptador entre `categoriasProvider` y [PanelCategorias].
+/// El panel de categorías del catálogo, atado al filtro de la tabla.
 ///
-/// Traduce el modelo de dominio al DTO del panel y aplica la búsqueda local
-/// de categorías. "Todas" —que pinta el propio panel— limpia el filtro.
-/// El estado del panel (abierto/cerrado y su búsqueda) vive aquí y no en la
-/// página: es UI local, y tenerlo arriba hacía que teclear una categoría
-/// reconstruyera también la tabla y el encabezado.
-class _PanelCategorias extends ConsumerStatefulWidget {
+/// El adaptador —traducir `Categoria` al DTO del panel, la búsqueda local y el
+/// abrir/cerrar— vive en el módulo de Categorías y lo comparten esta pantalla,
+/// el punto de venta y los dos editores. Aquí solo queda de qué provider sale
+/// la categoría activa.
+class _PanelCategorias extends ConsumerWidget {
   const _PanelCategorias();
 
   @override
-  ConsumerState<_PanelCategorias> createState() => _PanelCategoriasState();
-}
-
-class _PanelCategoriasState extends ConsumerState<_PanelCategorias> {
-  final _controladorBusqueda = TextEditingController();
-  String _busqueda = '';
-  bool _expandido = true;
-
-  @override
-  void dispose() {
-    _controladorBusqueda.dispose();
-    super.dispose();
-  }
-
-  /// Contrae o expande el panel.
-  ///
-  /// Al contraerlo limpia su búsqueda: en la tira de íconos no se ve el
-  /// buscador, y dejar una lista recortada sin explicar por qué confunde.
-  void _alternar() => setState(() {
-    _expandido = !_expandido;
-    if (!_expandido) {
-      _busqueda = '';
-      _controladorBusqueda.clear();
-    }
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    // `select` en ambos: el panel solo rebuilda si cambia la categoría activa
-    // o la lista de categorías, no con cada tecla del buscador de productos.
-    final seleccionada = ref.watch(
-      productosProvider.select((s) => s.value?.filtroCategoriaId),
-    );
-    final categorias =
-        ref.watch(catalogoCategoriasProvider).value ?? const <Categoria>[];
-
-    final query = _busqueda.trim().toLowerCase();
-    final items = [
-      for (final categoria in categorias)
-        if (categoria.id != null &&
-            (query.isEmpty || categoria.nombre.toLowerCase().contains(query)))
-          CategoriaPanelDato(
-            id: categoria.id!,
-            nombre: categoria.nombre,
-            color: colorDeHex(categoria.colorHex),
-          ),
-    ];
-
-    return PanelCategorias(
-      categorias: items,
-      seleccionada: seleccionada,
+  Widget build(BuildContext context, WidgetRef ref) {
+    return PanelCategoriasCatalogo(
+      // `select`: el panel solo rebuilda si cambia la categoría activa, no con
+      // cada tecla del buscador de productos.
+      seleccionada: ref.watch(
+        productosProvider.select((s) => s.value?.filtroCategoriaId),
+      ),
       alSeleccionar: (id) =>
           ref.read(productosProvider.notifier).filtrarPorCategoria(id),
-      expandido: _expandido,
-      alAlternar: _alternar,
-      controladorBusqueda: _controladorBusqueda,
-      alBuscar: (texto) => setState(() => _busqueda = texto),
     );
   }
 }

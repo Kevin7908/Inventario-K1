@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
-import '../../../../backend/features/ventas/ordenes/modelo/orden_resumen.dart';
+import '../../../../backend/features/ordenes/modelo/orden_resumen.dart';
 import '../../../../core/formato.dart';
 import '../../../share2/share2.dart';
 import '../provider/ordenes_providers.dart';

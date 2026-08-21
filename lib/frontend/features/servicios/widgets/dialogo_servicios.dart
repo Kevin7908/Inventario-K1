@@ -1,8 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
-import '../../../../../backend/features/ventas/servicios/modelo/servicio.dart';
-import '../../../../share2/share2.dart';
+import '../../../../backend/features/servicios/modelo/servicio.dart';
+import '../../../share2/share2.dart';
 import '../provider/servicios_provider.dart';
 
 /// Diálogo de creación y edición de un servicio del taller.

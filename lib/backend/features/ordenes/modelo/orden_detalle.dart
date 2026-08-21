@@ -1,8 +1,8 @@
 import 'package:equatable/equatable.dart';
-import 'package:inventario_k1/backend/features/ventas/ordenes/modelo/orden_repuesto.dart';
-import 'package:inventario_k1/backend/features/ventas/ordenes/modelo/orden_tarea.dart';
+import 'package:inventario_k1/backend/features/ordenes/modelo/orden_repuesto.dart';
+import 'package:inventario_k1/backend/features/ordenes/modelo/orden_tarea.dart';
 
-import '../../../../../core/iva_app.dart';
+import '../../../../core/iva_app.dart';
 import '../enum/enum_ordenes.dart';
 import 'orden_cargo.dart';
 

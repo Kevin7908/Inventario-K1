@@ -1,10 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
-import '../../../../backend/features/ventas/servicios/modelo/servicio.dart';
+import '../../../../backend/features/servicios/modelo/servicio.dart';
 import '../../../share2/share2.dart';
-import '../../ventas/servicios/provider/servicios_provider.dart';
-import '../../ventas/servicios/widgets/dialogo_servicios.dart';
+import '../../servicios/provider/servicios_provider.dart';
+import '../../servicios/widgets/dialogo_servicios.dart';
 
 /// Pestaña "Servicios" de Configuración: catálogo de servicios del taller en
 /// formato de tabla, con búsqueda y alta/edición/eliminación.

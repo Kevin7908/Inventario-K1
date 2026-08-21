@@ -1,6 +1,6 @@
 import 'package:drift/drift.dart';
 
-import '../../../../share/database/app_db.dart';
+import '../../../share/database/app_db.dart';
 import '../mapper/servicio_mapper.dart';
 import '../modelo/servicio.dart';
 import 'repositorio_servicios.dart';
