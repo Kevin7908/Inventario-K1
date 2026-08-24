@@ -65,7 +65,7 @@ class _DialogoNuevaReservaState extends ConsumerState<DialogoNuevaReserva> {
             items: const [],
           );
       if (!mounted) return;
-      ref.invalidate(reservasListaProvider);
+      // El listado se entera solo: su consulta es un stream de Drift.
       Navigator.of(context).pop(id);
     } catch (e) {
       if (!mounted) return;

@@ -79,7 +79,12 @@ final class ReservasListaState {
 }
 
 class ReservasListaNotifier extends AsyncNotifier<ReservasListaState> {
-  late final RepositorioReservas _repo;
+  /// `late` **sin `final`**: Riverpod conserva la instancia del notifier y
+  /// vuelve a llamar a `build()` cada vez que el provider se invalida o cambia
+  /// algo que observa. Con `late final`, esa segunda pasada reventaba con
+  /// «Field '_repo' has already been initialized» y la pantalla se quedaba en
+  /// el mensaje de error.
+  late RepositorioReservas _repo;
   StreamSubscription<PaginaReservas>? _sub;
 
   @override

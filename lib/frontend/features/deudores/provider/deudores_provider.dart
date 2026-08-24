@@ -74,7 +74,9 @@ final class DeudoresState {
 // ── Notifier ──────────────────────────────────────────────────────────────────
 
 class DeudoresNotifier extends AsyncNotifier<DeudoresState> {
-  late final RepositorioDeudores _repo;
+  /// `late` sin `final`: «Reintentar» invalida el provider y `build()` corre
+  /// por segunda vez sobre la misma instancia del notifier.
+  late RepositorioDeudores _repo;
 
   @override
   Future<DeudoresState> build() async {

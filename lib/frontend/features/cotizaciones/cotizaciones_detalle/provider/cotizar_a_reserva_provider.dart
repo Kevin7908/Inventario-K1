@@ -74,7 +74,6 @@ final class CotizarAReservaUseCase {
         metodoPagoInicial: metodoPago,
         referenciaInicial: referencia,
       );
-      _ref.invalidate(reservasListaProvider);
       return null;
     } catch (e) {
       return e.toString().replaceFirst('Exception: ', '');

@@ -36,7 +36,8 @@ class ReservaEditorNotifier extends AsyncNotifier<ReservaEditorState> {
 
   final int reservaId;
 
-  late final RepositorioReservas _repo;
+  /// `late` sin `final`: `build()` se repite y el campo se reasigna.
+  late RepositorioReservas _repo;
 
   /// Cuánto se espera desde la última tecla antes de escribir.
   static const _retardoGuardado = Duration(milliseconds: 450);
@@ -101,7 +102,9 @@ class ReservaEditorNotifier extends AsyncNotifier<ReservaEditorState> {
     final detalle = await _repo.obtenerDetalle(reservaId);
     if (!ref.mounted) return;
     state = AsyncData(_desdeDetalle(detalle, conservando: actual));
-    ref.invalidate(reservasListaProvider);
+    // Sin `invalidate` del listado: `observarPagina` es un stream de Drift y
+    // re-emite solo en cuanto cambian las tablas. Invalidarlo no lo refrescaba
+    // antes, solo forzaba una segunda pasada por `build()`.
   }
 
   /// Ejecuta una escritura inmediata: marca «guardando», escribe, relee.
