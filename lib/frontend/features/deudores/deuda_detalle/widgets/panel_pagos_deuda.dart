@@ -16,7 +16,8 @@ import '../provider/deuda_editor_provider.dart';
 /// **El contexto va arriba y no es decoración.** Registrar un abono es el
 /// único gesto de esta pantalla que mueve plata, y quien lo hace está mirando
 /// a un cliente al otro lado del mostrador: antes de teclear un monto tiene
-/// que poder confirmar quién es y cuánto debía, sin volver al otro panel.
+/// que poder confirmar quién es, para qué moto fue y cuánto debía, sin volver
+/// al otro panel.
 ///
 /// El formulario es el mismo de las reservas ([FormularioAbono]), con otras
 /// palabras: se abona igual contra un apartado que contra un fiado.
@@ -30,8 +31,10 @@ class PanelPagosDeuda extends ConsumerWidget {
     final provider = deudaEditorProvider(deudaId);
     final datos = ref.watch(
       provider.select((s) => (
-            cliente: s.value?.deuda.nombreCliente ?? '',
-            concepto: s.value?.deuda.concepto ?? '',
+            cliente: s.value?.clienteNombre ?? '',
+            moto: s.value?.motoDescripcion,
+            concepto: s.value?.concepto,
+            lineas: s.value?.lineas.length ?? 0,
             total: s.value?.montoTotal ?? 0,
             saldo: s.value?.saldo ?? 0,
             editable: s.value?.editable ?? false,
@@ -49,8 +52,8 @@ class PanelPagosDeuda extends ConsumerWidget {
         case Fallo(:final mensaje):
           MensajeApp.error(context, mensaje);
         case Exito():
-          MensajeApp.exito(context, 'Abono de ${formatearPrecio(monto)} '
-              'registrado.');
+          MensajeApp.exito(
+              context, 'Abono de ${formatearPrecio(monto)} registrado.');
       }
     }
 
@@ -59,7 +62,9 @@ class PanelPagosDeuda extends ConsumerWidget {
       children: [
         _Contexto(
           cliente: datos.cliente,
+          moto: datos.moto,
           concepto: datos.concepto,
+          lineas: datos.lineas,
           total: datos.total,
         ),
         const SizedBox(height: 16),
@@ -70,11 +75,11 @@ class PanelPagosDeuda extends ConsumerWidget {
           metodoInicial: MetodoPago.efectivo,
           constructorEtiqueta: (m) => m.etiqueta,
           formatearImporte: formatearPrecio,
-          titulo: 'Registrar abono',
-          etiquetaBoton: 'Registrar abono',
           etiquetaReferencia: 'Nota',
           placeholderReferencia: 'Opcional: recibo, quién recibió…',
-          textoSaldado: 'No queda saldo: esta deuda ya está cobrada.',
+          textoSaldado: datos.total == 0
+              ? 'Todavía no se ha fiado nada: anota los repuestos primero.'
+              : 'No queda saldo: esta deuda ya está cobrada.',
           alRegistrar: (monto, metodo, nota) =>
               unawaited(registrar(monto, metodo, nota)),
         ),
@@ -85,33 +90,46 @@ class PanelPagosDeuda extends ConsumerWidget {
   }
 }
 
-/// A quién se le fió y por qué.
+/// A quién se le fió, para qué moto y cuánto suma.
 class _Contexto extends StatelessWidget {
   const _Contexto({
     required this.cliente,
+    required this.moto,
     required this.concepto,
+    required this.lineas,
     required this.total,
   });
 
   final String cliente;
-  final String concepto;
+  final String? moto;
+  final String? concepto;
+  final int lineas;
   final int total;
 
   @override
   Widget build(BuildContext context) {
     return PanelSeccion(
-      titulo: 'Le debe el taller a',
+      titulo: 'Le fió el taller a',
       icono: Icons.person_outline_rounded,
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
           FichaResumen(
             titulo: cliente.isEmpty ? 'Sin cliente' : cliente,
-            subtitulo: concepto.isEmpty ? 'Sin concepto' : concepto,
+            subtitulo: moto ?? concepto ?? 'Sin moto ni concepto',
             inicial: cliente.isEmpty ? null : inicialDe(cliente),
             icono: cliente.isEmpty ? Icons.person_outline : null,
           ),
           const SizedBox(height: 12),
+          FilaDato(
+            icono: Icons.inventory_2_outlined,
+            texto: switch (lineas) {
+              0 => 'Sin repuestos anotados',
+              1 => '1 repuesto fiado',
+              final n => '$n repuestos fiados',
+            },
+          ),
+          const SizedBox(height: 6),
           FilaDato(
             icono: Icons.sell_outlined,
             texto: 'Deuda total: ${formatearPrecio(total)}',
@@ -147,8 +165,9 @@ class _Historial extends ConsumerWidget {
     );
     if (confirmado != true || !context.mounted) return;
 
-    final resultado =
-        await ref.read(deudaEditorProvider(deudaId).notifier).eliminarPago(pago.id);
+    final resultado = await ref
+        .read(deudaEditorProvider(deudaId).notifier)
+        .eliminarPago(pago.id);
     if (!context.mounted) return;
     if (resultado case Fallo(:final mensaje)) MensajeApp.error(context, mensaje);
   }
@@ -163,7 +182,7 @@ class _Historial extends ConsumerWidget {
         ref.watch(provider.select((s) => s.value?.editable ?? false));
 
     return PanelSeccion(
-      titulo: 'Abonos',
+      titulo: 'Movimientos',
       icono: Icons.receipt_long_outlined,
       child: pagos.isEmpty
           ? const Padding(
@@ -176,22 +195,46 @@ class _Historial extends ConsumerWidget {
           : Column(
               children: [
                 for (final pago in pagos)
-                  FilaMovimiento(
+                  _FilaPago(
                     key: ValueKey(pago.id),
-                    icono: Icons.arrow_downward_rounded,
-                    titulo: pago.metodoPago.etiqueta,
-                    detalle: [
-                      formatearFecha(pago.fechaPago),
-                      if (pago.notas != null) pago.notas!,
-                    ].join(' · '),
-                    importe: formatearPrecio(pago.monto),
-                    color: ColoresApp.statusSuccess,
+                    pago: pago,
                     alEliminar: editable
                         ? () => unawaited(_borrar(context, ref, pago))
                         : null,
                   ),
               ],
             ),
+    );
+  }
+}
+
+/// Un movimiento de dinero. Los negativos son devoluciones: aparecen cuando se
+/// quita un repuesto de una deuda que ya tenía abonos y hay que regresar la
+/// diferencia.
+///
+/// La devolución **no se borra**: no es un abono que alguien tecleó mal, es la
+/// consecuencia de haber quitado una línea. Se deshace quitando esa línea, no
+/// esta fila.
+class _FilaPago extends StatelessWidget {
+  const _FilaPago({super.key, required this.pago, this.alEliminar});
+
+  final DeudorPago pago;
+  final VoidCallback? alEliminar;
+
+  @override
+  Widget build(BuildContext context) {
+    final devolucion = pago.monto < 0;
+
+    return FilaMovimiento(
+      icono: devolucion ? Icons.undo_rounded : Icons.arrow_downward_rounded,
+      titulo: devolucion ? 'Devolución' : pago.metodoPago.etiqueta,
+      detalle: [
+        formatearFecha(pago.fechaPago),
+        if (pago.notas != null) pago.notas!,
+      ].join(' · '),
+      importe: formatearPrecio(pago.monto),
+      color: devolucion ? ColoresApp.statusDanger : ColoresApp.statusSuccess,
+      alEliminar: devolucion ? null : alEliminar,
     );
   }
 }

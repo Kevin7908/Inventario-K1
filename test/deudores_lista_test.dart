@@ -62,7 +62,7 @@ class _RepoFalso implements RepositorioDeudores {
         if (_enVista(d, filtro.vista) &&
             (query.isEmpty ||
                 d.numero.toLowerCase().contains(query) ||
-                d.concepto.toLowerCase().contains(query) ||
+                (d.concepto?.toLowerCase().contains(query) ?? false) ||
                 d.nombreCliente.toLowerCase().contains(query)))
           d,
     ];

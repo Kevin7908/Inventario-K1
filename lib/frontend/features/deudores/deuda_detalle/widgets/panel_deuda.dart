@@ -4,20 +4,23 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../../../backend/features/deudores/enum/enum_deudor.dart';
+import '../../../../../backend/features/deudores/modelo/deudor_item.dart';
 import '../../../../../core/formato.dart';
 import '../../../../../core/resultado.dart';
 import '../../../../share2/share2.dart';
 import '../../widgets/estado_deuda_ui.dart';
+import '../provider/catalogo_deuda_providers.dart';
 import '../provider/deuda_editor_provider.dart';
 import 'dialogo_datos_deuda.dart';
+import 'linea_deuda.dart';
 import 'pie_deuda.dart';
 
-/// Panel derecho de la ficha: quién debe, por qué, y el estado de cuentas.
+/// Panel derecho de la ficha: lo que se llevó fiado y el estado de cuentas.
 ///
 /// Mismo aside de 360 px que el punto de venta, las cotizaciones, las órdenes
-/// y las reservas ([PanelDocumento]). Lo propio de una deuda es que **el medio
-/// no lleva líneas**: no hay mercancía que listar, solo el concepto, el plazo
-/// y lo que se anotó. Por eso el contenido es texto y no un `ListView`.
+/// y las reservas ([PanelDocumento]). Lo propio de una deuda es el pie: no
+/// lleva subtotal ni IVA sino lo cobrado y lo que falta, porque la pregunta
+/// aquí es cuánta plata está en la calle.
 class PanelDeuda extends StatelessWidget {
   const PanelDeuda({super.key, required this.deudaId});
 
@@ -29,13 +32,13 @@ class PanelDeuda extends StatelessWidget {
   Widget build(BuildContext context) {
     return PanelDocumento(
       cabecera: _Cabecera(deudaId: deudaId),
-      contenido: _Cuerpo(deudaId: deudaId),
+      contenido: _Lineas(deudaId: deudaId),
       pie: _Pie(deudaId: deudaId),
     );
   }
 }
 
-/// Título, número, situación y a quién se le fía.
+/// Título, contador, situación y a quién se le fió.
 class _Cabecera extends ConsumerWidget {
   const _Cabecera({required this.deudaId});
 
@@ -43,16 +46,27 @@ class _Cabecera extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final deuda =
-        ref.watch(deudaEditorProvider(deudaId).select((s) => s.value?.deuda));
-    if (deuda == null) return const SizedBox.shrink();
+    final datos = ref.watch(
+      deudaEditorProvider(deudaId).select((s) => (
+            numero: s.value?.numero ?? '',
+            cliente: s.value?.clienteNombre ?? '',
+            moto: s.value?.motoDescripcion,
+            concepto: s.value?.concepto,
+            vence: s.value?.fechaVencimiento,
+            vencida: s.value?.estaVencida ?? false,
+            estado: s.value?.estado,
+            items: s.value?.lineas.length ?? 0,
+          )),
+    );
 
-    final vence = deuda.fechaVencimiento;
-    final subtitulo = vence == null
-        ? 'Sin plazo pactado'
-        : deuda.estaVencida
-            ? 'Venció el ${formatearFecha(vence)}'
-            : 'Vence el ${formatearFecha(vence)}';
+    final subtitulo = [
+      ?datos.moto,
+      ?datos.concepto,
+      if (datos.vence != null)
+        datos.vencida
+            ? 'venció el ${formatearFecha(datos.vence!)}'
+            : 'vence el ${formatearFecha(datos.vence!)}',
+    ].join(' · ');
 
     return Container(
       padding: const EdgeInsets.fromLTRB(22, 22, 22, 14),
@@ -62,13 +76,25 @@ class _Cabecera extends ConsumerWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const Text('Deuda', style: TipografiaApp.heading3),
+          Row(
+            children: [
+              const Expanded(
+                child: Text('Lo fiado', style: TipografiaApp.heading3),
+              ),
+              IndicadorEstado(
+                etiqueta:
+                    datos.items == 1 ? '1 ítem' : '${datos.items} ítems',
+                color: ColoresApp.castletonGreen,
+                colorFondo: ColoresApp.statusSuccessBg,
+              ),
+            ],
+          ),
           const SizedBox(height: 6),
           Row(
             children: [
               Expanded(
                 child: Text(
-                  '#${deuda.numero}',
+                  '#${datos.numero}',
                   style: TipografiaApp.caption.copyWith(
                     fontSize: 12,
                     color: ColoresApp.textMuted,
@@ -77,15 +103,20 @@ class _Cabecera extends ConsumerWidget {
                   overflow: TextOverflow.ellipsis,
                 ),
               ),
-              BadgeSituacionDeuda(deuda: deuda),
+              if (datos.estado != null)
+                _BadgeDeEstado(
+                  estado: datos.estado!,
+                  vencida: datos.vencida,
+                ),
             ],
           ),
           const SizedBox(height: 12),
           FichaResumen(
-            titulo: deuda.nombreCliente,
-            subtitulo: subtitulo,
-            inicial: inicialDe(deuda.nombreCliente),
-            etiquetaAccion: 'Concepto, monto, plazo y notas',
+            titulo: datos.cliente.isEmpty ? 'Sin cliente' : datos.cliente,
+            subtitulo: subtitulo.isEmpty ? 'Sin moto ni plazo' : subtitulo,
+            inicial: datos.cliente.isEmpty ? null : inicialDe(datos.cliente),
+            icono: datos.cliente.isEmpty ? Icons.person_outline : null,
+            etiquetaAccion: 'Moto, concepto, plazo y notas',
             alPresionar: () =>
                 DialogoDatosDeuda.mostrar(context, deudaId: deudaId),
           ),
@@ -95,77 +126,83 @@ class _Cabecera extends ConsumerWidget {
   }
 }
 
-/// Por qué se debe y lo que se acordó. Es lo único que hay entre la cabecera y
-/// las cuentas, así que va con aire y no apretado como una línea de documento.
-class _Cuerpo extends ConsumerWidget {
-  const _Cuerpo({required this.deudaId});
+/// El badge de la cabecera, con la misma lectura que la fila del listado.
+///
+/// No usa `BadgeSituacionDeuda` porque ese recibe un `DeudorResumen` y aquí lo
+/// que hay es el estado del editor; la traducción es la misma, y por eso
+/// [SituacionDeuda] vive en un solo sitio.
+class _BadgeDeEstado extends StatelessWidget {
+  const _BadgeDeEstado({required this.estado, required this.vencida});
+
+  final EstadoDeudor estado;
+  final bool vencida;
+
+  @override
+  Widget build(BuildContext context) {
+    final situacion = switch (estado) {
+      EstadoDeudor.pagada => SituacionDeuda.pagada,
+      EstadoDeudor.incobrable => SituacionDeuda.incobrable,
+      _ => vencida ? SituacionDeuda.vencida : SituacionDeuda.alDia,
+    };
+    final estilo = estiloDeSituacion(situacion);
+
+    return IndicadorEstado(
+      etiqueta: estilo.etiqueta,
+      color: estilo.color,
+      colorFondo: estilo.fondo,
+    );
+  }
+}
+
+/// Los repuestos fiados. Es lo único del panel que cambia al anotar o quitar
+/// algo, así que va en su propio widget.
+class _Lineas extends ConsumerWidget {
+  const _Lineas({required this.deudaId});
 
   final int deudaId;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final datos = ref.watch(
-      deudaEditorProvider(deudaId).select((s) => (
-            concepto: s.value?.deuda.concepto ?? '',
-            notas: s.value?.deuda.notas,
-            abierta: s.value?.deuda.creadoEn,
-            pagos: s.value?.pagos.length ?? 0,
-          )),
+    final provider = deudaEditorProvider(deudaId);
+    final lineas = ref.watch(
+      provider.select((s) => s.value?.lineas ?? const <DeudorItem>[]),
     );
-    final notas = datos.notas;
-    final abierta = datos.abierta;
+    final editable =
+        ref.watch(provider.select((s) => s.value?.editable ?? false));
 
-    return ListView(
-      padding: const EdgeInsets.fromLTRB(22, 16, 22, 16),
-      children: [
-        PanelSeccion(
-          titulo: 'Concepto',
-          icono: Icons.description_outlined,
-          child: Text(
-            datos.concepto.isEmpty ? 'Sin concepto' : datos.concepto,
-            style: TipografiaApp.cuerpo.copyWith(fontSize: 13),
-          ),
-        ),
-        const SizedBox(height: 14),
-        PanelSeccion(
-          titulo: 'La deuda',
-          icono: Icons.event_outlined,
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              FilaDato(
-                icono: Icons.calendar_today_outlined,
-                texto: abierta == null
-                    ? 'Sin fecha de apertura'
-                    : 'Abierta el ${formatearFecha(abierta)}',
-              ),
-              const SizedBox(height: 6),
-              FilaDato(
-                icono: Icons.receipt_long_outlined,
-                texto: switch (datos.pagos) {
-                  0 => 'Todavía no ha abonado nada',
-                  1 => '1 abono recibido',
-                  final n => '$n abonos recibidos',
-                },
-              ),
-            ],
-          ),
-        ),
-        if (notas != null && notas.trim().isNotEmpty) ...[
-          const SizedBox(height: 14),
-          PanelSeccion(
-            titulo: 'Notas',
-            icono: Icons.sticky_note_2_outlined,
-            child: Text(
-              notas,
-              style: TipografiaApp.cuerpo.copyWith(
-                fontSize: 12.5,
-                color: ColoresApp.textSecondary,
-              ),
-            ),
-          ),
-        ],
-      ],
+    if (lineas.isEmpty) {
+      return const EstadoVacio(
+        icono: Icons.receipt_long_outlined,
+        titulo: 'Todavía no se ha fiado nada',
+        pista: 'Toca un repuesto de la izquierda para anotarlo en la deuda.',
+      );
+    }
+
+    final notifier = ref.read(provider.notifier);
+    final stock = ref.watch(stockPorProductoDeudaProvider);
+
+    /// Lo que queda en bodega **más** lo que la línea ya se llevó: subir a esa
+    /// cifra no le pide nada nuevo al inventario.
+    double? topeDe(DeudorItem linea) {
+      final disponible = stock[linea.productoId];
+      return disponible == null ? null : disponible + linea.cantidad;
+    }
+
+    return ListView.builder(
+      padding: const EdgeInsets.symmetric(horizontal: 22),
+      itemCount: lineas.length,
+      itemBuilder: (context, i) {
+        final linea = lineas[i];
+        return LineaDeuda(
+          key: ValueKey(linea.id),
+          linea: linea,
+          editable: editable,
+          disponible: topeDe(linea),
+          alCambiarCantidad: (cantidad) =>
+              notifier.cambiarCantidad(linea, cantidad),
+          alEliminar: () => unawaited(notifier.eliminarLinea(linea)),
+        );
+      },
     );
   }
 }
@@ -176,9 +213,10 @@ class _Pie extends ConsumerWidget {
 
   final int deudaId;
 
-  /// Dar una deuda por perdida **no cobra nada**: la saca de la cartera y
-  /// reconoce que esa plata no vuelve. Por eso se confirma, y por eso el aviso
-  /// dice el saldo con el número.
+  /// Dar una deuda por perdida **no devuelve nada al inventario**, y es la
+  /// diferencia de fondo con cancelar una reserva: lo apartado sigue en la
+  /// bodega, lo fiado se fue montado en una moto. El aviso lo dice con el
+  /// número, porque es plata que el taller da por perdida.
   Future<void> _darPorPerdida(
     BuildContext context,
     WidgetRef ref,
@@ -188,8 +226,9 @@ class _Pie extends ConsumerWidget {
       context,
       titulo: '¿Dar la deuda por perdida?',
       mensaje: 'Se dejan de contar ${formatearPrecio(saldo)} en el total por '
-          'cobrar. **No se borra nada**: la deuda y sus abonos siguen ahí, '
-          'y se puede volver a cobrar después.',
+          'cobrar. **Los repuestos no vuelven al inventario**: salieron del '
+          'taller. La deuda y sus abonos siguen ahí, y se puede volver a '
+          'cobrar después.',
     );
     if (confirmado != true) return;
     await ref
@@ -212,12 +251,22 @@ class _Pie extends ConsumerWidget {
             total: s.value?.montoTotal ?? 0,
             pagado: s.value?.montoPagado ?? 0,
             saldo: s.value?.saldo ?? 0,
+            lineas: s.value?.lineas.length ?? 0,
             editable: s.value?.editable ?? false,
-            estado: s.value?.deuda.estado,
-            situacion: s.value == null ? null : situacionDe(s.value!.deuda),
+            estado: s.value?.estado,
+            vencida: s.value?.estaVencida ?? false,
           )),
     );
-    final situacion = datos.situacion;
+
+    // Sin nada fiado no hay deuda que dar por perdida: cerrar una vacía solo
+    // la saca del listado sin haber hecho nada.
+    final puedeCerrar = datos.editable && datos.lineas > 0;
+
+    final situacion = switch (datos.estado) {
+      EstadoDeudor.pagada => SituacionDeuda.pagada,
+      EstadoDeudor.incobrable => SituacionDeuda.incobrable,
+      _ => datos.vencida ? SituacionDeuda.vencida : SituacionDeuda.alDia,
+    };
 
     return Container(
       padding: const EdgeInsets.fromLTRB(22, 18, 22, 22),
@@ -228,14 +277,12 @@ class _Pie extends ConsumerWidget {
       child: PieDeuda(
         total: datos.total,
         pagado: datos.pagado,
-        colorAvance: situacion == null
-            ? ColoresApp.goGreen
-            : colorDeAvance(situacion),
-        alDarPorPerdida: datos.editable
+        colorAvance: colorDeAvance(situacion),
+        alDarPorPerdida: puedeCerrar
             ? () => unawaited(_darPorPerdida(context, ref, datos.saldo))
             : null,
         // Solo la que se dio por perdida se puede reabrir: una pagada no se
-        // "reabre", se le corrige el monto o se le borra el abono.
+        // «reabre», se le anota otro repuesto o se le borra el abono.
         alReabrir: datos.estado == EstadoDeudor.incobrable
             ? () => unawaited(_reabrir(context, ref))
             : null,

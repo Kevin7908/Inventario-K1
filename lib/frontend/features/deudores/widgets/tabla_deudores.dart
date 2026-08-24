@@ -84,18 +84,10 @@ class TablaDeudores extends ConsumerWidget {
           flex: 14,
           constructor: (d) => _Cliente(deuda: d),
         ),
-        ColumnaTabla(
+        const ColumnaTabla(
           titulo: 'Concepto',
           flex: 16,
-          constructor: (d) => Text(
-            d.concepto,
-            style: TipografiaApp.cuerpo.copyWith(
-              fontSize: 12.5,
-              color: ColoresApp.textSecondary,
-            ),
-            maxLines: 1,
-            overflow: TextOverflow.ellipsis,
-          ),
+          constructor: _Concepto.new,
         ),
         const ColumnaTabla(
           titulo: 'Vence',
@@ -180,6 +172,32 @@ class _Cliente extends StatelessWidget {
           ),
         ),
       ],
+    );
+  }
+}
+
+/// Por qué se debe. El concepto es opcional —las líneas ya dicen qué se
+/// llevó—, así que cuando falta se dice en qué moto se montó, que es la otra
+/// forma de reconocer el fiado. Si tampoco hay moto, queda el guion.
+class _Concepto extends StatelessWidget {
+  const _Concepto(this.deuda, {super.key});
+
+  final DeudorResumen deuda;
+
+  @override
+  Widget build(BuildContext context) {
+    final texto = deuda.concepto ?? deuda.descripcionMoto;
+
+    return Text(
+      texto ?? '—',
+      style: TipografiaApp.cuerpo.copyWith(
+        fontSize: 12.5,
+        color: texto == null
+            ? ColoresApp.textDisabled
+            : ColoresApp.textSecondary,
+      ),
+      maxLines: 1,
+      overflow: TextOverflow.ellipsis,
     );
   }
 }

@@ -8,8 +8,10 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:inventario_k1/backend/features/deudores/enum/enum_deudor.dart';
+import 'package:inventario_k1/backend/features/deudores/modelo/deudor_item.dart';
 import 'package:inventario_k1/backend/features/deudores/modelo/deudor_resumen.dart';
 import 'package:inventario_k1/core/formato.dart';
+import 'package:inventario_k1/frontend/features/deudores/deuda_detalle/widgets/linea_deuda.dart';
 import 'package:inventario_k1/frontend/features/deudores/deuda_detalle/widgets/pie_deuda.dart';
 import 'package:inventario_k1/frontend/features/deudores/widgets/estado_deuda_ui.dart';
 import 'package:inventario_k1/frontend/share2/share2.dart';
@@ -40,6 +42,16 @@ DeudorResumen _deuda({
     );
 
 DateTime _haceDias(int dias) => DateTime.now().subtract(Duration(days: dias));
+
+DeudorItem _linea({double cantidad = 2}) => DeudorItem(
+      id: 1,
+      deudorId: 7,
+      productoId: 3,
+      nombreProducto: 'Pastilla de freno',
+      sku: 'FRE-1123',
+      cantidad: cantidad,
+      precioUnitario: 30000,
+    );
 
 void main() {
   group('la situación de una deuda no es su columna estado', () {
@@ -290,6 +302,92 @@ void main() {
 
       expect(registros, 0);
       expect(find.textContaining(r'Faltan $60.000'), findsOneWidget);
+    });
+  });
+
+  group('LineaDeuda', () {
+    testWidgets('muestra el repuesto, su SKU y el precio unitario',
+        (tester) async {
+      await _pump(
+        tester,
+        LineaDeuda(
+          linea: _linea(),
+          editable: true,
+          alCambiarCantidad: (_) {},
+          alEliminar: () {},
+        ),
+      );
+
+      expect(find.text('Pastilla de freno'), findsOneWidget);
+      expect(find.text('FRE-1123'), findsOneWidget);
+      // El unitario, no el subtotal: es lo que se compara con el catálogo.
+      expect(find.text(r'$30.000'), findsOneWidget);
+    });
+
+    testWidgets('el − con cantidad 1 quita la línea', (tester) async {
+      // Bajar de 1 a 0 es la única forma de quitarla: el diseño no tiene
+      // papelera. Y quitarla devuelve el repuesto al estante, porque
+      // significa que nunca debió anotarse.
+      var quitada = false;
+      var cantidades = <double>[];
+      await _pump(
+        tester,
+        LineaDeuda(
+          linea: _linea(cantidad: 1),
+          editable: true,
+          alCambiarCantidad: cantidades.add,
+          alEliminar: () => quitada = true,
+        ),
+      );
+
+      await tester.tap(find.byIcon(Icons.remove_rounded));
+      await tester.pump();
+
+      expect(quitada, isTrue);
+      expect(cantidades, isEmpty, reason: 'no se pide cantidad 0');
+    });
+
+    testWidgets('el tope de stock apaga el +', (tester) async {
+      // Fiar saca la mercancía de verdad: no se puede fiar lo que no hay, y
+      // el repositorio lo rechaza. El control avisa antes de intentarlo.
+      var cantidades = <double>[];
+      await _pump(
+        tester,
+        LineaDeuda(
+          linea: _linea(cantidad: 3),
+          editable: true,
+          disponible: 3,
+          alCambiarCantidad: cantidades.add,
+          alEliminar: () {},
+        ),
+      );
+
+      await tester.tap(find.byIcon(Icons.add_rounded));
+      await tester.pump();
+
+      expect(cantidades, isEmpty);
+    });
+
+    testWidgets('una deuda cerrada se ve pero no se toca', (tester) async {
+      var cantidades = <double>[];
+      var quitada = false;
+      await _pump(
+        tester,
+        LineaDeuda(
+          linea: _linea(),
+          editable: false,
+          alCambiarCantidad: cantidades.add,
+          alEliminar: () => quitada = true,
+        ),
+      );
+
+      await tester.tap(find.byIcon(Icons.add_rounded));
+      await tester.tap(find.byIcon(Icons.remove_rounded));
+      await tester.pump();
+
+      expect(cantidades, isEmpty);
+      expect(quitada, isFalse);
+      expect(find.text('Pastilla de freno'), findsOneWidget);
     });
   });
 }

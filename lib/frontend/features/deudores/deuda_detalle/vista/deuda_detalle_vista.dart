@@ -1,27 +1,30 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../../../../core/resultado.dart';
 import '../../../../share2/share2.dart';
-import '../../widgets/estado_deuda_ui.dart';
+import '../modelo/deuda_editor_state.dart';
 import '../provider/deuda_editor_provider.dart';
+import '../widgets/panel_catalogo_deuda.dart';
 import '../widgets/panel_deuda.dart';
-import '../widgets/panel_pagos_deuda.dart';
 
-/// Ficha de una deuda: dos paneles, como el resto de documentos de la app.
+/// Ficha de una deuda: dos paneles, como el punto de venta.
 ///
-/// A la izquierda lo que se hace —cobrar y ver lo cobrado—; a la derecha la
-/// deuda con su estado de cuentas. **Está al revés que en reservas a
-/// propósito**: allí la izquierda es el catálogo del que se saca mercancía, y
-/// aquí no hay nada que sacar, solo plata que entra.
+/// A la izquierda, de dónde salen los repuestos que se fían y dónde se cobra;
+/// a la derecha, la deuda que se está armando con su estado de cuentas.
 ///
-/// La deuda **ya existe** cuando se llega aquí: la creó `DialogoNuevaDeuda`,
-/// porque `cliente_id`, el concepto y el monto son obligatorios y no se puede
-/// abrir vacía.
+/// Es la misma pantalla que el editor de reservas **porque el gesto es el
+/// mismo** —elegir mercancía del catálogo y cobrar—, con una diferencia que
+/// vale por todo el módulo: apartar deja el repuesto en la bodega y fiar lo
+/// saca montado en una moto. Por eso una reserva cancelada devuelve su
+/// mercancía al inventario y una deuda dada por perdida no.
 ///
-/// No hay indicador de guardado, al revés que en el editor de reservas: aquí
-/// no hay autoguardado que explicar. Cada escritura es un gesto explícito
-/// —registrar un abono, guardar el diálogo de datos— y avisa por su cuenta.
-class DeudaDetalleVista extends ConsumerWidget {
+/// La deuda **ya existe** cuando se llega aquí: `cliente_id` es `NOT NULL`,
+/// así que quien abre la ficha la creó antes con `DialogoNuevaDeuda`. Eso
+/// también evita deudas huérfanas —entrar y arrepentirse no quema un
+/// consecutivo—.
+class DeudaDetalleVista extends ConsumerStatefulWidget {
   const DeudaDetalleVista({
     super.key,
     required this.deudaId,
@@ -32,8 +35,44 @@ class DeudaDetalleVista extends ConsumerWidget {
   final VoidCallback alCerrar;
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
-    final provider = deudaEditorProvider(deudaId);
+  ConsumerState<DeudaDetalleVista> createState() => _DeudaDetalleVistaState();
+}
+
+class _DeudaDetalleVistaState extends ConsumerState<DeudaDetalleVista> {
+  final _focoBusqueda = FocusNode();
+
+  @override
+  void dispose() {
+    _focoBusqueda.dispose();
+    super.dispose();
+  }
+
+  void _avisar(String mensaje) => MensajeApp.error(context, mensaje);
+
+  /// Fuerza la escritura sin esperar el retardo. Lo usan `Ctrl+Enter` y el
+  /// cierre de la ficha: si no, el último cambio se perdería con el `Timer`.
+  Future<void> _guardarAhora() async {
+    final resultado = await ref
+        .read(deudaEditorProvider(widget.deudaId).notifier)
+        .guardarAhora();
+    if (!mounted) return;
+    if (resultado case Fallo(:final mensaje)) _avisar(mensaje);
+  }
+
+  Future<void> _cerrar() async {
+    final resultado = await ref
+        .read(deudaEditorProvider(widget.deudaId).notifier)
+        .guardarAhora();
+    if (!mounted) return;
+    if (resultado case Fallo(:final mensaje)) {
+      _avisar('No se guardó el último cambio: $mensaje');
+    }
+    widget.alCerrar();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final provider = deudaEditorProvider(widget.deudaId);
     final cargando = ref.watch(provider.select((s) => !s.hasValue));
 
     if (cargando) {
@@ -44,7 +83,10 @@ class DeudaDetalleVista extends ConsumerWidget {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              BotonVolver(etiqueta: 'Cuentas por cobrar', alPresionar: alCerrar),
+              BotonVolver(
+                etiqueta: 'Cuentas por cobrar',
+                alPresionar: widget.alCerrar,
+              ),
               const SizedBox(height: 24),
               Expanded(
                 child: EstadoVacio(
@@ -62,26 +104,46 @@ class DeudaDetalleVista extends ConsumerWidget {
       );
     }
 
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.stretch,
-      children: [
-        _BarraSuperior(deudaId: deudaId, alVolver: alCerrar),
-        const Divider(color: ColoresApp.border, height: 1),
-        Expanded(
-          child: Row(
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              Expanded(child: PanelPagosDeuda(deudaId: deudaId)),
-              PanelDeuda(deudaId: deudaId),
-            ],
-          ),
+    return AtajosFormulario(
+      alGuardar: _guardarAhora,
+      alCancelar: _cerrar,
+      child: CallbackShortcuts(
+        bindings: {
+          const SingleActivator(LogicalKeyboardKey.keyF, control: true): () =>
+              _focoBusqueda.requestFocus(),
+        },
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            _BarraSuperior(deudaId: widget.deudaId, alVolver: _cerrar),
+            const Divider(color: ColoresApp.border, height: 1),
+            Expanded(
+              child: Row(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  Expanded(
+                    child: PanelCatalogoDeuda(
+                      deudaId: widget.deudaId,
+                      focoBusqueda: _focoBusqueda,
+                    ),
+                  ),
+                  PanelDeuda(deudaId: widget.deudaId),
+                ],
+              ),
+            ),
+          ],
         ),
-      ],
+      ),
     );
   }
 }
 
-/// Vuelta al listado, número de la deuda y en qué situación está.
+/// Vuelta al listado, número de la deuda y estado del guardado.
+///
+/// No hay botón de guardar: la deuda se persiste sola. Lo que sí hace falta es
+/// decir en qué punto va, porque sin botón el usuario no tiene otra forma de
+/// saber si su trabajo ya está a salvo —y aquí «a salvo» incluye el stock que
+/// se acaba de descontar—.
 class _BarraSuperior extends ConsumerWidget {
   const _BarraSuperior({required this.deudaId, required this.alVolver});
 
@@ -90,8 +152,13 @@ class _BarraSuperior extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final deuda =
-        ref.watch(deudaEditorProvider(deudaId).select((s) => s.value?.deuda));
+    final datos = ref.watch(
+      deudaEditorProvider(deudaId).select((s) => (
+            numero: s.value?.numero ?? '',
+            guardado: s.value?.guardado ?? EstadoGuardadoDeuda.guardado,
+            motivo: s.value?.motivoBloqueo,
+          )),
+    );
 
     return Padding(
       padding: const EdgeInsets.fromLTRB(32, 20, 32, 16),
@@ -101,12 +168,65 @@ class _BarraSuperior extends ConsumerWidget {
           const SizedBox(width: 16),
           Expanded(
             child: Text(
-              deuda?.numero ?? 'Deuda',
+              datos.numero.isEmpty ? 'Deuda' : datos.numero,
               style: TipografiaApp.heading3,
               overflow: TextOverflow.ellipsis,
             ),
           ),
-          if (deuda != null) BadgeSituacionDeuda(deuda: deuda),
+          _EstadoGuardado(estado: datos.guardado, motivo: datos.motivo),
+        ],
+      ),
+    );
+  }
+}
+
+/// En qué punto va el guardado automático, en una línea.
+class _EstadoGuardado extends StatelessWidget {
+  const _EstadoGuardado({required this.estado, required this.motivo});
+
+  final EstadoGuardadoDeuda estado;
+  final String? motivo;
+
+  @override
+  Widget build(BuildContext context) {
+    final (icono, texto, color) = switch (estado) {
+      EstadoGuardadoDeuda.pendiente => (
+          Icons.sync_rounded,
+          'Sin guardar…',
+          ColoresApp.textMuted,
+        ),
+      EstadoGuardadoDeuda.guardando => (
+          Icons.sync_rounded,
+          'Guardando…',
+          ColoresApp.textSecondary,
+        ),
+      EstadoGuardadoDeuda.guardado => (
+          Icons.cloud_done_outlined,
+          'Guardada',
+          ColoresApp.statusSuccess,
+        ),
+      EstadoGuardadoDeuda.bloqueado => (
+          Icons.error_outline_rounded,
+          motivo ?? 'No se pudo guardar',
+          ColoresApp.statusDanger,
+        ),
+    };
+
+    return ConstrainedBox(
+      constraints: const BoxConstraints(maxWidth: 420),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(icono, size: 17, color: color),
+          const SizedBox(width: 7),
+          Flexible(
+            child: Text(
+              texto,
+              style: TipografiaApp.caption.copyWith(color: color),
+              maxLines: 2,
+              overflow: TextOverflow.ellipsis,
+            ),
+          ),
         ],
       ),
     );

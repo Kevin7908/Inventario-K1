@@ -3,22 +3,24 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../../../../backend/features/motos/modelo/moto.dart';
 import '../../../../../core/formato.dart';
 import '../../../../../core/resultado.dart';
 import '../../../../share2/share2.dart';
+import '../../../motos/provider/motos_provider.dart';
 import '../provider/deuda_editor_provider.dart';
 
-/// Los datos de la cabecera de una deuda: por qué se debe, cuánto, hasta
-/// cuándo y qué se anotó.
+/// La cabecera de la deuda: en qué moto se montó, cómo se llama el fiado,
+/// hasta cuándo hay plazo y qué se anotó.
 ///
-/// **Aquí sí hay botón de guardar**, al revés que en el diálogo de una
-/// reserva. Una reserva se persiste sola porque se arma línea a línea; una
-/// deuda es una cabecera que se teclea de una vez, y escribir la base a cada
-/// letra del concepto no le hace falta a nadie.
+/// **El monto no está aquí**, y esa es la diferencia con el diálogo que tenía
+/// antes: la deuda vale lo que suman sus repuestos, y esos se anotan en el
+/// panel de la izquierda. Un campo de monto tecleable al lado de unas líneas
+/// que ya suman es la vía más corta a que las dos cifras no coincidan.
 ///
-/// El monto **no puede bajar de lo ya cobrado**: el repositorio lo rechaza y
-/// el motivo llega escrito, con la cifra, para que el usuario sepa hasta dónde
-/// puede bajarlo.
+/// **Sí hay botón de guardar**, al revés que en el diálogo de una reserva: son
+/// cuatro campos que se teclean de una vez, y escribir la base a cada letra
+/// del concepto no le hace falta a nadie.
 class DialogoDatosDeuda extends ConsumerStatefulWidget {
   const DialogoDatosDeuda({super.key, required this.deudaId});
 
@@ -36,63 +38,51 @@ class DialogoDatosDeuda extends ConsumerStatefulWidget {
 
 class _DialogoDatosDeudaState extends ConsumerState<DialogoDatosDeuda> {
   late final TextEditingController _concepto;
-  late final TextEditingController _monto;
   late final TextEditingController _notas;
 
   DateTime? _vence;
+  int? _motoId;
   bool _guardando = false;
-  String? _error;
-
-  /// Lo ya cobrado, para no dejar bajar el monto por debajo.
-  int _cobrado = 0;
   bool _editable = true;
+  String? _error;
 
   @override
   void initState() {
     super.initState();
     // El estado inicial se lee una sola vez: mientras el diálogo está abierto
-    // nadie más escribe esta deuda, y releerlo en `build` pisaría lo tecleado.
+    // nadie más escribe esta cabecera, y releerlo en `build` pisaría lo
+    // tecleado.
     final estado = ref.read(deudaEditorProvider(widget.deudaId)).value;
-    _concepto = TextEditingController(text: estado?.deuda.concepto ?? '');
-    _monto = TextEditingController(text: '${estado?.montoTotal ?? 0}');
-    _notas = TextEditingController(text: estado?.deuda.notas ?? '');
-    _vence = estado?.deuda.fechaVencimiento;
-    _cobrado = estado?.montoPagado ?? 0;
+    _concepto = TextEditingController(text: estado?.concepto ?? '');
+    _notas = TextEditingController(text: estado?.notas ?? '');
+    _vence = estado?.fechaVencimiento;
+    _motoId = estado?.motoId;
     _editable = estado?.editable ?? false;
   }
 
   @override
   void dispose() {
     _concepto.dispose();
-    _monto.dispose();
     _notas.dispose();
     super.dispose();
   }
 
-  int get _montoTotal => int.tryParse(_monto.text) ?? 0;
-
-  bool get _puedeGuardar =>
-      _editable &&
-      !_guardando &&
-      _concepto.text.trim().isNotEmpty &&
-      _montoTotal >= _cobrado &&
-      _montoTotal > 0;
-
   void _cerrar() => Navigator.of(context).pop();
 
   Future<void> _guardar() async {
-    if (!_puedeGuardar) return;
+    if (!_editable || _guardando) return;
     setState(() {
       _guardando = true;
       _error = null;
     });
 
+    final concepto = _concepto.text.trim();
     final notas = _notas.text.trim();
     final resultado = await ref
         .read(deudaEditorProvider(widget.deudaId).notifier)
         .actualizarDatos(
-          concepto: _concepto.text.trim(),
-          montoTotal: _montoTotal,
+          motoId: _motoId,
+          concepto: concepto.isEmpty ? null : concepto,
           fechaVencimiento: _vence,
           notas: notas.isEmpty ? null : notas,
         );
@@ -110,7 +100,20 @@ class _DialogoDatosDeudaState extends ConsumerState<DialogoDatosDeuda> {
 
   @override
   Widget build(BuildContext context) {
-    final bajoLoCobrado = _montoTotal < _cobrado;
+    final clienteId = ref.watch(
+      deudaEditorProvider(widget.deudaId).select((s) => s.value?.clienteId),
+    );
+    final todasLasMotos =
+        ref.watch(catalogoMotosProvider).value ?? const <Moto>[];
+    // Solo las motos de quien debe: cargarle a alguien el repuesto de la moto
+    // de otro es justo el error que la deuda tiene que poder explicar después.
+    // La que ya está elegida se conserva aunque haya cambiado de dueño, para
+    // no borrarla sin avisar al abrir el diálogo.
+    final motos = [
+      for (final m in todasLasMotos)
+        if (m.clienteId == clienteId || m.id == _motoId) m,
+    ];
+    final moto = motos.where((m) => m.id == _motoId).firstOrNull;
 
     return AtajosFormulario(
       alGuardar: _guardar,
@@ -139,39 +142,29 @@ class _DialogoDatosDeudaState extends ConsumerState<DialogoDatosDeuda> {
               const SizedBox(height: 6),
               Text(
                 _editable
-                    ? 'Por qué se debe, cuánto y hasta cuándo.'
+                    ? 'En qué moto se montó, cómo se llama y hasta cuándo hay '
+                        'plazo. Lo que se debe sale de los repuestos.'
                     : 'Esta deuda ya está cerrada: se lee, no se cambia.',
                 style: TipografiaApp.caption,
               ),
               const SizedBox(height: 20),
-              CampoTexto(
-                etiqueta: 'Concepto',
-                controlador: _concepto,
-                placeholder: 'Por qué queda debiendo…',
-                habilitado: _editable,
-                alCambiar: (_) => setState(() {}),
+              CampoBusqueda<Moto>(
+                etiqueta: 'Moto',
+                valor: moto,
+                opciones: motos,
+                constructorEtiqueta: (m) => m.nombreDisplay,
+                constructorDetalle: (m) => m.placa,
+                placeholder: 'Opcional: en qué moto se montó…',
+                alCambiar: _editable
+                    ? (m) => setState(() => _motoId = m?.id)
+                    : (_) {},
               ),
               const SizedBox(height: 14),
               CampoTexto(
-                etiqueta: 'Monto total',
-                controlador: _monto,
-                placeholder: '0',
-                soloEnteros: true,
+                etiqueta: 'Concepto',
+                controlador: _concepto,
+                placeholder: 'Opcional: cómo se llama este fiado…',
                 habilitado: _editable,
-                alCambiar: (_) => setState(() {}),
-              ),
-              const SizedBox(height: 6),
-              Text(
-                bajoLoCobrado
-                    ? 'El cliente ya entregó ${formatearPrecio(_cobrado)}: la '
-                        'deuda no puede quedar por debajo de eso.'
-                    : 'Cobrado hasta ahora: ${formatearPrecio(_cobrado)}.',
-                style: TipografiaApp.caption.copyWith(
-                  fontSize: 11.5,
-                  color: bajoLoCobrado
-                      ? ColoresApp.statusDanger
-                      : ColoresApp.textMuted,
-                ),
               ),
               const SizedBox(height: 14),
               CampoFecha(
@@ -212,7 +205,8 @@ class _DialogoDatosDeudaState extends ConsumerState<DialogoDatosDeuda> {
                     BotonPrimario(
                       etiqueta: _guardando ? 'Guardando…' : 'Guardar',
                       icono: Icons.check_rounded,
-                      alPresionar: _puedeGuardar ? () => unawaited(_guardar()) : null,
+                      alPresionar:
+                          _guardando ? null : () => unawaited(_guardar()),
                     ),
                   ],
                 ],
