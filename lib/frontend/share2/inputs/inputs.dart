@@ -7,6 +7,7 @@ export 'campo_texto.dart';
 export 'control_cantidad.dart';
 export 'cuadro_seleccion.dart';
 export 'fila_campos.dart';
+export 'formulario_abono.dart';
 export 'grupo_radio.dart';
 export 'interruptor_campo.dart';
 export 'selector_widget.dart';

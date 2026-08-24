@@ -4,10 +4,10 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../../../backend/features/reservas/modelo/reserva_abono.dart';
+import '../../../../../backend/share/dominio/metodo_pago.dart';
 import '../../../../../core/formato.dart';
 import '../../../../share2/share2.dart';
 import '../provider/reserva_editor_provider.dart';
-import 'form_abono.dart';
 
 /// La mitad de dinero del editor: contra qué se abona, el formulario y lo que
 /// ya se recibió.
@@ -49,9 +49,14 @@ class PanelAbonos extends ConsumerWidget {
           total: datos.total,
         ),
         const SizedBox(height: 16),
-        FormAbono(
+        FormularioAbono<MetodoPago>(
           saldo: datos.saldo,
           habilitado: datos.editable,
+          metodos: MetodoPago.paraAbonos,
+          metodoInicial: MetodoPago.efectivo,
+          constructorEtiqueta: (m) => m.etiqueta,
+          formatearImporte: formatearPrecio,
+          textoSaldado: 'No queda saldo: esta reserva ya está pagada.',
           alRegistrar: (monto, metodo, referencia) => unawaited(
             notifier.registrarAbono(
               monto: monto,
@@ -152,6 +157,10 @@ class _Historial extends ConsumerWidget {
 
 /// Un movimiento de dinero. Los negativos son devoluciones: aparecen cuando se
 /// quita mercancía de una reserva ya abonada y hay que regresar la diferencia.
+///
+/// Traduce el abono a la fila compartida de share2, que es la misma que usan
+/// los pagos de una deuda: el ícono, el rótulo y el color son la lectura que
+/// hace reservas del signo, no algo que share2 pueda saber.
 class _FilaAbono extends StatelessWidget {
   const _FilaAbono({required this.abono});
 
@@ -160,53 +169,16 @@ class _FilaAbono extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final devolucion = abono.monto < 0;
-    final color =
-        devolucion ? ColoresApp.statusDanger : ColoresApp.statusSuccess;
 
-    return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 9),
-      child: Row(
-        children: [
-          Icon(
-            devolucion
-                ? Icons.undo_rounded
-                : Icons.arrow_downward_rounded,
-            size: 15,
-            color: color,
-          ),
-          const SizedBox(width: 10),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Text(
-                  devolucion ? 'Devolución' : abono.metodoPago.etiqueta,
-                  style: TipografiaApp.cuerpoMedium.copyWith(fontSize: 12.5),
-                ),
-                const SizedBox(height: 1),
-                Text(
-                  [
-                    formatearFecha(abono.fechaPago),
-                    if (abono.referenciaPago != null) abono.referenciaPago!,
-                  ].join(' · '),
-                  style: TipografiaApp.caption.copyWith(fontSize: 11),
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                ),
-              ],
-            ),
-          ),
-          const SizedBox(width: 10),
-          Text(
-            formatearPrecio(abono.monto),
-            style: TipografiaApp.cuerpoMedium.copyWith(
-              fontSize: 13,
-              color: color,
-            ),
-          ),
-        ],
-      ),
+    return FilaMovimiento(
+      icono: devolucion ? Icons.undo_rounded : Icons.arrow_downward_rounded,
+      titulo: devolucion ? 'Devolución' : abono.metodoPago.etiqueta,
+      detalle: [
+        formatearFecha(abono.fechaPago),
+        if (abono.referenciaPago != null) abono.referenciaPago!,
+      ].join(' · '),
+      importe: formatearPrecio(abono.monto),
+      color: devolucion ? ColoresApp.statusDanger : ColoresApp.statusSuccess,
     );
   }
 }

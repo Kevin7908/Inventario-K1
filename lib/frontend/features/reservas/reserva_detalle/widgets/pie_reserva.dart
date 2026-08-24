@@ -58,17 +58,20 @@ class PieReserva extends StatelessWidget {
       crossAxisAlignment: CrossAxisAlignment.stretch,
       mainAxisSize: MainAxisSize.min,
       children: [
-        _Fila(etiqueta: 'Total reserva', valor: total),
+        RenglonCuenta(
+          etiqueta: 'Total reserva',
+          valor: formatearPrecio(total),
+        ),
         const SizedBox(height: 8),
-        _Fila(
+        RenglonCuenta(
           etiqueta: 'Pagado',
-          valor: pagado,
+          valor: formatearPrecio(pagado),
           color: ColoresApp.statusSuccess,
         ),
         const SizedBox(height: 8),
-        _Fila(
+        RenglonCuenta(
           etiqueta: 'Saldo pendiente',
-          valor: _saldo,
+          valor: formatearPrecio(_saldo),
           // Ámbar y no rojo: deber plata de un apartado es el estado normal
           // de una reserva, no un error. Es el mismo color con que la tarjeta
           // del listado pinta el saldo.
@@ -123,36 +126,6 @@ class PieReserva extends StatelessWidget {
             alPresionar: alCancelar,
           ),
         ],
-      ],
-    );
-  }
-}
-
-/// Etiqueta a la izquierda, importe a la derecha.
-class _Fila extends StatelessWidget {
-  const _Fila({required this.etiqueta, required this.valor, this.color});
-
-  final String etiqueta;
-  final int valor;
-  final Color? color;
-
-  @override
-  Widget build(BuildContext context) {
-    return Row(
-      children: [
-        Expanded(
-          child: Text(
-            etiqueta,
-            style: TipografiaApp.caption.copyWith(fontSize: 12.5),
-          ),
-        ),
-        Text(
-          formatearPrecio(valor),
-          style: TipografiaApp.cuerpoMedium.copyWith(
-            fontSize: 13,
-            color: color ?? ColoresApp.textPrimary,
-          ),
-        ),
       ],
     );
   }

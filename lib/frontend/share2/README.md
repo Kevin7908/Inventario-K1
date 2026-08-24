@@ -71,6 +71,7 @@ share2/
 │   ├── cuadro_seleccion.dart
 │   ├── grupo_radio.dart
 │   ├── fila_campos.dart
+│   ├── formulario_abono.dart
 │   ├── interruptor_campo.dart
 │   ├── atajos_formulario.dart
 │   ├── barra_busqueda.dart
@@ -105,6 +106,8 @@ share2/
 │   ├── tarjeta_producto.dart
 │   ├── ficha_resumen.dart
 │   ├── pie_totales.dart
+│   ├── renglon_cuenta.dart
+│   ├── fila_movimiento.dart
 │   ├── marcador_identidad.dart
 │   ├── fila_dato.dart
 │   ├── panel_seccion.dart
@@ -173,6 +176,7 @@ Widgets para formularios y entrada de datos. Aplican el estilo visual del proyec
 | `ControlCantidad` | Cantidad de una línea: `–`, `+` y el número editable a mano |
 | `FilaCampos` | Reparte campos en una fila y los apila cuando falta ancho |
 | `InterruptorCampo` | Switch con etiqueta y una línea que explica qué implica el estado |
+| `FormularioAbono<T>` | Recibir plata contra un documento: monto acotado al saldo, método de pago y «Todo el saldo». Lo comparten el abono de una reserva y el pago de una deuda |
 | `AtajosFormulario` | Esc cancela, Ctrl/Cmd+Enter guarda |
 
 ---
@@ -205,6 +209,8 @@ Widgets para agrupar y presentar información con estilos consistentes.
 | `EncabezadoGrupoLineas` | Separador de un bloque de líneas con su subtotal |
 | `FichaResumen` | Bloque de datos de una entidad, para cabeceras de detalle |
 | `PieTotales` | Pie de un documento: subtotal, descuento editable, total e IVA incluido |
+| `RenglonCuenta` | Un renglón «etiqueta … importe» del bloque de cuentas. El color lo decide quien lo usa: un saldo pendiente no significa lo mismo en una reserva que en una deuda |
+| `FilaMovimiento` | Una línea del historial de dinero: ícono, qué fue, cuándo y cuánto. La comparten los abonos de una reserva y los pagos de una deuda |
 | `MarcadorIdentidad` | Cuadro con el ícono de la entidad o la inicial de su nombre sobre su color |
 | `FilaDato` | Línea "ícono + texto" dentro de una tarjeta (contacto, teléfono, ciudad) |
 | `PanelSeccion` | Agrupa un bloque de contenido con título y borde |
