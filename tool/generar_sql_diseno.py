@@ -104,9 +104,17 @@ stock.""",
 
  ('7. CARTERA', """Lo que queda por cobrar. `monto_pagado` es caché de SUM(deudor_pagos.monto).
 
+La deuda NACE EN CUENTAS POR COBRAR, no en una factura. Hubo una columna
+venta_id que apuntaba a la venta que la originó; se quitó cuando el mostrador
+dejó de fiar —toda venta se cobra completa— y nadie volvió a escribirla. Si
+algún día se vuelve a fiar desde el POS, es una FK nueva, no una columna que
+llevaba años en NULL.
+
 VENCIDA es un estado guardado y a la vez calculable desde fecha_vencimiento:
 se guarda porque el usuario puede marcarla antes de tiempo, así que no es una
-función de la fecha sino una decisión.""",
+función de la fecha sino una decisión. Quien pregunta "¿cuáles hay que ir a
+cobrar?" necesita las dos cosas a la vez, y esa es la condición que aplican
+RepositorioDeudores en SQL y DeudorResumen.estaVencida en Dart.""",
   ['deudores', 'deudor_pagos']),
 
  ('8. SOPORTE', """Datos del negocio y numeración de documentos.
@@ -129,7 +137,7 @@ salida = [f"""-- {L}
 --   `flutter test test/volcado_esquema_test.dart` y pasando el resultado
 --   por `tool/generar_sql_diseno.py`.
 --
---   26 tablas · 44 índices · 9 guardas (triggers).
+--   {{CONTEO}}
 --
 --   Convenciones que valen en todo el esquema:
 --
@@ -178,5 +186,14 @@ for nombre, sql in objetos['trigger'].items():
     salida.append(sql.strip().rstrip(';') + ';\n')
 
 texto = '\n'.join(salida).rstrip() + '\n'
+
+# El conteo se cuenta, no se escribe: la línea del encabezado decía «26 tablas
+# · 44 índices» mientras el volcado ya traía 46 índices, porque nadie se
+# acuerda de subirla al agregar una tabla.
+conteo = (f"{texto.count(chr(10) + 'CREATE TABLE')} tablas · "
+          f"{texto.count(chr(10) + 'CREATE INDEX') + texto.count(chr(10) + 'CREATE UNIQUE INDEX')} índices · "
+          f"{texto.count(chr(10) + 'CREATE TRIGGER')} guardas (triggers).")
+texto = texto.replace('{CONTEO}', conteo)
+
 open('/tmp/InventarioK1.sql', 'w').write(texto)
-print(f"{len(texto.splitlines())} líneas")
+print(f"{len(texto.splitlines())} líneas · {conteo}")
