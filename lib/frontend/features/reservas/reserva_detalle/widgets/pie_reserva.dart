@@ -15,20 +15,34 @@ import '../../../../share2/share2.dart';
 /// porcentaje se lee de un vistazo desde el otro lado del mostrador, los
 /// números no.
 ///
+/// Los colores son los mismos que usa la tarjeta del listado —verde lo
+/// entregado, ámbar lo que falta— para que la misma reserva no se lea de dos
+/// maneras según la pantalla.
+///
+/// Parámetros:
+/// Las dos acciones van aquí, bajo las cuentas, porque es donde se mira al
+/// terminar: entregar arriba —es el cierre normal— y cancelar debajo. **Hacen
+/// lo contrario con el inventario**: entregar no devuelve nada porque el
+/// cliente se llevó la mercancía; cancelar la devuelve entera. Por eso la
+/// segunda va en rojo suave y la primera en verde.
+///
 /// Parámetros:
 /// - [total]: lo que vale la mercancía apartada.
 /// - [pagado]: lo entregado hasta ahora.
+/// - [alEntregar]: `null` si la reserva ya está cerrada.
 /// - [alCancelar]: `null` si la reserva ya no se puede cancelar.
 class PieReserva extends StatelessWidget {
   const PieReserva({
     super.key,
     required this.total,
     required this.pagado,
+    this.alEntregar,
     this.alCancelar,
   });
 
   final int total;
   final int pagado;
+  final VoidCallback? alEntregar;
   final VoidCallback? alCancelar;
 
   int get _saldo => (total - pagado).clamp(0, total);
@@ -55,7 +69,10 @@ class PieReserva extends StatelessWidget {
         _Fila(
           etiqueta: 'Saldo pendiente',
           valor: _saldo,
-          color: _saldo > 0 ? ColoresApp.statusDanger : ColoresApp.textMuted,
+          // Ámbar y no rojo: deber plata de un apartado es el estado normal
+          // de una reserva, no un error. Es el mismo color con que la tarjeta
+          // del listado pinta el saldo.
+          color: _saldo > 0 ? ColoresApp.statusWarning : ColoresApp.textMuted,
         ),
         const SizedBox(height: 14),
         BarraProgreso(
@@ -78,14 +95,26 @@ class PieReserva extends StatelessWidget {
             ),
             Text(
               formatearPrecio(total),
+              // El verde oscuro de marca, igual que el total de `PieTotales`:
+              // un importe cerrado se pinta igual en los cuatro documentos.
               style: TipografiaApp.heading3.copyWith(
-                color: ColoresApp.statusInfo,
+                fontSize: 18,
+                color: ColoresApp.castletonGreen,
               ),
             ),
           ],
         ),
-        if (alCancelar != null) ...[
+        if (alEntregar != null) ...[
           const SizedBox(height: 16),
+          BotonPrimario(
+            etiqueta: 'Marcar entregada',
+            icono: Icons.check_rounded,
+            expandido: true,
+            alPresionar: alEntregar,
+          ),
+        ],
+        if (alCancelar != null) ...[
+          SizedBox(height: alEntregar != null ? 10 : 16),
           BotonDestructivo(
             etiqueta: 'Cancelar reserva',
             icono: Icons.cancel_outlined,

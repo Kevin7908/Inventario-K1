@@ -116,9 +116,48 @@ void main() {
       expect(find.text('0 % pagado'), findsOneWidget);
     });
 
-    testWidgets('sin callback no ofrece cancelar', (tester) async {
+    testWidgets('sin callbacks no ofrece cerrar la reserva', (tester) async {
+      // Es lo que se ve en una reserva ya completada o cancelada: las cuentas
+      // se leen, pero no hay nada más que hacerle.
       await _pump(tester, const PieReserva(total: 100000, pagado: 40000));
 
+      expect(find.text('Cancelar reserva'), findsNothing);
+      expect(find.text('Marcar entregada'), findsNothing);
+    });
+
+    testWidgets('entregar va encima de cancelar', (tester) async {
+      // El orden importa: entregar es el cierre normal y cancelar el que
+      // deshace. Poner primero el destructivo invita a errarle.
+      await _pump(
+        tester,
+        PieReserva(
+          total: 100000,
+          pagado: 40000,
+          alEntregar: () {},
+          alCancelar: () {},
+        ),
+      );
+
+      final entregar = tester.getCenter(find.text('Marcar entregada'));
+      final cancelar = tester.getCenter(find.text('Cancelar reserva'));
+      expect(entregar.dy, lessThan(cancelar.dy));
+    });
+
+    testWidgets('el botón de entregar avisa por su callback', (tester) async {
+      var entregada = false;
+      await _pump(
+        tester,
+        PieReserva(
+          total: 100000,
+          pagado: 100000,
+          alEntregar: () => entregada = true,
+        ),
+      );
+
+      await tester.tap(find.text('Marcar entregada'));
+      await tester.pump();
+
+      expect(entregada, isTrue);
       expect(find.text('Cancelar reserva'), findsNothing);
     });
 
@@ -137,6 +176,39 @@ void main() {
       await tester.pump();
 
       expect(cancelada, isTrue);
+    });
+  });
+
+  group('los colores del pie salen de la paleta', () {
+    // El bloque de cuentas es lo único del panel derecho que no se parece a
+    // los otros tres documentos, así que es donde más fácil se cuela un color
+    // inventado. Estos tests fijan los tres que importan.
+
+    Color colorDe(WidgetTester tester, String texto) =>
+        tester.widget<Text>(find.text(texto)).style!.color!;
+
+    testWidgets('el total va en el verde de marca, como en PieTotales',
+        (tester) async {
+      await _pump(tester, const PieReserva(total: 100000, pagado: 40000));
+
+      // El importe grande del pie: el segundo `$100.000` de la pantalla.
+      final total = tester.widgetList<Text>(find.text(r'$100.000')).last;
+      expect(total.style?.color, ColoresApp.castletonGreen);
+    });
+
+    testWidgets('lo pagado va en verde y el saldo en ámbar', (tester) async {
+      await _pump(tester, const PieReserva(total: 100000, pagado: 40000));
+
+      expect(colorDe(tester, r'$40.000'), ColoresApp.statusSuccess);
+      // Ámbar, no rojo: deber de un apartado es el estado normal, no un error.
+      expect(colorDe(tester, r'$60.000'), ColoresApp.statusWarning);
+    });
+
+    testWidgets('sin saldo la cifra se apaga en vez de seguir en ámbar',
+        (tester) async {
+      await _pump(tester, const PieReserva(total: 50000, pagado: 50000));
+
+      expect(colorDe(tester, r'$0'), ColoresApp.textMuted);
     });
   });
 

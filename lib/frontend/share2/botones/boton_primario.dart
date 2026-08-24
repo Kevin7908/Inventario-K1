@@ -28,11 +28,16 @@ class BotonPrimario extends StatelessWidget {
     required this.etiqueta,
     required this.alPresionar,
     this.icono,
+    this.expandido = false,
   });
 
   final String etiqueta;
   final VoidCallback? alPresionar;
   final IconData? icono;
+
+  /// Ocupa todo el ancho disponible en lugar de ajustarse al texto. Es lo que
+  /// hace falta cuando el botón cierra un panel angosto, apilado sobre otros.
+  final bool expandido;
 
   @override
   Widget build(BuildContext context) {
@@ -50,7 +55,8 @@ class BotonPrimario extends StatelessWidget {
         child: Padding(
           padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
           child: Row(
-            mainAxisSize: MainAxisSize.min,
+            mainAxisSize: expandido ? MainAxisSize.max : MainAxisSize.min,
+            mainAxisAlignment: MainAxisAlignment.center,
             children: [
               if (icono != null) ...[
                 Icon(icono, size: 18, color: ColoresApp.textOnPrimary),

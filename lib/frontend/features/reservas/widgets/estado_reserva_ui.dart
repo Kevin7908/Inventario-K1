@@ -15,6 +15,9 @@ import '../../../share2/share2.dart';
 ///   Solo se muestra cuando dice algo que el otro no: una reserva `ACTIVA` ya
 ///   se entiende por su saldo, pero una cancelada hay que decirla.
 
+/// El mismo reparto que usan las órdenes para sus estados, para que un
+/// documento cerrado se lea igual en las dos pantallas: gris el que sigue en
+/// curso, verde el que terminó bien, rojo el que se deshizo.
 ({Color color, Color fondo}) coloresDeEstadoReserva(EstadoReserva estado) =>
     switch (estado) {
       EstadoReserva.activa => (
@@ -22,8 +25,8 @@ import '../../../share2/share2.dart';
           fondo: ColoresApp.statusNeutralBg,
         ),
       EstadoReserva.completada => (
-          color: ColoresApp.statusInfo,
-          fondo: ColoresApp.statusInfoBg,
+          color: ColoresApp.statusSuccess,
+          fondo: ColoresApp.statusSuccessBg,
         ),
       EstadoReserva.cancelada => (
           color: ColoresApp.statusDanger,

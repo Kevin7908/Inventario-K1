@@ -41,6 +41,10 @@ class BotonDestructivo extends StatelessWidget {
   /// una reserva desde su propio pie, anular una orden dentro de su diálogo—,
   /// donde un bloque rojo sólido se lleva toda la atención de una pantalla que
   /// no trata de eso. Sigue leyéndose como peligro, pero no grita.
+  ///
+  /// Usa la pareja `statusDangerBg` / `statusDanger` y **no lleva borde**, que
+  /// es como resuelve la app el resto de sus bloques suaves (`IndicadorEstado`,
+  /// los avisos de panel cerrado).
   final bool suave;
 
   @override
@@ -48,9 +52,7 @@ class BotonDestructivo extends StatelessWidget {
     final bool deshabilitado = alPresionar == null;
 
     final contenido = suave
-        ? (deshabilitado
-            ? ColoresApp.statusDanger.withValues(alpha: 0.5)
-            : ColoresApp.statusDanger)
+        ? (deshabilitado ? ColoresApp.textDisabled : ColoresApp.statusDanger)
         : ColoresApp.textOnPrimary;
 
     return Material(
@@ -66,16 +68,8 @@ class BotonDestructivo extends StatelessWidget {
         hoverColor: suave
             ? ColoresApp.statusDanger.withValues(alpha: 0.08)
             : Colors.black.withValues(alpha: 0.12),
-        child: Container(
+        child: Padding(
           padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
-          decoration: suave
-              ? BoxDecoration(
-                  borderRadius: BorderRadius.circular(8),
-                  border: Border.all(
-                    color: ColoresApp.statusDanger.withValues(alpha: 0.35),
-                  ),
-                )
-              : null,
           child: Row(
             mainAxisSize: expandido ? MainAxisSize.max : MainAxisSize.min,
             mainAxisAlignment: MainAxisAlignment.center,

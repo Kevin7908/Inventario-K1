@@ -202,6 +202,28 @@ class _Pie extends ConsumerWidget {
 
   final int reservaId;
 
+  /// Entregar cierra la reserva **sin devolver nada** al inventario: la
+  /// mercancía salió de verdad. Si queda saldo, el aviso lo dice con el número
+  /// —el taller decide si deja llevarla fiada, pero no debería enterarse
+  /// después—.
+  Future<void> _entregar(BuildContext context, WidgetRef ref, int saldo) async {
+    final confirmado = await DialogoConfirmacion.mostrar(
+      context,
+      titulo: '¿Marcar como entregada?',
+      mensaje: saldo > 0
+          ? 'El cliente se lleva la mercancía y la reserva se cierra. '
+              'Quedan ${formatearPrecio(saldo)} sin pagar, y después no se le '
+              'podrán agregar ni quitar productos.'
+          : 'El cliente se lleva la mercancía y la reserva se cierra. No '
+              'vuelve al inventario, porque salió de verdad. Después no se le '
+              'podrán agregar ni quitar productos.',
+    );
+    if (confirmado != true) return;
+    await ref
+        .read(reservaEditorProvider(reservaId).notifier)
+        .cambiarEstado(EstadoReserva.completada);
+  }
+
   Future<void> _cancelar(BuildContext context, WidgetRef ref) async {
     final confirmado = await DialogoConfirmacion.mostrar(
       context,
@@ -222,9 +244,15 @@ class _Pie extends ConsumerWidget {
       reservaEditorProvider(reservaId).select((s) => (
             total: s.value?.totalReserva ?? 0,
             pagado: s.value?.pagadoAcumulado ?? 0,
+            saldo: s.value?.saldo ?? 0,
+            lineas: s.value?.lineas.length ?? 0,
             editable: s.value?.editable ?? false,
           )),
     );
+
+    // Sin nada apartado no hay nada que entregar: cerrar una reserva vacía
+    // solo la saca del listado sin haber hecho nada.
+    final puedeEntregar = datos.editable && datos.lineas > 0;
 
     return Container(
       padding: const EdgeInsets.fromLTRB(22, 18, 22, 22),
@@ -235,6 +263,9 @@ class _Pie extends ConsumerWidget {
       child: PieReserva(
         total: datos.total,
         pagado: datos.pagado,
+        alEntregar: puedeEntregar
+            ? () => unawaited(_entregar(context, ref, datos.saldo))
+            : null,
         alCancelar:
             datos.editable ? () => unawaited(_cancelar(context, ref)) : null,
       ),

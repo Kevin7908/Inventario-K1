@@ -1,23 +1,18 @@
-import 'dart:async';
-
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../../../backend/features/reservas/enum/enum_reserva.dart';
 import '../../../../../core/formato.dart';
-import '../../../../../core/resultado.dart';
 import '../../../../share2/share2.dart';
 import '../provider/reserva_editor_provider.dart';
 
-/// La cabecera de la reserva: hasta cuándo se guarda y en qué punto está.
+/// La cabecera de la reserva: de dónde salió, hasta cuándo se guarda y dónde
+/// está su mercancía ahora mismo.
 ///
-/// No hay botón de guardar: la reserva se persiste sola, así que el selector
-/// avisa al editor en cuanto cambia y «Listo» solo cierra.
-///
-/// **Entregar y cancelar no son lo mismo**, y por eso están separados: cancelar
-/// devuelve la mercancía al inventario, entregar no —el cliente se la llevó—.
-/// Cancelar vive en el pie del panel, junto a las cuentas; aquí queda entregar,
-/// que es el cierre normal.
+/// **Es solo de lectura.** Las dos acciones que cierran una reserva —entregar
+/// y cancelar— viven juntas en el pie del panel derecho, bajo las cuentas, que
+/// es donde se mira al terminar. Tenerlas también aquí obligaba a recordar en
+/// cuál de los dos sitios estaba cada una.
 class DialogoDatosReserva extends ConsumerStatefulWidget {
   const DialogoDatosReserva({super.key, required this.reservaId});
 
@@ -38,31 +33,7 @@ class DialogoDatosReserva extends ConsumerStatefulWidget {
 }
 
 class _DialogoDatosReservaState extends ConsumerState<DialogoDatosReserva> {
-  String? _error;
-
   void _cerrar() => Navigator.of(context).pop();
-
-  Future<void> _entregar() async {
-    final confirmado = await DialogoConfirmacion.mostrar(
-      context,
-      titulo: '¿Marcar como entregada?',
-      mensaje: 'El cliente se lleva la mercancía y la reserva se cierra. **No** '
-          'vuelve al inventario, porque salió de verdad. Después no se le '
-          'pueden agregar ni quitar productos.',
-    );
-    if (confirmado != true || !mounted) return;
-
-    setState(() => _error = null);
-    final resultado = await ref
-        .read(reservaEditorProvider(widget.reservaId).notifier)
-        .cambiarEstado(EstadoReserva.completada);
-    if (!mounted) return;
-    if (resultado case Fallo(:final mensaje)) {
-      setState(() => _error = mensaje);
-    } else {
-      _cerrar();
-    }
-  }
 
   @override
   Widget build(BuildContext context) {
@@ -72,8 +43,6 @@ class _DialogoDatosReservaState extends ConsumerState<DialogoDatosReserva> {
             estado: s.value?.estado ?? EstadoReserva.activa,
             limite: s.value?.fechaLimite,
             cotizacionId: s.value?.cotizacionId,
-            editable: s.value?.editable ?? false,
-            saldo: s.value?.saldo ?? 0,
           )),
     );
 
@@ -126,24 +95,9 @@ class _DialogoDatosReservaState extends ConsumerState<DialogoDatosReserva> {
               ],
               const SizedBox(height: 16),
               _AvisoInventario(estado: datos.estado),
-              if (_error != null) ...[
-                const SizedBox(height: 14),
-                Text(
-                  _error!,
-                  style: TipografiaApp.caption.copyWith(
-                    color: ColoresApp.statusDanger,
-                  ),
-                ),
-              ],
               const SizedBox(height: 24),
               Row(
                 children: [
-                  if (datos.editable)
-                    BotonPrimario(
-                      etiqueta: 'Marcar entregada',
-                      icono: Icons.check_rounded,
-                      alPresionar: () => unawaited(_entregar()),
-                    ),
                   const Spacer(),
                   BotonSecundario(etiqueta: 'Listo', alPresionar: _cerrar),
                 ],
