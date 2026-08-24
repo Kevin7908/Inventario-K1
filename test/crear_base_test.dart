@@ -1,14 +1,27 @@
 // Utilidad de desarrollo: crea la base de la app desde cero.
 //
-// No es un test: borra la base que haya en `~/Documentos` y la recrea con el
-// mismo Drift que usa la aplicación —tablas, guardas y catálogos iniciales—.
-// Se ejecuta a mano cuando el esquema cambió y hay que empezar de nuevo.
+// **No es un test y destruye datos**: borra la base que haya en `~/Documentos`
+// y la recrea con el mismo Drift que usa la aplicación —tablas, guardas y
+// catálogos iniciales—. Se ejecuta a mano cuando el esquema cambió y hay que
+// empezar de nuevo.
+//
+// Por eso va **apagada por defecto**. Vive en `test/`, así que `flutter test`
+// la recogía junto con los demás y le borraba la base al que estuviera usando
+// la app: se trabajaba una mañana entera, alguien corría la suite, y al
+// siguiente hot reload no quedaba nada. Ahora hay que pedirla a mano:
+//
+// ```
+// RECREAR_BD=1 flutter test test/crear_base_test.dart
+// ```
 import 'dart:io';
 
 import 'package:drift/native.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:inventario_k1/backend/share/database/app_db.dart';
 import 'package:path/path.dart' as p;
+
+/// Solo corre si se pide explícitamente por entorno.
+final _pedida = Platform.environment['RECREAR_BD'] == '1';
 
 void main() {
   test('recrea ~/Documentos/InventarioK1.sqlite', () async {
@@ -50,5 +63,6 @@ void main() {
     print('creada: $ruta  ·  ${tablas.read<int>('n')} tablas');
 
     expect(File(ruta).existsSync(), isTrue);
-  });
+  }, skip: _pedida ? null : 'Utilidad manual que BORRA la base de la app. '
+      'Para ejecutarla: RECREAR_BD=1 flutter test test/crear_base_test.dart');
 }
