@@ -8,7 +8,10 @@ class DeudorResumen extends Equatable {
     required this.numero,
     required this.clienteId,
     required this.nombreCliente,
-    required this.concepto,
+    this.motoId,
+    this.nombreMoto,
+    this.placaMoto,
+    this.concepto,
     required this.montoTotal,
     required this.montoPagado,
     required this.estado,
@@ -21,7 +24,14 @@ class DeudorResumen extends Equatable {
   final String numero;
   final int clienteId;
   final String nombreCliente;
-  final String concepto;
+  final int? motoId;
+  final String? nombreMoto;
+  final String? placaMoto;
+
+  /// Por qué se debe, si se escribió. Las líneas ya dicen qué se llevó, así
+  /// que esto es opcional: sirve para nombrar el fiado («Reparación del
+  /// motor») cuando el listado de repuestos no lo explica solo.
+  final String? concepto;
   final int montoTotal;
   final int montoPagado;
   final EstadoDeudor estado;
@@ -30,6 +40,12 @@ class DeudorResumen extends Equatable {
   final DateTime creadoEn;
 
   int get saldo => (montoTotal - montoPagado).clamp(0, montoTotal);
+
+  /// La moto en una línea, para las cabeceras. `null` si no se anotó ninguna.
+  String? get descripcionMoto {
+    final partes = [?nombreMoto, ?placaMoto];
+    return partes.isEmpty ? null : partes.join(' · ');
+  }
 
   double get porcentajePagado =>
       montoTotal > 0 ? (montoPagado / montoTotal).clamp(0.0, 1.0) : 0.0;
@@ -61,6 +77,9 @@ class DeudorResumen extends Equatable {
         numero,
         clienteId,
         nombreCliente,
+        motoId,
+        nombreMoto,
+        placaMoto,
         concepto,
         montoTotal,
         montoPagado,

@@ -12,9 +12,11 @@ enum TipoMovimiento {
   salidaVenta('SALIDA_VENTA', 'Venta'),
   salidaServicio('SALIDA_SERVICIO', 'Repuesto de orden'),
   salidaReserva('SALIDA_RESERVA', 'Reserva'),
+  salidaFiado('SALIDA_FIADO', 'Fiado'),
   devolucionVenta('DEVOLUCION_VENTA', 'Venta anulada'),
   devolucionServicio('DEVOLUCION_SERVICIO', 'Repuesto retirado de la orden'),
-  devolucionReserva('DEVOLUCION_RESERVA', 'Reserva liberada');
+  devolucionReserva('DEVOLUCION_RESERVA', 'Reserva liberada'),
+  devolucionFiado('DEVOLUCION_FIADO', 'Fiado corregido');
 
   const TipoMovimiento(this.codigo, this.etiqueta);
 
@@ -37,6 +39,7 @@ final class MovimientoInventario extends Equatable {
     this.ventaId,
     this.ordenId,
     this.reservaId,
+    this.deudorId,
     this.notas,
     required this.creadoEn,
   });
@@ -51,6 +54,7 @@ final class MovimientoInventario extends Equatable {
   final int? ventaId;
   final int? ordenId;
   final int? reservaId;
+  final int? deudorId;
   final String? notas;
   final DateTime creadoEn;
 
@@ -58,7 +62,7 @@ final class MovimientoInventario extends Equatable {
 
   @override
   List<Object?> get props =>
-      [id, productoId, tipo, cantidad, ventaId, ordenId, reservaId, creadoEn];
+      [id, productoId, tipo, cantidad, ventaId, ordenId, reservaId, deudorId, creadoEn];
 }
 
 /// Lo que se le pide al repositorio para mover stock.
@@ -73,6 +77,7 @@ final class SolicitudMovimiento {
     this.ventaId,
     this.ordenId,
     this.reservaId,
+    this.deudorId,
     this.notas,
   });
 
@@ -86,6 +91,7 @@ final class SolicitudMovimiento {
     int? ventaId,
     int? ordenId,
     int? reservaId,
+    int? deudorId,
     String? notas,
   }) =>
       SolicitudMovimiento(
@@ -95,6 +101,7 @@ final class SolicitudMovimiento {
         ventaId: ventaId,
         ordenId: ordenId,
         reservaId: reservaId,
+        deudorId: deudorId,
         notas: notas,
       );
 
@@ -106,6 +113,7 @@ final class SolicitudMovimiento {
     int? ventaId,
     int? ordenId,
     int? reservaId,
+    int? deudorId,
     String? notas,
   }) =>
       SolicitudMovimiento(
@@ -115,6 +123,7 @@ final class SolicitudMovimiento {
         ventaId: ventaId,
         ordenId: ordenId,
         reservaId: reservaId,
+        deudorId: deudorId,
         notas: notas,
       );
 
@@ -124,5 +133,6 @@ final class SolicitudMovimiento {
   final int? ventaId;
   final int? ordenId;
   final int? reservaId;
+  final int? deudorId;
   final String? notas;
 }

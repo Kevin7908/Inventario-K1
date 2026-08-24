@@ -93,34 +93,70 @@ abstract class RepositorioDeudores {
 
   Future<DeudorDetalle> obtenerDetalle(int id);
 
-  /// Abre una deuda y devuelve su id.
+  /// Abre una deuda **vacía** y devuelve su id.
+  ///
+  /// Nace en cero y se le van anotando los repuestos con [agregarItem], igual
+  /// que una reserva: el monto es la suma de las líneas, no un número que se
+  /// teclee.
   ///
   /// Lanza si la base la rechaza, igual que `RepositorioReservas.crear`: quien
   /// la llama es un diálogo que solo puede hacer una cosa con el fallo, que es
   /// enseñarlo.
   Future<int> crear({
     required int clienteId,
-    required String concepto,
-    required int montoTotal,
+    int? motoId,
+    String? concepto,
     DateTime? fechaVencimiento,
     String? notas,
-    int pagoInicial = 0,
-    MetodoPago metodoPagoInicial = MetodoPago.efectivo,
-    String? notasPagoInicial,
   });
 
-  /// Cambia los datos de la cabecera.
-  ///
-  /// El monto **no puede bajar de lo ya cobrado**: el `CHECK` de la tabla lo
-  /// rechazaría con un error de SQLite, y lo que hace falta es decirle al
-  /// usuario cuánto lleva recibido.
+  /// Cambia los datos de la cabecera. **El monto no está aquí**: sale de las
+  /// líneas.
   Future<Resultado> actualizar({
     required int id,
-    required String concepto,
-    required int montoTotal,
+    int? motoId,
+    String? concepto,
     DateTime? fechaVencimiento,
     String? notas,
   });
+
+  // Líneas, una a una
+  //
+  // Mismo modelo que reservas y órdenes: el editor escribe por línea y no
+  // reemplazando la deuda entera, porque cada línea mueve inventario y
+  // reescribirlas todas en cada tecleo serían dos movimientos por línea y por
+  // tecla.
+
+  /// Anota un repuesto más como fiado y **lo descuenta del inventario**.
+  ///
+  /// Si el producto ya está en la deuda se le suma a su línea en vez de abrir
+  /// otra. Falla si no hay stock: no se puede fiar lo que no está.
+  Future<Resultado> agregarItem({
+    required int deudorId,
+    required int productoId,
+    required double cantidad,
+    required int precioUnitario,
+  });
+
+  /// Cambia la cantidad o el precio de una línea, moviendo **solo la
+  /// diferencia** de stock.
+  Future<Resultado> actualizarItem(
+    int itemId, {
+    double? cantidad,
+    int? precioUnitario,
+  });
+
+  /// Quita la línea y devuelve su mercancía al inventario.
+  ///
+  /// **Es la corrección de un error de captura, no una devolución del
+  /// cliente**: lo fiado ya salió del taller. Quitar una línea significa que
+  /// nunca debió anotarse, y por eso el repuesto vuelve al estante.
+  ///
+  /// Si al quitarla el total queda por debajo de lo que el cliente ya abonó,
+  /// se registra un **pago negativo** por la diferencia: esa plata hay que
+  /// regresarla, y queda escrita como un movimiento más en vez de corregir los
+  /// abonos viejos.
+  Future<Resultado> eliminarItem(int itemId);
 
   /// Anota un abono y recalcula el caché `monto_pagado`.
   ///
@@ -146,4 +182,11 @@ abstract class RepositorioDeudores {
   /// `RepositorioInventario.descuadres` y `RepositorioReservas.descuadres`: un
   /// caché solo está justificado si algo puede afirmar que coincide.
   Future<Map<int, int>> descuadres();
+
+  /// Las deudas cuyo `monto_total` no cuadra con la suma de sus líneas,
+  /// indexadas por id y con la diferencia (`caché − suma`).
+  ///
+  /// El segundo caché de la tabla necesita su propia afirmación, igual que el
+  /// primero (§7 de `REGLAS_BD.md`).
+  Future<Map<int, int>> descuadresTotal();
 }

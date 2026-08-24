@@ -15,6 +15,7 @@ abstract final class MovimientoMapper {
       ventaId: fila.ventaId,
       ordenId: fila.ordenId,
       reservaId: fila.reservaId,
+      deudorId: fila.deudorId,
       notas: fila.notas,
       creadoEn: fila.creadoEn,
     );
@@ -30,6 +31,7 @@ abstract final class MovimientoMapper {
       ventaId: Value(s.ventaId),
       ordenId: Value(s.ordenId),
       reservaId: Value(s.reservaId),
+      deudorId: Value(s.deudorId),
       notas: Value(s.notas),
     );
   }

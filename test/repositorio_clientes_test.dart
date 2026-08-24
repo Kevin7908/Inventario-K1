@@ -74,8 +74,8 @@ Future<void> _deuda({
         TablaDeudorCompanion.insert(
           numero: numero,
           clienteId: clienteId,
-          concepto: 'Prueba',
-          montoTotal: total,
+          concepto: const Value('Prueba'),
+          montoTotal: Value(total),
           montoPagado: Value(pagado),
           estado: Value(estado),
         ),

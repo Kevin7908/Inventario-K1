@@ -8,6 +8,12 @@ import 'tabla_deudor.dart';
 /// Es la fuente de verdad de `deudores.monto_pagado`, que solo es su suma
 /// cacheada. Como el libro mayor del inventario y los abonos de reserva, se
 /// escribe y no se corrige.
+///
+/// **Un monto negativo es una devolución.** Aparece cuando se quita una línea
+/// de una deuda que ya tenía abonos y el total cae por debajo de lo entregado:
+/// esa diferencia hay que regresarla, y queda escrita como un movimiento más
+/// en vez de corregir los abonos viejos. Por eso el `CHECK` es `<> 0` y no
+/// `> 0`, igual que en `reserva_abonos`.
 // Índice compuesto: cubre WHERE deudorId = ? ORDER BY fechaPago ASC en _cargarPagos
 @TableIndex(name: 'idx_pagos_deudor_fecha', columns: {#deudorId, #fechaPago})
 class TablaDeudorPago extends Table {
@@ -32,7 +38,7 @@ class TablaDeudorPago extends Table {
 
   @override
   List<String> get customConstraints => [
-        'CHECK (monto > 0)',
+        'CHECK (monto <> 0)',
         'CHECK (metodo_pago IN (${MetodoPago.listaSqlAbonos}))',
       ];
 }

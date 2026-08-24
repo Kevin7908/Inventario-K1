@@ -1,5 +1,6 @@
 import 'package:drift/drift.dart';
 
+import '../../deudores/esquema_datos/tabla_deudor.dart';
 import '../../productos/esquema_datos/tabla_producto.dart';
 import '../../reservas/esquema_datos/tabla_reserva.dart';
 import '../../pos/esquema_datos/tabla_ventas.dart';
@@ -48,12 +49,12 @@ class TablaMovimientoInventario extends Table {
   /// Con signo: `+` entra al inventario, `−` sale. Nunca cero.
   RealColumn get cantidad => real()();
 
-  /// De qué documento vino el movimiento. Son tres columnas y no un par
+  /// De qué documento vino el movimiento. Son cuatro columnas y no un par
   /// `referencia_tipo` / `referencia_id` a propósito: una FK polimórfica no la
   /// puede verificar la base, y el `CHECK` de abajo garantiza que como mucho
-  /// una esté puesta. Un ajuste manual las deja las tres en NULL.
+  /// una esté puesta. Un ajuste manual las deja las cuatro en NULL.
   ///
-  /// `setNull` en las tres: si el documento desaparece, el movimiento sigue
+  /// `setNull` en las cuatro: si el documento desaparece, el movimiento sigue
   /// contando para el stock aunque pierda su origen.
   IntColumn get ventaId => integer()
       .nullable()
@@ -67,6 +68,14 @@ class TablaMovimientoInventario extends Table {
       .nullable()
       .references(TablaReserva, #id, onDelete: KeyAction.setNull)();
 
+  /// La deuda que se llevó la mercancía. **Fiar no es apartar**: en una
+  /// reserva el repuesto sigue en la bodega y la salida es contable; aquí el
+  /// cliente se lo llevó puesto en la moto y no vuelve, salvo que la línea se
+  /// hubiera anotado por error.
+  IntColumn get deudorId => integer()
+      .nullable()
+      .references(TablaDeudor, #id, onDelete: KeyAction.setNull)();
+
   TextColumn get notas => text().nullable()();
 
   DateTimeColumn get creadoEn => dateTime().withDefault(currentDateAndTime)();
@@ -76,10 +85,11 @@ class TablaMovimientoInventario extends Table {
         "CHECK (tipo IN ("
             "'AJUSTE_INICIAL', 'AJUSTE_POSITIVO', 'AJUSTE_NEGATIVO', "
             "'ENTRADA_COMPRA', 'SALIDA_VENTA', 'SALIDA_SERVICIO', "
-            "'SALIDA_RESERVA', 'DEVOLUCION_VENTA', 'DEVOLUCION_SERVICIO', "
-            "'DEVOLUCION_RESERVA'))",
+            "'SALIDA_RESERVA', 'SALIDA_FIADO', 'DEVOLUCION_VENTA', "
+            "'DEVOLUCION_SERVICIO', 'DEVOLUCION_RESERVA', "
+            "'DEVOLUCION_FIADO'))",
         'CHECK (cantidad <> 0)',
         'CHECK ((venta_id IS NOT NULL) + (orden_id IS NOT NULL) + '
-            '(reserva_id IS NOT NULL) <= 1)',
+            '(reserva_id IS NOT NULL) + (deudor_id IS NOT NULL) <= 1)',
       ];
 }
