@@ -110,12 +110,24 @@ dejó de fiar —toda venta se cobra completa— y nadie volvió a escribirla. S
 algún día se vuelve a fiar desde el POS, es una FK nueva, no una columna que
 llevaba años en NULL.
 
+FIAR SACA LA MERCANCÍA DEL TALLER, y ahí está la diferencia con una reserva:
+lo apartado sigue en la bodega y cancelarlo lo devuelve; lo fiado se fue
+montado en una moto. Cada deudor_items tiene su renglón en
+movimientos_inventario con tipo SALIDA_FIADO, y dar una deuda por INCOBRABLE
+NO devuelve nada: si el cliente no paga, el taller pierde la plata, no
+recupera la pieza. La única entrada (DEVOLUCION_FIADO) es corregir una línea
+que se anotó mal.
+
+monto_total es caché de SUM(deudor_items.cantidad * precio_unitario), como
+total_reserva. Un monto negativo en deudor_pagos es una devolución: aparece
+cuando quitar una línea deja el total por debajo de lo ya abonado.
+
 VENCIDA es un estado guardado y a la vez calculable desde fecha_vencimiento:
 se guarda porque el usuario puede marcarla antes de tiempo, así que no es una
 función de la fecha sino una decisión. Quien pregunta "¿cuáles hay que ir a
 cobrar?" necesita las dos cosas a la vez, y esa es la condición que aplican
 RepositorioDeudores en SQL y DeudorResumen.estaVencida en Dart.""",
-  ['deudores', 'deudor_pagos']),
+  ['deudores', 'deudor_items', 'deudor_pagos']),
 
  ('8. SOPORTE', """Datos del negocio y numeración de documentos.
 
