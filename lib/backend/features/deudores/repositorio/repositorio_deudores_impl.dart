@@ -1,9 +1,10 @@
-import '../../../share/consecutivos/documento_consecutivo.dart';
-import '../../../share/consecutivos/repositorio_consecutivos.dart';
-import '../../../share/dominio/metodo_pago.dart';
 import 'package:drift/drift.dart';
 import 'package:inventario_k1/backend/share/database/app_db.dart';
 
+import '../../../../core/resultado.dart';
+import '../../../share/consecutivos/documento_consecutivo.dart';
+import '../../../share/consecutivos/repositorio_consecutivos.dart';
+import '../../../share/dominio/metodo_pago.dart';
 import '../enum/enum_deudor.dart';
 import '../mapper/deudor_mapper.dart';
 import '../modelo/deudor_detalle.dart';
@@ -47,26 +48,113 @@ class RepositorioDeudoresImpl implements RepositorioDeudores {
   // ── Lecturas ───────────────────────────────────────────────────────────────
 
   @override
-  Stream<List<DeudorResumen>> observarTodas() {
-    return (_baseQuery
-          ..orderBy([OrderingTerm.desc(_db.tablaDeudor.creadoEn)]))
-        .watch()
-        .map((rows) => rows.map(_filaAResumen).toList());
+  Stream<PaginaDeudores> observarPagina({
+    required FiltroDeudores filtro,
+    required int pagina,
+    required int tamano,
+  }) {
+    final consulta = _baseQuery
+      ..orderBy([OrderingTerm.desc(_db.tablaDeudor.creadoEn)]);
+    _aplicarFiltro(consulta, filtro);
+    consulta.limit(tamano, offset: pagina * tamano);
+
+    // El total va aparte y sin `LIMIT`: es cuántas cumplen el filtro, no
+    // cuántas caben en la página.
+    final conteo = _db.selectOnly(_db.tablaDeudor).join([
+      innerJoin(_db.tablaCliente,
+          _db.tablaCliente.id.equalsExp(_db.tablaDeudor.clienteId)),
+      innerJoin(_db.tablaPersona,
+          _db.tablaPersona.id.equalsExp(_db.tablaCliente.personaId)),
+    ])
+      ..addColumns([_db.tablaDeudor.id.count()]);
+    _aplicarFiltro(conteo, filtro);
+
+    return consulta.watch().asyncMap((rows) async {
+      final fila = await conteo.getSingle();
+      return PaginaDeudores(
+        items: rows.map(_filaAResumen).toList(),
+        total: fila.read(_db.tablaDeudor.id.count()) ?? 0,
+      );
+    });
+  }
+
+  /// El mismo `WHERE` para la página y para el `COUNT`. Separarlos era la vía
+  /// por la que el total podía contar deudas que la página no muestra.
+  void _aplicarFiltro(
+    JoinedSelectStatement<HasResultSet, dynamic> consulta,
+    FiltroDeudores filtro,
+  ) {
+    final t = _db.tablaDeudor;
+    switch (filtro.vista) {
+      case VistaDeudores.todas:
+        break;
+      case VistaDeudores.alDia:
+        consulta.where(_viva & _vencida.not());
+      case VistaDeudores.vencidas:
+        consulta.where(_viva & _vencida);
+      case VistaDeudores.pagadas:
+        consulta.where(t.estado.equals(EstadoDeudor.pagada.valor));
+    }
+
+    final texto = filtro.busqueda.trim();
+    if (texto.isEmpty) return;
+
+    final patron = '%${texto.toLowerCase()}%';
+    consulta.where(
+      t.numero.lower().like(patron) |
+          t.concepto.lower().like(patron) |
+          _db.tablaPersona.nombres.lower().like(patron) |
+          _db.tablaPersona.apellidos.lower().like(patron),
+    );
+  }
+
+  /// Sigue esperando plata: ni cobrada ni dada por perdida.
+  Expression<bool> get _viva => _db.tablaDeudor.estado.isIn([
+        EstadoDeudor.activa.valor,
+        EstadoDeudor.vencida.valor,
+      ]);
+
+  /// Se le pasó el plazo, o alguien la dio por vencida antes de tiempo.
+  ///
+  /// Es la traducción literal de `DeudorResumen.estaVencida`, y tiene que
+  /// seguir siéndolo: si las dos se separan, el contador de la cabecera dice
+  /// una cosa y el badge de la fila otra.
+  Expression<bool> get _vencida {
+    final t = _db.tablaDeudor;
+    final hoy = DateTime.now();
+    final medianoche = DateTime(hoy.year, hoy.month, hoy.day);
+    return t.estado.equals(EstadoDeudor.vencida.valor) |
+        (t.fechaVencimiento.isNotNull() &
+            t.fechaVencimiento.isSmallerThanValue(medianoche));
   }
 
   @override
-  Future<List<DeudorResumen>> obtenerTodas() async {
-    final rows = await (_baseQuery
-          ..orderBy([OrderingTerm.desc(_db.tablaDeudor.creadoEn)]))
-        .get();
-    return rows.map(_filaAResumen).toList();
+  Stream<ResumenCartera> observarResumen() {
+    final t = _db.tablaDeudor;
+
+    // Una sola pasada: un `SUM` y tres `COUNT` con su propio `filter`.
+    final porCobrar = (t.montoTotal - t.montoPagado).sum(filter: _viva);
+    final alDia = t.id.count(filter: _viva & _vencida.not());
+    final vencidas = t.id.count(filter: _viva & _vencida);
+    final pagadas =
+        t.id.count(filter: t.estado.equals(EstadoDeudor.pagada.valor));
+
+    final consulta = _db.selectOnly(t)
+      ..addColumns([porCobrar, alDia, vencidas, pagadas]);
+
+    return consulta.watchSingleOrNull().map(
+          (fila) => (
+            porCobrar: fila?.read(porCobrar) ?? 0,
+            alDia: fila?.read(alDia) ?? 0,
+            vencidas: fila?.read(vencidas) ?? 0,
+            pagadas: fila?.read(pagadas) ?? 0,
+          ),
+        );
   }
 
   @override
   Future<DeudorDetalle> obtenerDetalle(int id) async {
-    final rows = await (_baseQuery
-          ..where(_db.tablaDeudor.id.equals(id)))
-        .get();
+    final rows = await (_baseQuery..where(_db.tablaDeudor.id.equals(id))).get();
     if (rows.isEmpty) throw Exception('Deudor $id no encontrado');
 
     final resumen = _filaAResumen(rows.first);
@@ -87,7 +175,6 @@ class RepositorioDeudoresImpl implements RepositorioDeudores {
   @override
   Future<int> crear({
     required int clienteId,
-    int? ventaId,
     required String concepto,
     required int montoTotal,
     DateTime? fechaVencimiento,
@@ -104,7 +191,6 @@ class RepositorioDeudoresImpl implements RepositorioDeudores {
             DeudorMapper.nuevaACompanion(
               numero: numero,
               clienteId: clienteId,
-              ventaId: ventaId,
               concepto: concepto,
               montoTotal: montoTotal,
               fechaVencimiento: fechaVencimiento,
@@ -132,69 +218,131 @@ class RepositorioDeudoresImpl implements RepositorioDeudores {
   }
 
   @override
-  Future<void> actualizar({
+  Future<Resultado> actualizar({
     required int id,
-    int? ventaId,
     required String concepto,
     required int montoTotal,
     DateTime? fechaVencimiento,
     String? notas,
-    required EstadoDeudor estado,
   }) async {
-    await (_db.update(_db.tablaDeudor)..where((t) => t.id.equals(id))).write(
-      TablaDeudorCompanion(
-        ventaId: Value(ventaId),
-        concepto: Value(concepto),
-        montoTotal: Value(montoTotal),
-        fechaVencimiento: Value(fechaVencimiento),
-        notas: Value(notas),
-        estado: Value(estado.valor),
-        actualizadoEn: Value(DateTime.now()),
-      ),
-    );
+    if (concepto.trim().isEmpty) {
+      return const Fallo(MotivoFallo.validacion, 'La deuda necesita un concepto.');
+    }
+    if (montoTotal <= 0) {
+      return const Fallo(
+        MotivoFallo.validacion,
+        'El monto de la deuda tiene que ser mayor que cero.',
+      );
+    }
+
+    final deudor = await _fila(id);
+    if (deudor == null) {
+      return const Fallo(MotivoFallo.persistencia, 'La deuda ya no existe.');
+    }
+    if (montoTotal < deudor.montoPagado) {
+      return Fallo(
+        MotivoFallo.validacion,
+        'El cliente ya entregó ${deudor.montoPagado} pesos: la deuda no puede '
+        'quedar por debajo de eso.',
+      );
+    }
+
+    return _envolver(() async {
+      await _db.transaction(() async {
+        await (_db.update(_db.tablaDeudor)..where((t) => t.id.equals(id))).write(
+          TablaDeudorCompanion(
+            concepto: Value(concepto.trim()),
+            montoTotal: Value(montoTotal),
+            fechaVencimiento: Value(fechaVencimiento),
+            notas: Value(notas),
+            actualizadoEn: Value(DateTime.now()),
+          ),
+        );
+        // Subir el monto reabre una deuda que había quedado saldada; bajarlo
+        // hasta lo ya cobrado la cierra. En los dos casos lo decide la suma de
+        // los pagos, no quien editó la cabecera.
+        await _recalcularPagado(id, restaurarActiva: true);
+      });
+    });
   }
 
   @override
-  Future<void> registrarPago({
+  Future<Resultado> registrarPago({
     required int deudorId,
     required int monto,
     required MetodoPago metodoPago,
     String? notas,
-  }) {
-    return _db.transaction(() async {
-      await _db.into(_db.tablaDeudorPago).insert(
-            DeudorMapper.pagoACompanion(
-              deudorId: deudorId,
-              monto: monto,
-              metodoPago: metodoPago,
-              notas: notas,
-            ),
-          );
-      await _recalcularPagado(deudorId);
-    });
+  }) async {
+    if (monto <= 0) {
+      return const Fallo(
+        MotivoFallo.validacion,
+        'El abono tiene que ser mayor que cero.',
+      );
+    }
+
+    final deudor = await _fila(deudorId);
+    if (deudor == null) {
+      return const Fallo(MotivoFallo.persistencia, 'La deuda ya no existe.');
+    }
+
+    final saldo = deudor.montoTotal - deudor.montoPagado;
+    if (monto > saldo) {
+      return Fallo(
+        MotivoFallo.validacion,
+        'Solo faltan $saldo pesos por cobrar de esta deuda.',
+      );
+    }
+
+    return _envolver(() => _db.transaction(() async {
+          await _db.into(_db.tablaDeudorPago).insert(
+                DeudorMapper.pagoACompanion(
+                  deudorId: deudorId,
+                  monto: monto,
+                  metodoPago: metodoPago,
+                  notas: notas,
+                ),
+              );
+          await _recalcularPagado(deudorId);
+        }));
   }
 
   @override
-  Future<void> eliminarPago(int pagoId, int deudorId) {
-    return _db.transaction(() async {
-      await (_db.delete(_db.tablaDeudorPago)
-            ..where((t) => t.id.equals(pagoId)))
-          .go();
-      await _recalcularPagado(deudorId, restaurarActiva: true);
-    });
+  Future<Resultado> eliminarPago(int pagoId, int deudorId) {
+    return _envolver(() => _db.transaction(() async {
+          await (_db.delete(_db.tablaDeudorPago)
+                ..where((t) => t.id.equals(pagoId)))
+              .go();
+          await _recalcularPagado(deudorId, restaurarActiva: true);
+        }));
   }
 
   @override
-  Future<void> cambiarEstado(int id, EstadoDeudor nuevoEstado) =>
-      _escribirEstado(id, nuevoEstado);
+  Future<Resultado> cambiarEstado(int id, EstadoDeudor nuevoEstado) async {
+    final deudor = await _fila(id);
+    if (deudor == null) {
+      return const Fallo(MotivoFallo.persistencia, 'La deuda ya no existe.');
+    }
+    // Marcar como pagada una deuda que no se cobró descuadraría el caché
+    // contra la suma de sus pagos, que es justo lo que `descuadres()` afirma
+    // que no pasa. Cerrarla se hace cobrando el saldo, no cambiando el estado.
+    if (nuevoEstado == EstadoDeudor.pagada &&
+        deudor.montoPagado < deudor.montoTotal) {
+      return const Fallo(
+        MotivoFallo.validacion,
+        'Todavía queda saldo: una deuda se da por pagada registrando el '
+        'último abono, no cambiándole el estado.',
+      );
+    }
+
+    return _envolver(() => _escribirEstado(id, nuevoEstado));
+  }
 
   @override
-  Future<void> eliminar(int id) async {
-    await (_db.delete(_db.tablaDeudor)..where((t) => t.id.equals(id))).go();
-  }
+  Future<Resultado> eliminar(int id) =>
+      _envolver(() =>
+          (_db.delete(_db.tablaDeudor)..where((t) => t.id.equals(id))).go());
 
   // ── Helpers privados ───────────────────────────────────────────────────────
-
 
   @override
   Future<Map<int, int>> descuadres() async {
@@ -219,10 +367,18 @@ class RepositorioDeudoresImpl implements RepositorioDeudores {
     };
   }
 
-  Future<void> _recalcularPagado(int deudorId, {bool restaurarActiva = false}) async {
-    final deudor = await (_db.select(_db.tablaDeudor)
-          ..where((t) => t.id.equals(deudorId)))
-        .getSingleOrNull();
+  Future<TablaDeudorData?> _fila(int id) =>
+      (_db.select(_db.tablaDeudor)..where((t) => t.id.equals(id)))
+          .getSingleOrNull();
+
+  /// El caché se **recalcula entero** desde los pagos, nunca sumándole el
+  /// delta al valor anterior: así no se desvía aunque una escritura falle a
+  /// mitad (§7 de `REGLAS_BD.md`).
+  Future<void> _recalcularPagado(
+    int deudorId, {
+    bool restaurarActiva = false,
+  }) async {
+    final deudor = await _fila(deudorId);
     if (deudor == null) return;
 
     final sumExpr = _db.tablaDeudorPago.monto.sum();
@@ -232,7 +388,7 @@ class RepositorioDeudoresImpl implements RepositorioDeudores {
     final sumRow = await sumQuery.getSingleOrNull();
     final nuevoPagado = (sumRow?.read(sumExpr) ?? 0).clamp(0, deudor.montoTotal);
 
-    EstadoDeudor nuevoEstado;
+    final EstadoDeudor nuevoEstado;
     if (nuevoPagado >= deudor.montoTotal) {
       nuevoEstado = EstadoDeudor.pagada;
     } else if (restaurarActiva && deudor.estado == EstadoDeudor.pagada.valor) {
@@ -247,17 +403,6 @@ class RepositorioDeudoresImpl implements RepositorioDeudores {
       estado: Value(nuevoEstado.valor),
       actualizadoEn: Value(DateTime.now()),
     ));
-
-    // Sincronizar: cuando la deuda queda pagada y está vinculada a una factura,
-    // marcar esa factura como PAGADA también.
-    if (nuevoEstado == EstadoDeudor.pagada && deudor.ventaId != null) {
-      await _db.customUpdate(
-        "UPDATE ventas SET total_pagado = total, estado_pago = 'PAGADO', "
-        "actualizado_en = datetime('now','localtime') WHERE id = ?",
-        variables: [Variable.withInt(deudor.ventaId!)],
-        updates: {_db.tablaVentas},
-      );
-    }
   }
 
   Future<void> _escribirEstado(int id, EstadoDeudor estado) =>
@@ -267,4 +412,15 @@ class RepositorioDeudoresImpl implements RepositorioDeudores {
           actualizadoEn: Value(DateTime.now()),
         ),
       );
+
+  /// Traduce lo que SQLite rechace a un [Fallo] tipado. Las reglas que tienen
+  /// mensaje propio ya se comprobaron antes: aquí solo queda lo imprevisto.
+  Future<Resultado> _envolver(Future<void> Function() operacion) async {
+    try {
+      await operacion();
+      return const Exito();
+    } catch (e) {
+      return Fallo(MotivoFallo.persistencia, 'No se pudo guardar: $e');
+    }
+  }
 }

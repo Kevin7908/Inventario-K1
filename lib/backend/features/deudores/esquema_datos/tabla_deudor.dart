@@ -1,7 +1,6 @@
 import 'package:drift/drift.dart';
 
 import '../../clientes/esquema_datos/tabla_cliente.dart';
-import '../../pos/esquema_datos/tabla_ventas.dart';
 
 /// Lo que un cliente debe, con sus pagos.
 ///
@@ -10,11 +9,17 @@ import '../../pos/esquema_datos/tabla_ventas.dart';
 /// `descuadres()` comprueba que coincida con la suma, que es lo que justifica
 /// tenerlo.
 ///
+/// **La deuda nace en Cuentas por cobrar, no en una factura.** Antes había una
+/// columna `venta_id` que apuntaba a la venta que la originó; se quitó cuando
+/// el mostrador dejó de fiar —toda venta se cobra completa— y nadie volvió a
+/// escribirla. Si algún día se vuelve a fiar desde el POS, es una FK nueva,
+/// no una columna que llevaba años en NULL.
+///
 /// `VENCIDA` es un estado guardado y a la vez calculable desde
 /// `fecha_vencimiento`. Se guarda porque el usuario puede marcar una deuda
 /// como vencida antes de tiempo —o dejarla activa después—, así que no es una
 /// función de la fecha: es una decisión. `DeudorResumen.estaVencida` responde
-/// la otra pregunta, la del calendario.
+/// la pregunta completa, la del calendario **y** la de la marca.
 @TableIndex(name: 'idx_deudores_estado', columns: {#estado})
 @TableIndex(name: 'idx_deudores_cliente', columns: {#clienteId})
 @TableIndex(name: 'idx_deudores_creado', columns: {#creadoEn})
@@ -30,12 +35,6 @@ class TablaDeudor extends Table {
   /// `restrict`: no se borra a quien debe.
   IntColumn get clienteId =>
       integer().references(TablaCliente, #id, onDelete: KeyAction.restrict)();
-
-  /// La factura que originó la deuda, si la hubo. `setNull`: la deuda sigue
-  /// existiendo aunque la factura desaparezca.
-  IntColumn get ventaId => integer()
-      .nullable()
-      .references(TablaVentas, #id, onDelete: KeyAction.setNull)();
 
   TextColumn get concepto => text()();
 

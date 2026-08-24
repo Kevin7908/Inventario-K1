@@ -18,7 +18,6 @@ class DeudorMapper {
       numero: row.numero,
       clienteId: row.clienteId,
       nombreCliente: nombreCliente,
-      ventaId: row.ventaId,
       concepto: row.concepto,
       montoTotal: row.montoTotal,
       montoPagado: row.montoPagado,
@@ -43,7 +42,6 @@ class DeudorMapper {
   static TablaDeudorCompanion nuevaACompanion({
     required String numero,
     required int clienteId,
-    int? ventaId,
     required String concepto,
     required int montoTotal,
     DateTime? fechaVencimiento,
@@ -52,7 +50,6 @@ class DeudorMapper {
     return TablaDeudorCompanion.insert(
       numero: numero,
       clienteId: clienteId,
-      ventaId: Value(ventaId),
       concepto: concepto,
       montoTotal: montoTotal,
       fechaVencimiento: Value(fechaVencimiento),

@@ -8,7 +8,6 @@ class DeudorResumen extends Equatable {
     required this.numero,
     required this.clienteId,
     required this.nombreCliente,
-    this.ventaId,
     required this.concepto,
     required this.montoTotal,
     required this.montoPagado,
@@ -22,7 +21,6 @@ class DeudorResumen extends Equatable {
   final String numero;
   final int clienteId;
   final String nombreCliente;
-  final int? ventaId;
   final String concepto;
   final int montoTotal;
   final int montoPagado;
@@ -36,16 +34,23 @@ class DeudorResumen extends Equatable {
   double get porcentajePagado =>
       montoTotal > 0 ? (montoPagado / montoTotal).clamp(0.0, 1.0) : 0.0;
 
-  /// Si el plazo ya pasó. Distinto de `estado == EstadoDeudor.vencida`, que
-  /// es una marca que pone el usuario: esto lo dice el calendario.
+  /// Si la deuda sigue esperando plata. Es lo contrario de estar cerrada:
+  /// `PAGADA` se cobró e `INCOBRABLE` se dio por perdida.
+  bool get estaViva =>
+      estado == EstadoDeudor.activa || estado == EstadoDeudor.vencida;
+
+  /// Si el plazo se pasó. Son dos cosas a la vez y por eso están juntas: la
+  /// marca `VENCIDA` que pone el usuario —puede darla por vencida antes de
+  /// tiempo— y el calendario, que la vence sola en cuanto pasa la fecha.
   ///
-  /// Una deuda pagada o dada por incobrable no vence: ya no espera nada.
+  /// Una deuda cerrada no vence: ya no espera nada. Es la misma condición que
+  /// aplica `RepositorioDeudores` en SQL, y tiene que seguir siéndolo para que
+  /// el contador de «Vencidas» y el badge de la fila digan lo mismo.
   bool get estaVencida {
+    if (!estaViva) return false;
+    if (estado == EstadoDeudor.vencida) return true;
     final limite = fechaVencimiento;
     if (limite == null) return false;
-    if (estado == EstadoDeudor.pagada || estado == EstadoDeudor.incobrable) {
-      return false;
-    }
     final hoy = DateTime.now();
     return limite.isBefore(DateTime(hoy.year, hoy.month, hoy.day));
   }
@@ -56,7 +61,6 @@ class DeudorResumen extends Equatable {
         numero,
         clienteId,
         nombreCliente,
-        ventaId,
         concepto,
         montoTotal,
         montoPagado,
