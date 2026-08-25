@@ -1,0 +1,164 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="36 78 464 352" width="464" height="352" role="img" aria-label="Dos gatos geométricos abrazados">
+  <title>Dos gatos abrazados</title>
+
+  <!-- Respiración: escala mínima alrededor de la base (260, 420) -->
+  <g transform="translate(260 420)">
+    <g>
+      <animateTransform attributeName="transform" type="scale"
+        values="1 1; 1.012 1.012; 1 1" dur="4.6s" calcMode="spline"
+        keyTimes="0;0.5;1" keySplines="0.4 0 0.2 1; 0.4 0 0.2 1"
+        repeatCount="indefinite"/>
+      <g transform="translate(-260 -420)">
+
+        <!-- Colina de fondo -->
+        <circle cx="256" cy="288" r="208" fill="#E4F7EE"/>
+
+        <!-- Chispas de marca -->
+        <g fill="#01B763">
+          <circle cx="452" cy="122" r="7">
+            <animateTransform attributeName="transform" type="translate"
+              values="0 0; 0 -9; 0 0" dur="2.9s" repeatCount="indefinite"/>
+            <animate attributeName="opacity" values="0.9;0.45;0.9" dur="2.9s" repeatCount="indefinite"/>
+          </circle>
+          <circle cx="480" cy="176" r="4.5">
+            <animateTransform attributeName="transform" type="translate"
+              values="0 0; 0 7; 0 0" dur="3.6s" repeatCount="indefinite"/>
+            <animate attributeName="opacity" values="0.5;0.9;0.5" dur="3.6s" repeatCount="indefinite"/>
+          </circle>
+          <circle cx="72" cy="150" r="5.5">
+            <animateTransform attributeName="transform" type="translate"
+              values="0 0; 0 -7; 0 0" dur="3.2s" repeatCount="indefinite"/>
+            <animate attributeName="opacity" values="0.75;0.35;0.75" dur="3.2s" repeatCount="indefinite"/>
+          </circle>
+        </g>
+
+        <!-- ── Cola del gato negro (detrás del cuerpo) ───────────────── -->
+        <g transform="rotate(0 128 372)">
+          <animateTransform attributeName="transform" type="rotate"
+            values="-7 128 372; 7 128 372; -7 128 372" dur="3.1s"
+            calcMode="spline" keyTimes="0;0.5;1"
+            keySplines="0.45 0 0.55 1; 0.45 0 0.55 1" repeatCount="indefinite"/>
+          <path d="M128 372 C 66 378, 54 416, 96 424" fill="none"
+                stroke="#19211D" stroke-width="26" stroke-linecap="round"/>
+        </g>
+
+        <!-- ── Cola del gato amarillo (detrás del cuerpo) ─────────────── -->
+        <g>
+          <animateTransform attributeName="transform" type="rotate"
+            values="6 412 358; -6 412 358; 6 412 358" dur="3.7s"
+            calcMode="spline" keyTimes="0;0.5;1"
+            keySplines="0.45 0 0.55 1; 0.45 0 0.55 1" repeatCount="indefinite"/>
+          <path d="M412 358 C 470 364, 482 410, 442 424" fill="none"
+                stroke="#F5C518" stroke-width="24" stroke-linecap="round"/>
+        </g>
+
+        <!-- ── GATO NEGRO ─────────────────────────────────────────────── -->
+        <g transform="rotate(4 190 420)">
+          <g>
+            <animateTransform attributeName="transform" type="rotate"
+              values="0 190 420; 1.6 190 420; 0 190 420" dur="5.2s"
+              calcMode="spline" keyTimes="0;0.5;1"
+              keySplines="0.4 0 0.2 1; 0.4 0 0.2 1" repeatCount="indefinite"/>
+
+            <!-- Orejas: van antes que el cuerpo para que la base quede tapada -->
+            <path d="M128 160 L152 92 L192 148 Z" fill="#19211D"/>
+            <path d="M143 150 L155 116 L175 145 Z" fill="#3E4A43"/>
+            <path d="M200 148 L236 92 L258 162 Z" fill="#19211D"/>
+            <path d="M214 146 L234 118 L243 152 Z" fill="#3E4A43"/>
+
+            <!-- Cuerpo -->
+            <rect x="112" y="140" width="156" height="284" rx="62" fill="#19211D"/>
+
+            <!-- Ojos, con parpadeo -->
+            <g transform="translate(166 218)">
+              <g>
+                <animateTransform attributeName="transform" type="scale"
+                  values="1 1; 1 1; 1 0.06; 1 1; 1 1" keyTimes="0;0.88;0.915;0.95;1"
+                  dur="4.3s" repeatCount="indefinite"/>
+                <ellipse rx="13" ry="15" fill="#FFFFFF"/>
+                <circle cx="2.5" cy="1" r="6.5" fill="#19211D"/>
+              </g>
+            </g>
+            <g transform="translate(216 216)">
+              <g>
+                <animateTransform attributeName="transform" type="scale"
+                  values="1 1; 1 1; 1 0.06; 1 1; 1 1" keyTimes="0;0.88;0.915;0.95;1"
+                  dur="4.3s" repeatCount="indefinite"/>
+                <ellipse rx="13" ry="15" fill="#FFFFFF"/>
+                <circle cx="2.5" cy="1" r="6.5" fill="#19211D"/>
+              </g>
+            </g>
+
+            <!-- Nariz -->
+            <path d="M185 246 L199 246 L192 255 Z" fill="#F5C518"/>
+          </g>
+        </g>
+
+        <!-- ── GATO AMARILLO ──────────────────────────────────────────── -->
+        <g transform="rotate(-5 356 420)">
+          <g>
+            <animateTransform attributeName="transform" type="rotate"
+              values="0 356 420; -1.8 356 420; 0 356 420" dur="5.9s"
+              calcMode="spline" keyTimes="0;0.5;1"
+              keySplines="0.4 0 0.2 1; 0.4 0 0.2 1" repeatCount="indefinite"/>
+
+            <path d="M288 214 L312 152 L348 206 Z" fill="#F5C518"/>
+            <path d="M302 204 L314 174 L332 202 Z" fill="#FFE694"/>
+            <path d="M358 206 L386 152 L412 220 Z" fill="#F5C518"/>
+            <path d="M371 204 L386 178 L397 210 Z" fill="#FFE694"/>
+
+            <rect x="280" y="196" width="152" height="228" rx="60" fill="#F5C518"/>
+
+            <g transform="translate(332 272)">
+              <g>
+                <animateTransform attributeName="transform" type="scale"
+                  values="1 1; 1 1; 1 0.06; 1 1; 1 1" keyTimes="0;0.9;0.93;0.965;1"
+                  dur="5.8s" repeatCount="indefinite"/>
+                <ellipse rx="12.5" ry="14.5" fill="#FFFFFF"/>
+                <circle cx="-2" cy="1" r="6.2" fill="#19211D"/>
+              </g>
+            </g>
+            <g transform="translate(380 274)">
+              <g>
+                <animateTransform attributeName="transform" type="scale"
+                  values="1 1; 1 1; 1 0.06; 1 1; 1 1" keyTimes="0;0.9;0.93;0.965;1"
+                  dur="5.8s" repeatCount="indefinite"/>
+                <ellipse rx="12.5" ry="14.5" fill="#FFFFFF"/>
+                <circle cx="-2" cy="1" r="6.2" fill="#19211D"/>
+              </g>
+            </g>
+
+            <path d="M349 302 L363 302 L356 311 Z" fill="#19211D"/>
+          </g>
+        </g>
+
+        <!-- ── El abrazo: los brazos se cruzan ────────────────────────── -->
+
+        <!-- Brazo amarillo por delante del gato negro -->
+        <g transform="rotate(-7 240 374)">
+          <g>
+            <animateTransform attributeName="transform" type="rotate"
+              values="0 240 374; -1.4 240 374; 0 240 374" dur="5.2s"
+              calcMode="spline" keyTimes="0;0.5;1"
+              keySplines="0.4 0 0.2 1; 0.4 0 0.2 1" repeatCount="indefinite"/>
+            <rect x="126" y="353" width="242" height="42" rx="21" fill="#F5C518"/>
+            <circle cx="134" cy="374" r="24" fill="#F5C518"/>
+          </g>
+        </g>
+
+        <!-- Brazo negro por delante del gato amarillo -->
+        <g transform="rotate(9 336 332)">
+          <g>
+            <animateTransform attributeName="transform" type="rotate"
+              values="0 336 332; 1.6 336 332; 0 336 332" dur="5.9s"
+              calcMode="spline" keyTimes="0;0.5;1"
+              keySplines="0.4 0 0.2 1; 0.4 0 0.2 1" repeatCount="indefinite"/>
+            <rect x="234" y="311" width="206" height="44" rx="22" fill="#19211D"/>
+            <circle cx="432" cy="333" r="25" fill="#19211D"/>
+          </g>
+        </g>
+
+      </g>
+    </g>
+  </g>
+</svg>
