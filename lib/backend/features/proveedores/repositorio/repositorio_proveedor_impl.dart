@@ -7,9 +7,41 @@ import '../../persona/repositorio/repositorio_persona_impl.dart';
 import '../mapper/proveedor_mapper.dart';
 import '../modelo/proveedor.dart';
 import 'repositorio_proveedores.dart';
+import '../../../share/dominio/sesion_actual.dart';
+import '../../bitacora/modelo/entrada_bitacora.dart';
+import '../../bitacora/repositorio/repositorio_bitacora.dart';
+import '../../bitacora/repositorio/repositorio_bitacora_impl.dart';
+import '../../../share/dominio/permiso.dart';
 
-class RepositorioProveedoresImpl implements RepositorioProveedores {
-  RepositorioProveedoresImpl(this._db);
+class RepositorioProveedoresImpl with FirmaDeSesion implements RepositorioProveedores {
+  RepositorioProveedoresImpl(this._db, this.sesion);
+
+  /// Quién firma lo que este repositorio escribe. La inyecta Riverpod por el
+  /// constructor, no la busca en ningún registro global.
+  @override
+  final SesionActual? sesion;
+
+  late final RepositorioBitacora _bitacora =
+      RepositorioBitacoraImpl(_db, sesion);
+
+  /// Deja el renglón de la bitácora. Se llama **dentro** de la transacción del
+  /// cambio: si la escritura se revierte, el renglón se va con ella.
+  Future<void> _anotar(
+    AccionAuditada accion,
+    int? id,
+    String descripcion, {
+    String? detalle,
+  }) =>
+      _bitacora.anotar(
+        Anotacion(
+          entidad: EntidadAuditada.proveedor,
+          accion: accion,
+          entidadId: id,
+          descripcion: descripcion,
+          detalle: detalle,
+        ),
+      );
+
 
   final AppDb _db;
 
@@ -51,22 +83,30 @@ class RepositorioProveedoresImpl implements RepositorioProveedores {
 
   @override
   Future<Proveedor> crear(Proveedor proveedor) {
+    exigir(Permiso.proveedoresEditar);
     // Persona y rol son dos filas: o entran las dos o no entra ninguna.
     return _db.transaction(() async {
       final personaId = await _personas.guardar(proveedor.datosPersona);
       final id = await _db.into(_tabla).insert(
             ProveedorMapper.modeloACompanion(proveedor, personaId: personaId),
           );
+      await _anotar(AccionAuditada.creo, id, proveedor.nombre);
       return (await obtenerPorId(id))!;
     });
   }
 
   @override
   Future<Proveedor> actualizar(Proveedor proveedor) {
+    exigir(Permiso.proveedoresEditar);
     return _db.transaction(() async {
       final personaId = await _personas.guardar(proveedor.datosPersona);
       await (_db.update(_tabla)..where((t) => t.id.equals(proveedor.id!))).write(
         ProveedorMapper.modeloACompanion(proveedor, personaId: personaId),
+      );
+      await _anotar(
+        AccionAuditada.modifico,
+        proveedor.id,
+        proveedor.nombre,
       );
       return (await obtenerPorId(proveedor.id!))!;
     });
@@ -74,7 +114,9 @@ class RepositorioProveedoresImpl implements RepositorioProveedores {
 
   @override
   Future<void> eliminar(int id) {
+    exigir(Permiso.proveedoresEliminar);
     return _db.transaction(() async {
+      final antes = await obtenerPorId(id);
       final fila = await (_db.selectOnly(_tabla)
             ..addColumns([_tabla.personaId])
             ..where(_tabla.id.equals(id)))
@@ -85,6 +127,12 @@ class RepositorioProveedoresImpl implements RepositorioProveedores {
       if (personaId != null) {
         await _personas.borrarSiQuedoSinRoles(personaId);
       }
+
+      await _anotar(
+        AccionAuditada.elimino,
+        id,
+        antes?.nombre ?? 'Proveedor #$id',
+      );
     });
   }
 

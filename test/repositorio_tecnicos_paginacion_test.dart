@@ -8,8 +8,13 @@ import 'package:inventario_k1/backend/features/tecnicos/repositorio/repositorio_
 import 'package:inventario_k1/backend/features/tecnicos/repositorio/repositorio_tecnico_impl.dart';
 import 'package:inventario_k1/backend/share/database/app_db.dart';
 import 'soporte/base_en_memoria.dart';
+import 'soporte/sesion_de_prueba.dart';
+import 'package:inventario_k1/backend/share/dominio/sesion_actual.dart';
 
 late AppDb db;
+
+/// Quien firma lo que escriben estos tests. Ver `sesionDePrueba`.
+late SesionActual sesion;
 late RepositorioTecnicoDrift repo;
 
 Tecnico _tecnico({
@@ -37,7 +42,8 @@ Future<List<String>> _nombres(FiltroTecnicos filtro) async {
 void main() {
   setUp(() async {
     db = baseEnMemoria();
-    repo = RepositorioTecnicoDrift(db);
+    sesion = await sesionDePrueba(db);
+    repo = RepositorioTecnicoDrift(db, sesion);
   });
 
   tearDown(() async => db.close());

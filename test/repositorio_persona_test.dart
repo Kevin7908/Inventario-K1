@@ -9,8 +9,13 @@ import 'package:inventario_k1/backend/features/tecnicos/repositorio/repositorio_
 import 'package:inventario_k1/backend/share/database/app_db.dart';
 
 import 'soporte/base_en_memoria.dart';
+import 'soporte/sesion_de_prueba.dart';
+import 'package:inventario_k1/backend/share/dominio/sesion_actual.dart';
 
 late AppDb db;
+
+/// Quien firma lo que escriben estos tests. Ver `sesionDePrueba`.
+late SesionActual sesion;
 late RepositorioPersonaImpl personas;
 late RepositorioClientesImpl clientes;
 late RepositorioTecnicoDrift tecnicos;
@@ -45,19 +50,28 @@ Tecnico _tecnico({
       creadoEn: DateTime.now(),
     );
 
+/// Cuántas personas hay, **sin contar la de la cuenta que firma los tests**.
+///
+/// `sesionDePrueba` inserta su propia persona para poder tener un usuario, y
+/// lo que estos tests miden es si los roles duplican identidades: contarla
+/// desplazaría todas las cifras en uno y escondería justo lo que se prueba.
 Future<int> _filasEnPersonas() async {
   final fila = await db
-      .customSelect('SELECT COUNT(*) AS n FROM personas')
+      .customSelect(
+        'SELECT COUNT(*) AS n FROM personas WHERE id NOT IN '
+        '(SELECT persona_id FROM usuarios)',
+      )
       .getSingle();
   return fila.read<int>('n');
 }
 
 void main() {
-  setUp(() {
+  setUp(() async {
     db = baseEnMemoria();
+    sesion = await sesionDePrueba(db);
     personas = RepositorioPersonaImpl(db);
-    clientes = RepositorioClientesImpl(db);
-    tecnicos = RepositorioTecnicoDrift(db);
+    clientes = RepositorioClientesImpl(db, sesion);
+    tecnicos = RepositorioTecnicoDrift(db, sesion);
   });
 
   tearDown(() => db.close());

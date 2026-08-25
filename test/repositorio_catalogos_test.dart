@@ -7,8 +7,13 @@ import 'package:inventario_k1/backend/share/database/app_db.dart';
 
 import 'soporte/base_en_memoria.dart';
 import 'soporte/datos_taller.dart';
+import 'soporte/sesion_de_prueba.dart';
+import 'package:inventario_k1/backend/share/dominio/sesion_actual.dart';
 
 late AppDb db;
+
+/// Quien firma lo que escriben estos tests. Ver `sesionDePrueba`.
+late SesionActual sesion;
 late RepositorioMotosImpl motos;
 late RepositorioConfiguracionImpl configuracion;
 late DatosTaller taller;
@@ -16,7 +21,8 @@ late DatosTaller taller;
 void main() {
   setUp(() async {
     db = baseEnMemoria();
-    motos = RepositorioMotosImpl(db);
+    sesion = await sesionDePrueba(db);
+    motos = RepositorioMotosImpl(db, sesion);
     configuracion = RepositorioConfiguracionImpl(db);
     taller = await sembrarTaller(db);
   });

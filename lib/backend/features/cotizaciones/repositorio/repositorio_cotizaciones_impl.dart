@@ -9,9 +9,41 @@ import '../mapper/cotizacion_mapper.dart';
 import '../modelo/cotizacion_detalle.dart';
 import '../modelo/cotizacion_resumen.dart';
 import 'repositorio_cotizaciones.dart';
+import '../../../share/dominio/sesion_actual.dart';
+import '../../bitacora/modelo/entrada_bitacora.dart';
+import '../../bitacora/repositorio/repositorio_bitacora.dart';
+import '../../bitacora/repositorio/repositorio_bitacora_impl.dart';
+import '../../../share/dominio/permiso.dart';
 
-class RepositorioCotizacionesImpl implements RepositorioCotizaciones {
-  RepositorioCotizacionesImpl(this._db);
+class RepositorioCotizacionesImpl with FirmaDeSesion implements RepositorioCotizaciones {
+  RepositorioCotizacionesImpl(this._db, this.sesion);
+
+  /// Quién firma lo que este repositorio escribe. La inyecta Riverpod
+  /// desde `sesionActualProvider`: es una dependencia del constructor, no
+  /// un registro global que se consulte por dentro.
+  @override
+  final SesionActual? sesion;
+
+  late final RepositorioBitacora _bitacora =
+      RepositorioBitacoraImpl(_db, sesion);
+
+  /// Deja el renglón de la bitácora, **dentro** de la transacción del cambio.
+  Future<void> _anotar(
+    AccionAuditada accion,
+    int? id,
+    String descripcion, {
+    String? detalle,
+  }) =>
+      _bitacora.anotar(
+        Anotacion(
+          entidad: EntidadAuditada.cotizacion,
+          accion: accion,
+          entidadId: id,
+          descripcion: descripcion,
+          detalle: detalle,
+        ),
+      );
+
 
   final AppDb _db;
 
@@ -251,6 +283,8 @@ class RepositorioCotizacionesImpl implements RepositorioCotizaciones {
     required List<ItemDraft> items,
     int descuento = 0,
   }) {
+    exigir(Permiso.cotizacionesCrear);
+
     return _db.transaction(() async {
       final numero = await _consecutivos.siguiente(DocumentoConsecutivo.cotizacion);
       final subtotal = items.fold(0, (s, d) => s + d.subtotal);
@@ -260,6 +294,7 @@ class RepositorioCotizacionesImpl implements RepositorioCotizaciones {
 
       final id = await _db.into(_db.tablaCotizacion).insert(
             CotizacionMapper.nuevaACompanion(
+              usuarioId: autorId,
               numero: numero,
               clienteId: clienteId,
               motoId: motoId,
@@ -337,8 +372,24 @@ class RepositorioCotizacionesImpl implements RepositorioCotizaciones {
   }
 
   @override
-  Future<void> eliminar(int id) =>
-      (_db.delete(_db.tablaCotizacion)..where((t) => t.id.equals(id))).go();
+  Future<void> eliminar(int id) {
+    exigir(Permiso.cotizacionesEliminar);
+
+    return _db.transaction(() async {
+      final antes = await (_db.select(_db.tablaCotizacion)
+            ..where((t) => t.id.equals(id)))
+          .getSingleOrNull();
+
+      await (_db.delete(_db.tablaCotizacion)..where((t) => t.id.equals(id)))
+          .go();
+
+      await _anotar(
+        AccionAuditada.elimino,
+        id,
+        antes == null ? 'Cotización #$id' : 'Cotización ${antes.numero}',
+      );
+    });
+  }
 
   @override
   Future<void> agregarItem({
@@ -349,6 +400,8 @@ class RepositorioCotizacionesImpl implements RepositorioCotizaciones {
     required double cantidad,
     required int precioUnitario,
   }) {
+    exigir(Permiso.cotizacionesEditar);
+
     final subtotal = (cantidad * precioUnitario).round();
     return _db.transaction(() async {
       await _db.into(_db.tablaCotizacionItem).insert(

@@ -12,8 +12,13 @@ import 'package:inventario_k1/backend/share/database/app_db.dart';
 import 'package:inventario_k1/core/resultado.dart';
 import 'package:inventario_k1/frontend/features/clientes/provider/validacion_cliente.dart';
 import 'soporte/base_en_memoria.dart';
+import 'soporte/sesion_de_prueba.dart';
+import 'package:inventario_k1/backend/share/dominio/sesion_actual.dart';
 
 late AppDb db;
+
+/// Quien firma lo que escriben estos tests. Ver `sesionDePrueba`.
+late SesionActual sesion;
 late RepositorioClientesImpl clientes;
 late RepositorioMotosImpl motos;
 
@@ -47,10 +52,11 @@ Future<Resultado?> _validar(Cliente cliente, List<Moto> lista) => validarCliente
     );
 
 void main() {
-  setUp(() {
+  setUp(() async {
     db = baseEnMemoria();
-    clientes = RepositorioClientesImpl(db);
-    motos = RepositorioMotosImpl(db);
+    sesion = await sesionDePrueba(db);
+    clientes = RepositorioClientesImpl(db, sesion);
+    motos = RepositorioMotosImpl(db, sesion);
   });
 
   tearDown(() async => db.close());

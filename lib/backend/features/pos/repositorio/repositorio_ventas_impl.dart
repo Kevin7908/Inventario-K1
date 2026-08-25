@@ -13,9 +13,41 @@ import '../modelo/linea_venta_mostrador.dart';
 import '../modelo/venta_detalle.dart';
 import '../modelo/venta_resumen.dart';
 import 'repositorio_ventas.dart';
+import '../../../share/dominio/sesion_actual.dart';
+import '../../bitacora/modelo/entrada_bitacora.dart';
+import '../../bitacora/repositorio/repositorio_bitacora.dart';
+import '../../bitacora/repositorio/repositorio_bitacora_impl.dart';
+import '../../../share/dominio/permiso.dart';
 
-class RepositorioVentasImpl implements RepositorioVentas {
-  RepositorioVentasImpl(this._db);
+class RepositorioVentasImpl with FirmaDeSesion implements RepositorioVentas {
+  RepositorioVentasImpl(this._db, this.sesion);
+
+  /// Quién firma lo que este repositorio escribe. La inyecta Riverpod
+  /// desde `sesionActualProvider`: es una dependencia del constructor, no
+  /// un registro global que se consulte por dentro.
+  @override
+  final SesionActual? sesion;
+
+  late final RepositorioBitacora _bitacora =
+      RepositorioBitacoraImpl(_db, sesion);
+
+  /// Deja el renglón de la bitácora, **dentro** de la transacción del cambio.
+  Future<void> _anotar(
+    AccionAuditada accion,
+    int? id,
+    String descripcion, {
+    String? detalle,
+  }) =>
+      _bitacora.anotar(
+        Anotacion(
+          entidad: EntidadAuditada.venta,
+          accion: accion,
+          entidadId: id,
+          descripcion: descripcion,
+          detalle: detalle,
+        ),
+      );
+
 
   final AppDb _db;
 
@@ -25,7 +57,7 @@ class RepositorioVentasImpl implements RepositorioVentas {
       RepositorioConsecutivos(_db);
 
   /// Cobrar y anular mueven stock. Todo por aquí.
-  late final RepositorioInventario _inventario = RepositorioInventarioImpl(_db);
+  late final RepositorioInventario _inventario = RepositorioInventarioImpl(_db, sesion);
 
   $TablaVentasTable get _tablaVentas => _db.tablaVentas;
   $TablaVentaDetallesTable get _tablaItems => _db.tablaVentaDetalles;
@@ -100,6 +132,8 @@ class RepositorioVentasImpl implements RepositorioVentas {
     int iva = 0,
     int descuento = 0,
   }) {
+    exigir(Permiso.posVender);
+
     if (lineas.isEmpty) {
       throw Exception('La venta no tiene productos.');
     }
@@ -151,6 +185,7 @@ class RepositorioVentasImpl implements RepositorioVentas {
   }) async {
     return _db.into(_tablaVentas).insert(
           VentasMapper.companionNuevo(
+            usuarioId: autorId,
             numeroFactura:
                 await _consecutivos.siguiente(DocumentoConsecutivo.factura),
             clienteId: clienteId,
@@ -192,6 +227,7 @@ class RepositorioVentasImpl implements RepositorioVentas {
 
   @override
   Future<void> anular(int id) async {
+    exigir(Permiso.posAnular);
     await _db.transaction(() async {
       final venta = await (_db.select(_tablaVentas)
             ..where((t) => t.id.equals(id)))
@@ -234,6 +270,13 @@ class RepositorioVentasImpl implements RepositorioVentas {
           estadoPago: Value(EstadoPago.anulada.aTexto),
           actualizadoEn: Value(DateTime.now()),
         ),
+      );
+
+      await _anotar(
+        AccionAuditada.anulo,
+        id,
+        'Venta ${venta.numeroFactura}',
+        detalle: 'Total: ${venta.total}',
       );
     });
   }

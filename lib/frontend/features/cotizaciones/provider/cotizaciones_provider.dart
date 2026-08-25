@@ -8,12 +8,18 @@ import '../../../../backend/features/cotizaciones/repositorio/repositorio_cotiza
 import '../../../../backend/features/cotizaciones/repositorio/repositorio_cotizaciones_impl.dart';
 import '../../../../backend/share/database/app_db_provider.dart';
 import '../../../../core/resultado.dart';
+import '../../autenticacion/provider/auth_providers.dart';
 
 // Repositorio
 
 final repositorioCotizacionesProvider = Provider<RepositorioCotizaciones>(
   name: 'repositorioCotizacionesProvider',
-  (ref) => RepositorioCotizacionesImpl(ref.watch(appDatabaseProvider)),
+  (ref) => RepositorioCotizacionesImpl(
+    ref.watch(appDatabaseProvider),
+    // Quién firma lo que este repositorio escriba. Es una dependencia
+    // del constructor, no un registro global (`CLAUDE.md` §3).
+    ref.watch(sesionActualProvider),
+  ),
 );
 
 // Estado

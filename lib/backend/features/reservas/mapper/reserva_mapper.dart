@@ -63,6 +63,7 @@ class ReservaMapper {
   }
 
   static TablaReservaCompanion nuevaACompanion({
+    required int usuarioId,
     required String numero,
     required int clienteId,
     int? motoId,
@@ -71,6 +72,7 @@ class ReservaMapper {
     required DateTime? fechaLimite,
   }) {
     return TablaReservaCompanion.insert(
+      usuarioId: usuarioId,
       numero: numero,
       clienteId: clienteId,
       motoId: Value(motoId),
@@ -95,12 +97,14 @@ class ReservaMapper {
   }
 
   static TablaReservaAbonoCompanion abonoACompanion({
+    required int usuarioId,
     required int reservaId,
     required int monto,
     required MetodoPago metodoPago,
     String? referenciaPago,
   }) {
     return TablaReservaAbonoCompanion.insert(
+      usuarioId: usuarioId,
       reservaId: reservaId,
       monto: monto,
       metodoPago: metodoPago.codigo,

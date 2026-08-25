@@ -8,8 +8,13 @@ import 'package:inventario_k1/backend/features/proveedores/repositorio/repositor
 import 'package:inventario_k1/backend/features/proveedores/repositorio/repositorio_proveedores.dart';
 import 'package:inventario_k1/backend/share/database/app_db.dart';
 import 'soporte/base_en_memoria.dart';
+import 'soporte/sesion_de_prueba.dart';
+import 'package:inventario_k1/backend/share/dominio/sesion_actual.dart';
 
 late AppDb db;
+
+/// Quien firma lo que escriben estos tests. Ver `sesionDePrueba`.
+late SesionActual sesion;
 late RepositorioProveedoresImpl repo;
 
 Proveedor _proveedor({
@@ -40,7 +45,8 @@ Future<List<String>> _nombres(FiltroProveedores filtro) async {
 void main() {
   setUp(() async {
     db = baseEnMemoria();
-    repo = RepositorioProveedoresImpl(db);
+    sesion = await sesionDePrueba(db);
+    repo = RepositorioProveedoresImpl(db, sesion);
   });
 
   tearDown(() async => db.close());

@@ -8,12 +8,18 @@ import '../../../../backend/features/motos/repositorio/repositorio_motos.dart';
 import '../../../../backend/share/database/app_db_provider.dart';
 import '../../../../core/resultado.dart';
 import 'validacion_moto.dart';
+import '../../autenticacion/provider/auth_providers.dart';
 
 // Repositorio
 
 final repositorioMotosProvider = Provider<RepositorioMotos>(
   name: 'repositorioMotosProvider',
-  (ref) => RepositorioMotosImpl(ref.watch(appDatabaseProvider)),
+  (ref) => RepositorioMotosImpl(
+    ref.watch(appDatabaseProvider),
+    // Quién firma lo que este repositorio escriba. Es una dependencia
+    // del constructor, no un registro global (`CLAUDE.md` §3).
+    ref.watch(sesionActualProvider),
+  ),
 );
 
 // Estado

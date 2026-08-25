@@ -10,8 +10,13 @@ import 'package:inventario_k1/backend/features/productos/repositorio/repositorio
 import 'package:inventario_k1/backend/features/productos/repositorio/repositorio_producto_impl.dart';
 import 'package:inventario_k1/backend/share/database/app_db.dart';
 import 'soporte/base_en_memoria.dart';
+import 'soporte/sesion_de_prueba.dart';
+import 'package:inventario_k1/backend/share/dominio/sesion_actual.dart';
 
 late AppDb db;
+
+/// Quien firma lo que escriben estos tests. Ver `sesionDePrueba`.
+late SesionActual sesion;
 late RepositorioProductosImpl repo;
 late RepositorioCategoriasImpl repoCategorias;
 
@@ -65,8 +70,9 @@ Future<int> _crearCategoria(String nombre) async {
 void main() {
   setUp(() async {
     db = baseEnMemoria();
-    repo = RepositorioProductosImpl(db);
-    repoCategorias = RepositorioCategoriasImpl(db);
+    sesion = await sesionDePrueba(db);
+    repo = RepositorioProductosImpl(db, sesion);
+    repoCategorias = RepositorioCategoriasImpl(db, sesion);
   });
 
   tearDown(() async => db.close());

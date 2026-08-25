@@ -114,6 +114,7 @@ share2/
 │   └── cards.dart
 │
 ├── feedback/                       ← respuesta visual al usuario
+│   ├── aviso_en_linea.dart
 │   ├── badge_contador.dart
 │   ├── barra_progreso.dart
 │   ├── mensaje_app.dart
@@ -165,7 +166,7 @@ Widgets para formularios y entrada de datos. Aplican el estilo visual del proyec
 
 | Widget | Cuándo usarlo |
 |---|---|
-| `CampoTexto` | Entrada de texto general (nombre, descripción) |
+| `CampoTexto` | Entrada de texto general (nombre, descripción). Con `oculto` sirve de contraseña, y con `alAlternarOculto` aparece el ojo — el estado del ojo lo lleva la vista, no el widget |
 | `SelectorWidget` | Dropdown de opciones predefinidas |
 | `CuadroSeleccion` | Selección booleana estilizada |
 | `GrupoRadio` | Elegir una opción de pocas, en fila |
@@ -224,6 +225,7 @@ Widgets para agrupar y presentar información con estilos consistentes.
 | Widget | Cuándo usarlo |
 |---|---|
 | `MensajeApp` | El aviso breve de abajo: `MensajeApp.exito(context, …)` / `.error(…)`. No es un widget sino dos funciones, como `colorDeHex` |
+| `AvisoEnLinea` | El aviso que **se queda** dentro del contenido, con su tono (`información`, `éxito`, `alerta`, `error`). Para lo que el usuario todavía tiene que leer mientras decide: «la contraseña no coincide», «el correo no está configurado». `MensajeApp` confirma lo que ya pasó; este acompaña |
 | `DialogoConfirmacion` | Pide confirmación antes de una acción irreversible |
 | `BadgeContador` | Círculo con número para conteos (notificaciones, ítems pendientes) |
 | `IndicadorEstado` | Badge/chip de color para mostrar un estado (Pagado, Pendiente, Anulado) |

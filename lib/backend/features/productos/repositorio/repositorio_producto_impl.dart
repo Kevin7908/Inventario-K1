@@ -1,21 +1,53 @@
 import 'package:drift/drift.dart';
 
 import '../../../share/database/app_db.dart';
+import '../../../share/dominio/sesion_actual.dart';
+import '../../bitacora/modelo/entrada_bitacora.dart';
+import '../../bitacora/repositorio/repositorio_bitacora.dart';
+import '../../bitacora/repositorio/repositorio_bitacora_impl.dart';
 import '../../inventario/modelo/movimiento_inventario.dart';
 import '../../inventario/repositorio/repositorio_inventario.dart';
 import '../../inventario/repositorio/repositorio_inventario_impl.dart';
 import '../mapper/producto_mapper.dart';
 import '../modelo/producto.dart';
 import 'repositorio_producto.dart';
+import '../../../share/dominio/permiso.dart';
 
-class RepositorioProductosImpl implements RepositorioProducto {
-  RepositorioProductosImpl(this._db);
+class RepositorioProductosImpl with FirmaDeSesion implements RepositorioProducto {
+  RepositorioProductosImpl(this._db, this.sesion);
 
   final AppDb _db;
 
+  /// Quién firma lo que este repositorio escribe. La inyecta Riverpod por el
+  /// constructor, no la busca en ningún registro global.
+  @override
+  final SesionActual? sesion;
+
   /// Todo cambio de stock pasa por aquí. Ni este repositorio escribe
   /// `stock_actual` a mano.
-  late final RepositorioInventario _inventario = RepositorioInventarioImpl(_db);
+  late final RepositorioInventario _inventario =
+      RepositorioInventarioImpl(_db, sesion);
+
+  late final RepositorioBitacora _bitacora =
+      RepositorioBitacoraImpl(_db, sesion);
+
+  /// Deja el renglón de la bitácora. Se llama **dentro** de la transacción del
+  /// cambio: si la escritura se revierte, el renglón se va con ella.
+  Future<void> _anotar(
+    AccionAuditada accion,
+    int? id,
+    String descripcion, {
+    String? detalle,
+  }) =>
+      _bitacora.anotar(
+        Anotacion(
+          entidad: EntidadAuditada.producto,
+          accion: accion,
+          entidadId: id,
+          descripcion: descripcion,
+          detalle: detalle,
+        ),
+      );
 
   // Helper: JOIN base
 
@@ -128,6 +160,7 @@ class RepositorioProductosImpl implements RepositorioProducto {
 
   @override
   Future<Producto> crear(Producto producto) {
+    exigir(Permiso.productosCrear);
     // El producto nace con stock 0 y el inventario inicial entra como
     // movimiento, no como columna: si el alta pusiera `stock_actual` a mano,
     // el libro mayor arrancaría descuadrado desde la primera fila.
@@ -147,6 +180,8 @@ class RepositorioProductosImpl implements RepositorioProducto {
         );
       }
 
+      await _anotar(AccionAuditada.creo, id, _nombreDe(producto));
+
       // No hay SELECT extra: el stream de Drift emite el dato completo.
       return producto.copyWith(id: id);
     });
@@ -154,6 +189,7 @@ class RepositorioProductosImpl implements RepositorioProducto {
 
   @override
   Future<Producto> actualizar(Producto producto) {
+    exigir(Permiso.productosEditar);
     // `stock_actual` no viaja en el companion —el mapper lo excluye a
     // propósito, §7 de las reglas de base de datos—, así que editar el campo
     // en la ficha no escribía nada y el valor volvía al de antes en cuanto el
@@ -183,6 +219,15 @@ class RepositorioProductosImpl implements RepositorioProducto {
         );
       }
 
+      await _anotar(
+        AccionAuditada.modifico,
+        producto.id,
+        _nombreDe(producto),
+        detalle: diferencia == 0
+            ? null
+            : 'Stock ajustado en ${diferencia > 0 ? '+' : ''}$diferencia',
+      );
+
       // No hay SELECT extra: el stream emite el resultado actualizado.
       return producto;
     });
@@ -190,26 +235,61 @@ class RepositorioProductosImpl implements RepositorioProducto {
 
   @override
   Future<Producto> ajustarStock(int id, double cantidad) async {
+    exigir(Permiso.productosStock);
     if (cantidad == 0) return (await obtenerPorId(id))!;
 
-    await _inventario.registrar(
-      SolicitudMovimiento(
-        productoId: id,
-        cantidad: cantidad,
-        tipo: cantidad > 0
-            ? TipoMovimiento.ajustePositivo
-            : TipoMovimiento.ajusteNegativo,
-        notas: 'Ajuste manual',
-      ),
-    );
+    // El movimiento ya lleva su `usuario_id`, pero el ajuste a mano también va
+    // a la bitácora: es una decisión de una persona, no la consecuencia de una
+    // venta, y es justo lo que alguien va a querer revisar.
+    await _db.transaction(() async {
+      await _inventario.registrar(
+        SolicitudMovimiento(
+          productoId: id,
+          cantidad: cantidad,
+          tipo: cantidad > 0
+              ? TipoMovimiento.ajustePositivo
+              : TipoMovimiento.ajusteNegativo,
+          notas: 'Ajuste manual',
+        ),
+      );
+
+      final producto = await obtenerPorId(id);
+      await _anotar(
+        AccionAuditada.modifico,
+        id,
+        producto == null ? 'Producto #$id' : _nombreDe(producto),
+        detalle: 'Ajuste manual de stock: ${cantidad > 0 ? '+' : ''}$cantidad',
+      );
+    });
 
     return (await obtenerPorId(id))!;
   }
 
   @override
   Future<void> eliminar(int id) async {
-    await (_db.delete(_db.tablaProducto)..where((t) => t.id.equals(id))).go();
+    exigir(Permiso.productosEliminar);
+    // Se lee **antes** de borrar: después no hay a quién preguntarle cómo se
+    // llamaba, y un renglón que dice «eliminó el producto 47» no le sirve a
+    // nadie.
+    await _db.transaction(() async {
+      final antes = await (_db.select(_db.tablaProducto)
+            ..where((t) => t.id.equals(id)))
+          .getSingleOrNull();
+
+      await (_db.delete(_db.tablaProducto)..where((t) => t.id.equals(id))).go();
+
+      await _anotar(
+        AccionAuditada.elimino,
+        id,
+        antes == null ? 'Producto #$id' : '${antes.nombre} (${antes.sku})',
+      );
+    });
   }
+
+  /// Cómo se lee un producto en la bitácora: nombre y SKU, que es lo que
+  /// permite reconocerlo cuando la fila ya no existe.
+  static String _nombreDe(Producto producto) =>
+      '${producto.nombre} (${producto.sku})';
 
   // Validaciones
 

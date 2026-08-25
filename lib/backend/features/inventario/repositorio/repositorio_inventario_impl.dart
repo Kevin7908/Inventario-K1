@@ -4,9 +4,16 @@ import '../../../share/database/app_db.dart';
 import '../mapper/movimiento_mapper.dart';
 import '../modelo/movimiento_inventario.dart';
 import 'repositorio_inventario.dart';
+import '../../../share/dominio/sesion_actual.dart';
 
-class RepositorioInventarioImpl implements RepositorioInventario {
-  RepositorioInventarioImpl(this._db);
+class RepositorioInventarioImpl with FirmaDeSesion implements RepositorioInventario {
+  RepositorioInventarioImpl(this._db, this.sesion);
+
+  /// Quién firma lo que este repositorio escribe. La inyecta Riverpod
+  /// desde `sesionActualProvider`: es una dependencia del constructor, no
+  /// un registro global que se consulte por dentro.
+  @override
+  final SesionActual? sesion;
 
   final AppDb _db;
 
@@ -24,7 +31,7 @@ class RepositorioInventarioImpl implements RepositorioInventario {
       for (final solicitud in solicitudes) {
         await _db
             .into(_tabla)
-            .insert(MovimientoMapper.solicitudACompanion(solicitud));
+            .insert(MovimientoMapper.solicitudACompanion(solicitud, autorId));
 
         // El caché se ajusta con un `UPDATE` relativo y no leyendo-sumando-
         // escribiendo: así es atómico y no hay ciclo que se pueda entrelazar.

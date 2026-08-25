@@ -79,6 +79,7 @@ abstract final class OrdenMapper {
   // Companions (Escritura en BD)
 
   static TablaOrdenesServicioCompanion aCompanionNuevo({
+    required int usuarioId,
     required String numero,
     required int motoId,
     required int clienteId,
@@ -87,6 +88,7 @@ abstract final class OrdenMapper {
     String? observaciones,
     int descuento = 0,
   }) => TablaOrdenesServicioCompanion.insert(
+    usuarioId: usuarioId,
     numero: numero,
     descuento: Value(descuento),
     motoId: motoId,

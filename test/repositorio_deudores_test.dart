@@ -16,8 +16,13 @@ import 'package:inventario_k1/core/resultado.dart';
 
 import 'soporte/base_en_memoria.dart';
 import 'soporte/datos_taller.dart';
+import 'soporte/sesion_de_prueba.dart';
+import 'package:inventario_k1/backend/share/dominio/sesion_actual.dart';
 
 late AppDb db;
+
+/// Quien firma lo que escriben estos tests. Ver `sesionDePrueba`.
+late SesionActual sesion;
 late RepositorioDeudoresImpl deudores;
 late RepositorioInventarioImpl inventario;
 late DatosTaller taller;
@@ -82,8 +87,9 @@ Future<PaginaDeudores> _pagina({
 void main() {
   setUp(() async {
     db = baseEnMemoria();
-    deudores = RepositorioDeudoresImpl(db);
-    inventario = RepositorioInventarioImpl(db);
+    sesion = await sesionDePrueba(db);
+    deudores = RepositorioDeudoresImpl(db, sesion);
+    inventario = RepositorioInventarioImpl(db, sesion);
     taller = await sembrarTaller(db, stockInicial: 10);
   });
 
@@ -385,6 +391,7 @@ void main() {
       expect(
         () => db.into(db.tablaDeudorPago).insert(
               TablaDeudorPagoCompanion.insert(
+                usuarioId: sesion.usuarioId,
                 deudorId: id,
                 monto: 1000,
                 metodoPago: 'TRUEQUE',

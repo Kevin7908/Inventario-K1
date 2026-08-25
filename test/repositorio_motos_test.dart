@@ -12,8 +12,13 @@ import 'package:inventario_k1/backend/features/motos/repositorio/repositorio_mot
 import 'package:inventario_k1/backend/features/motos/repositorio/repositorio_motos.dart';
 import 'package:inventario_k1/backend/share/database/app_db.dart';
 import 'soporte/base_en_memoria.dart';
+import 'soporte/sesion_de_prueba.dart';
+import 'package:inventario_k1/backend/share/dominio/sesion_actual.dart';
 
 late AppDb db;
+
+/// Quien firma lo que escriben estos tests. Ver `sesionDePrueba`.
+late SesionActual sesion;
 late RepositorioMotosImpl repo;
 late RepositorioClientesImpl clientes;
 
@@ -51,10 +56,11 @@ Future<List<String>> _nombres(FiltroMotos filtro) async {
 }
 
 void main() {
-  setUp(() {
+  setUp(() async {
     db = baseEnMemoria();
-    repo = RepositorioMotosImpl(db);
-    clientes = RepositorioClientesImpl(db);
+    sesion = await sesionDePrueba(db);
+    repo = RepositorioMotosImpl(db, sesion);
+    clientes = RepositorioClientesImpl(db, sesion);
   });
 
   tearDown(() async => db.close());

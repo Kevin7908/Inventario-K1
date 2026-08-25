@@ -8,12 +8,18 @@ import '../../../../backend/features/proveedores/repositorio/repositorio_proveed
 import '../../../../backend/share/database/app_db_provider.dart';
 import '../../../../core/resultado.dart';
 import '../../productos/provider/productos_provider.dart';
+import '../../autenticacion/provider/auth_providers.dart';
 
 // Repositorio
 
 final repositorioProveedoresProvider = Provider<RepositorioProveedores>(
   name: 'repositorioProveedoresProvider',
-  (ref) => RepositorioProveedoresImpl(ref.watch(appDatabaseProvider)),
+  (ref) => RepositorioProveedoresImpl(
+    ref.watch(appDatabaseProvider),
+    // Quién firma lo que este repositorio escriba. Es una dependencia
+    // del constructor, no un registro global (`CLAUDE.md` §3).
+    ref.watch(sesionActualProvider),
+  ),
 );
 
 // Estado

@@ -9,8 +9,13 @@ import 'package:inventario_k1/backend/share/database/app_db.dart';
 
 import 'soporte/base_en_memoria.dart';
 import 'soporte/datos_taller.dart';
+import 'soporte/sesion_de_prueba.dart';
+import 'package:inventario_k1/backend/share/dominio/sesion_actual.dart';
 
 late AppDb db;
+
+/// Quien firma lo que escriben estos tests. Ver `sesionDePrueba`.
+late SesionActual sesion;
 late RepositorioOrdenesImpl ordenes;
 late RepositorioInventarioImpl inventario;
 late DatosTaller taller;
@@ -36,8 +41,9 @@ Future<int> _orden() async {
 void main() {
   setUp(() async {
     db = baseEnMemoria();
-    ordenes = RepositorioOrdenesImpl(db);
-    inventario = RepositorioInventarioImpl(db);
+    sesion = await sesionDePrueba(db);
+    ordenes = RepositorioOrdenesImpl(db, sesion);
+    inventario = RepositorioInventarioImpl(db, sesion);
     taller = await sembrarTaller(db);
   });
 

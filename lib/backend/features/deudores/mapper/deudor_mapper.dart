@@ -64,6 +64,7 @@ class DeudorMapper {
   }
 
   static TablaDeudorCompanion nuevaACompanion({
+    required int usuarioId,
     required String numero,
     required int clienteId,
     int? motoId,
@@ -72,6 +73,7 @@ class DeudorMapper {
     String? notas,
   }) {
     return TablaDeudorCompanion.insert(
+      usuarioId: usuarioId,
       numero: numero,
       clienteId: clienteId,
       motoId: Value(motoId),
@@ -96,12 +98,14 @@ class DeudorMapper {
   }
 
   static TablaDeudorPagoCompanion pagoACompanion({
+    required int usuarioId,
     required int deudorId,
     required int monto,
     required MetodoPago metodoPago,
     String? notas,
   }) {
     return TablaDeudorPagoCompanion.insert(
+      usuarioId: usuarioId,
       deudorId: deudorId,
       monto: monto,
       metodoPago: metodoPago.codigo,

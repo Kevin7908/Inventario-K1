@@ -10,8 +10,13 @@ import 'package:inventario_k1/core/resultado.dart';
 
 import 'soporte/base_en_memoria.dart';
 import 'soporte/datos_taller.dart';
+import 'soporte/sesion_de_prueba.dart';
+import 'package:inventario_k1/backend/share/dominio/sesion_actual.dart';
 
 late AppDb db;
+
+/// Quien firma lo que escriben estos tests. Ver `sesionDePrueba`.
+late SesionActual sesion;
 late RepositorioReservasImpl reservas;
 late RepositorioInventarioImpl inventario;
 late DatosTaller taller;
@@ -55,8 +60,9 @@ Future<int> _itemDe(int reservaId) async =>
 void main() {
   setUp(() async {
     db = baseEnMemoria();
-    reservas = RepositorioReservasImpl(db);
-    inventario = RepositorioInventarioImpl(db);
+    sesion = await sesionDePrueba(db);
+    reservas = RepositorioReservasImpl(db, sesion);
+    inventario = RepositorioInventarioImpl(db, sesion);
     taller = await sembrarTaller(db);
   });
 
@@ -429,6 +435,7 @@ void main() {
     /// El sembrado del taller no crea cotizaciones, así que la pone el test.
     Future<int> cotizacion() => db.into(db.tablaCotizacion).insert(
           TablaCotizacionCompanion.insert(
+            usuarioId: sesion.usuarioId,
             numero: 'COT-TEST-${DateTime.now().microsecondsSinceEpoch}',
             clienteId: Value(taller.clienteId),
             vigenciaHasta: DateTime.now().add(const Duration(days: 15)),
@@ -527,6 +534,7 @@ void main() {
       expect(
         () => db.into(db.tablaReservaAbono).insert(
               TablaReservaAbonoCompanion.insert(
+                usuarioId: sesion.usuarioId,
                 reservaId: id,
                 monto: 0,
                 metodoPago: 'EFECTIVO',
@@ -542,6 +550,7 @@ void main() {
       expect(
         () => db.into(db.tablaReservaAbono).insert(
               TablaReservaAbonoCompanion.insert(
+                usuarioId: sesion.usuarioId,
                 reservaId: id,
                 monto: 1000,
                 metodoPago: 'BITCOIN',
@@ -558,6 +567,7 @@ void main() {
       expect(
         () => db.into(db.tablaReservaAbono).insert(
               TablaReservaAbonoCompanion.insert(
+                usuarioId: sesion.usuarioId,
                 reservaId: id,
                 monto: 1000,
                 metodoPago: MetodoPago.credito.codigo,
@@ -583,6 +593,7 @@ void main() {
       // informativa, así que su desaparición no puede llevarse la reserva.
       final cotizacionId = await db.into(db.tablaCotizacion).insert(
             TablaCotizacionCompanion.insert(
+              usuarioId: sesion.usuarioId,
               numero: 'COT-0001',
               vigenciaHasta: DateTime.now(),
             ),

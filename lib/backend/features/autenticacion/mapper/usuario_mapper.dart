@@ -1,6 +1,7 @@
 import 'package:drift/drift.dart';
 
 import '../../../share/database/app_db.dart';
+import '../../../share/dominio/rol_usuario.dart';
 import '../modelo/usuario.dart';
 
 abstract final class UsuarioMapper {
@@ -16,8 +17,7 @@ abstract final class UsuarioMapper {
       // vacía para no obligar a todo el módulo de login a manejar un `null`.
       email: persona.email ?? '',
       usuario: rol.usuario,
-      passwordHash: rol.passwordHash,
-      esAdmin: rol.esAdmin,
+      rol: RolUsuario.desdeCodigo(rol.rol),
       estaActivo: rol.estaActivo,
       creadoEn: rol.creadoEn,
     );

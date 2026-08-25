@@ -11,14 +11,46 @@ import '../enum/enum_ordenes.dart';
 import '../mapper/ordenes_mapper.dart';
 import '../modelo/orden_detalle.dart';
 import '../modelo/orden_resumen.dart';
+import '../../../share/dominio/sesion_actual.dart';
+import '../../bitacora/modelo/entrada_bitacora.dart';
+import '../../bitacora/repositorio/repositorio_bitacora.dart';
+import '../../bitacora/repositorio/repositorio_bitacora_impl.dart';
+import '../../../share/dominio/permiso.dart';
 
-class RepositorioOrdenesImpl implements RepositorioOrdenes {
-  RepositorioOrdenesImpl(this._db);
+class RepositorioOrdenesImpl with FirmaDeSesion implements RepositorioOrdenes {
+  RepositorioOrdenesImpl(this._db, this.sesion);
+
+  /// Quién firma lo que este repositorio escribe. La inyecta Riverpod
+  /// desde `sesionActualProvider`: es una dependencia del constructor, no
+  /// un registro global que se consulte por dentro.
+  @override
+  final SesionActual? sesion;
+
+  late final RepositorioBitacora _bitacora =
+      RepositorioBitacoraImpl(_db, sesion);
+
+  /// Deja el renglón de la bitácora, **dentro** de la transacción del cambio.
+  Future<void> _anotar(
+    AccionAuditada accion,
+    int? id,
+    String descripcion, {
+    String? detalle,
+  }) =>
+      _bitacora.anotar(
+        Anotacion(
+          entidad: EntidadAuditada.orden,
+          accion: accion,
+          entidadId: id,
+          descripcion: descripcion,
+          detalle: detalle,
+        ),
+      );
+
 
   final AppDb _db;
 
   /// Agregar o quitar un repuesto mueve stock, y eso solo se hace por aquí.
-  late final RepositorioInventario _inventario = RepositorioInventarioImpl(_db);
+  late final RepositorioInventario _inventario = RepositorioInventarioImpl(_db, sesion);
 
   // Getters para acceso rápido a tablas
   $TablaOrdenesServicioTable get _tablaOrdenes => _db.tablaOrdenesServicio;
@@ -262,11 +294,14 @@ class RepositorioOrdenesImpl implements RepositorioOrdenes {
     String? diagnostico,
     String? observaciones,
   }) {
+    exigir(Permiso.ordenesCrear);
+
     // El número se pide dentro de la transacción que inserta la orden: si el
     // `INSERT` falla, el consecutivo se devuelve y la serie sigue sin huecos.
     return _db.transaction(() async {
       final id = await _db.into(_tablaOrdenes).insert(
             OrdenMapper.aCompanionNuevo(
+              usuarioId: autorId,
               numero: await _consecutivos.siguiente(DocumentoConsecutivo.orden),
               motoId: motoId,
               clienteId: clienteId,
@@ -346,10 +381,24 @@ class RepositorioOrdenesImpl implements RepositorioOrdenes {
 
   @override
   Future<void> eliminar(int id) async {
-    final deleted = await (_db.delete(
-      _tablaOrdenes,
-    )..where((t) => t.id.equals(id))).go();
-    if (deleted == 0) throw Exception('Orden #$id no existe.');
+    exigir(Permiso.ordenesEliminar);
+    await _db.transaction(() async {
+      // El número se lee antes: después la orden ya no está para decirlo.
+      final antes = await (_db.select(_tablaOrdenes)
+            ..where((t) => t.id.equals(id)))
+          .getSingleOrNull();
+
+      final deleted = await (_db.delete(
+        _tablaOrdenes,
+      )..where((t) => t.id.equals(id))).go();
+      if (deleted == 0) throw Exception('Orden #$id no existe.');
+
+      await _anotar(
+        AccionAuditada.elimino,
+        id,
+        antes == null ? 'Orden #$id' : 'Orden ${antes.numero}',
+      );
+    });
   }
 
   @override
@@ -360,6 +409,8 @@ class RepositorioOrdenesImpl implements RepositorioOrdenes {
     required int precioPactado,
     String? notas,
   }) async {
+    exigir(Permiso.ordenesEditar);
+
     await _db
         .into(_tablaTareas)
         .insert(
@@ -426,6 +477,8 @@ class RepositorioOrdenesImpl implements RepositorioOrdenes {
     required double cantidad,
     required int precioUnitario,
   }) {
+    exigir(Permiso.ordenesEditar);
+
     // Anotar el repuesto **es** sacarlo del estante: la pieza queda apartada
     // para esta moto aunque el mecánico todavía no la haya montado. Por eso
     // se verifica y se descuenta aquí, y no al cerrar la orden: así el error
@@ -646,6 +699,8 @@ class RepositorioOrdenesImpl implements RepositorioOrdenes {
     required String descripcion,
     required int precio,
   }) async {
+    exigir(Permiso.ordenesEditar);
+
     final limpia = descripcion.trim();
     if (limpia.isEmpty) {
       throw Exception('El cargo necesita una descripción.');

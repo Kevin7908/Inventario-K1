@@ -21,10 +21,15 @@ abstract final class MovimientoMapper {
     );
   }
 
+  /// [usuarioId] no viene en la solicitud sino aparte: quien mueve stock es
+  /// quien tiene la sesión abierta, y eso lo sabe el repositorio, no cada uno
+  /// de los diez sitios que piden un movimiento.
   static TablaMovimientoInventarioCompanion solicitudACompanion(
     SolicitudMovimiento s,
+    int usuarioId,
   ) {
     return TablaMovimientoInventarioCompanion.insert(
+      usuarioId: usuarioId,
       productoId: s.productoId,
       tipo: s.tipo.codigo,
       cantidad: s.cantidad,

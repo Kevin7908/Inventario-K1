@@ -23,6 +23,14 @@ import '../temas/tipografia_app.dart';
 /// - [soloEnteros]: rechaza todo lo que no sea un dígito mientras se escribe.
 ///   Para importes en pesos y cantidades, que en este sistema no llevan
 ///   decimales.
+/// - [nodoFoco]: para encadenar el orden de tabulación desde la vista.
+/// - [alEnviar]: se dispara con Enter. En un campo de una sola línea Enter ya
+///   envía el formulario (`CLAUDE.md` §8); `Ctrl+Enter` lo resuelve
+///   `AtajosFormulario` para los de varias.
+/// - [oculto]: pinta el contenido con puntos, para contraseñas.
+/// - [alAlternarOculto]: si se pasa, aparece el ojo que muestra y esconde el
+///   texto. El campo **no guarda** ese estado —share2 es sin estado—: lo lleva
+///   quien lo usa y vuelve por [oculto].
 ///
 /// Ejemplo:
 /// ```dart
@@ -63,6 +71,10 @@ class CampoTexto extends StatelessWidget {
     this.monoespaciado = false,
     this.soloEnteros = false,
     this.habilitado = true,
+    this.nodoFoco,
+    this.alEnviar,
+    this.oculto = false,
+    this.alAlternarOculto,
   });
 
   final String etiqueta;
@@ -74,6 +86,11 @@ class CampoTexto extends StatelessWidget {
   final bool autofocus;
   final bool monoespaciado;
   final bool soloEnteros;
+
+  final FocusNode? nodoFoco;
+  final ValueChanged<String>? alEnviar;
+  final bool oculto;
+  final VoidCallback? alAlternarOculto;
 
   /// En `false` el campo se ve pero no se escribe. Se usa cuando el documento
   /// que lo contiene está cerrado: quitarlo de la pantalla escondería el dato,
@@ -95,10 +112,13 @@ class CampoTexto extends StatelessWidget {
         const SizedBox(height: 7),
         TextFormField(
           controller: controlador,
+          focusNode: nodoFoco,
           enabled: habilitado,
           onChanged: alCambiar,
+          onFieldSubmitted: alEnviar,
           validator: validador,
-          maxLines: lineas,
+          obscureText: oculto,
+          maxLines: oculto ? 1 : lineas,
           autofocus: autofocus,
           keyboardType: soloEnteros ? TextInputType.number : null,
           inputFormatters: soloEnteros ? _soloDigitos : null,
@@ -115,6 +135,20 @@ class CampoTexto extends StatelessWidget {
               horizontal: 14,
               vertical: 13,
             ),
+            suffixIcon: alAlternarOculto == null
+                ? null
+                : IconButton(
+                    onPressed: alAlternarOculto,
+                    icon: Icon(
+                      oculto
+                          ? Icons.visibility_outlined
+                          : Icons.visibility_off_outlined,
+                      size: 18,
+                      color: ColoresApp.textMuted,
+                    ),
+                    tooltip: oculto ? 'Mostrar' : 'Ocultar',
+                    splashRadius: 18,
+                  ),
             border: borde(ColoresApp.borderInput),
             enabledBorder: borde(ColoresApp.borderInput),
             focusedBorder: borde(ColoresApp.borderFocus),

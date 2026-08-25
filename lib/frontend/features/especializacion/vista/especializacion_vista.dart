@@ -183,7 +183,7 @@ class _EspecializacionesVistaState
       child: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
-          Icon(
+          const Icon(
             Icons.build_circle_outlined,
             size: 44,
             color: ColoresApp.textDisabled,

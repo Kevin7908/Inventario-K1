@@ -15,9 +15,41 @@ import '../modelo/reserva_detalle.dart';
 import '../modelo/reserva_item.dart';
 import '../modelo/reserva_resumen.dart';
 import 'repositorio_reservas.dart';
+import '../../../share/dominio/sesion_actual.dart';
+import '../../bitacora/modelo/entrada_bitacora.dart';
+import '../../bitacora/repositorio/repositorio_bitacora.dart';
+import '../../bitacora/repositorio/repositorio_bitacora_impl.dart';
+import '../../../share/dominio/permiso.dart';
 
-class RepositorioReservasImpl implements RepositorioReservas {
-  RepositorioReservasImpl(this._db);
+class RepositorioReservasImpl with FirmaDeSesion implements RepositorioReservas {
+  RepositorioReservasImpl(this._db, this.sesion);
+
+  /// Quién firma lo que este repositorio escribe. La inyecta Riverpod
+  /// desde `sesionActualProvider`: es una dependencia del constructor, no
+  /// un registro global que se consulte por dentro.
+  @override
+  final SesionActual? sesion;
+
+  late final RepositorioBitacora _bitacora =
+      RepositorioBitacoraImpl(_db, sesion);
+
+  /// Deja el renglón de la bitácora, **dentro** de la transacción del cambio.
+  Future<void> _anotar(
+    AccionAuditada accion,
+    int? id,
+    String descripcion, {
+    String? detalle,
+  }) =>
+      _bitacora.anotar(
+        Anotacion(
+          entidad: EntidadAuditada.reserva,
+          accion: accion,
+          entidadId: id,
+          descripcion: descripcion,
+          detalle: detalle,
+        ),
+      );
+
 
   final AppDb _db;
 
@@ -27,7 +59,7 @@ class RepositorioReservasImpl implements RepositorioReservas {
       RepositorioConsecutivos(_db);
 
   /// Reservar y liberar mueven stock, y eso solo se hace por aquí.
-  late final RepositorioInventario _inventario = RepositorioInventarioImpl(_db);
+  late final RepositorioInventario _inventario = RepositorioInventarioImpl(_db, sesion);
 
   // ── Join base ──────────────────────────────────────────────────────────────
 
@@ -206,9 +238,12 @@ class RepositorioReservasImpl implements RepositorioReservas {
     MetodoPago metodoPagoInicial = MetodoPago.efectivo,
     String? referenciaInicial,
   }) {
+    exigir(Permiso.reservasCrear);
+
     return _db.transaction(() async {
       final id = await _db.into(_db.tablaReserva).insert(
             ReservaMapper.nuevaACompanion(
+              usuarioId: autorId,
               numero: await _consecutivos.siguiente(DocumentoConsecutivo.reserva),
               clienteId: clienteId,
               motoId: motoId,
@@ -233,6 +268,7 @@ class RepositorioReservasImpl implements RepositorioReservas {
       if (abonoInicial > 0 && total > 0) {
         await _db.into(_db.tablaReservaAbono).insert(
               ReservaMapper.abonoACompanion(
+                usuarioId: autorId,
                 reservaId: id,
                 monto: abonoInicial.clamp(1, total),
                 metodoPago: metodoPagoInicial,
@@ -476,6 +512,8 @@ class RepositorioReservasImpl implements RepositorioReservas {
     required MetodoPago metodoPago,
     String? referenciaPago,
   }) {
+    exigir(Permiso.reservasAbonar);
+
     return _db.transaction(() async {
       // El `CHECK (pagado_acumulado <= total_reserva)` también lo impediría,
       // pero su error no se le puede enseñar a nadie. Y desde que el caché ya
@@ -495,6 +533,7 @@ class RepositorioReservasImpl implements RepositorioReservas {
 
       await _db.into(_db.tablaReservaAbono).insert(
             ReservaMapper.abonoACompanion(
+              usuarioId: autorId,
               reservaId: reservaId,
               monto: monto,
               metodoPago: metodoPago,
@@ -507,19 +546,26 @@ class RepositorioReservasImpl implements RepositorioReservas {
 
   @override
   Future<void> cambiarEstado(int id, EstadoReserva nuevoEstado) async {
-    if (nuevoEstado == EstadoReserva.cancelada) {
-      await _db.transaction(() async {
-        final items = await _itemsDraft(id);
-        await _restaurarStock(id, items);
-        await _escribirEstado(id, nuevoEstado);
-      });
-    } else {
+    await _db.transaction(() async {
+      if (nuevoEstado == EstadoReserva.cancelada) {
+        await _restaurarStock(id, await _itemsDraft(id));
+      }
       await _escribirEstado(id, nuevoEstado);
-    }
+
+      await _anotar(
+        nuevoEstado == EstadoReserva.cancelada
+            ? AccionAuditada.anulo
+            : AccionAuditada.modifico,
+        id,
+        await _numeroDe(id),
+        detalle: 'Estado: ${nuevoEstado.valor}',
+      );
+    });
   }
 
   @override
   Future<void> eliminar(int id) async {
+    exigir(Permiso.reservasEliminar);
     await _db.transaction(() async {
       final items = await _itemsDraft(id);
       final reserva = await (_db.select(_db.tablaReserva)
@@ -529,7 +575,21 @@ class RepositorioReservasImpl implements RepositorioReservas {
         await _restaurarStock(id, items);
       }
       await (_db.delete(_db.tablaReserva)..where((t) => t.id.equals(id))).go();
+
+      await _anotar(
+        AccionAuditada.elimino,
+        id,
+        reserva == null ? 'Reserva #$id' : 'Reserva ${reserva.numero}',
+      );
     });
+  }
+
+  /// El número de una reserva, para nombrarla en la bitácora.
+  Future<String> _numeroDe(int id) async {
+    final fila = await (_db.select(_db.tablaReserva)
+          ..where((t) => t.id.equals(id)))
+        .getSingleOrNull();
+    return fila == null ? 'Reserva #$id' : 'Reserva ${fila.numero}';
   }
 
   // ── Helpers privados ───────────────────────────────────────────────────────
@@ -680,6 +740,7 @@ class RepositorioReservasImpl implements RepositorioReservas {
     if (pagado > total) {
       await _db.into(_db.tablaReservaAbono).insert(
             ReservaMapper.abonoACompanion(
+              usuarioId: autorId,
               reservaId: reservaId,
               monto: total - pagado, // negativo: sale plata
               metodoPago: MetodoPago.efectivo,

@@ -7,11 +7,17 @@ import '../../../../backend/features/especializacion/modelo/especializacion.dart
 import '../../../../backend/features/especializacion/repositorio/repositorio_especializacion.dart';
 import '../../../../backend/features/especializacion/repositorio/repositorio_especializacion_impl.dart';
 import '../../../../backend/share/database/app_db_provider.dart';
+import '../../autenticacion/provider/auth_providers.dart';
 
 // Repositorio concreto. Cambiar la impl aquí no toca ninguna otra capa.
 final repositorioEspecializacionProvider =
     Provider<RepositorioEspecializacion>(
-  (ref) => RepositorioEspecializacionImpl(ref.watch(appDatabaseProvider)),
+  (ref) => RepositorioEspecializacionImpl(
+    ref.watch(appDatabaseProvider),
+    // Quién firma lo que este repositorio escriba. Es una dependencia
+    // del constructor, no un registro global (`CLAUDE.md` §3).
+    ref.watch(sesionActualProvider),
+  ),
   name: 'repositorioEspecializacionProvider',
 );
 

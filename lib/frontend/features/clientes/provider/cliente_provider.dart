@@ -11,12 +11,18 @@ import '../../../../backend/share/database/app_db_provider.dart';
 import '../../../../core/resultado.dart';
 import '../../motos/provider/motos_provider.dart';
 import 'validacion_cliente.dart';
+import '../../autenticacion/provider/auth_providers.dart';
 
 // Repositorio
 
 final repositorioClientesProvider = Provider<RepositorioClientes>(
   name: 'repositorioClientesProvider',
-  (ref) => RepositorioClientesImpl(ref.watch(appDatabaseProvider)),
+  (ref) => RepositorioClientesImpl(
+    ref.watch(appDatabaseProvider),
+    // Quién firma lo que este repositorio escriba. Es una dependencia
+    // del constructor, no un registro global (`CLAUDE.md` §3).
+    ref.watch(sesionActualProvider),
+  ),
 );
 
 // Estado

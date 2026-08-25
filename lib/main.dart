@@ -1,20 +1,16 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:inventario_k1/frontend/layout/layout_principal.dart';
-import 'package:inventario_k1/frontend/share2/temas/colores_app.dart';
 
-import 'backend/share/database/locator.dart';
+import 'frontend/features/autenticacion/vista/portal_sesion.dart';
+import 'frontend/share2/temas/colores_app.dart';
 
 void main() {
   WidgetsFlutterBinding.ensureInitialized();
 
-  // Registra todas las dependencias antes de arrancar la app
-  setupLocator();
-  runApp(
-    const ProviderScope(
-      child: MainApp(),
-    ),
-  );
+  // Ya no hay `setupLocator()`: la única base de datos y todos los
+  // repositorios los construye Riverpod. `get_it` salió del proyecto con la
+  // migración de `autenticacion` (`CLAUDE.md` §3).
+  runApp(const ProviderScope(child: MainApp()));
 }
 
 class MainApp extends StatelessWidget {
@@ -31,7 +27,7 @@ class MainApp extends StatelessWidget {
         scaffoldBackgroundColor: ColoresApp.bgApp,
         useMaterial3: true,
       ),
-      home: const LayoutPrincipal(),
+      home: const PortalSesion(),
     );
   }
 }

@@ -8,6 +8,7 @@ import '../../../../backend/features/ordenes/modelo/orden_resumen.dart';
 import '../../../../backend/features/ordenes/repositorio/repositorio_ordenes.dart';
 import '../../../../backend/features/ordenes/repositorio/repositorio_ordenes_impl.dart';
 import '../../../../backend/share/database/app_db_provider.dart';
+import '../../autenticacion/provider/auth_providers.dart';
 
 /// Providers del módulo de Órdenes de servicio (el nuevo, con el diseño del
 /// mockup).
@@ -19,7 +20,12 @@ import '../../../../backend/share/database/app_db_provider.dart';
 
 final repositorioOrdenesProvider = Provider<RepositorioOrdenes>(
   name: 'repositorioOrdenesProvider2',
-  (ref) => RepositorioOrdenesImpl(ref.watch(appDatabaseProvider)),
+  (ref) => RepositorioOrdenesImpl(
+    ref.watch(appDatabaseProvider),
+    // Quién firma lo que este repositorio escriba. Es una dependencia
+    // del constructor, no un registro global (`CLAUDE.md` §3).
+    ref.watch(sesionActualProvider),
+  ),
 );
 
 /// Los cuatro contadores del encabezado, de un `COUNT` por estado.

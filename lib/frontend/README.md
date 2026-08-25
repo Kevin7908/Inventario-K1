@@ -19,7 +19,11 @@ frontend/
 
 ## `layout/`
 
-El punto de entrada visual de la app después del login. Contiene `LayoutPrincipal`, que arma el sidebar izquierdo y el `IndexedStack` de vistas.
+El punto de entrada visual de la app después del login. Contiene
+`LayoutPrincipal`, que arma el sidebar izquierdo y el `IndexedStack` de vistas.
+
+Quién decide si se ve el login o la app es `PortalSesion`, en
+`features/autenticacion/vista/`: es lo que `main.dart` pone como `home`.
 
 → Ver [`layout/README.md`](layout/README.md)
 
@@ -31,7 +35,8 @@ Cada módulo del negocio tiene su propia carpeta. Las vistas de un módulo no im
 
 | Carpeta | Módulo |
 |---|---|
-| `autenticacion/` | Login y registro |
+| `autenticacion/` | Inicio de sesión, alta del primer administrador, recuperación de contraseña, cuentas y sus permisos |
+| `bitacora/` | (solo backend por ahora) Quién hizo qué: el repositorio existe, la pantalla no |
 | `categorias/` | Categorías de productos |
 | `clientes/` | Gestión de clientes y de las motos de cada uno |
 | `configuracion/` | Ajustes de la aplicación |
@@ -77,7 +82,12 @@ Biblioteca de widgets y tokens de diseño reutilizables. Todo componente visual 
 
 ## `share/` (legacy — congelado)
 
-Código de la versión anterior. **No se toca, no se extiende.** Existe solo como referencia histórica. Todo trabajo nuevo va en `share2/`.
+Código de la versión anterior. **No se toca, no se extiende.** Existe solo como
+referencia histórica. Todo trabajo nuevo va en `share2/`.
+
+Desde que `autenticacion` se migró, **ningún archivo fuera de `share/` importa
+nada de `share/`**: la carpeta quedó huérfana. Borrarla entera es una decisión
+aparte, no un descuido —está anotada en `DEUDA_TECNICA.md`—.
 
 ---
 
@@ -101,5 +111,17 @@ Código de la versión anterior. **No se toca, no se extiende.** Existe solo com
 - Un widget de `share2/` nunca importa de `features/`.
 - `layout/` puede importar de `features/` y de `share2/`, pero no al revés.
 - El frontend importa de `lib/backend/` **solo modelos y enums** —`Producto`,
-  `EstadoOrden`, `MetodoPago`—, nunca una base de datos ni un repositorio a
-  mano: al repositorio se llega por su provider de Riverpod.
+  `EstadoOrden`, `MetodoPago`, `Permiso`—, nunca una base de datos ni un
+  repositorio a mano: al repositorio se llega por su provider de Riverpod.
+- **Para esconder algo según el permiso, `SiPuede`** —de
+  `features/autenticacion/widgets/`—. Es una línea por compuerta:
+
+  ```dart
+  SiPuede(
+    permiso: Permiso.productosEliminar,
+    child: BotonDestructivo(etiqueta: 'Eliminar', alPresionar: _borrar),
+  )
+  ```
+
+  Esconder un botón es orden, no control: la compuerta que impide de verdad
+  está en el repositorio (`CLAUDE.md` §7 bis).

@@ -8,11 +8,17 @@ import '../../../../backend/features/tecnicos/repositorio/repositorio_tecnico_im
 import '../../../../backend/share/database/app_db_provider.dart';
 import '../../../../core/resultado.dart';
 import '../../ordenes/provider/ordenes_providers.dart';
+import '../../autenticacion/provider/auth_providers.dart';
 
 // Repositorio
 
 final repositorioTecnicoProvider = Provider<RepositorioTecnico>(
-  (ref) => RepositorioTecnicoDrift(ref.watch(appDatabaseProvider)),
+  (ref) => RepositorioTecnicoDrift(
+    ref.watch(appDatabaseProvider),
+    // Quién firma lo que este repositorio escriba. Es una dependencia
+    // del constructor, no un registro global (`CLAUDE.md` §3).
+    ref.watch(sesionActualProvider),
+  ),
   name: 'repositorioTecnicoProvider',
 );
 

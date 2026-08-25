@@ -52,6 +52,7 @@ class CotizacionMapper {
   }
 
   static TablaCotizacionCompanion nuevaACompanion({
+    required int usuarioId,
     required String numero,
     int? clienteId,
     int? motoId,
@@ -62,6 +63,7 @@ class CotizacionMapper {
     String? notas,
   }) {
     return TablaCotizacionCompanion.insert(
+      usuarioId: usuarioId,
       numero: numero,
       clienteId: Value(clienteId),
       motoId: Value(motoId),

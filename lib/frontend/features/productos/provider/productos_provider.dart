@@ -8,12 +8,18 @@ import '../../../../backend/features/productos/repositorio/repositorio_producto_
 import '../../../../backend/share/database/app_db_provider.dart';
 import '../../../../backend/share/utils/sku_utils.dart';
 import '../../../../core/resultado.dart';
+import '../../autenticacion/provider/auth_providers.dart';
 
 // Repositorio
 
 final repositorioProductosProvider = Provider<RepositorioProducto>(
   name: 'repositorioProductosProvider',
-  (ref) => RepositorioProductosImpl(ref.watch(appDatabaseProvider)),
+  (ref) => RepositorioProductosImpl(
+    ref.watch(appDatabaseProvider),
+    // Quién firma lo que este repositorio escriba. Es una dependencia
+    // del constructor, no un registro global (`CLAUDE.md` §3).
+    ref.watch(sesionActualProvider),
+  ),
 );
 
 // Enums públicos

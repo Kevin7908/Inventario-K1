@@ -4,10 +4,16 @@ import '../../../../backend/features/unidades_medida/modelo/unidad_medida.dart';
 import '../../../../backend/features/unidades_medida/repositorio/repositorio_unidades_medida.dart';
 import '../../../../backend/features/unidades_medida/repositorio/repositorio_unidades_medida_impl.dart';
 import '../../../../backend/share/database/app_db_provider.dart';
+import '../../autenticacion/provider/auth_providers.dart';
 
 final repositorioUnidadesMedidaProvider = Provider<RepositorioUnidadesMedida>(
   name: 'repositorioUnidadesMedidaProvider',
-  (ref) => RepositorioUnidadesMedidaImpl(ref.watch(appDatabaseProvider)),
+  (ref) => RepositorioUnidadesMedidaImpl(
+    ref.watch(appDatabaseProvider),
+    // Quién firma lo que este repositorio escriba. Es una dependencia
+    // del constructor, no un registro global (`CLAUDE.md` §3).
+    ref.watch(sesionActualProvider),
+  ),
 );
 
 class UnidadesMedidaState {

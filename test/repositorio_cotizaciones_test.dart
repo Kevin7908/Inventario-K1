@@ -17,8 +17,13 @@ import 'package:inventario_k1/backend/features/productos/repositorio/repositorio
 import 'package:inventario_k1/backend/share/database/app_db.dart';
 import 'package:inventario_k1/core/iva_app.dart';
 import 'soporte/base_en_memoria.dart';
+import 'soporte/sesion_de_prueba.dart';
+import 'package:inventario_k1/backend/share/dominio/sesion_actual.dart';
 
 late AppDb db;
+
+/// Quien firma lo que escriben estos tests. Ver `sesionDePrueba`.
+late SesionActual sesion;
 late RepositorioCotizacionesImpl repo;
 late RepositorioClientesImpl clientes;
 late RepositorioProductosImpl productos;
@@ -74,9 +79,10 @@ Future<List<String>> _numeros(FiltroCotizaciones filtro) async {
 void main() {
   setUp(() async {
     db = baseEnMemoria();
-    repo = RepositorioCotizacionesImpl(db);
-    clientes = RepositorioClientesImpl(db);
-    productos = RepositorioProductosImpl(db);
+    sesion = await sesionDePrueba(db);
+    repo = RepositorioCotizacionesImpl(db, sesion);
+    clientes = RepositorioClientesImpl(db, sesion);
+    productos = RepositorioProductosImpl(db, sesion);
     productoId = (await productos.crear(
       const Producto(
         sku: 'REP-1',
@@ -609,6 +615,7 @@ void main() {
       expect(
         () => db.into(db.tablaCotizacion).insert(
               TablaCotizacionCompanion.insert(
+                usuarioId: sesion.usuarioId,
                 numero: numero,
                 vigenciaHasta: DateTime(2026, 12, 31),
               ),

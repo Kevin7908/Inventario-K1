@@ -12,8 +12,13 @@ import 'package:inventario_k1/backend/features/motos/modelo/moto.dart';
 import 'package:inventario_k1/backend/features/motos/repositorio/repositorio_moto_impl.dart';
 import 'package:inventario_k1/backend/share/database/app_db.dart';
 import 'soporte/base_en_memoria.dart';
+import 'soporte/sesion_de_prueba.dart';
+import 'package:inventario_k1/backend/share/dominio/sesion_actual.dart';
 
 late AppDb db;
+
+/// Quien firma lo que escriben estos tests. Ver `sesionDePrueba`.
+late SesionActual sesion;
 late RepositorioClientesImpl repo;
 late RepositorioMotosImpl motos;
 
@@ -72,6 +77,7 @@ Future<void> _deuda({
 }) async {
   await db.into(db.tablaDeudor).insert(
         TablaDeudorCompanion.insert(
+          usuarioId: sesion.usuarioId,
           numero: numero,
           clienteId: clienteId,
           concepto: const Value('Prueba'),
@@ -83,10 +89,11 @@ Future<void> _deuda({
 }
 
 void main() {
-  setUp(() {
+  setUp(() async {
     db = baseEnMemoria();
-    repo = RepositorioClientesImpl(db);
-    motos = RepositorioMotosImpl(db);
+    sesion = await sesionDePrueba(db);
+    repo = RepositorioClientesImpl(db, sesion);
+    motos = RepositorioMotosImpl(db, sesion);
   });
 
   tearDown(() async => db.close());

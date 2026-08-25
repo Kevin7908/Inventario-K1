@@ -8,6 +8,7 @@ import '../../../../backend/features/reservas/modelo/reserva_resumen.dart';
 import '../../../../backend/features/reservas/repositorio/repositorio_reservas.dart';
 import '../../../../backend/features/reservas/repositorio/repositorio_reservas_impl.dart';
 import '../../../../backend/share/database/app_db_provider.dart';
+import '../../autenticacion/provider/auth_providers.dart';
 
 /// Providers del listado de Reservas con el diseño del mockup.
 ///
@@ -18,7 +19,12 @@ import '../../../../backend/share/database/app_db_provider.dart';
 
 final repositorioReservasProvider = Provider<RepositorioReservas>(
   name: 'repositorioReservasProvider',
-  (ref) => RepositorioReservasImpl(ref.watch(appDatabaseProvider)),
+  (ref) => RepositorioReservasImpl(
+    ref.watch(appDatabaseProvider),
+    // Quién firma lo que este repositorio escriba. Es una dependencia
+    // del constructor, no un registro global (`CLAUDE.md` §3).
+    ref.watch(sesionActualProvider),
+  ),
 );
 
 /// Estado del listado: **solo la página visible**, más lo que hace falta para

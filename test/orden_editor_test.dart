@@ -27,8 +27,14 @@ import 'package:inventario_k1/frontend/features/ordenes/orden_detalle/provider/v
 
 import 'soporte/base_en_memoria.dart';
 import 'soporte/datos_taller.dart';
+import 'soporte/sesion_de_prueba.dart';
+import 'package:inventario_k1/backend/share/dominio/sesion_actual.dart';
+import 'package:inventario_k1/frontend/features/autenticacion/provider/auth_providers.dart';
 
 late AppDb db;
+
+/// Quien firma lo que escriben estos tests. Ver `sesionDePrueba`.
+late SesionActual sesion;
 late RepositorioOrdenesImpl repo;
 late DatosTaller taller;
 late ProviderContainer container;
@@ -53,7 +59,13 @@ Future<double> _stock() async {
 /// Monta el editor sobre la orden recién creada y espera a que cargue.
 Future<void> _montar() async {
   container = ProviderContainer(
-    overrides: [appDatabaseProvider.overrideWithValue(db)],
+    overrides: [
+      appDatabaseProvider.overrideWithValue(db),
+      // Los repositorios que arma Riverpod reciben la sesión por el
+      // constructor. Sin este override serían anónimos y `usuario_id`, que es
+      // `NOT NULL`, no tendría con qué llenarse.
+      sesionActualProvider.overrideWithValue(sesion),
+    ],
   );
   addTearDown(container.dispose);
 
@@ -68,7 +80,8 @@ Future<Resultado> _cerrarOrden([EstadoOrden a = EstadoOrden.lista]) =>
 void main() {
   setUp(() async {
     db = baseEnMemoria();
-    repo = RepositorioOrdenesImpl(db);
+    sesion = await sesionDePrueba(db);
+    repo = RepositorioOrdenesImpl(db, sesion);
     taller = await sembrarTaller(db);
     final orden = await repo.agregar(
       motoId: taller.motoId,

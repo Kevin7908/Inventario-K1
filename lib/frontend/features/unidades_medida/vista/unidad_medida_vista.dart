@@ -260,7 +260,7 @@ class _UnidadesMedidaVistaState extends ConsumerState<UnidadesMedidaVista> {
                 child: Row(
                   mainAxisSize: MainAxisSize.min,
                   children: [
-                    Icon(Icons.arrow_back_rounded,
+                    const Icon(Icons.arrow_back_rounded,
                         size: 16, color: ColoresApp.textMuted),
                     const SizedBox(width: 6),
                     Text(

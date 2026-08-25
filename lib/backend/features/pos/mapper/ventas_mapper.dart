@@ -70,6 +70,7 @@ abstract final class VentasMapper {
   /// única otra forma de venta que existía, la de una orden de servicio, se
   /// fue con el módulo de Facturación.
   static TablaVentasCompanion companionNuevo({
+    required int usuarioId,
     required String numeroFactura,
     int? clienteId,
     required MetodoPago metodoPago,
@@ -77,6 +78,7 @@ abstract final class VentasMapper {
     int descuento = 0,
   }) =>
       TablaVentasCompanion.insert(
+        usuarioId: usuarioId,
         numeroFactura: numeroFactura,
         tipo: Value(TipoVenta.mostrador.aTexto),
         clienteId: Value(clienteId),

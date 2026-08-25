@@ -8,6 +8,8 @@ import '../consecutivos/tabla_consecutivo.dart';
 import 'guardas_sql.dart';
 
 import '../../features/autenticacion/esquema_datos/tabla_usuario.dart';
+import '../../features/autenticacion/esquema_datos/tabla_usuario_permiso.dart';
+import '../../features/bitacora/esquema_datos/tabla_bitacora.dart';
 import '../../features/categorias/esquema_datos/tabla_categoria.dart';
 import '../../features/clientes/esquema_datos/tabla_cliente.dart';
 import '../../features/configuracion/esquema_datos/configuracion_tabla.dart';
@@ -48,6 +50,7 @@ part 'app_db.g.dart';
     TablaProducto,
     TablaMovimientoInventario,
     TablaUsuario,
+    TablaUsuarioPermiso,
     TablaCliente,
     TablaMoto,
     TablaEspecializacion,
@@ -67,6 +70,7 @@ part 'app_db.g.dart';
     TablaDeudor,
     TablaDeudorItem,
     TablaDeudorPago,
+    TablaBitacora,
   ],
 )
 class AppDb extends _$AppDb {

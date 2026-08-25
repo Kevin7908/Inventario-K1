@@ -9,9 +9,41 @@ import '../../persona/repositorio/repositorio_persona_impl.dart';
 import '../mapper/cliente_mapper.dart';
 import '../modelo/cliente.dart';
 import 'repositorio_cliente.dart';
+import '../../../share/dominio/sesion_actual.dart';
+import '../../bitacora/modelo/entrada_bitacora.dart';
+import '../../bitacora/repositorio/repositorio_bitacora.dart';
+import '../../bitacora/repositorio/repositorio_bitacora_impl.dart';
+import '../../../share/dominio/permiso.dart';
 
-class RepositorioClientesImpl implements RepositorioClientes {
-  RepositorioClientesImpl(this._db);
+class RepositorioClientesImpl with FirmaDeSesion implements RepositorioClientes {
+  RepositorioClientesImpl(this._db, this.sesion);
+
+  /// Quién firma lo que este repositorio escribe. La inyecta Riverpod por el
+  /// constructor, no la busca en ningún registro global.
+  @override
+  final SesionActual? sesion;
+
+  late final RepositorioBitacora _bitacora =
+      RepositorioBitacoraImpl(_db, sesion);
+
+  /// Deja el renglón de la bitácora. Se llama **dentro** de la transacción del
+  /// cambio: si la escritura se revierte, el renglón se va con ella.
+  Future<void> _anotar(
+    AccionAuditada accion,
+    int? id,
+    String descripcion, {
+    String? detalle,
+  }) =>
+      _bitacora.anotar(
+        Anotacion(
+          entidad: EntidadAuditada.cliente,
+          accion: accion,
+          entidadId: id,
+          descripcion: descripcion,
+          detalle: detalle,
+        ),
+      );
+
 
   final AppDb _db;
 
@@ -205,35 +237,61 @@ class RepositorioClientesImpl implements RepositorioClientes {
 
   @override
   Future<int> crear(Cliente cliente) {
+    exigir(Permiso.clientesEditar);
     // Persona y rol son dos filas: si la segunda falla, la primera no puede
     // quedar suelta.
     return _db.transaction(() async {
       final personaId = await _personas.guardar(cliente.datosPersona);
-      return _db
+      final id = await _db
           .into(_tabla)
           .insert(ClienteMapper.modeloACompanion(cliente, personaId: personaId));
+      await _anotar(AccionAuditada.creo, id, _nombreDe(cliente));
+      return id;
     });
   }
 
   @override
   Future<void> actualizar(Cliente cliente) {
+    exigir(Permiso.clientesEditar);
     return _db.transaction(() async {
       final personaId = await _personas.guardar(cliente.datosPersona);
       await (_db.update(_tabla)..where((t) => t.id.equals(cliente.id))).write(
         ClienteMapper.modeloACompanion(cliente, personaId: personaId),
       );
+      await _anotar(AccionAuditada.modifico, cliente.id, _nombreDe(cliente));
     });
   }
 
   @override
   Future<void> eliminar(int id) {
+    exigir(Permiso.clientesEliminar);
     return _db.transaction(() async {
+      // El nombre se lee antes: después el cliente ya no está para decirlo.
+      final antes = await obtenerPorId(id);
       final personaId = await _personaIdDe(id);
+
       await (_db.delete(_tabla)..where((t) => t.id.equals(id))).go();
       if (personaId != null) {
         await _personas.borrarSiQuedoSinRoles(personaId);
       }
+
+      await _anotar(
+        AccionAuditada.elimino,
+        id,
+        antes == null ? 'Cliente #$id' : _nombreDe(antes),
+      );
     });
+  }
+
+  /// Cómo se lee un cliente en la bitácora.
+  static String _nombreDe(Cliente cliente) {
+    final completo = [cliente.nombres, cliente.apellidos]
+        .where((p) => p != null && p.trim().isNotEmpty)
+        .join(' ');
+    final documento = cliente.documento;
+    return documento == null || documento.isEmpty
+        ? completo
+        : '$completo ($documento)';
   }
 
   Future<int?> _personaIdDe(int clienteId) async {
@@ -249,6 +307,11 @@ class RepositorioClientesImpl implements RepositorioClientes {
     required Cliente cliente,
     required List<Moto> motos,
   }) {
+    // `crear` y `actualizar` traen su propia compuerta, pero las motos se
+    // insertan aquí mismo: sin esto, quien no pueda editar clientes podría
+    // cambiarle la moto a uno.
+    exigir(Permiso.clientesEditar);
+
     return _db.transaction(() async {
       final clienteId = cliente.id == 0
           ? await crear(cliente)

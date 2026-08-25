@@ -4,11 +4,43 @@ import 'package:inventario_k1/backend/share/database/app_db.dart';
 
 import '../mapper/moto_mapper.dart';
 import '../modelo/moto.dart';
+import '../../../share/dominio/sesion_actual.dart';
+import '../../bitacora/modelo/entrada_bitacora.dart';
+import '../../bitacora/repositorio/repositorio_bitacora.dart';
+import '../../bitacora/repositorio/repositorio_bitacora_impl.dart';
+import '../../../share/dominio/permiso.dart';
 
-class RepositorioMotosImpl implements RepositorioMotos {
+class RepositorioMotosImpl with FirmaDeSesion implements RepositorioMotos {
   final AppDb _db;
 
-  RepositorioMotosImpl(this._db);
+  RepositorioMotosImpl(this._db, this.sesion);
+
+  /// Quién firma lo que este repositorio escribe. La inyecta Riverpod por el
+  /// constructor, no la busca en ningún registro global.
+  @override
+  final SesionActual? sesion;
+
+  late final RepositorioBitacora _bitacora =
+      RepositorioBitacoraImpl(_db, sesion);
+
+  /// Deja el renglón de la bitácora. Se llama **dentro** de la transacción del
+  /// cambio: si la escritura se revierte, el renglón se va con ella.
+  Future<void> _anotar(
+    AccionAuditada accion,
+    int? id,
+    String descripcion, {
+    String? detalle,
+  }) =>
+      _bitacora.anotar(
+        Anotacion(
+          entidad: EntidadAuditada.moto,
+          accion: accion,
+          entidadId: id,
+          descripcion: descripcion,
+          detalle: detalle,
+        ),
+      );
+
 
 JoinedSelectStatement<HasResultSet, dynamic> get _baseQuery {
   return _db.select(_db.tablaMoto).join([
@@ -278,21 +310,49 @@ JoinedSelectStatement<HasResultSet, dynamic> get _baseQuery {
   // Escritura 
 
   @override
-  Future<int> crear(Moto moto) async {
-    final companion = MotoMapper.modeloACompanion(moto);
-    return _db.into(_db.tablaMoto).insert(companion);
+  Future<int> crear(Moto moto) {
+    exigir(Permiso.clientesEditar);
+    return _db.transaction(() async {
+      final companion = MotoMapper.modeloACompanion(moto);
+      final id = await _db.into(_db.tablaMoto).insert(companion);
+      await _anotar(AccionAuditada.creo, id, _nombreDe(moto));
+      return id;
+    });
   }
 
   @override
-  Future<void> actualizar(Moto moto) async {
-    final companion = MotoMapper.modeloACompanion(moto);
-    await (_db.update(_db.tablaMoto)
-          ..where((t) => t.id.equals(moto.id)))
-        .write(companion);
+  Future<void> actualizar(Moto moto) {
+    exigir(Permiso.clientesEditar);
+    return _db.transaction(() async {
+      final companion = MotoMapper.modeloACompanion(moto);
+      await (_db.update(_db.tablaMoto)
+            ..where((t) => t.id.equals(moto.id)))
+          .write(companion);
+      await _anotar(AccionAuditada.modifico, moto.id, _nombreDe(moto));
+    });
   }
 
   @override
-  Future<void> eliminar(int id) async {
-    await (_db.delete(_db.tablaMoto)..where((t) => t.id.equals(id))).go();
+  Future<void> eliminar(int id) {
+    exigir(Permiso.clientesEliminar);
+    return _db.transaction(() async {
+      final antes = await (_db.select(_db.tablaMoto)
+            ..where((t) => t.id.equals(id)))
+          .getSingleOrNull();
+
+      await (_db.delete(_db.tablaMoto)..where((t) => t.id.equals(id))).go();
+
+      await _anotar(
+        AccionAuditada.elimino,
+        id,
+        antes == null
+            ? 'Moto #$id'
+            : '${antes.marca} ${antes.modelo} (${antes.placa})',
+      );
+    });
   }
+
+  /// Cómo se lee una moto en la bitácora: la placa es lo que la identifica.
+  static String _nombreDe(Moto moto) =>
+      '${moto.marca} ${moto.modelo} (${moto.placa})';
 }

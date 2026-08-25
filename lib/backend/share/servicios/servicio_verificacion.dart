@@ -1,12 +1,5 @@
 import 'dart:math';
 
-/// Resultado de una solicitud de código de verificación.
-enum ResultadoEnvioCodigo {
-  enviado,
-  emailYaRegistrado,
-  errorEnvio,
-}
-
 /// Modelo interno que guarda un código y su fecha de expiración.
 class _EntradaCodigo {
   final String codigo;
@@ -17,17 +10,20 @@ class _EntradaCodigo {
   bool get estaVigente => DateTime.now().isBefore(expira);
 }
 
-/// Servicio en memoria para generar, almacenar y validar códigos OTP de 6 dígitos.
+/// Genera y valida los códigos de 6 dígitos que se mandan por correo.
 ///
-/// - Los códigos expiran a los 10 minutos.
-/// - Máximo 3 intentos fallidos por email antes de invalidar el código.
-/// - No persiste en disco: si la app se reinicia, el código se pierde.
+/// - Los códigos vencen a los [minutosExpiracion] minutos.
+/// - Máximo 3 intentos fallidos por correo antes de invalidar el código.
+/// - **Vive en memoria**: si la app se reinicia, el código se pierde y hay que
+///   pedir otro. Es a propósito —un código de diez minutos no merece una tabla
+///   y una migración—, pero conviene saberlo: cerrar la app a mitad del flujo
+///   obliga a empezar de nuevo.
 ///
 /// Uso:
 /// ```dart
 /// final codigo = servicioVerificacion.generarCodigo(email);
 /// // enviar código por correo...
-/// final valido = servicioVerificacion.validarCodigo(email, codigoIngresado);
+/// final resultado = servicioVerificacion.validarCodigo(email, tecleado);
 /// ```
 class ServicioVerificacion {
   /// email.toLowerCase() → entrada con código y expiración
@@ -37,7 +33,9 @@ class ServicioVerificacion {
   final Map<String, int> _intentosFallidos = {};
 
   static const _maxIntentos = 3;
-  static const _minutosExpiracion = 10;
+
+  /// Cuánto vale un código. Lo lee el correo para decirlo en el mensaje.
+  static const int minutosExpiracion = 10;
 
   final Random _rng = Random.secure();
 
@@ -54,7 +52,7 @@ class ServicioVerificacion {
 
     _codigos[clave] = _EntradaCodigo(
       codigo,
-      DateTime.now().add(const Duration(minutes: _minutosExpiracion)),
+      DateTime.now().add(const Duration(minutes: minutosExpiracion)),
     );
 
     // Resetear intentos al generar un código nuevo

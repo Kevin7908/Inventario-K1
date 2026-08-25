@@ -5,9 +5,15 @@ import '../../../../backend/features/servicios/modelo/servicio.dart';
 import '../../../../backend/features/servicios/repositorio/repositorio_servicios.dart';
 import '../../../../backend/features/servicios/repositorio/repositorio_servicios_impl.dart';
 import '../../../../backend/share/database/app_db_provider.dart';
+import '../../autenticacion/provider/auth_providers.dart';
 
 final repositorioServiciosProvider = Provider<RepositorioServicios>(
-  (ref) => RepositorioServiciosImpl(ref.watch(appDatabaseProvider)),
+  (ref) => RepositorioServiciosImpl(
+    ref.watch(appDatabaseProvider),
+    // Quién firma lo que este repositorio escriba. Es una dependencia
+    // del constructor, no un registro global (`CLAUDE.md` §3).
+    ref.watch(sesionActualProvider),
+  ),
   name: 'repositorioServiciosProvider',
 );
 

@@ -69,6 +69,8 @@ app.*.map.json
 .env
 .env.*
 !.env.example
+# La plantilla sí sube: es la que documenta qué claves hace falta llenar.
+!.env.ejemplo
 
 # Databases
 *.db

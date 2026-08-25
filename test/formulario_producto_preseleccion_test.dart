@@ -23,6 +23,7 @@ import 'package:inventario_k1/frontend/features/categorias/provider/categorias_p
 import 'package:inventario_k1/frontend/features/productos/widgets/formulario_producto.dart';
 import 'package:inventario_k1/frontend/features/proveedores/provider/proveedores_provider.dart';
 import 'soporte/base_en_memoria.dart';
+import 'package:inventario_k1/frontend/features/autenticacion/provider/auth_providers.dart';
 
 final _frenos = Categoria(
   id: 7,
@@ -73,6 +74,9 @@ void main() {
           // Unidades de medida no se sustituye —es un AsyncNotifier— pero sí
           // necesita una base: la de memoria le basta para quedarse vacía.
           appDatabaseProvider.overrideWithValue(baseEnMemoria()),
+          // El formulario no escribe en este test, pero los repositorios que
+          // arma Riverpod piden la sesión por el constructor.
+          sesionActualProvider.overrideWithValue(null),
           catalogoCategoriasProvider.overrideWith((ref) => Stream.value([_frenos])),
           catalogoProveedoresProvider.overrideWith((ref) => Stream.value(proveedores)),
         ],

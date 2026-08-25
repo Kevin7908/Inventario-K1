@@ -15,9 +15,41 @@ import '../modelo/deudor_item.dart';
 import '../modelo/deudor_pago.dart';
 import '../modelo/deudor_resumen.dart';
 import 'repositorio_deudores.dart';
+import '../../../share/dominio/sesion_actual.dart';
+import '../../bitacora/modelo/entrada_bitacora.dart';
+import '../../bitacora/repositorio/repositorio_bitacora.dart';
+import '../../bitacora/repositorio/repositorio_bitacora_impl.dart';
+import '../../../share/dominio/permiso.dart';
 
-class RepositorioDeudoresImpl implements RepositorioDeudores {
-  RepositorioDeudoresImpl(this._db);
+class RepositorioDeudoresImpl with FirmaDeSesion implements RepositorioDeudores {
+  RepositorioDeudoresImpl(this._db, this.sesion);
+
+  /// Quién firma lo que este repositorio escribe. La inyecta Riverpod
+  /// desde `sesionActualProvider`: es una dependencia del constructor, no
+  /// un registro global que se consulte por dentro.
+  @override
+  final SesionActual? sesion;
+
+  late final RepositorioBitacora _bitacora =
+      RepositorioBitacoraImpl(_db, sesion);
+
+  /// Deja el renglón de la bitácora, **dentro** de la transacción del cambio.
+  Future<void> _anotar(
+    AccionAuditada accion,
+    int? id,
+    String descripcion, {
+    String? detalle,
+  }) =>
+      _bitacora.anotar(
+        Anotacion(
+          entidad: EntidadAuditada.deuda,
+          accion: accion,
+          entidadId: id,
+          descripcion: descripcion,
+          detalle: detalle,
+        ),
+      );
+
 
   final AppDb _db;
 
@@ -27,7 +59,7 @@ class RepositorioDeudoresImpl implements RepositorioDeudores {
       RepositorioConsecutivos(_db);
 
   /// El **único** camino por el que cambia el stock (§7 de `REGLAS_BD.md`).
-  late final RepositorioInventario _inventario = RepositorioInventarioImpl(_db);
+  late final RepositorioInventario _inventario = RepositorioInventarioImpl(_db, sesion);
 
   // ── Join base ──────────────────────────────────────────────────────────────
 
@@ -231,10 +263,13 @@ class RepositorioDeudoresImpl implements RepositorioDeudores {
     DateTime? fechaVencimiento,
     String? notas,
   }) {
+    exigir(Permiso.deudoresCrear);
+
     return _db.transaction(() async {
       final numero = await _consecutivos.siguiente(DocumentoConsecutivo.deuda);
       return _db.into(_db.tablaDeudor).insert(
             DeudorMapper.nuevaACompanion(
+              usuarioId: autorId,
               numero: numero,
               clienteId: clienteId,
               motoId: motoId,
@@ -395,6 +430,16 @@ class RepositorioDeudoresImpl implements RepositorioDeudores {
     required MetodoPago metodoPago,
     String? notas,
   }) async {
+    // Este método sí devuelve `Resultado`, así que la falta de permiso viaja
+    // como un `Fallo` en vez de una excepción: la vista ya sabe pintarlo.
+    if (!puede(Permiso.deudoresCobrar)) {
+      return const Fallo(
+        MotivoFallo.validacion,
+        'Tu cuenta no tiene permiso para recibir pagos. Pídeselo a un '
+        'administrador del taller.',
+      );
+    }
+
     if (monto <= 0) {
       return const Fallo(
         MotivoFallo.validacion,
@@ -420,6 +465,7 @@ class RepositorioDeudoresImpl implements RepositorioDeudores {
     return _envolver(() => _db.transaction(() async {
           await _db.into(_db.tablaDeudorPago).insert(
                 DeudorMapper.pagoACompanion(
+                  usuarioId: autorId,
                   deudorId: deudorId,
                   monto: monto,
                   metodoPago: metodoPago,
@@ -470,6 +516,16 @@ class RepositorioDeudoresImpl implements RepositorioDeudores {
     // Borrar la deuda es decir que **nunca existió**, así que sí devuelve lo
     // que sacó: es lo contrario de darla por perdida, que reconoce que la
     // mercancía salió y no vuelve.
+    if (!puede(Permiso.deudoresEliminar)) {
+      return Future.value(
+        const Fallo(
+          MotivoFallo.validacion,
+          'Tu cuenta no tiene permiso para eliminar deudas. Pídeselo a un '
+          'administrador del taller.',
+        ),
+      );
+    }
+
     return _envolver(() => _db.transaction(() async {
           final deudor = await _fila(id);
           if (deudor != null &&
@@ -481,6 +537,15 @@ class RepositorioDeudoresImpl implements RepositorioDeudores {
           }
           await (_db.delete(_db.tablaDeudor)..where((t) => t.id.equals(id)))
               .go();
+
+          await _anotar(
+            AccionAuditada.elimino,
+            id,
+            deudor == null ? 'Deuda #$id' : 'Deuda ${deudor.numero}',
+            detalle: deudor == null
+                ? null
+                : 'Saldo al borrarla: ${deudor.montoTotal - deudor.montoPagado}',
+          );
         }));
   }
 
@@ -646,6 +711,7 @@ class RepositorioDeudoresImpl implements RepositorioDeudores {
     if (pagado > total) {
       await _db.into(_db.tablaDeudorPago).insert(
             DeudorMapper.pagoACompanion(
+              usuarioId: autorId,
               deudorId: deudorId,
               monto: total - pagado, // negativo: sale plata
               metodoPago: MetodoPago.efectivo,

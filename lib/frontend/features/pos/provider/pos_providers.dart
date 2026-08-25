@@ -7,6 +7,7 @@ import '../../../../backend/share/database/app_db_provider.dart';
 import '../../productos/provider/productos_provider.dart';
 import '../modelo/pos_state.dart';
 import 'pos_notifier.dart';
+import '../../autenticacion/provider/auth_providers.dart';
 
 /// El repositorio donde queda registrada cada venta de mostrador.
 ///
@@ -14,7 +15,12 @@ import 'pos_notifier.dart';
 /// tiene a su único usuario.
 final repositorioVentasProvider = Provider<RepositorioVentas>(
   name: 'repositorioVentasProvider',
-  (ref) => RepositorioVentasImpl(ref.watch(appDatabaseProvider)),
+  (ref) => RepositorioVentasImpl(
+    ref.watch(appDatabaseProvider),
+    // Quién firma lo que este repositorio escriba. Es una dependencia
+    // del constructor, no un registro global (`CLAUDE.md` §3).
+    ref.watch(sesionActualProvider),
+  ),
 );
 
 final posProvider = NotifierProvider<PosNotifier, PosState>(

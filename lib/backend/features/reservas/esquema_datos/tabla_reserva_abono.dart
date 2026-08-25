@@ -1,6 +1,7 @@
 import 'package:drift/drift.dart';
 
 import '../../../share/dominio/metodo_pago.dart';
+import '../../autenticacion/esquema_datos/tabla_usuario.dart';
 import 'tabla_reserva.dart';
 
 /// Cada entrega de dinero contra una reserva.
@@ -10,6 +11,7 @@ import 'tabla_reserva.dart';
 /// corrige: devolver un abono es registrar otro, no editar el de ayer.
 @TableIndex(name: 'idx_reserva_abonos_reserva_fecha',
     columns: {#reservaId, #fechaPago})
+@TableIndex(name: 'idx_reserva_abonos_usuario', columns: {#usuarioId})
 class TablaReservaAbono extends Table {
   @override
   String get tableName => 'reserva_abonos';
@@ -36,6 +38,17 @@ class TablaReservaAbono extends Table {
   TextColumn get referenciaPago => text().nullable()();
 
   DateTimeColumn get fechaPago => dateTime().withDefault(currentDateAndTime)();
+
+
+  /// Quién lo registró. `restrict`: borrar la cuenta destruiría la atribución
+  /// de lo que esa persona hizo, que es justo lo que esta columna existe para
+  /// conservar.
+  ///
+  /// `NOT NULL` **y sin valor por defecto**, a propósito: así el
+  /// `Companion.insert` que genera Drift lo exige como parámetro obligatorio y
+  /// un método de escritura nuevo que se olvide del autor no compila.
+  IntColumn get usuarioId => integer()
+      .references(TablaUsuario, #id, onDelete: KeyAction.restrict)();
 
   @override
   List<String> get customConstraints => [

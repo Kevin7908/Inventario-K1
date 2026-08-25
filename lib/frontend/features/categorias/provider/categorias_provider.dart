@@ -9,10 +9,16 @@ import '../../../../backend/share/database/app_db_provider.dart';
 import '../../../../backend/share/utils/sku_utils.dart';
 import '../../../../core/resultado.dart';
 import '../../productos/provider/productos_provider.dart';
+import '../../autenticacion/provider/auth_providers.dart';
 
 final repositorioCategoriasProvider = Provider<RepositorioCategorias>(
   name: 'repositorioCategoriasProvider',
-  (ref) => RepositorioCategoriasImpl(ref.watch(appDatabaseProvider)),
+  (ref) => RepositorioCategoriasImpl(
+    ref.watch(appDatabaseProvider),
+    // Quién firma lo que este repositorio escriba. Es una dependencia
+    // del constructor, no un registro global (`CLAUDE.md` §3).
+    ref.watch(sesionActualProvider),
+  ),
 );
 
 /// Estado del catálogo de categorías: **solo la página visible**.

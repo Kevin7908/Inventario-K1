@@ -9,9 +9,41 @@ import '../../persona/repositorio/repositorio_persona_impl.dart';
 import '../mapper/tecnico_mapper.dart';
 import '../modelo/tecnico.dart';
 import 'repositorio_tecnico.dart';
+import '../../../share/dominio/sesion_actual.dart';
+import '../../bitacora/modelo/entrada_bitacora.dart';
+import '../../bitacora/repositorio/repositorio_bitacora.dart';
+import '../../bitacora/repositorio/repositorio_bitacora_impl.dart';
+import '../../../share/dominio/permiso.dart';
 
-final class RepositorioTecnicoDrift implements RepositorioTecnico {
-  RepositorioTecnicoDrift(this._db);
+final class RepositorioTecnicoDrift with FirmaDeSesion implements RepositorioTecnico {
+  RepositorioTecnicoDrift(this._db, this.sesion);
+
+  /// Quién firma lo que este repositorio escribe. La inyecta Riverpod por el
+  /// constructor, no la busca en ningún registro global.
+  @override
+  final SesionActual? sesion;
+
+  late final RepositorioBitacora _bitacora =
+      RepositorioBitacoraImpl(_db, sesion);
+
+  /// Deja el renglón de la bitácora. Se llama **dentro** de la transacción del
+  /// cambio: si la escritura se revierte, el renglón se va con ella.
+  Future<void> _anotar(
+    AccionAuditada accion,
+    int? id,
+    String descripcion, {
+    String? detalle,
+  }) =>
+      _bitacora.anotar(
+        Anotacion(
+          entidad: EntidadAuditada.tecnico,
+          accion: accion,
+          entidadId: id,
+          descripcion: descripcion,
+          detalle: detalle,
+        ),
+      );
+
 
   final AppDb _db;
 
@@ -58,30 +90,36 @@ final class RepositorioTecnicoDrift implements RepositorioTecnico {
 
   @override
   Future<Tecnico> crear(Tecnico tecnico) {
+    exigir(Permiso.tecnicosEditar);
     // Persona y rol son dos filas: o entran las dos o no entra ninguna.
     return _db.transaction(() async {
       final personaId = await _personas.guardar(tecnico.datosPersona);
       final id = await _db
           .into(_tabla)
           .insert(TecnicoMapper.modeloACompanion(tecnico, personaId: personaId));
+      await _anotar(AccionAuditada.creo, id, _nombreDe(tecnico));
       return (await _obtenerPorId(id))!;
     });
   }
 
   @override
   Future<Tecnico> actualizar(Tecnico tecnico) {
+    exigir(Permiso.tecnicosEditar);
     return _db.transaction(() async {
       final personaId = await _personas.guardar(tecnico.datosPersona);
       await (_db.update(_tabla)..where((t) => t.id.equals(tecnico.id!))).write(
         TecnicoMapper.modeloACompanion(tecnico, personaId: personaId),
       );
+      await _anotar(AccionAuditada.modifico, tecnico.id, _nombreDe(tecnico));
       return (await _obtenerPorId(tecnico.id!))!;
     });
   }
 
   @override
   Future<void> eliminar(int id) {
+    exigir(Permiso.tecnicosEliminar);
     return _db.transaction(() async {
+      final antes = await _obtenerPorId(id);
       final fila = await (_db.selectOnly(_tabla)
             ..addColumns([_tabla.personaId])
             ..where(_tabla.id.equals(id)))
@@ -92,8 +130,19 @@ final class RepositorioTecnicoDrift implements RepositorioTecnico {
       if (personaId != null) {
         await _personas.borrarSiQuedoSinRoles(personaId);
       }
+
+      await _anotar(
+        AccionAuditada.elimino,
+        id,
+        antes == null ? 'Técnico #$id' : _nombreDe(antes),
+      );
     });
   }
+
+  /// Cómo se lee un técnico en la bitácora.
+  static String _nombreDe(Tecnico tecnico) => [tecnico.nombres, tecnico.apellidos]
+      .where((p) => p != null && p.trim().isNotEmpty)
+      .join(' ');
 
   // Paginación — WHERE, COUNT y LIMIT los resuelve SQLite, no el frontend.
 

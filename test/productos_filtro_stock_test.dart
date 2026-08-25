@@ -14,8 +14,14 @@ import 'package:inventario_k1/backend/share/database/app_db.dart';
 import 'package:inventario_k1/backend/share/database/app_db_provider.dart';
 import 'package:inventario_k1/frontend/features/productos/provider/productos_provider.dart';
 import 'soporte/base_en_memoria.dart';
+import 'soporte/sesion_de_prueba.dart';
+import 'package:inventario_k1/backend/share/dominio/sesion_actual.dart';
+import 'package:inventario_k1/frontend/features/autenticacion/provider/auth_providers.dart';
 
 late AppDb db;
+
+/// Quien firma lo que escriben estos tests. Ver `sesionDePrueba`.
+late SesionActual sesion;
 late ProviderContainer container;
 
 Producto _producto({
@@ -42,15 +48,22 @@ void main() {
 
   setUp(() async {
     db = baseEnMemoria();
+    sesion = await sesionDePrueba(db);
     container = ProviderContainer(
-      overrides: [appDatabaseProvider.overrideWithValue(db)],
+      overrides: [
+      appDatabaseProvider.overrideWithValue(db),
+      // Los repositorios que arma Riverpod reciben la sesión por el
+      // constructor. Sin este override serían anónimos y `usuario_id`, que es
+      // `NOT NULL`, no tendría con qué llenarse.
+      sesionActualProvider.overrideWithValue(sesion),
+    ],
     );
 
-    final repoCategorias = RepositorioCategoriasImpl(db);
+    final repoCategorias = RepositorioCategoriasImpl(db, sesion);
     frenos = (await repoCategorias.crear(Categoria(nombre: 'Frenos', creadoEn: DateTime.now(), actualizadoEn: DateTime.now()))).id!;
     motor = (await repoCategorias.crear(Categoria(nombre: 'Motor', creadoEn: DateTime.now(), actualizadoEn: DateTime.now()))).id!;
 
-    final repo = RepositorioProductosImpl(db);
+    final repo = RepositorioProductosImpl(db, sesion);
     // Frenos: 2 en stock, 1 bajo, 1 agotado. Motor: 1 agotado.
     await repo.crear(_producto(
         nombre: 'Pastillas', sku: 'F-1', stock: 40, categoriaId: frenos));

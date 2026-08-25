@@ -7,6 +7,7 @@ import '../../../../backend/features/deudores/modelo/deudor_resumen.dart';
 import '../../../../backend/features/deudores/repositorio/repositorio_deudores.dart';
 import '../../../../backend/features/deudores/repositorio/repositorio_deudores_impl.dart';
 import '../../../../backend/share/database/app_db_provider.dart';
+import '../../autenticacion/provider/auth_providers.dart';
 
 /// Providers del listado de Cuentas por cobrar.
 ///
@@ -17,7 +18,12 @@ import '../../../../backend/share/database/app_db_provider.dart';
 
 final repositorioDeudoresProvider = Provider<RepositorioDeudores>(
   name: 'repositorioDeudoresProvider',
-  (ref) => RepositorioDeudoresImpl(ref.watch(appDatabaseProvider)),
+  (ref) => RepositorioDeudoresImpl(
+    ref.watch(appDatabaseProvider),
+    // Quién firma lo que este repositorio escriba. Es una dependencia
+    // del constructor, no un registro global (`CLAUDE.md` §3).
+    ref.watch(sesionActualProvider),
+  ),
 );
 
 /// Estado del listado: **solo la página visible**, más lo que hace falta para

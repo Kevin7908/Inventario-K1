@@ -150,4 +150,30 @@ const List<String> guardasSql = [
       'La orden ya está cerrada: no admite más tareas.');
   END;
   ''',
+
+  // ── La bitácora es de solo escritura ────────────────────────────────────
+  //
+  // Mismo argumento que el libro mayor del inventario, y más fuerte: una
+  // bitácora que se puede editar o borrar no prueba nada. Quien quisiera tapar
+  // lo que hizo empezaría por su propio renglón, así que la única defensa que
+  // vale es que la base no lo permita a nadie.
+  '''
+  CREATE TRIGGER IF NOT EXISTS guarda_bitacora_inmutable
+  BEFORE UPDATE ON bitacora
+  FOR EACH ROW
+  BEGIN
+    SELECT RAISE(ABORT,
+      'La bitácora no se edita: es el registro de lo que ya pasó.');
+  END;
+  ''',
+
+  '''
+  CREATE TRIGGER IF NOT EXISTS guarda_bitacora_sin_borrado
+  BEFORE DELETE ON bitacora
+  FOR EACH ROW
+  BEGIN
+    SELECT RAISE(ABORT,
+      'La bitácora no se borra.');
+  END;
+  ''',
 ];

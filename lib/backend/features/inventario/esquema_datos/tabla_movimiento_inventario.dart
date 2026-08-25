@@ -1,5 +1,6 @@
 import 'package:drift/drift.dart';
 
+import '../../autenticacion/esquema_datos/tabla_usuario.dart';
 import '../../deudores/esquema_datos/tabla_deudor.dart';
 import '../../productos/esquema_datos/tabla_producto.dart';
 import '../../reservas/esquema_datos/tabla_reserva.dart';
@@ -31,6 +32,7 @@ import '../../ordenes/esquema_datos/tabla_ordenes_servicio.dart';
   columns: {#productoId, #creadoEn},
 )
 @TableIndex(name: 'idx_movimientos_tipo', columns: {#tipo})
+@TableIndex(name: 'idx_movimientos_usuario', columns: {#usuarioId})
 class TablaMovimientoInventario extends Table {
   @override
   String get tableName => 'movimientos_inventario';
@@ -77,6 +79,16 @@ class TablaMovimientoInventario extends Table {
       .references(TablaDeudor, #id, onDelete: KeyAction.setNull)();
 
   TextColumn get notas => text().nullable()();
+
+  /// Quién lo registró. `restrict`: borrar la cuenta destruiría la atribución
+  /// de lo que esa persona hizo, que es justo lo que esta columna existe para
+  /// conservar.
+  ///
+  /// `NOT NULL` **y sin valor por defecto**, a propósito: así el
+  /// `Companion.insert` que genera Drift lo exige como parámetro obligatorio y
+  /// un método de escritura nuevo que se olvide del autor no compila.
+  IntColumn get usuarioId => integer()
+      .references(TablaUsuario, #id, onDelete: KeyAction.restrict)();
 
   DateTimeColumn get creadoEn => dateTime().withDefault(currentDateAndTime)();
 

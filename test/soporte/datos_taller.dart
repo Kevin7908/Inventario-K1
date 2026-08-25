@@ -34,6 +34,10 @@ Future<DatosTaller> sembrarTaller(
   AppDb db, {
   double stockInicial = 10,
   int precioVenta = 30000,
+  /// Quién firma el movimiento del stock inicial. `usuario_id` es `NOT NULL`
+  /// en `movimientos_inventario`, así que hace falta una cuenta real; los
+  /// tests la crean con `sesionDePrueba`.
+  int? usuarioId,
 }) async {
   final personaCliente = await db.into(db.tablaPersona).insert(
         TablaPersonaCompanion.insert(
@@ -82,6 +86,7 @@ Future<DatosTaller> sembrarTaller(
   if (stockInicial != 0) {
     await db.into(db.tablaMovimientoInventario).insert(
           TablaMovimientoInventarioCompanion.insert(
+            usuarioId: usuarioId ?? await _cuentaDeSiembra(db),
             productoId: productoId,
             tipo: 'AJUSTE_INICIAL',
             cantidad: stockInicial,
@@ -101,4 +106,26 @@ Future<DatosTaller> sembrarTaller(
     servicioId: servicioId,
     productoId: productoId,
   );
+}
+
+/// La cuenta que firma el sembrado cuando el test no pasa la suya.
+///
+/// Reutiliza la primera que haya —los tests crean la suya con
+/// `sesionDePrueba` antes de sembrar— y solo inventa una si no hay ninguna,
+/// para que un test que no necesita sesión siga funcionando.
+Future<int> _cuentaDeSiembra(AppDb db) async {
+  final existente = await db.select(db.tablaUsuario).getSingleOrNull();
+  if (existente != null) return existente.id;
+
+  final personaId = await db
+      .into(db.tablaPersona)
+      .insert(TablaPersonaCompanion.insert(nombres: 'Siembra'));
+
+  return db.into(db.tablaUsuario).insert(
+        TablaUsuarioCompanion.insert(
+          personaId: personaId,
+          usuario: 'siembra',
+          passwordHash: 'hash-de-prueba',
+        ),
+      );
 }
