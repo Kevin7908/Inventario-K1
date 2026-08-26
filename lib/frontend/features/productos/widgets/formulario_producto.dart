@@ -9,6 +9,7 @@ import '../../../../backend/features/proveedores/modelo/proveedor.dart';
 import '../../../../backend/features/unidades_medida/modelo/unidad_medida.dart';
 import '../../../../core/iva_app.dart';
 import '../../../../core/resultado.dart';
+import '../../../../core/validaciones.dart';
 import '../../../share2/share2.dart';
 import '../../categorias/provider/categorias_provider.dart';
 import '../../proveedores/provider/proveedores_provider.dart';
@@ -152,16 +153,19 @@ class _FormularioProductoState extends ConsumerState<FormularioProducto> {
     super.dispose();
   }
 
-  /// Al elegir categoría se propone un SKU, solo cuando se está creando:
-  /// en edición el SKU ya existe y regenerarlo rompería referencias.
+  /// Al elegir categoría se enseña el SKU que le tocaría.
+  ///
+  /// Es una **previsualización**: el definitivo lo asigna el repositorio
+  /// dentro de la transacción del alta, así que cambiar de categoría diez
+  /// veces no quema diez códigos. En edición no se toca: el SKU ya está
+  /// impreso en la estantería.
   Future<void> _alCambiarCategoria(Categoria? categoria) async {
     setState(() => _categoria = categoria);
-    if (categoria == null || widget.esEdicion) return;
+    if (widget.esEdicion) return;
 
-    // Consulta el catálogo completo, así que es asíncrono: el SKU tiene que
-    // ser único en toda la tabla, no solo en la página visible.
-    final sku =
-        await ref.read(productosProvider.notifier).generarSku(categoria.nombre);
+    final sku = await ref
+        .read(repositorioProductosProvider)
+        .previsualizarSku(categoria?.id);
     if (!mounted) return;
     _skuCtrl.text = sku;
   }
@@ -180,13 +184,14 @@ class _FormularioProductoState extends ConsumerState<FormularioProducto> {
   }
 
   double _aDouble(TextEditingController ctrl) =>
-      double.tryParse(ctrl.text.replaceAll(',', '').trim()) ?? 0;
+      double.tryParse(ctrl.text.replaceAll(',', '.').trim()) ?? 0;
 
-  /// Los importes del catálogo son pesos enteros (ver `TablaProducto`), así
-  /// que se redondean aquí y no en el repositorio: si el usuario tecleó
-  /// «19.999,5» lo que se guarda es 20000, no un `double` que arrastre el
-  /// medio peso hasta la factura.
-  int _aEntero(TextEditingController ctrl) => _aDouble(ctrl).round();
+  /// Los importes del catálogo son pesos enteros (ver `TablaProducto`). Los
+  /// campos traen los puntos de miles del formateador (`45.000`), así que se
+  /// limpian antes de convertir: lo que se guarda es 45000, no un `double`
+  /// que arrastre medio peso hasta la factura.
+  int _aPesos(TextEditingController ctrl) =>
+      int.tryParse(normalizarDigitos(ctrl.text)) ?? 0;
 
   Future<void> _guardar() async {
     if (!_formKey.currentState!.validate()) return;
@@ -196,11 +201,15 @@ class _FormularioProductoState extends ConsumerState<FormularioProducto> {
     final ubicacion = _ubicacionCtrl.text.trim();
     final precioTaller = _precioTallerCtrl.text.trim().isEmpty
         ? null
-        : _aEntero(_precioTallerCtrl);
+        : _aPesos(_precioTallerCtrl);
 
     final producto = Producto(
       id: widget.productoAEditar?.id,
-      sku: _skuCtrl.text.trim(),
+      // Al crear se manda **vacío** a propósito: lo que se ve en el campo es
+      // una previsualización, y el número bueno lo toma el repositorio de la
+      // serie, dentro de su transacción. Mandar el previsualizado haría que
+      // dos altas seguidas de la misma categoría compartieran SKU.
+      sku: widget.esEdicion ? _skuCtrl.text.trim() : '',
       nombre: _nombreCtrl.text.trim(),
       descripcion: descripcion.isEmpty ? null : descripcion,
       categoriaId: _categoria?.id,
@@ -209,8 +218,8 @@ class _FormularioProductoState extends ConsumerState<FormularioProducto> {
       unidadMedidaNombre: _unidad?.nombre,
       proveedorId: _proveedor?.id,
       proveedorNombre: _proveedor?.nombre,
-      precioCompra: _aEntero(_precioCompraCtrl),
-      precioVenta: _aEntero(_precioVentaCtrl),
+      precioCompra: _aPesos(_precioCompraCtrl),
+      precioVenta: _aPesos(_precioVentaCtrl),
       precioVentaTaller: precioTaller,
       stockActual: _aDouble(_stockCtrl),
       stockMinimo: _aDouble(_stockMinimoCtrl),
@@ -298,32 +307,39 @@ class _FormularioProductoState extends ConsumerState<FormularioProducto> {
                     ? 'El nombre es obligatorio.'
                     : null,
               ),
+              // Solo lectura: lo arma la app con el prefijo de la categoría.
+              // Tecleado a mano volvían a aparecer los duplicados y los
+              // formatos de cada quien.
               CampoTexto(
-                etiqueta: 'Código / SKU *',
+                etiqueta: 'Código / SKU',
                 controlador: _skuCtrl,
-                placeholder: 'FRE-001',
+                placeholder: 'Se genera al elegir la categoría',
                 monoespaciado: true,
-                validador: (v) => (v == null || v.trim().isEmpty)
-                    ? 'El SKU es obligatorio.'
-                    : null,
+                soloLectura: true,
               ),
             ],
           ),
           const SizedBox(height: 16),
           FilaCampos(
             hijos: [
-              SelectorWidget<Categoria?>(
+              CampoBusqueda<Categoria>(
                 etiqueta: 'Categoría',
                 valor: _categoria,
-                opciones: <Categoria?>[null, ...categorias],
-                constructorEtiqueta: (c) => c?.nombre ?? 'Sin categoría',
+                opciones: categorias,
+                constructorEtiqueta: (c) => c.nombre,
+                constructorDetalle: (c) => c.descripcion,
+                placeholder: 'Sin categoría',
+                placeholderBusqueda: 'Buscar categoría…',
                 alCambiar: _alCambiarCategoria,
               ),
-              SelectorWidget<UnidadMedida?>(
+              CampoBusqueda<UnidadMedida>(
                 etiqueta: 'Unidad de medida',
                 valor: _unidad,
-                opciones: <UnidadMedida?>[null, ...unidades],
-                constructorEtiqueta: (u) => u?.nombre ?? 'Sin unidad',
+                opciones: unidades,
+                constructorEtiqueta: (u) => u.nombre,
+                constructorDetalle: (u) => u.abreviatura,
+                placeholder: 'Sin unidad',
+                placeholderBusqueda: 'Buscar unidad…',
                 alCambiar: (u) => setState(() => _unidad = u),
               ),
             ],
@@ -360,23 +376,25 @@ class _FormularioProductoState extends ConsumerState<FormularioProducto> {
                 etiqueta: 'Precio de venta *',
                 controlador: _precioVentaCtrl,
                 placeholder: '0',
+                comoPrecio: true,
                 validador: (v) {
-                  final valor =
-                      double.tryParse((v ?? '').replaceAll(',', '').trim());
-                  if (valor == null) return 'Ingresa un número.';
-                  if (valor <= 0) return 'Debe ser mayor a 0.';
-                  return null;
+                  final error = validarImporte(v);
+                  if (error != null) return error;
+                  final valor = int.tryParse(normalizarDigitos(v ?? '')) ?? 0;
+                  return valor <= 0 ? 'Debe ser mayor a 0.' : null;
                 },
               ),
               CampoTexto(
                 etiqueta: 'Stock actual',
                 controlador: _stockCtrl,
                 placeholder: '0',
+                validador: (v) => validarCantidad(v, obligatorio: false),
               ),
               CampoTexto(
                 etiqueta: 'Stock mínimo',
                 controlador: _stockMinimoCtrl,
                 placeholder: '0',
+                validador: (v) => validarCantidad(v, obligatorio: false),
               ),
               CampoTexto(
                 etiqueta: 'Ubicación',
@@ -392,11 +410,15 @@ class _FormularioProductoState extends ConsumerState<FormularioProducto> {
                 etiqueta: 'Precio de compra',
                 controlador: _precioCompraCtrl,
                 placeholder: '0',
+                comoPrecio: true,
+                validador: (v) => validarImporte(v, obligatorio: false),
               ),
               CampoTexto(
                 etiqueta: 'Precio taller',
                 controlador: _precioTallerCtrl,
                 placeholder: 'Opcional',
+                comoPrecio: true,
+                validador: (v) => validarImporte(v, obligatorio: false),
               ),
               SelectorWidget<Proveedor?>(
                 etiqueta: 'Proveedor',

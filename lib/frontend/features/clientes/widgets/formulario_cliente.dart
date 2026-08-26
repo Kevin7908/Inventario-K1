@@ -5,6 +5,7 @@ import '../../../../backend/features/clientes/modelo/cliente.dart';
 import '../../../../backend/features/motos/modelo/moto.dart';
 import '../../../../backend/features/persona/repositorio/repositorio_persona.dart';
 import '../../../../core/resultado.dart';
+import '../../../../core/validaciones.dart';
 import '../../../share2/share2.dart';
 import '../../motos/provider/motos_provider.dart';
 import '../../persona/provider/persona_provider.dart';
@@ -232,12 +233,7 @@ class _FormularioClienteState extends ConsumerState<FormularioCliente> {
                 controlador: _nombresCtrl,
                 placeholder: 'Ej: Carlos Andrés',
                 autofocus: true,
-                validador: (v) {
-                  final texto = v?.trim() ?? '';
-                  if (texto.isEmpty) return 'El nombre es obligatorio.';
-                  if (texto.length < 2) return 'Mínimo 2 caracteres.';
-                  return null;
-                },
+                validador: (v) => validarObligatorio(v, 'El nombre'),
               ),
               CampoTexto(
                 etiqueta: 'Apellidos',
@@ -249,6 +245,9 @@ class _FormularioClienteState extends ConsumerState<FormularioCliente> {
                 controlador: _cedulaCtrl,
                 placeholder: 'Ej: 1020304050',
                 monoespaciado: true,
+                soloEnteros: true,
+                maximoCaracteres: maximoDigitosDocumento,
+                validador: validarDocumento,
               ),
             ],
           ),
@@ -279,19 +278,16 @@ class _FormularioClienteState extends ConsumerState<FormularioCliente> {
                 etiqueta: 'Teléfono',
                 controlador: _telefonoCtrl,
                 placeholder: 'Ej: 3001234567',
+                monoespaciado: true,
+                soloEnteros: true,
+                maximoCaracteres: maximoDigitosTelefono,
+                validador: validarTelefono,
               ),
               CampoTexto(
                 etiqueta: 'Correo electrónico',
                 controlador: _emailCtrl,
                 placeholder: 'Ej: cliente@correo.com',
-                validador: (v) {
-                  final texto = v?.trim() ?? '';
-                  if (texto.isEmpty) return null;
-                  final valido = RegExp(r'^[^@\s]+@[^@\s]+\.[^@\s]+$');
-                  return valido.hasMatch(texto)
-                      ? null
-                      : 'Correo con formato inválido.';
-                },
+                validador: validarEmail,
               ),
             ],
           ),

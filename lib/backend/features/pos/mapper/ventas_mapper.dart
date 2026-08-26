@@ -26,6 +26,7 @@ abstract final class VentasMapper {
       estadoPago: EstadoPago.desdeTexto(row['estado_pago'] as String? ?? 'PENDIENTE'),
       metodoPago: MetodoPago.desdeCodigo(row['metodo_pago'] as String? ?? 'EFECTIVO'),
       creadoEn: _parseFecha(row['creado_en']),
+      cajero: (row['cajero'] as String?)?.trim() ?? '',
     );
   }
 

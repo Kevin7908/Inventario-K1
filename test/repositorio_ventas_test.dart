@@ -4,6 +4,7 @@ import 'package:inventario_k1/backend/features/inventario/modelo/movimiento_inve
 import 'package:inventario_k1/backend/features/inventario/repositorio/repositorio_inventario_impl.dart';
 import 'package:inventario_k1/backend/features/pos/enum/enum_ventas.dart';
 import 'package:inventario_k1/backend/features/pos/modelo/linea_venta_mostrador.dart';
+import 'package:inventario_k1/backend/features/pos/repositorio/repositorio_ventas.dart';
 import 'package:inventario_k1/backend/features/pos/repositorio/repositorio_ventas_impl.dart';
 import 'package:inventario_k1/backend/share/database/app_db.dart';
 
@@ -419,6 +420,106 @@ void main() {
       );
 
       expect(await ventas.observarTodas().first, isEmpty);
+    });
+  });
+
+  group('el historial pagina y filtra en SQL', () {
+    // Es lo que mira la pantalla de Historial de ventas. Lo que se prueba aquí
+    // es que el `WHERE`, el `COUNT` y el `LIMIT` los resuelva SQLite: traer
+    // todas las facturas para recortarlas en Dart es lo que esta consulta
+    // existe para evitar.
+
+    test('el total no lo recorta el LIMIT', () async {
+      await _ventaConProducto(cantidad: 1);
+      await _ventaConProducto(cantidad: 1);
+      await _ventaConProducto(cantidad: 1);
+
+      final pagina = await ventas
+          .observarPagina(
+            filtro: const FiltroVentas(),
+            pagina: 0,
+            tamano: 2,
+          )
+          .first;
+
+      expect(pagina.items, hasLength(2));
+      expect(pagina.total, 3);
+    });
+
+    test('cada venta trae el nombre de quien la hizo', () async {
+      await _ventaConProducto(cantidad: 1);
+
+      final pagina = await ventas
+          .observarPagina(
+            filtro: const FiltroVentas(),
+            pagina: 0,
+            tamano: 10,
+          )
+          .first;
+
+      // `sesionDePrueba` inserta a «Usuario de prueba».
+      expect(pagina.items.single.cajero, 'Usuario de prueba');
+    });
+
+    test('filtrar por cajero deja fuera lo de los demás', () async {
+      final otra = await sesionDePrueba(db, usuario: 'otro');
+      await _ventaConProducto(cantidad: 1);
+      await RepositorioVentasImpl(db, otra).registrarVentaMostrador(
+        clienteId: taller.clienteId,
+        metodoPago: MetodoPago.efectivo,
+        lineas: [
+          LineaVentaMostrador(
+            productoId: taller.productoId,
+            descripcion: 'Pastilla de freno',
+            cantidad: 1,
+            precioUnitario: 30000,
+            costoUnitario: 18000,
+          ),
+        ],
+      );
+
+      final suyas = await ventas
+          .observarPagina(
+            filtro: FiltroVentas(usuarioId: otra.usuarioId),
+            pagina: 0,
+            tamano: 10,
+          )
+          .first;
+
+      expect(suyas.total, 1);
+      expect(suyas.items.single.cajero, isNotEmpty);
+    });
+
+    test('la búsqueda mira el número de factura', () async {
+      final id = await _ventaConProducto(cantidad: 1);
+      final detalle = await ventas.obtenerDetalle(id);
+
+      final pagina = await ventas
+          .observarPagina(
+            filtro: FiltroVentas(busqueda: detalle.numeroFactura),
+            pagina: 0,
+            tamano: 10,
+          )
+          .first;
+
+      expect(pagina.total, 1);
+    });
+
+    test('una venta anulada se puede aislar por estado', () async {
+      final id = await _ventaConProducto(cantidad: 1);
+      await _ventaConProducto(cantidad: 1);
+      await ventas.anular(id);
+
+      final anuladas = await ventas
+          .observarPagina(
+            filtro: const FiltroVentas(estado: EstadoPago.anulada),
+            pagina: 0,
+            tamano: 10,
+          )
+          .first;
+
+      expect(anuladas.total, 1);
+      expect(anuladas.items.single.id, id);
     });
   });
 }

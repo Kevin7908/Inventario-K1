@@ -6,7 +6,6 @@ import '../../../../backend/features/productos/modelo/producto.dart';
 import '../../../../backend/features/productos/repositorio/repositorio_producto.dart';
 import '../../../../backend/features/productos/repositorio/repositorio_producto_impl.dart';
 import '../../../../backend/share/database/app_db_provider.dart';
-import '../../../../backend/share/utils/sku_utils.dart';
 import '../../../../core/resultado.dart';
 import '../../autenticacion/provider/auth_providers.dart';
 
@@ -189,40 +188,6 @@ class ProductosNotifier extends AsyncNotifier<ProductosState> {
   //
   // Consulta el catálogo completo: el SKU debe ser único en toda la tabla,
   // no solo dentro de la página que se está viendo.
-  Future<String> generarSku(String nombreCategoria) async {
-    final todos = await _repo.obtenerTodos();
-    final base = normalizarCategoria(nombreCategoria);
-    if (base.isEmpty) return 'PRD-001';
-
-    // Encuentra el prefijo más corto (mínimo 3 letras) que no esté siendo
-    // usado por una categoría diferente. Si hay conflicto, agrega una letra más.
-    final catLower = nombreCategoria.toLowerCase();
-    var prefijo = base.substring(0, base.length.clamp(0, 3));
-    for (var len = 3; len <= base.length; len++) {
-      final candidato = base.substring(0, len);
-      final conflicto = todos.any((p) {
-        // Ignora productos de la misma categoría
-        if ((p.categoriaNombre ?? '').toLowerCase() == catLower) return false;
-        // ¿Algún producto de otra categoría ya usa este prefijo?
-        return RegExp('^${RegExp.escape(candidato)}-(\\d+)\$')
-            .hasMatch(p.sku.toUpperCase());
-      });
-      prefijo = candidato;
-      if (!conflicto) break;
-    }
-
-    // Máximo número existente con este prefijo → +1
-    final patron = RegExp('^${RegExp.escape(prefijo)}-(\\d+)\$');
-    var maximo = 0;
-    for (final p in todos) {
-      final match = patron.firstMatch(p.sku.toUpperCase());
-      if (match != null) {
-        final n = int.tryParse(match.group(1)!) ?? 0;
-        if (n > maximo) maximo = n;
-      }
-    }
-    return '$prefijo-${(maximo + 1).toString().padLeft(3, '0')}';
-  }
 
   // Mutaciones
 
@@ -233,7 +198,9 @@ class ProductosNotifier extends AsyncNotifier<ProductosState> {
         'Ya existe un producto con el nombre "${producto.nombre}".',
       );
     }
-    if (await _repo.existeSku(producto.sku)) {
+    // Al crear, el SKU viene vacío y lo asigna el repositorio con su
+    // consecutivo; solo hay algo que comprobar si llegó uno puesto.
+    if (producto.sku.trim().isNotEmpty && await _repo.existeSku(producto.sku)) {
       return Fallo(
         MotivoFallo.skuDuplicado,
         'El SKU "${producto.sku}" ya está en uso.',

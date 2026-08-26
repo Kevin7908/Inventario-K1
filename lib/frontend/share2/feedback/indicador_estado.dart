@@ -16,6 +16,10 @@ import '../temas/tipografia_app.dart';
 /// - [colorFondo]: color de fondo del chip.
 /// - [conPunto]: antepone un círculo del mismo color que el texto.
 ///
+/// El chip toma el ancho de su texto, pero **encoge antes que desbordar**: en
+/// una celda de tabla estrecha, «Administrador» se recorta con puntos
+/// suspensivos en vez de pintar la franja de overflow.
+///
 /// Ejemplo:
 /// ```dart
 /// IndicadorEstado(
@@ -64,12 +68,16 @@ class IndicadorEstado extends StatelessWidget {
             ),
             const SizedBox(width: 7),
           ],
-          Text(
-            etiqueta,
-            style: TipografiaApp.caption.copyWith(
-              fontSize: 12,
-              fontWeight: FontWeight.w600,
-              color: color,
+          Flexible(
+            child: Text(
+              etiqueta,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: TipografiaApp.caption.copyWith(
+                fontSize: 12,
+                fontWeight: FontWeight.w600,
+                color: color,
+              ),
             ),
           ),
         ],

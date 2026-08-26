@@ -28,7 +28,6 @@ Moto _moto({
   required int clienteId,
   String? placa,
   String? color,
-  String? vin,
   bool activo = true,
 }) =>
     Moto(
@@ -38,7 +37,6 @@ Moto _moto({
       modelo: modelo,
       placa: placa,
       color: color,
-      vin: vin,
       activo: activo,
       creadoEn: DateTime.now(),
       actualizadoEn: DateTime.now(),
@@ -143,7 +141,7 @@ void main() {
   });
 
   group('filtros', () {
-    test('la búsqueda filtra en SQL por marca, modelo, placa, color y chasis',
+    test('la búsqueda filtra en SQL por marca, modelo, placa y color',
         () async {
       final dueno = await _cliente('Carlos');
       await repo.crear(_moto(
@@ -152,7 +150,6 @@ void main() {
         clienteId: dueno,
         placa: 'KMN12C',
         color: 'Rojo',
-        vin: '9C2KC1670LR000001',
       ));
       await repo.crear(_moto(
         marca: 'Honda',
@@ -170,8 +167,6 @@ void main() {
           ['Bajaj Pulsar NS200']);
       expect(await _nombres(const FiltroMotos(busqueda: 'negro')),
           ['Honda CB110']);
-      expect(await _nombres(const FiltroMotos(busqueda: '9c2kc')),
-          ['Bajaj Pulsar NS200']);
       expect(await _nombres(const FiltroMotos(busqueda: 'nada')), isEmpty);
     });
 
@@ -196,7 +191,7 @@ void main() {
 
     test('un campo opcional vacío no excluye a la moto de la búsqueda',
         () async {
-      // Sin placa, color ni chasis: en SQL esos LIKE devuelven NULL, no false.
+      // Sin placa ni color: en SQL esos LIKE devuelven NULL, no false.
       // Si el OR se tragara el NULL, esta moto sería imposible de encontrar.
       final dueno = await _cliente('Carlos');
       await repo.crear(
@@ -250,7 +245,7 @@ void main() {
     });
   });
 
-  group('unicidad de placa y chasis', () {
+  group('unicidad de placa', () {
     test('duenoDePlaca no distingue mayúsculas y nombra al dueño actual',
         () async {
       // El índice `unique` de SQLite sí distingue, así que sin la comparación

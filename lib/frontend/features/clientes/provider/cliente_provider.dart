@@ -9,6 +9,7 @@ import '../../../../backend/features/motos/modelo/moto.dart';
 import '../../../../backend/features/motos/repositorio/repositorio_motos.dart';
 import '../../../../backend/share/database/app_db_provider.dart';
 import '../../../../core/resultado.dart';
+import '../../persona/provider/persona_provider.dart';
 import '../../motos/provider/motos_provider.dart';
 import 'validacion_cliente.dart';
 import '../../autenticacion/provider/auth_providers.dart';
@@ -166,6 +167,7 @@ class ClientesNotifier extends AsyncNotifier<ClientesState> {
       motos: motos,
       repoClientes: _repo,
       repoMotos: _motos,
+      repoPersonas: ref.read(repositorioPersonaProvider),
     );
     if (invalido != null) return invalido;
 

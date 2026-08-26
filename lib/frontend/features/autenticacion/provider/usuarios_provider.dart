@@ -15,6 +15,25 @@ final usuariosProvider = StreamProvider<List<Usuario>>(
   (ref) => ref.watch(repositorioAuthProvider).observarUsuarios(),
 );
 
+/// Una cuenta concreta, sacada del listado que ya está en vivo.
+///
+/// La ficha observa esto y no una copia recibida por parámetro: cambiarle el
+/// rol o desactivarla se ve al momento, sin abrir un segundo stream para lo
+/// que la lista ya trae. Buscar el id aquí y no en `build` es la regla de los
+/// cálculos derivados (`CLAUDE.md` §3): con el mismo listado, el resultado es
+/// idéntico y Riverpod no notifica.
+final cuentaProvider = Provider.family<Usuario?, int>(
+  name: 'cuentaProvider',
+  (ref, id) {
+    final lista = ref.watch(usuariosProvider).value;
+    if (lista == null) return null;
+    for (final cuenta in lista) {
+      if (cuenta.id == id) return cuenta;
+    }
+    return null;
+  },
+);
+
 /// Los permisos guardados de una cuenta, en vivo.
 ///
 /// `family` por id: la pantalla de permisos observa solo la cuenta que está

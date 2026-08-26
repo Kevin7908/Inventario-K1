@@ -21,8 +21,6 @@ class Proveedor {
     this.ciudad,
     this.notas,
     required this.activo,
-    required this.colorHex,
-    required this.icono,
     this.creadoEn,
     this.actualizadoEn,
   });
@@ -47,8 +45,6 @@ class Proveedor {
   final String? ciudad;
   final String? notas;
   final bool activo;
-  final String colorHex;
-  final String icono;
   final DateTime? creadoEn;
   final DateTime? actualizadoEn;
 
@@ -76,8 +72,6 @@ class Proveedor {
     String? ciudad,
     String? notas,
     bool? activo,
-    String? colorHex,
-    String? icono,
     DateTime? creadoEn,
     DateTime? actualizadoEn,
   }) {
@@ -93,8 +87,6 @@ class Proveedor {
       ciudad: ciudad ?? this.ciudad,
       notas: notas ?? this.notas,
       activo: activo ?? this.activo,
-      colorHex: colorHex ?? this.colorHex,
-      icono: icono ?? this.icono,
       creadoEn: creadoEn ?? this.creadoEn,
       actualizadoEn: actualizadoEn ?? this.actualizadoEn,
     );

@@ -4,6 +4,7 @@ import '../../../../backend/features/motos/modelo/moto.dart';
 import '../../../../backend/features/motos/repositorio/repositorio_motos.dart';
 import '../../../../core/resultado.dart';
 import '../../motos/provider/validacion_moto.dart';
+import '../../../../backend/features/persona/repositorio/repositorio_persona.dart';
 
 /// Reglas de negocio del alta y la edición de un cliente y sus motos.
 ///
@@ -17,6 +18,7 @@ Future<Resultado?> validarCliente({
   required List<Moto> motos,
   required RepositorioClientes repoClientes,
   required RepositorioMotos repoMotos,
+  required RepositorioPersona repoPersonas,
 }) async {
   final identidad = _validarIdentidad(cliente);
   if (identidad != null) return identidad;
@@ -34,6 +36,23 @@ Future<Resultado?> validarCliente({
       MotivoFallo.documentoDuplicado,
       'Ya existe otro cliente con esa cédula.',
     );
+  }
+
+  // El teléfono es único en `personas`: el choque puede ser con un técnico o
+  // con un proveedor, no solo con otro cliente. Es de cortesía —para dar un
+  // mensaje que se entienda—; la que impide de verdad es el `UNIQUE`.
+  final telefono = cliente.telefono?.trim() ?? '';
+  if (telefono.isNotEmpty) {
+    final dueno = await repoPersonas.duenoDeTelefono(
+      telefono,
+      excluirPersonaId: cliente.personaId,
+    );
+    if (dueno != null) {
+      return Fallo(
+        MotivoFallo.telefonoDuplicado,
+        'El teléfono $telefono ya está registrado a nombre de $dueno.',
+      );
+    }
   }
 
   return _validarMotos(motos, repoMotos);
@@ -68,7 +87,6 @@ Future<Resultado?> _validarMotos(
   RepositorioMotos repo,
 ) async {
   final placasVistas = <String>{};
-  final vinsVistos = <String>{};
 
   for (final moto in motos) {
     final placa = moto.placa?.trim() ?? '';
@@ -76,14 +94,6 @@ Future<Resultado?> _validarMotos(
       return Fallo(
         MotivoFallo.placaRegistrada,
         'Repetiste la placa $placa en dos motos de este cliente.',
-      );
-    }
-
-    final vin = moto.vin?.trim() ?? '';
-    if (vin.isNotEmpty && !vinsVistos.add(vin.toLowerCase())) {
-      return Fallo(
-        MotivoFallo.placaRegistrada,
-        'Repetiste el número de chasis $vin en dos motos de este cliente.',
       );
     }
 

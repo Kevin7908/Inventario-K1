@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
 import '../temas/colores_app.dart';
+import 'formateador_miles.dart';
 import '../temas/tipografia_app.dart';
 
 /// Campo de texto de propósito general con etiqueta arriba.
@@ -23,6 +24,15 @@ import '../temas/tipografia_app.dart';
 /// - [soloEnteros]: rechaza todo lo que no sea un dígito mientras se escribe.
 ///   Para importes en pesos y cantidades, que en este sistema no llevan
 ///   decimales.
+/// - [maximoCaracteres]: corta la escritura al llegar al límite. Es el que
+///   hace que un teléfono no pueda tener once dígitos: el validador avisa
+///   después, esto no deja ni teclearlo.
+/// - [comoPrecio]: agrupa los miles mientras se escribe (`45000` se ve
+///   `45.000`) y antepone el `$`. El valor que sale del controlador sigue
+///   siendo el texto formateado: quien guarda lo pasa por
+///   `normalizarDigitos`.
+/// - [soloLectura]: se ve y se puede copiar, pero no se escribe. Para lo que
+///   la app calcula sola, como el SKU de un producto.
 /// - [nodoFoco]: para encadenar el orden de tabulación desde la vista.
 /// - [alEnviar]: se dispara con Enter. En un campo de una sola línea Enter ya
 ///   envía el formulario (`CLAUDE.md` §8); `Ctrl+Enter` lo resuelve
@@ -54,10 +64,20 @@ import '../temas/tipografia_app.dart';
 /// )
 /// ```
 class CampoTexto extends StatelessWidget {
-  /// Fuera del `build` para no crear la lista en cada reconstrucción.
-  static final List<TextInputFormatter> _soloDigitos = [
-    FilteringTextInputFormatter.digitsOnly,
-  ];
+  static final FormateadorMiles _miles = FormateadorMiles();
+
+  /// Los formateadores que aplican, según lo que se haya pedido. El orden
+  /// importa: primero se filtra lo que no es dígito, después se recorta al
+  /// máximo y al final se agrupan los miles.
+  List<TextInputFormatter>? get _formateadores {
+    final lista = <TextInputFormatter>[
+      if (soloEnteros || comoPrecio) FilteringTextInputFormatter.digitsOnly,
+      if (maximoCaracteres != null)
+        LengthLimitingTextInputFormatter(maximoCaracteres),
+      if (comoPrecio) _miles,
+    ];
+    return lista.isEmpty ? null : lista;
+  }
 
   const CampoTexto({
     super.key,
@@ -70,6 +90,9 @@ class CampoTexto extends StatelessWidget {
     this.autofocus = false,
     this.monoespaciado = false,
     this.soloEnteros = false,
+    this.maximoCaracteres,
+    this.comoPrecio = false,
+    this.soloLectura = false,
     this.habilitado = true,
     this.nodoFoco,
     this.alEnviar,
@@ -86,6 +109,9 @@ class CampoTexto extends StatelessWidget {
   final bool autofocus;
   final bool monoespaciado;
   final bool soloEnteros;
+  final int? maximoCaracteres;
+  final bool comoPrecio;
+  final bool soloLectura;
 
   final FocusNode? nodoFoco;
   final ValueChanged<String>? alEnviar;
@@ -114,22 +140,28 @@ class CampoTexto extends StatelessWidget {
           controller: controlador,
           focusNode: nodoFoco,
           enabled: habilitado,
+          readOnly: soloLectura,
           onChanged: alCambiar,
           onFieldSubmitted: alEnviar,
           validator: validador,
           obscureText: oculto,
           maxLines: oculto ? 1 : lineas,
           autofocus: autofocus,
-          keyboardType: soloEnteros ? TextInputType.number : null,
-          inputFormatters: soloEnteros ? _soloDigitos : null,
+          keyboardType:
+              (soloEnteros || comoPrecio) ? TextInputType.number : null,
+          inputFormatters: _formateadores,
           style: monoespaciado
               ? TipografiaApp.monoespaciada(TipografiaApp.cuerpo)
               : TipografiaApp.cuerpo,
           decoration: InputDecoration(
+            prefixText: comoPrecio ? r'$ ' : null,
+            prefixStyle: TipografiaApp.cuerpo.copyWith(
+              color: ColoresApp.textMuted,
+            ),
             hintText: placeholder,
             hintStyle: TipografiaApp.deshabilitado(TipografiaApp.cuerpo),
             filled: true,
-            fillColor: ColoresApp.bgInput,
+            fillColor: soloLectura ? ColoresApp.bgCardHover : ColoresApp.bgInput,
             isDense: true,
             contentPadding: const EdgeInsets.symmetric(
               horizontal: 14,

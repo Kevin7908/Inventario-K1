@@ -7,6 +7,8 @@ import '../../../../backend/features/especializacion/modelo/especializacion.dart
 import '../../../../backend/features/persona/repositorio/repositorio_persona.dart';
 import '../../../../backend/features/tecnicos/modelo/tecnico.dart';
 import '../../../../core/resultado.dart';
+import '../../../../core/formato.dart';
+import '../../../../core/validaciones.dart';
 import '../../../share2/share2.dart';
 import '../../especializacion/provider/especializacion_provider.dart';
 import '../../persona/provider/persona_provider.dart';
@@ -67,8 +69,11 @@ class _FormularioTecnicoState extends ConsumerState<FormularioTecnico> {
     _cedulaCtrl = TextEditingController(text: t?.documento ?? '');
     _telefonoCtrl = TextEditingController(text: t?.telefono ?? '');
     _emailCtrl = TextEditingController(text: t?.email ?? '');
+    // Ya agrupado, para que el campo abra igual que como se ve al teclear.
     _salarioCtrl = TextEditingController(
-      text: t?.salarioBase == null ? '' : t!.salarioBase!.toStringAsFixed(0),
+      text: t?.salarioBase == null
+          ? ''
+          : agruparMiles(t!.salarioBase!.round()),
     );
     _activo = t?.activo ?? true;
 
@@ -138,9 +143,10 @@ class _FormularioTecnicoState extends ConsumerState<FormularioTecnico> {
       telefono: _opcional(_telefonoCtrl),
       email: _opcional(_emailCtrl),
       especializacionId: _especializacion?.id,
+      // El campo trae los puntos de miles del formateador (`1.800.000`).
       salarioBase: _salarioCtrl.text.trim().isEmpty
           ? null
-          : double.tryParse(_salarioCtrl.text.trim()),
+          : double.tryParse(normalizarDigitos(_salarioCtrl.text)),
       activo: _activo,
       creadoEn: widget.tecnicoAEditar?.creadoEn ?? DateTime.now(),
     );
@@ -222,12 +228,7 @@ class _FormularioTecnicoState extends ConsumerState<FormularioTecnico> {
             controlador: _nombresCtrl,
             placeholder: 'Ej: Carlos Andrés',
             autofocus: true,
-            validador: (v) {
-              final texto = v?.trim() ?? '';
-              if (texto.isEmpty) return 'El nombre es obligatorio.';
-              if (texto.length < 2) return 'Mínimo 2 caracteres.';
-              return null;
-            },
+            validador: (v) => validarObligatorio(v, 'El nombre'),
           ),
           CampoTexto(
             etiqueta: 'Apellidos',
@@ -239,6 +240,9 @@ class _FormularioTecnicoState extends ConsumerState<FormularioTecnico> {
             controlador: _cedulaCtrl,
             placeholder: 'Ej: 1020304050',
             monoespaciado: true,
+            soloEnteros: true,
+            maximoCaracteres: maximoDigitosDocumento,
+            validador: validarDocumento,
           ),
         ],
       ),
@@ -255,19 +259,16 @@ class _FormularioTecnicoState extends ConsumerState<FormularioTecnico> {
             etiqueta: 'Teléfono',
             controlador: _telefonoCtrl,
             placeholder: 'Ej: 3001234567',
+            monoespaciado: true,
+            soloEnteros: true,
+            maximoCaracteres: maximoDigitosTelefono,
+            validador: validarTelefono,
           ),
           CampoTexto(
             etiqueta: 'Correo electrónico',
             controlador: _emailCtrl,
             placeholder: 'Ej: tecnico@taller.com',
-            validador: (v) {
-              final texto = v?.trim() ?? '';
-              if (texto.isEmpty) return null;
-              final valido = RegExp(r'^[^@\s]+@[^@\s]+\.[^@\s]+$');
-              return valido.hasMatch(texto)
-                  ? null
-                  : 'Correo con formato inválido.';
-            },
+            validador: validarEmail,
           ),
         ],
       ),
@@ -286,26 +287,22 @@ class _FormularioTecnicoState extends ConsumerState<FormularioTecnico> {
         children: [
           FilaCampos(
             hijos: [
-              SelectorWidget<Especializacion?>(
+              CampoBusqueda<Especializacion>(
                 etiqueta: 'Especialización',
                 valor: _especializacion,
-                opciones: <Especializacion?>[null, ...especializaciones],
-                constructorEtiqueta: (e) => e?.nombre ?? 'Sin especialización',
+                opciones: especializaciones,
+                constructorEtiqueta: (e) => e.nombre,
+                constructorDetalle: (e) => e.descripcion,
+                placeholder: 'Sin especialización',
+                placeholderBusqueda: 'Buscar especialización…',
                 alCambiar: (e) => setState(() => _especializacion = e),
               ),
               CampoTexto(
                 etiqueta: 'Salario base',
                 controlador: _salarioCtrl,
-                placeholder: 'Ej: 1800000',
-                validador: (v) {
-                  final texto = v?.trim() ?? '';
-                  if (texto.isEmpty) return null;
-                  final valor = double.tryParse(texto);
-                  if (valor == null || valor < 0) {
-                    return 'Ingresa un número válido.';
-                  }
-                  return null;
-                },
+                placeholder: '0',
+                comoPrecio: true,
+                validador: (v) => validarImporte(v, obligatorio: false),
               ),
             ],
           ),

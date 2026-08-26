@@ -4,6 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../../backend/features/categorias/modelo/categoria.dart';
 import '../../../share2/share2.dart';
 import '../provider/categorias_provider.dart';
+import 'identidad_categoria.dart';
 
 /// Adaptador entre `catalogoCategoriasProvider` y [PanelCategorias] de share2.
 ///
@@ -87,7 +88,7 @@ class _PanelCategoriasCatalogoState
           CategoriaPanelDato(
             id: categoria.id!,
             nombre: categoria.nombre,
-            color: colorDeHex(categoria.colorHex),
+            color: IdentidadCategoria.color,
           ),
     ];
 

@@ -10,23 +10,32 @@ import '../provider/usuarios_provider.dart';
 /// Los permisos de **una cuenta**, agrupados por módulo, para prenderlos y
 /// apagarlos uno por uno.
 ///
-/// Se abre desde la fila de esa cuenta en Configuración → Usuarios. Los
-/// cambios no se guardan solos: se acumulan aquí y salen todos juntos con
-/// «Guardar», que es lo que espera quien está repasando una lista de cuarenta
-/// interruptores.
+/// Es el cuerpo de la ficha de la cuenta, no un diálogo: repasar cuarenta
+/// interruptores dentro de un modal obligaba a hacer scroll en un cuadro que
+/// tapaba la tabla de detrás, y encima escondía a quién se le estaban
+/// cambiando.
 ///
-/// Un administrador no aparece nunca: sus permisos son todos y no se editan.
+/// Los cambios no se guardan solos: se acumulan aquí y salen todos juntos con
+/// «Guardar», que es lo que espera quien está repasando una lista larga.
+///
+/// Un administrador no llega hasta aquí: sus permisos son todos y no se
+/// editan. De eso se encarga la ficha.
+///
+/// Parámetros:
+/// - [cuenta]: de quién son los permisos.
+/// - [alGuardado]: se llama cuando el repositorio confirmó el cambio.
+/// - [alCerrar]: qué hace Esc. Normalmente, volver al listado.
 class PanelPermisos extends ConsumerStatefulWidget {
-  const PanelPermisos({super.key, required this.cuenta});
+  const PanelPermisos({
+    super.key,
+    required this.cuenta,
+    this.alGuardado,
+    this.alCerrar,
+  });
 
   final Usuario cuenta;
-
-  /// Devuelve `true` si se guardaron cambios.
-  static Future<bool?> mostrar(BuildContext context, Usuario cuenta) =>
-      showDialog<bool>(
-        context: context,
-        builder: (_) => PanelPermisos(cuenta: cuenta),
-      );
+  final VoidCallback? alGuardado;
+  final VoidCallback? alCerrar;
 
   @override
   ConsumerState<PanelPermisos> createState() => _PanelPermisosState();
@@ -40,6 +49,17 @@ class _PanelPermisosState extends ConsumerState<PanelPermisos> {
 
   bool _guardando = false;
   String? _error;
+
+  /// Cambiar de cuenta sin cambiar de widget dejaría los interruptores de la
+  /// anterior encendidos sobre la nueva.
+  @override
+  void didUpdateWidget(PanelPermisos anterior) {
+    super.didUpdateWidget(anterior);
+    if (anterior.cuenta.id != widget.cuenta.id) {
+      _marcados = null;
+      _error = null;
+    }
+  }
 
   void _alternar(Permiso permiso, bool activo) {
     setState(() {
@@ -75,7 +95,8 @@ class _PanelPermisosState extends ConsumerState<PanelPermisos> {
 
     switch (resultado) {
       case Exito():
-        Navigator.of(context).pop(true);
+        setState(() => _guardando = false);
+        widget.alGuardado?.call();
       case Fallo(:final mensaje):
         setState(() {
           _guardando = false;
@@ -90,39 +111,25 @@ class _PanelPermisosState extends ConsumerState<PanelPermisos> {
 
     return AtajosFormulario(
       alGuardar: _guardando ? null : _guardar,
-      alCancelar: () => Navigator.of(context).pop(false),
-      child: Dialog(
-        backgroundColor: ColoresApp.bgCard,
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(18)),
-        child: ConstrainedBox(
-          constraints: const BoxConstraints(maxWidth: 620, maxHeight: 700),
-          child: Padding(
-            padding: const EdgeInsets.all(28),
-            child: guardados.when(
-              loading: () => const SizedBox(
-                height: 200,
-                child: Center(
-                  child: CircularProgressIndicator(color: ColoresApp.goGreen),
-                ),
-              ),
-              error: (e, _) => AvisoEnLinea(mensaje: e.toString()),
-              data: (permisos) {
-                // Solo la primera vez: después manda lo que el usuario tocó,
-                // o cada reemisión del stream le borraría los cambios.
-                _marcados ??= permisos;
-                return _Contenido(
-                  cuenta: widget.cuenta,
-                  marcados: _marcados!,
-                  guardando: _guardando,
-                  error: _error,
-                  alAlternar: _alternar,
-                  alAlternarModulo: _alternarModulo,
-                  alGuardar: _guardar,
-                );
-              },
-            ),
-          ),
+      alCancelar: widget.alCerrar,
+      child: guardados.when(
+        loading: () => const Center(
+          child: CircularProgressIndicator(color: ColoresApp.goGreen),
         ),
+        error: (e, _) => AvisoEnLinea(mensaje: e.toString()),
+        data: (permisos) {
+          // Solo la primera vez: después manda lo que el usuario tocó, o cada
+          // reemisión del stream le borraría los cambios.
+          _marcados ??= permisos;
+          return _Contenido(
+            marcados: _marcados!,
+            guardando: _guardando,
+            error: _error,
+            alAlternar: _alternar,
+            alAlternarModulo: _alternarModulo,
+            alGuardar: _guardar,
+          );
+        },
       ),
     );
   }
@@ -130,7 +137,6 @@ class _PanelPermisosState extends ConsumerState<PanelPermisos> {
 
 class _Contenido extends StatelessWidget {
   const _Contenido({
-    required this.cuenta,
     required this.marcados,
     required this.guardando,
     required this.error,
@@ -139,7 +145,6 @@ class _Contenido extends StatelessWidget {
     required this.alGuardar,
   });
 
-  final Usuario cuenta;
   final Set<Permiso> marcados;
   final bool guardando;
   final String? error;
@@ -151,16 +156,28 @@ class _Contenido extends StatelessWidget {
   Widget build(BuildContext context) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
-      mainAxisSize: MainAxisSize.min,
       children: [
-        Text('Permisos de ${cuenta.nombre}', style: TipografiaApp.heading3),
-        const SizedBox(height: 4),
-        Text(
-          '${marcados.length} de ${Permiso.values.length} activos · '
-          '${cuenta.rol.etiqueta}',
-          style: TipografiaApp.subtituloPagina,
+        Row(
+          children: [
+            Expanded(
+              child: Text(
+                'Qué puede hacer en cada módulo · '
+                '${marcados.length} de ${Permiso.values.length} activos',
+                style: TipografiaApp.subtituloPagina,
+              ),
+            ),
+            BotonPrimario(
+              etiqueta: guardando ? 'Guardando…' : 'Guardar permisos',
+              icono: Icons.check,
+              alPresionar: guardando ? null : alGuardar,
+            ),
+          ],
         ),
-        const SizedBox(height: 18),
+        if (error != null) ...[
+          const SizedBox(height: 12),
+          AvisoEnLinea(mensaje: error!),
+        ],
+        const SizedBox(height: 16),
         Expanded(
           child: ListView.builder(
             itemCount: ModuloPermiso.values.length,
@@ -174,26 +191,6 @@ class _Contenido extends StatelessWidget {
               );
             },
           ),
-        ),
-        if (error != null) ...[
-          const SizedBox(height: 14),
-          AvisoEnLinea(mensaje: error!),
-        ],
-        const SizedBox(height: 18),
-        Row(
-          mainAxisAlignment: MainAxisAlignment.end,
-          children: [
-            BotonSecundario(
-              etiqueta: 'Cancelar',
-              alPresionar:
-                  guardando ? null : () => Navigator.of(context).pop(false),
-            ),
-            const SizedBox(width: 10),
-            BotonPrimario(
-              etiqueta: guardando ? 'Guardando…' : 'Guardar permisos',
-              alPresionar: guardando ? null : alGuardar,
-            ),
-          ],
         ),
       ],
     );

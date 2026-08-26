@@ -219,8 +219,6 @@ class _FichaMoto extends StatelessWidget {
       if (moto.anio != null) '${moto.anio}',
       if (moto.cilindraje != null) '${moto.cilindraje} cc',
       if ((moto.color ?? '').trim().isNotEmpty) moto.color!.trim(),
-      if (moto.kilometrajeInicial > 0)
-        '${formatearCantidad(moto.kilometrajeInicial)} km',
     ].join(' · ');
 
     return Container(

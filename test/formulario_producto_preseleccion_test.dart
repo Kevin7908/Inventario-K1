@@ -36,8 +36,6 @@ Proveedor _prov(int id, String nombre, {bool activo = true}) => Proveedor(
       id: id,
       nombre: nombre,
       activo: activo,
-      colorHex: '#3B82F6',
-      icono: 'local_shipping',
     );
 
 Producto _producto({int? categoriaId, int? proveedorId}) => Producto(

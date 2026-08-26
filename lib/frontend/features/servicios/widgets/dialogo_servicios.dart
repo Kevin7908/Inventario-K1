@@ -4,6 +4,8 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../../backend/features/servicios/modelo/servicio.dart';
 import '../../../share2/share2.dart';
 import '../provider/servicios_provider.dart';
+import '../../../../core/formato.dart';
+import '../../../../core/validaciones.dart';
 
 /// Diálogo de creación y edición de un servicio del taller.
 ///
@@ -48,7 +50,10 @@ class _DialogoServicioState extends ConsumerState<DialogoServicio> {
     _descripcionCtrl = TextEditingController(text: s?.descripcion ?? '');
     // 0 es "sin definir": el campo se muestra vacío en vez de con un cero.
     _precioCtrl = TextEditingController(
-      text: (s?.precioSugerido ?? 0) == 0 ? '' : '${s!.precioSugerido}',
+      // Ya agrupado, para que abra igual que como se ve al teclear.
+      text: (s?.precioSugerido ?? 0) == 0
+          ? ''
+          : agruparMiles(s!.precioSugerido),
     );
     _activo = s?.activo ?? true;
   }
@@ -102,7 +107,7 @@ class _DialogoServicioState extends ConsumerState<DialogoServicio> {
 
     final notifier = ref.read(serviciosProvider.notifier);
     final descripcion = _descripcionCtrl.text.trim();
-    final precioSugerido = int.tryParse(_precioCtrl.text.trim()) ?? 0;
+    final precioSugerido = int.tryParse(normalizarDigitos(_precioCtrl.text)) ?? 0;
     final String? error;
 
     if (widget.esEdicion) {
@@ -232,8 +237,8 @@ class _DialogoServicioState extends ConsumerState<DialogoServicio> {
                       CampoTexto(
                         etiqueta: 'Precio sugerido (opcional)',
                         controlador: _precioCtrl,
-                        placeholder: 'Ej: 25000',
-                        soloEnteros: true,
+                        placeholder: '0',
+                        comoPrecio: true,
                       ),
                       const SizedBox(height: 6),
                       const Text(

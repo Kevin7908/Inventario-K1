@@ -65,14 +65,29 @@ class RepositorioVentasImpl with FirmaDeSesion implements RepositorioVentas {
   // SQL base para resúmenes. El nombre del cliente vive en `personas`, no en
   // `clientes`, así que hacen falta los dos LEFT JOIN encadenados: la venta de
   // mostrador no tiene cliente.
+  /// El `JOIN` con `usuarios` va siempre: una venta sin el nombre de quien la
+  /// hizo no sirve para el historial, que es donde se mira. Es `INNER` porque
+  /// `ventas.usuario_id` es `NOT NULL`.
   static const _sqlSelectResumen = '''
     SELECT
       v.*,
-      COALESCE(pe.nombres || ' ' || COALESCE(pe.apellidos, ''), '— Sin cliente —') AS cliente_nombre
+      COALESCE(pe.nombres || ' ' || COALESCE(pe.apellidos, ''), '— Sin cliente —') AS cliente_nombre,
+      TRIM(pu.nombres || ' ' || COALESCE(pu.apellidos, '')) AS cajero
     FROM ventas v
     LEFT JOIN clientes c  ON c.id  = v.cliente_id
     LEFT JOIN personas pe ON pe.id = c.persona_id
+    INNER JOIN usuarios u  ON u.id  = v.usuario_id
+    INNER JOIN personas pu ON pu.id = u.persona_id
   ''';
+
+  /// Las tablas que hacen re-emitir el stream. Si falta una, el historial no
+  /// se entera de que cambió (`REGLAS_BD.md` §5).
+  Set<TableInfo<Table, dynamic>> get _tablasDelResumen => {
+        _tablaVentas,
+        _db.tablaCliente,
+        _db.tablaPersona,
+        _db.tablaUsuario,
+      };
 
   // Lecturas
 
@@ -81,11 +96,94 @@ class RepositorioVentasImpl with FirmaDeSesion implements RepositorioVentas {
     return _db
         .customSelect(
           '$_sqlSelectResumen ORDER BY v.id DESC',
-          readsFrom: {_tablaVentas, _db.tablaCliente, _db.tablaPersona},
+          readsFrom: _tablasDelResumen,
         )
         .watch()
         .map((rows) =>
             VentasMapper.resumenesDesdeMapas(rows.map((r) => r.data).toList()));
+  }
+
+  @override
+  Stream<PaginaVentas> observarPagina({
+    required FiltroVentas filtro,
+    required int pagina,
+    required int tamano,
+  }) {
+    final (where, variables) = _condicion(filtro);
+
+    // Dos consultas: el total no lo puede recortar el `LIMIT`, o el paginador
+    // diría que hay una página cuando hay veinte.
+    final consultaTotal = _db.customSelect(
+      'SELECT COUNT(*) AS total FROM ventas v '
+      'LEFT JOIN clientes c ON c.id = v.cliente_id '
+      'LEFT JOIN personas pe ON pe.id = c.persona_id '
+      'INNER JOIN usuarios u ON u.id = v.usuario_id '
+      'INNER JOIN personas pu ON pu.id = u.persona_id $where',
+      variables: variables,
+      readsFrom: _tablasDelResumen,
+    );
+
+    return _db
+        .customSelect(
+          '$_sqlSelectResumen $where ORDER BY v.id DESC LIMIT ?? OFFSET ??'
+              .replaceAll('??', '?'),
+          variables: [
+            ...variables,
+            Variable.withInt(tamano),
+            Variable.withInt(pagina * tamano),
+          ],
+          readsFrom: _tablasDelResumen,
+        )
+        .watch()
+        .asyncMap((filas) async {
+      final total = await consultaTotal.getSingleOrNull();
+      return PaginaVentas(
+        items:
+            VentasMapper.resumenesDesdeMapas(filas.map((f) => f.data).toList()),
+        total: total?.data['total'] as int? ?? 0,
+      );
+    });
+  }
+
+  /// El `WHERE` y sus variables, para que la página y el total filtren igual.
+  (String, List<Variable<Object>>) _condicion(FiltroVentas filtro) {
+    final condiciones = <String>[];
+    final variables = <Variable<Object>>[];
+
+    if (filtro.tipo != null) {
+      condiciones.add('v.tipo = ?');
+      variables.add(Variable.withString(filtro.tipo!.aTexto));
+    }
+    if (filtro.estado != null) {
+      condiciones.add('v.estado_pago = ?');
+      variables.add(Variable.withString(filtro.estado!.aTexto));
+    }
+    if (filtro.usuarioId != null) {
+      condiciones.add('v.usuario_id = ?');
+      variables.add(Variable.withInt(filtro.usuarioId!));
+    }
+    if (filtro.desde != null) {
+      condiciones.add('v.creado_en >= ?');
+      variables.add(Variable.withDateTime(filtro.desde!));
+    }
+    if (filtro.hasta != null) {
+      condiciones.add('v.creado_en <= ?');
+      variables.add(Variable.withDateTime(filtro.hasta!));
+    }
+
+    final busqueda = filtro.busqueda.trim().toLowerCase();
+    if (busqueda.isNotEmpty) {
+      condiciones.add(
+        '(LOWER(v.numero_factura) LIKE ?1 '
+        "OR LOWER(COALESCE(pe.nombres, '')) LIKE ?1 "
+        "OR LOWER(COALESCE(pe.apellidos, '')) LIKE ?1 "
+        'OR LOWER(pu.nombres) LIKE ?1)',
+      );
+      variables.add(Variable.withString('%$busqueda%'));
+    }
+
+    if (condiciones.isEmpty) return ('', variables);
+    return ('WHERE ${condiciones.join(' AND ')}', variables);
   }
 
   @override

@@ -1,21 +1,30 @@
+import 'dart:math' as math;
+
 import 'package:flutter/material.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 
 import '../../../share2/share2.dart';
+import 'ilustracion/ilustracion_gatos.dart';
+
+/// Radio de la tarjeta. Lo comparten el contenedor y el panel de la
+/// ilustración, que redondea solo su lado izquierdo para no salirse.
+const double _radioTarjeta = 20;
 
 /// El marco visual que comparten el login, el alta del primer administrador y
 /// la recuperación de la contraseña.
 ///
-/// Son tres pantallas con el mismo esqueleto: a la izquierda el panel oscuro
-/// de la marca —el mismo `bgSidebar` del sidebar de la app, para que entrar no
-/// parezca otro programa—, a la derecha el formulario centrado. Por debajo de
-/// 900 px de ancho el panel se va y queda solo el formulario.
+/// Son tres pantallas con el mismo esqueleto: una tarjeta blanca flotando
+/// sobre el fondo oscuro de la marca —el mismo `bgSidebar` del sidebar, para
+/// que entrar no parezca otro programa—, partida en dos: a la izquierda la
+/// ilustración del taller, a la derecha el formulario. Cuando la ventana no da
+/// para las dos mitades, la ilustración se va y queda la tarjeta del
+/// formulario sola.
 ///
 /// Vive en el módulo y no en `share2` porque solo lo usan estas tres
-/// pantallas y porque conoce el logo de la app.
+/// pantallas y porque conoce el logo y la ilustración de la app.
 ///
 /// Parámetros:
-/// - [titulo] y [subtitulo]: encabezan el formulario.
+/// - [titulo] y [subtitulo]: encabezan el formulario, centrados.
 /// - [child]: el formulario.
 /// - [alVolver]: si se pasa, aparece la flecha de regreso sobre el título.
 /// - [etiquetaVolver]: texto de esa flecha.
@@ -23,8 +32,8 @@ import '../../../share2/share2.dart';
 /// Ejemplo:
 /// ```dart
 /// MarcoAutenticacion(
-///   titulo: 'Entra a tu cuenta',
-///   subtitulo: 'Con tu usuario o tu correo.',
+///   titulo: 'Bienvenido de nuevo',
+///   subtitulo: 'Escribe tus datos para entrar.',
 ///   child: _FormularioLogin(),
 /// )
 /// ```
@@ -38,8 +47,15 @@ class MarcoAutenticacion extends StatelessWidget {
     this.etiquetaVolver = 'Volver',
   });
 
-  static const double _anchoPanel = 420;
-  static const double _anchoMinimoConPanel = 900;
+  static const double _anchoIlustracion = 440;
+  static const double _anchoFormulario = 460;
+  static const double _altoTarjeta = 620;
+  static const double _margenVentana = 32;
+
+  /// Por debajo de esto la tarjeta partida no cabe sin apretar el formulario,
+  /// así que la ilustración se va antes que estorbar.
+  static const double _anchoMinimoConPanel = 940;
+  static const double _altoMinimoConPanel = 560;
 
   final String titulo;
   final String subtitulo;
@@ -50,55 +66,67 @@ class MarcoAutenticacion extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: ColoresApp.bgCard,
+      backgroundColor: ColoresApp.bgSidebar,
       body: LayoutBuilder(
         builder: (context, restricciones) {
-          final cabePanel =
-              restricciones.maxWidth >= _anchoMinimoConPanel;
+          final cabePanel = restricciones.maxWidth >= _anchoMinimoConPanel &&
+              restricciones.maxHeight >= _altoMinimoConPanel;
 
-          return Row(
-            children: [
-              if (cabePanel)
-                const SizedBox(width: _anchoPanel, child: _PanelMarca()),
-              Expanded(
-                child: Center(
-                  child: SingleChildScrollView(
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 32,
-                      vertical: 40,
-                    ),
-                    child: ConstrainedBox(
-                      constraints: const BoxConstraints(maxWidth: 380),
-                      child: Column(
-                        mainAxisSize: MainAxisSize.min,
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          if (!cabePanel) ...[
-                            const _LogoCompacto(),
-                            const SizedBox(height: 28),
-                          ],
-                          if (alVolver != null) ...[
-                            BotonVolver(
-                              etiqueta: etiquetaVolver,
-                              alPresionar: alVolver!,
-                            ),
-                            const SizedBox(height: 12),
-                          ],
-                          Text(titulo, style: TipografiaApp.heading2),
-                          const SizedBox(height: 6),
-                          Text(
-                            subtitulo,
-                            style: TipografiaApp.subtituloPagina,
-                          ),
-                          const SizedBox(height: 28),
-                          child,
-                        ],
-                      ),
-                    ),
+          // La tarjeta nunca pasa del alto de la ventana: si sobra contenido
+          // —el alta del primer administrador son cinco campos— scrollea por
+          // dentro y el marco se queda quieto.
+          final alto = math.max(
+            0.0,
+            math.min(_altoTarjeta, restricciones.maxHeight - _margenVentana * 2),
+          );
+
+          final formulario = _Formulario(
+            titulo: titulo,
+            subtitulo: subtitulo,
+            alVolver: alVolver,
+            etiquetaVolver: etiquetaVolver,
+            child: child,
+          );
+
+          return Center(
+            child: Padding(
+              padding: const EdgeInsets.all(_margenVentana),
+              child: Container(
+                width: cabePanel
+                    ? _anchoIlustracion + _anchoFormulario
+                    : _anchoFormulario,
+                height: cabePanel ? alto : null,
+                constraints:
+                    cabePanel ? null : BoxConstraints(maxHeight: alto),
+                decoration: const BoxDecoration(
+                  color: ColoresApp.bgCard,
+                  borderRadius: BorderRadius.all(
+                    Radius.circular(_radioTarjeta),
                   ),
+                  boxShadow: [
+                    BoxShadow(
+                      color: ColoresApp.shadowMedium,
+                      blurRadius: 40,
+                      offset: Offset(0, 18),
+                    ),
+                  ],
                 ),
+                child: cabePanel
+                    ? Row(
+                        // La Row está dentro de una altura fija, que es lo que
+                        // `stretch` necesita para no reventar (`CLAUDE.md` §4).
+                        crossAxisAlignment: CrossAxisAlignment.stretch,
+                        children: [
+                          const SizedBox(
+                            width: _anchoIlustracion,
+                            child: _PanelIlustracion(),
+                          ),
+                          Expanded(child: formulario),
+                        ],
+                      )
+                    : formulario,
               ),
-            ],
+            ),
           );
         },
       ),
@@ -106,112 +134,114 @@ class MarcoAutenticacion extends StatelessWidget {
   }
 }
 
-/// El panel oscuro de la izquierda: logo, nombre y qué es esta app.
-class _PanelMarca extends StatelessWidget {
-  const _PanelMarca();
+/// La mitad derecha de la tarjeta: marca, título centrado y el formulario.
+class _Formulario extends StatelessWidget {
+  const _Formulario({
+    required this.titulo,
+    required this.subtitulo,
+    required this.alVolver,
+    required this.etiquetaVolver,
+    required this.child,
+  });
 
-  static const List<(IconData, String)> _puntos = [
-    (Icons.inventory_2_outlined, 'Inventario y repuestos al día'),
-    (Icons.build_outlined, 'Órdenes de servicio del taller'),
-    (Icons.attach_money_rounded, 'Ventas, cotizaciones y cartera'),
-  ];
+  final String titulo;
+  final String subtitulo;
+  final VoidCallback? alVolver;
+  final String etiquetaVolver;
+  final Widget child;
 
   @override
   Widget build(BuildContext context) {
-    return ColoredBox(
-      color: ColoresApp.bgSidebar,
-      child: Padding(
-        padding: const EdgeInsets.fromLTRB(44, 44, 44, 36),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Row(
-              children: [
-                SvgPicture.asset(
-                  'assets/images/logo-k1.svg',
-                  width: 44,
-                  height: 44,
-                ),
-                const SizedBox(width: 12),
-                Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      'InventarioK1',
-                      style: TipografiaApp.subtitulo.copyWith(
-                        color: ColoresApp.textOnPrimary,
-                        fontWeight: FontWeight.w700,
-                      ),
-                    ),
-                    const SizedBox(height: 2),
-                    Text(
-                      'Taller de motos',
-                      style: TipografiaApp.caption.copyWith(
-                        color: ColoresApp.textSidebarSecondary,
-                      ),
-                    ),
-                  ],
-                ),
-              ],
-            ),
-            const Spacer(),
-            Text(
-              'Todo el taller\nen un solo sitio.',
-              style: TipografiaApp.heading1.copyWith(
-                color: ColoresApp.textOnPrimary,
-                fontSize: 30,
-                height: 1.25,
+    return SingleChildScrollView(
+      padding: const EdgeInsets.fromLTRB(44, 40, 44, 40),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          if (alVolver != null) ...[
+            Align(
+              alignment: Alignment.centerLeft,
+              child: BotonVolver(
+                etiqueta: etiquetaVolver,
+                alPresionar: alVolver!,
               ),
             ),
-            const SizedBox(height: 24),
-            for (final (icono, texto) in _puntos)
-              Padding(
-                padding: const EdgeInsets.only(bottom: 12),
-                child: Row(
-                  children: [
-                    Icon(icono, size: 18, color: ColoresApp.brightGreen),
-                    const SizedBox(width: 12),
-                    Expanded(
-                      child: Text(
-                        texto,
-                        style: TipografiaApp.cuerpo.copyWith(
-                          color: ColoresApp.textSidebar,
-                        ),
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            const Spacer(),
-            Text(
-              'Los datos se guardan en este equipo.',
-              style: TipografiaApp.caption.copyWith(
-                color: ColoresApp.textSidebarLabel,
-              ),
-            ),
+            const SizedBox(height: 16),
           ],
-        ),
+          const _MarcaCompacta(),
+          const SizedBox(height: 24),
+          Text(
+            titulo,
+            textAlign: TextAlign.center,
+            style: TipografiaApp.heading1,
+          ),
+          const SizedBox(height: 8),
+          Text(
+            subtitulo,
+            textAlign: TextAlign.center,
+            style: TipografiaApp.subtituloPagina,
+          ),
+          const SizedBox(height: 28),
+          child,
+        ],
       ),
     );
   }
 }
 
-/// El logo en horizontal, para cuando la ventana es muy angosta y el panel
-/// oscuro no cabe.
-class _LogoCompacto extends StatelessWidget {
-  const _LogoCompacto();
+/// El logo y el nombre, centrados sobre el título. La ilustración no lleva
+/// marca, así que la marca va aquí y se ve con panel y sin él.
+class _MarcaCompacta extends StatelessWidget {
+  const _MarcaCompacta();
 
   @override
   Widget build(BuildContext context) {
     return Row(
+      mainAxisAlignment: MainAxisAlignment.center,
       children: [
-        SvgPicture.asset('assets/images/logo-k1.svg', width: 36, height: 36),
+        SvgPicture.asset('assets/images/logo-k1.svg', width: 32, height: 32),
         const SizedBox(width: 10),
         Text(
           'InventarioK1',
           style: TipografiaApp.subtitulo.copyWith(fontWeight: FontWeight.w700),
         ),
       ],
+    );
+  }
+}
+
+/// La mitad izquierda: la ilustración del taller sobre el gris de la app.
+class _PanelIlustracion extends StatelessWidget {
+  const _PanelIlustracion();
+
+  @override
+  Widget build(BuildContext context) {
+    return const DecoratedBox(
+      decoration: BoxDecoration(
+        color: ColoresApp.bgApp,
+        borderRadius: BorderRadius.horizontal(
+          left: Radius.circular(_radioTarjeta),
+        ),
+      ),
+      child: Padding(
+        padding: EdgeInsets.fromLTRB(40, 40, 40, 32),
+        child: Column(
+          children: [
+            Expanded(child: IlustracionGatos()),
+            SizedBox(height: 24),
+            Text(
+              'Todo el taller en un solo sitio.',
+              textAlign: TextAlign.center,
+              style: TipografiaApp.subtitulo,
+            ),
+            SizedBox(height: 6),
+            Text(
+              'Los datos se guardan en este equipo.',
+              textAlign: TextAlign.center,
+              style: TipografiaApp.caption,
+            ),
+          ],
+        ),
+      ),
     );
   }
 }

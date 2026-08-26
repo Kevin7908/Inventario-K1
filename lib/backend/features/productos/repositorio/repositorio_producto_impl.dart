@@ -8,6 +8,8 @@ import '../../bitacora/repositorio/repositorio_bitacora_impl.dart';
 import '../../inventario/modelo/movimiento_inventario.dart';
 import '../../inventario/repositorio/repositorio_inventario.dart';
 import '../../inventario/repositorio/repositorio_inventario_impl.dart';
+import '../../../share/consecutivos/repositorio_consecutivos.dart';
+import '../../../share/utils/sku_utils.dart';
 import '../mapper/producto_mapper.dart';
 import '../modelo/producto.dart';
 import 'repositorio_producto.dart';
@@ -30,6 +32,12 @@ class RepositorioProductosImpl with FirmaDeSesion implements RepositorioProducto
 
   late final RepositorioBitacora _bitacora =
       RepositorioBitacoraImpl(_db, sesion);
+
+  /// Reparte los números del SKU. Es el mismo mecanismo de las facturas: un
+  /// `UPSERT ... RETURNING` por serie, que no repite ni reutiliza el número de
+  /// lo que se borró.
+  late final RepositorioConsecutivos _consecutivos =
+      RepositorioConsecutivos(_db);
 
   /// Deja el renglón de la bitácora. Se llama **dentro** de la transacción del
   /// cambio: si la escritura se revierte, el renglón se va con ella.
@@ -158,6 +166,48 @@ class RepositorioProductosImpl with FirmaDeSesion implements RepositorioProducto
 
   // Escrituras
 
+  /// El prefijo que le corresponde a [categoriaId].
+  ///
+  /// Trae los nombres de las categorías porque el desempate necesita saber
+  /// cuáles empiezan igual. Es un catálogo de decenas de filas y solo se
+  /// consulta al dar de alta un producto, no en cada repintado.
+  Future<String> _prefijoDe(int? categoriaId) async {
+    if (categoriaId == null) return prefijoSinCategoria;
+
+    final filas = await (_db.select(_db.tablaCategoria)
+          ..orderBy([(c) => OrderingTerm.asc(c.id)]))
+        .get();
+
+    final anteriores = <String>[];
+    for (final fila in filas) {
+      if (fila.id == categoriaId) {
+        return prefijoDeCategoria(fila.nombre, anteriores);
+      }
+      anteriores.add(fila.nombre);
+    }
+
+    // La categoría se borró entre que se eligió y se guardó.
+    return prefijoSinCategoria;
+  }
+
+  @override
+  Future<String> previsualizarSku(int? categoriaId) async {
+    final prefijo = await _prefijoDe(categoriaId);
+    final numero = await _consecutivos.proximoDeSerie(_serie(prefijo));
+    return formatearSku(prefijo, numero);
+  }
+
+  /// La serie del consecutivo, una por prefijo.
+  static String _serie(String prefijo) => 'SKU_$prefijo';
+
+  /// Toma el siguiente número de la serie del prefijo. Se llama **dentro** de
+  /// la transacción del alta.
+  Future<String> _generarSku(int? categoriaId) async {
+    final prefijo = await _prefijoDe(categoriaId);
+    final numero = await _consecutivos.siguienteDeSerie(_serie(prefijo));
+    return formatearSku(prefijo, numero);
+  }
+
   @override
   Future<Producto> crear(Producto producto) {
     exigir(Permiso.productosCrear);
@@ -165,9 +215,16 @@ class RepositorioProductosImpl with FirmaDeSesion implements RepositorioProducto
     // movimiento, no como columna: si el alta pusiera `stock_actual` a mano,
     // el libro mayor arrancaría descuadrado desde la primera fila.
     return _db.transaction(() async {
+      // El SKU se asigna aquí y no en la vista: es una regla de negocio, y
+      // dentro de la transacción un alta que falle devuelve el número a la
+      // serie en vez de dejar un hueco en la estantería.
+      final conSku = producto.sku.trim().isEmpty
+          ? producto.copyWith(sku: await _generarSku(producto.categoriaId))
+          : producto;
+
       final id = await _db
           .into(_db.tablaProducto)
-          .insert(ProductoMapper.modeloACompanion(producto));
+          .insert(ProductoMapper.modeloACompanion(conSku));
 
       if (producto.stockActual != 0) {
         await _inventario.registrar(
@@ -180,10 +237,10 @@ class RepositorioProductosImpl with FirmaDeSesion implements RepositorioProducto
         );
       }
 
-      await _anotar(AccionAuditada.creo, id, _nombreDe(producto));
+      await _anotar(AccionAuditada.creo, id, _nombreDe(conSku));
 
       // No hay SELECT extra: el stream de Drift emite el dato completo.
-      return producto.copyWith(id: id);
+      return conSku.copyWith(id: id);
     });
   }
 

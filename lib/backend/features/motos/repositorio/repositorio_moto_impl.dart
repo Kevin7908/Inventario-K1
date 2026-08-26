@@ -148,10 +148,6 @@ JoinedSelectStatement<HasResultSet, dynamic> get _baseQuery {
   Future<Moto?> duenoDePlaca(String placa, {int? excluirMotoId}) =>
       _dueno((t) => t.placa, placa, excluirMotoId: excluirMotoId);
 
-  @override
-  Future<Moto?> duenoDeVin(String vin, {int? excluirMotoId}) =>
-      _dueno((t) => t.vin, vin, excluirMotoId: excluirMotoId);
-
   // Resumen por cliente
 
   @override
@@ -205,7 +201,6 @@ JoinedSelectStatement<HasResultSet, dynamic> get _baseQuery {
         m.modelo.lower().like(patron) |
         m.placa.lower().like(patron) |
         m.color.lower().like(patron) |
-        m.vin.lower().like(patron) |
         p.nombres.lower().like(patron) |
         p.apellidos.lower().like(patron);
   }

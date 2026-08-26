@@ -47,6 +47,17 @@ abstract class RepositorioPersona {
 
   Future<DatosPersona?> obtenerPorId(int id);
 
+  /// Cómo se llama quien ya tiene ese teléfono, o `null` si está libre.
+  ///
+  /// El teléfono es único en `personas`, así que el choque puede ser con
+  /// cualquier rol: el número que se teclea para un cliente puede ser el del
+  /// proveedor de al lado. Devolver el nombre —y no un `bool`— es lo que
+  /// permite que el mensaje diga de quién es en vez de solo que está ocupado.
+  ///
+  /// [excluirPersonaId] deja fuera a la propia ficha al editarla; sin eso,
+  /// guardar sin tocar el teléfono se rechazaría a sí mismo.
+  Future<String?> duenoDeTelefono(String telefono, {int? excluirPersonaId});
+
   /// Crea la persona, o actualiza la que ya tenga ese documento.
   ///
   /// Devuelve el id de la fila en `personas`. Es la pieza que reutilizan los

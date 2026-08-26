@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../../../../share2/share2.dart';
+import '../../../../../core/validaciones.dart';
 
 /// Formulario del cargo suelto: lo que no está en ningún catálogo.
 ///
@@ -44,7 +45,7 @@ class _CargoLibreFormState extends State<CargoLibreForm> {
   }
 
   void _revisar() => _completo.value = _descripcion.text.trim().isNotEmpty &&
-      (int.tryParse(_precio.text) ?? 0) > 0;
+      (int.tryParse(normalizarDigitos(_precio.text)) ?? 0) > 0;
 
   @override
   void dispose() {
@@ -56,7 +57,7 @@ class _CargoLibreFormState extends State<CargoLibreForm> {
 
   void _agregar() {
     if (!_completo.value) return;
-    widget.alAgregar(_descripcion.text.trim(), int.parse(_precio.text));
+    widget.alAgregar(_descripcion.text.trim(), int.parse(normalizarDigitos(_precio.text)));
     _descripcion.clear();
     _precio.clear();
   }
@@ -84,8 +85,8 @@ class _CargoLibreFormState extends State<CargoLibreForm> {
           CampoTexto(
             etiqueta: 'Precio *',
             controlador: _precio,
-            placeholder: '80000',
-            soloEnteros: true,
+            placeholder: '0',
+            comoPrecio: true,
           ),
           const SizedBox(height: 18),
           ValueListenableBuilder<bool>(

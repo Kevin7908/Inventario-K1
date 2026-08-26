@@ -1,6 +1,7 @@
 import 'package:drift/drift.dart';
 
 import '../../../share/database/app_db.dart';
+import '../../../share/dominio/permiso.dart';
 import '../../../share/dominio/sesion_actual.dart';
 import '../mapper/bitacora_mapper.dart';
 import '../modelo/entrada_bitacora.dart';
@@ -19,6 +20,11 @@ class RepositorioBitacoraImpl with FirmaDeSesion implements RepositorioBitacora 
   $TablaUsuarioTable get _usuarios => _db.tablaUsuario;
   $TablaPersonaTable get _personas => _db.tablaPersona;
 
+  /// **Sin compuerta, a propósito.** Anotar no es una acción del usuario: es
+  /// el rastro que deja la que sí lo es, y ya viene de un método que comprobó
+  /// su propio permiso. Exigir uno aquí dejaría a un cajero borrando un
+  /// producto sin que quede constancia, que es exactamente lo contrario de
+  /// para lo que existe esta tabla.
   @override
   Future<void> anotar(Anotacion anotacion) async {
     await _db.into(_tabla).insert(
@@ -39,6 +45,11 @@ class RepositorioBitacoraImpl with FirmaDeSesion implements RepositorioBitacora 
     required int pagina,
     required int tamano,
   }) {
+    // Leer la bitácora es un permiso aparte: dice quién movió el stock y quién
+    // borró qué, y eso no lo mira cualquiera. Esconder el ítem del sidebar es
+    // orden; esta línea es el control (`CLAUDE.md` §7 bis).
+    exigir(Permiso.bitacoraVer);
+
     final condicion = _condicion(filtro);
 
     final consultaPagina = _conAutor()
@@ -70,6 +81,8 @@ class RepositorioBitacoraImpl with FirmaDeSesion implements RepositorioBitacora 
     int entidadId, {
     int limite = 20,
   }) async {
+    exigir(Permiso.bitacoraVer);
+
     final filas = await (_conAutor()
           ..where(_tabla.entidad.equals(entidad.codigo) &
               _tabla.entidadId.equals(entidadId))

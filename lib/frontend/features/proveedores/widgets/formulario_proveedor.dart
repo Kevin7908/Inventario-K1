@@ -3,9 +3,9 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../../backend/features/proveedores/modelo/proveedor.dart';
 import '../../../../core/resultado.dart';
+import '../../../../core/validaciones.dart';
 import '../../../share2/share2.dart';
 import '../provider/proveedores_provider.dart';
-import 'selector_apariencia_proveedor.dart';
 
 /// Formulario de alta y edición de un proveedor.
 ///
@@ -50,8 +50,6 @@ class _FormularioProveedorState extends ConsumerState<FormularioProveedor> {
   late final TextEditingController _notasCtrl;
 
   late bool _activo;
-  late String _colorHex;
-  late String _icono;
 
   @override
   void initState() {
@@ -68,8 +66,6 @@ class _FormularioProveedorState extends ConsumerState<FormularioProveedor> {
     _notasCtrl = TextEditingController(text: p?.notas ?? '');
 
     _activo = p?.activo ?? true;
-    _colorHex = p?.colorHex ?? '#3B82F6';
-    _icono = p?.icono ?? 'local_shipping';
   }
 
   @override
@@ -121,8 +117,6 @@ class _FormularioProveedorState extends ConsumerState<FormularioProveedor> {
       ciudad: _opcional(_ciudadCtrl),
       notas: _opcional(_notasCtrl),
       activo: _activo,
-      colorHex: _colorHex,
-      icono: _icono,
       creadoEn: widget.proveedorAEditar?.creadoEn,
     );
 
@@ -162,7 +156,7 @@ class _FormularioProveedorState extends ConsumerState<FormularioProveedor> {
             const SizedBox(height: 20),
             _bloqueContacto(),
             const SizedBox(height: 20),
-            _bloqueApariencia(),
+            _bloqueEstado(),
             const SizedBox(height: 24),
             _acciones(),
           ],
@@ -185,19 +179,16 @@ class _FormularioProveedorState extends ConsumerState<FormularioProveedor> {
                 controlador: _nombreCtrl,
                 placeholder: 'Ej: Distribuidora Moto Parts SAS',
                 autofocus: true,
-                validador: (v) {
-                  final texto = v?.trim() ?? '';
-                  if (texto.isEmpty) return 'El nombre es obligatorio.';
-                  if (texto.length < 2) return 'Mínimo 2 caracteres.';
-                  if (texto.length > 120) return 'Máximo 120 caracteres.';
-                  return null;
-                },
+                validador: (v) => validarObligatorio(v, 'El nombre'),
               ),
               CampoTexto(
                 etiqueta: 'NIT / Cédula',
                 controlador: _nitCtrl,
-                placeholder: 'Ej: 900.123.456-7',
+                placeholder: 'Ej: 9001234567',
                 monoespaciado: true,
+                soloEnteros: true,
+                maximoCaracteres: maximoDigitosDocumento,
+                validador: validarDocumento,
               ),
             ],
           ),
@@ -231,22 +222,16 @@ class _FormularioProveedorState extends ConsumerState<FormularioProveedor> {
                 etiqueta: 'Teléfono',
                 controlador: _telefonoCtrl,
                 placeholder: 'Ej: 3001234567',
+                monoespaciado: true,
+                soloEnteros: true,
+                maximoCaracteres: maximoDigitosTelefono,
+                validador: validarTelefono,
               ),
               CampoTexto(
                 etiqueta: 'Correo electrónico',
                 controlador: _emailCtrl,
                 placeholder: 'Ej: ventas@proveedor.com',
-                validador: (v) {
-                  final texto = v?.trim() ?? '';
-                  if (texto.isEmpty) return null;
-                  // Validación deliberadamente laxa: basta con que tenga
-                  // forma de correo. Rechazar direcciones raras pero válidas
-                  // molesta más de lo que ayuda.
-                  final valido = RegExp(r'^[^@\s]+@[^@\s]+\.[^@\s]+$');
-                  return valido.hasMatch(texto)
-                      ? null
-                      : 'Correo con formato inválido.';
-                },
+                validador: validarEmail,
               ),
             ],
           ),
@@ -270,20 +255,15 @@ class _FormularioProveedorState extends ConsumerState<FormularioProveedor> {
     );
   }
 
-  Widget _bloqueApariencia() {
+  /// Solo el estado. La apariencia se fue: todos los proveedores se pintan
+  /// igual, con el almacén y el color de la app (ver `IdentidadProveedor`).
+  Widget _bloqueEstado() {
     return PanelSeccion(
-      titulo: 'Apariencia y estado',
-      icono: Icons.palette_outlined,
+      titulo: 'Estado',
+      icono: Icons.toggle_on_outlined,
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          SelectorAparienciaProveedor(
-            colorHex: _colorHex,
-            icono: _icono,
-            alCambiarColor: (hex) => setState(() => _colorHex = hex),
-            alCambiarIcono: (nombre) => setState(() => _icono = nombre),
-          ),
-          const SizedBox(height: 18),
           InterruptorCampo(
             etiqueta: 'Proveedor activo',
             detalle: _activo

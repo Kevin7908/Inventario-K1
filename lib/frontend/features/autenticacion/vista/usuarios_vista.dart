@@ -6,10 +6,9 @@ import '../../../share2/share2.dart';
 import '../../../../backend/share/dominio/permiso.dart';
 import '../provider/auth_providers.dart';
 import '../provider/usuarios_provider.dart';
-import '../../../../backend/features/autenticacion/modelo/usuario.dart';
 import '../widgets/dialogo_nueva_cuenta.dart';
-import '../widgets/panel_permisos.dart';
 import '../widgets/tabla_usuarios.dart';
+import 'usuario_detalle_vista.dart';
 
 /// Las cuentas del taller: quién puede entrar, con qué rol y desde cuándo.
 ///
@@ -18,11 +17,24 @@ import '../widgets/tabla_usuarios.dart';
 /// pestaña tampoco se le dibuja, pero eso es cortesía de la vista de
 /// Configuración; la comprobación de verdad la hace el repositorio en cada
 /// escritura.
-class UsuariosVista extends ConsumerWidget {
+class UsuariosVista extends ConsumerStatefulWidget {
   const UsuariosVista({super.key});
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  ConsumerState<UsuariosVista> createState() => _UsuariosVistaState();
+}
+
+class _UsuariosVistaState extends ConsumerState<UsuariosVista> {
+  /// Qué cuenta está abierta en su ficha. `null` = se ve el listado. Es el
+  /// mismo patrón del listado de deudas: una pestaña más dentro de la pantalla,
+  /// no una ruta nueva.
+  int? _abierta;
+
+  void _abrir(int id) => setState(() => _abierta = id);
+  void _volverALista() => setState(() => _abierta = null);
+
+  @override
+  Widget build(BuildContext context) {
     final esAdmin = ref.watch(puedeProvider(Permiso.usuariosAdministrar));
 
     if (!esAdmin) {
@@ -37,27 +49,27 @@ class UsuariosVista extends ConsumerWidget {
       );
     }
 
-    return const _PanelUsuarios();
+    final abierta = _abierta;
+    if (abierta != null) {
+      return UsuarioDetalleVista(
+        usuarioId: abierta,
+        alCerrar: _volverALista,
+      );
+    }
+
+    return _PanelUsuarios(alAbrir: _abrir);
   }
 }
 
 class _PanelUsuarios extends ConsumerWidget {
-  const _PanelUsuarios();
+  const _PanelUsuarios({required this.alAbrir});
+
+  final void Function(int usuarioId) alAbrir;
 
   Future<void> _crear(BuildContext context) async {
     final creada = await DialogoNuevaCuenta.mostrar(context);
     if (creada == true && context.mounted) {
       MensajeApp.exito(context, 'Cuenta creada.');
-    }
-  }
-
-  static Future<void> _editarPermisos(
-    BuildContext context,
-    Usuario cuenta,
-  ) async {
-    final guardado = await PanelPermisos.mostrar(context, cuenta);
-    if (guardado == true && context.mounted) {
-      MensajeApp.exito(context, 'Permisos actualizados.');
     }
   }
 
@@ -119,7 +131,7 @@ class _PanelUsuarios extends ConsumerWidget {
                 acciones.cambiarRol(cuenta, rol),
                 'Rol actualizado.',
               ),
-              alEditarPermisos: (cuenta) => _editarPermisos(context, cuenta),
+              alAbrir: (cuenta) => alAbrir(cuenta.id),
             ),
             loading: () => const Center(
               child: CircularProgressIndicator(color: ColoresApp.goGreen),

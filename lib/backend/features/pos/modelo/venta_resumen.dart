@@ -16,6 +16,7 @@ class VentaResumen extends Equatable {
     required this.estadoPago,
     required this.metodoPago,
     this.creadoEn,
+    this.cajero = '',
   });
 
   final int id;
@@ -32,6 +33,10 @@ class VentaResumen extends Equatable {
   final MetodoPago metodoPago;
   final DateTime? creadoEn;
 
+  /// Quién la registró, del `JOIN` con `usuarios` y `personas`. Cadena vacía
+  /// solo si la consulta no lo pidió: la columna `usuario_id` es `NOT NULL`.
+  final String cajero;
+
   @override
   List<Object?> get props => [
         id,
@@ -46,5 +51,6 @@ class VentaResumen extends Equatable {
         estadoPago,
         metodoPago,
         creadoEn,
+        cajero,
       ];
 }

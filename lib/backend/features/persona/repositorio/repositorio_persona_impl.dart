@@ -37,6 +37,29 @@ class RepositorioPersonaImpl implements RepositorioPersona {
   }
 
   @override
+  Future<String?> duenoDeTelefono(
+    String telefono, {
+    int? excluirPersonaId,
+  }) async {
+    final normalizado = telefono.replaceAll(RegExp(r'\D'), '');
+    if (normalizado.isEmpty) return null;
+
+    var consulta = _db.select(_tabla)
+      ..where((p) => p.telefono.equals(normalizado));
+    if (excluirPersonaId != null) {
+      consulta = consulta..where((p) => p.id.isNotValue(excluirPersonaId));
+    }
+
+    final fila = await consulta.getSingleOrNull();
+    if (fila == null) return null;
+
+    final apellidos = fila.apellidos?.trim() ?? '';
+    return apellidos.isEmpty
+        ? fila.nombres.trim()
+        : '${fila.nombres.trim()} $apellidos';
+  }
+
+  @override
   Future<int> guardar(DatosPersona datos) async {
     final companion = PersonaMapper.modeloACompanion(datos);
 

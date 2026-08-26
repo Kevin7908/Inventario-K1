@@ -7,6 +7,9 @@ import '../../persona/esquema_datos/tabla_persona.dart';
 /// La razón social, el NIT, el teléfono y la dirección viven en `personas`
 /// —una empresa usa `nombres` como razón social y `tipo_documento = 'NIT'`—.
 /// Aquí queda lo propio de surtir al taller.
+///
+/// **Sin color ni ícono**, por lo mismo que `categorias`: la apariencia de la
+/// tarjeta es cosa de la vista, no un dato del proveedor.
 @TableIndex(name: 'idx_proveedores_activo', columns: {#activo})
 class TablaProveedor extends Table {
   @override
@@ -26,11 +29,10 @@ class TablaProveedor extends Table {
   TextColumn get contacto => text().nullable()();
 
   TextColumn get notas => text().nullable()();
-  BoolColumn get activo => boolean().withDefault(const Constant(true))();
 
-  /// Decorativos de la tarjeta en la grilla.
-  TextColumn get colorHex => text().withDefault(const Constant('#3B82F6'))();
-  TextColumn get icono => text().withDefault(const Constant('store'))();
+  /// Baja lógica: un proveedor al que ya se le compró no se borra, se
+  /// desactiva. Borrarlo dejaría sin origen los productos de su catálogo.
+  BoolColumn get activo => boolean().withDefault(const Constant(true))();
 
   DateTimeColumn get creadoEn => dateTime().withDefault(currentDateAndTime)();
   DateTimeColumn get actualizadoEn =>

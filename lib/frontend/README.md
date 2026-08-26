@@ -36,7 +36,7 @@ Cada módulo del negocio tiene su propia carpeta. Las vistas de un módulo no im
 | Carpeta | Módulo |
 |---|---|
 | `autenticacion/` | Inicio de sesión, alta del primer administrador, recuperación de contraseña, cuentas y sus permisos |
-| `bitacora/` | (solo backend por ahora) Quién hizo qué: el repositorio existe, la pantalla no |
+| `bitacora/` | Quién hizo qué, y cuándo. Solo la ve quien tenga `BITACORA_VER` |
 | `categorias/` | Categorías de productos |
 | `clientes/` | Gestión de clientes y de las motos de cada uno |
 | `configuracion/` | Ajustes de la aplicación |
@@ -52,11 +52,13 @@ Cada módulo del negocio tiene su propia carpeta. Las vistas de un módulo no im
 | `servicios/` | Catálogo de servicios del taller |
 | `tecnicos/` | Técnicos del taller |
 | `unidades_medida/` | Unidades de medida |
+| `ventas/` | Historial de ventas: qué se vendió, cuándo y quién lo cobró |
 
-> **Facturación se borró el 21/08/2026.** Con ella se fue la carpeta `ventas/`:
-> órdenes y servicios subieron un nivel, y el backend de las ventas de
-> mostrador —las tablas `ventas` y `venta_detalles`, que el POS sigue
-> escribiendo— vive ahora en `backend/features/pos/`.
+> **Facturación se borró el 21/08/2026.** Órdenes y servicios subieron un
+> nivel, y el backend de las ventas de mostrador —las tablas `ventas` y
+> `venta_detalles`, que el POS sigue escribiendo— vive en
+> `backend/features/pos/`. La carpeta `ventas/` volvió el 25/08/2026, pero
+> solo de **lectura**: es el historial, no un módulo para armar facturas.
 
 ---
 

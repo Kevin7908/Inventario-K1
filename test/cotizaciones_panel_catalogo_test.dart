@@ -32,8 +32,6 @@ final _categorias = [
   Categoria(
     id: 1,
     nombre: 'Frenos',
-    colorHex: '#01B763',
-    icono: 'disc',
     creadoEn: DateTime(2026),
     actualizadoEn: DateTime(2026),
   ),

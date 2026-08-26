@@ -3,12 +3,14 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../backend/share/dominio/permiso.dart';
 import '../features/autenticacion/provider/auth_providers.dart';
+import '../features/bitacora/vista/bitacora_vista.dart';
 import '../features/categorias/vista/categorias_vistas.dart';
 import '../features/clientes/vista/cliente_vista.dart';
 import '../features/configuracion/vista/configuracion_vista.dart';
 import '../features/cotizaciones/vista/cotizaciones_vista.dart';
 import '../features/deudores/vista/deudores_vista.dart';
 import '../features/pos/vista/punto_venta_vista.dart';
+import '../features/ventas/vista/historial_ventas_vista.dart';
 import '../features/productos/vista/producto_vista.dart';
 import '../features/proveedores/vista/proveedores_vista.dart';
 import '../features/reservas/vista/reservas_vista.dart';
@@ -41,6 +43,7 @@ class _LayoutPrincipalState extends ConsumerState<LayoutPrincipal> {
   static const List<String> _rutas = [
     '/dashboard',
     '/venta',
+    '/historial-ventas',
     '/productos',
     '/categorias',
     '/proveedores',
@@ -50,6 +53,7 @@ class _LayoutPrincipalState extends ConsumerState<LayoutPrincipal> {
     '/tecnicos',
     '/clientes',
     '/deudores',
+    '/bitacora',
     '/configuracion',
   ];
 
@@ -58,6 +62,7 @@ class _LayoutPrincipalState extends ConsumerState<LayoutPrincipal> {
   static const List<Widget> _vistas = [
     _PlaceholderVista(etiqueta: 'Dashboard'),
     PuntoVentaVista(),
+    HistorialVentasVista(),
     ProductosVista(),
     CategoriasVista(),
     ProveedoresVista(),
@@ -67,6 +72,7 @@ class _LayoutPrincipalState extends ConsumerState<LayoutPrincipal> {
     TecnicosVista(),
     ClientesVista(),
     DeudoresVista(),
+    BitacoraVista(),
     ConfiguracionVista(),
   ];
 
@@ -97,6 +103,7 @@ class _LayoutPrincipalState extends ConsumerState<LayoutPrincipal> {
     '/tecnicos': Permiso.tecnicosVer,
     '/clientes': Permiso.clientesVer,
     '/deudores': Permiso.deudoresVer,
+    '/bitacora': Permiso.bitacoraVer,
     '/configuracion': Permiso.configuracionVer,
     // `/dashboard` no lleva permiso: es la pantalla a la que cae quien no
     // tiene ninguna otra, y dejar a alguien sin sitio donde aterrizar es peor
@@ -121,6 +128,14 @@ class _LayoutPrincipalState extends ConsumerState<LayoutPrincipal> {
           etiqueta: 'Punto de venta',
           ruta: '/venta',
           alPresionar: () => _navegar('/venta'),
+        ),
+        // Sin permiso a propósito: lo ven todos. Un cajero necesita poder
+        // buscar la factura de un cliente que vuelve a reclamar.
+        ItemNavDato(
+          icono: Icons.receipt_long_outlined,
+          etiqueta: 'Historial de ventas',
+          ruta: '/historial-ventas',
+          alPresionar: () => _navegar('/historial-ventas'),
         ),
       ],
     ),
@@ -190,6 +205,19 @@ class _LayoutPrincipalState extends ConsumerState<LayoutPrincipal> {
           etiqueta: 'Cuentas por cobrar',
           ruta: '/deudores',
           alPresionar: () => _navegar('/deudores'),
+        ),
+      ],
+    ),
+    // La sección entera desaparece para quien no tenga `bitacoraVer`: la
+    // recorta `_seccionesVisibles`, que no deja títulos sueltos sin ítems.
+    SeccionNavDato(
+      titulo: 'Administración',
+      items: [
+        ItemNavDato(
+          icono: Icons.history_rounded,
+          etiqueta: 'Bitácora',
+          ruta: '/bitacora',
+          alPresionar: () => _navegar('/bitacora'),
         ),
       ],
     ),

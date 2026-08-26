@@ -16,7 +16,8 @@ import '../../../share2/share2.dart';
 ///   no ofrecerle desactivarse a sí mismo.
 /// - [alCambiarEstado]: activar o desactivar una cuenta.
 /// - [alCambiarRol]: cambiar el rol de una cuenta.
-/// - [alEditarPermisos]: abrir la lista de permisos de esa cuenta.
+/// - [alAbrir]: abre la ficha de esa cuenta. Toda la fila lleva a ella; el
+///   chevron de la derecha solo lo anuncia.
 class TablaUsuarios extends StatelessWidget {
   const TablaUsuarios({
     super.key,
@@ -24,14 +25,14 @@ class TablaUsuarios extends StatelessWidget {
     required this.idEnSesion,
     required this.alCambiarEstado,
     required this.alCambiarRol,
-    required this.alEditarPermisos,
+    required this.alAbrir,
   });
 
   final List<Usuario> usuarios;
   final int? idEnSesion;
   final void Function(Usuario cuenta, bool activa) alCambiarEstado;
   final void Function(Usuario cuenta, RolUsuario rol) alCambiarRol;
-  final void Function(Usuario cuenta) alEditarPermisos;
+  final void Function(Usuario cuenta) alAbrir;
 
   bool _esUnoMismo(Usuario cuenta) => cuenta.id == idEnSesion;
 
@@ -40,6 +41,7 @@ class TablaUsuarios extends StatelessWidget {
     return TablaGenerica<Usuario>(
       items: usuarios,
       mensajeVacio: 'Todavía no hay cuentas',
+      alPresionarFila: alAbrir,
       columnas: [
         ColumnaTabla<Usuario>(
           titulo: 'Persona',
@@ -100,19 +102,17 @@ class TablaUsuarios extends StatelessWidget {
           constructor: (u) => Row(
             mainAxisSize: MainAxisSize.min,
             children: [
-              BotonIcono(
-                icono: Icons.tune_rounded,
-                tooltip: u.esAdmin
-                    ? 'Un administrador tiene todos los permisos'
-                    : 'Permisos de esta cuenta',
-                // Los de un administrador no se editan: son todos, y quitarle
-                // alguno dejaría la app sin quien pueda devolvérselo.
-                alPresionar: u.esAdmin ? null : () => alEditarPermisos(u),
-              ),
               _BotonEstado(
                 usuario: u,
                 esUnoMismo: _esUnoMismo(u),
                 alCambiarEstado: alCambiarEstado,
+              ),
+              // Decorativo: quien abre la ficha es la fila entera, así que no
+              // es un botón y no lleva tooltip propio.
+              const Icon(
+                Icons.chevron_right_rounded,
+                size: 20,
+                color: ColoresApp.textDisabled,
               ),
             ],
           ),
@@ -236,11 +236,17 @@ class _SelectorRol extends StatelessWidget {
       child: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
-          IndicadorEstado(
-            etiqueta: usuario.rol.etiqueta,
-            color: esAdmin ? ColoresApp.statusInfo : ColoresApp.statusNeutral,
-            colorFondo:
-                esAdmin ? ColoresApp.statusInfoBg : ColoresApp.statusNeutralBg,
+          // Sin `Flexible` el chip exige su ancho natural y la celda desborda
+          // en cuanto la ventana baja de ~1350 px.
+          Flexible(
+            child: IndicadorEstado(
+              etiqueta: usuario.rol.etiqueta,
+              color:
+                  esAdmin ? ColoresApp.statusInfo : ColoresApp.statusNeutral,
+              colorFondo: esAdmin
+                  ? ColoresApp.statusInfoBg
+                  : ColoresApp.statusNeutralBg,
+            ),
           ),
           const Icon(
             Icons.expand_more_rounded,

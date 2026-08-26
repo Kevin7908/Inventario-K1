@@ -55,19 +55,6 @@ Future<Resultado?> validarMoto({
     }
   }
 
-  final vin = moto.vin?.trim() ?? '';
-  if (vin.isNotEmpty) {
-    final dueno = await _dueno(
-      () => repo.duenoDeVin(vin, excluirMotoId: excluir),
-    );
-    if (dueno != null) {
-      return Fallo(
-        MotivoFallo.placaRegistrada,
-        'El chasis $vin ya está registrado a nombre de $dueno.',
-      );
-    }
-  }
-
   return null;
 }
 

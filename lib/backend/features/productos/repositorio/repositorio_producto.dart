@@ -90,6 +90,14 @@ abstract class RepositorioProducto {
   /// Usa [excludirId] para excluir el producto actual al editar.
   Future<bool> existeSku(String sku, {int? excludirId});
 
+  /// El SKU que le tocaría al siguiente producto de [categoriaId], **sin
+  /// consumirlo**.
+  ///
+  /// Es para enseñarlo en el formulario mientras se escribe. El definitivo lo
+  /// asigna [crear] dentro de su transacción: abrir el formulario y
+  /// arrepentirse no puede quemar un código.
+  Future<String> previsualizarSku(int? categoriaId);
+
   /// Retorna el total de productos activos registrados.
   Future<int> contarActivos();
 

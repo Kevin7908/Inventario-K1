@@ -65,8 +65,6 @@ class _FormularioMotoState extends State<FormularioMoto> {
   late final TextEditingController _anioCtrl;
   late final TextEditingController _cilindrajeCtrl;
   late final TextEditingController _colorCtrl;
-  late final TextEditingController _vinCtrl;
-  late final TextEditingController _kilometrajeCtrl;
   late final TextEditingController _notasCtrl;
 
   Cliente? _dueno;
@@ -84,12 +82,6 @@ class _FormularioMotoState extends State<FormularioMoto> {
     _cilindrajeCtrl =
         TextEditingController(text: m?.cilindraje?.toString() ?? '');
     _colorCtrl = TextEditingController(text: m?.color ?? '');
-    _vinCtrl = TextEditingController(text: m?.vin ?? '');
-    _kilometrajeCtrl = TextEditingController(
-      text: m == null || m.kilometrajeInicial == 0
-          ? ''
-          : m.kilometrajeInicial.toString(),
-    );
     _notasCtrl = TextEditingController(text: m?.notas ?? '');
     _dueno = widget.clienteInicial;
     _activa = m?.activo ?? true;
@@ -103,8 +95,6 @@ class _FormularioMotoState extends State<FormularioMoto> {
     _anioCtrl.dispose();
     _cilindrajeCtrl.dispose();
     _colorCtrl.dispose();
-    _vinCtrl.dispose();
-    _kilometrajeCtrl.dispose();
     _notasCtrl.dispose();
     super.dispose();
   }
@@ -144,8 +134,6 @@ class _FormularioMotoState extends State<FormularioMoto> {
         anio: int.tryParse(_anioCtrl.text.trim()),
         cilindraje: int.tryParse(_cilindrajeCtrl.text.trim()),
         color: _opcional(_colorCtrl),
-        vin: _opcional(_vinCtrl)?.toUpperCase(),
-        kilometrajeInicial: int.tryParse(_kilometrajeCtrl.text.trim()) ?? 0,
         notas: _opcional(_notasCtrl),
         activo: widget.mostrarEstado ? _activa : previa?.activo ?? true,
         creadoEn: previa?.creadoEn ?? DateTime.now(),
@@ -238,20 +226,7 @@ class _FormularioMotoState extends State<FormularioMoto> {
                   controlador: _colorCtrl,
                   placeholder: 'Ej: Rojo',
                 ),
-                CampoTexto(
-                  etiqueta: 'Kilometraje inicial',
-                  controlador: _kilometrajeCtrl,
-                  placeholder: 'Ej: 12500',
-                  validador: (v) => _entero(v, minimo: 0),
-                ),
               ],
-            ),
-            const SizedBox(height: 16),
-            CampoTexto(
-              etiqueta: 'Número de chasis (VIN)',
-              controlador: _vinCtrl,
-              placeholder: 'Ej: 9C2KC1670LR000001',
-              monoespaciado: true,
             ),
             const SizedBox(height: 16),
             CampoTexto(

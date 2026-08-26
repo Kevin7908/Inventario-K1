@@ -21,6 +21,28 @@ class RepositorioConsecutivos {
     return documento.formatear(secuencia, periodo: periodo);
   }
 
+  /// El siguiente número de una serie que **no** está en
+  /// [DocumentoConsecutivo], porque su código no se conoce hasta que corre la
+  /// app: el SKU lleva una serie por categoría y las categorías las crea el
+  /// usuario.
+  ///
+  /// Sigue siendo el mismo `UPSERT ... RETURNING`, así que hereda lo que hace
+  /// falta: no repite, no reutiliza el número de lo borrado, y una transacción
+  /// revertida devuelve el número a la serie.
+  Future<int> siguienteDeSerie(String codigo) => _incrementar(codigo, 0);
+
+  /// Lo que devolvería [siguienteDeSerie] **sin consumirlo**.
+  ///
+  /// Es para enseñar el número antes de guardar. Abrir un formulario y
+  /// arrepentirse no puede quemar un código: quien mira una estantería con
+  /// `ACE-003` y `ACE-005` se pregunta dónde está el cuarto.
+  Future<int> proximoDeSerie(String codigo) async {
+    final fila = await (_db.select(_db.tablaConsecutivo)
+          ..where((c) => c.documento.equals(codigo) & c.periodo.equals(0)))
+        .getSingleOrNull();
+    return (fila?.ultimo ?? 0) + 1;
+  }
+
   /// Incrementa el contador y devuelve el valor nuevo, en una sola sentencia.
   ///
   /// `ON CONFLICT ... RETURNING` evita el ciclo «leer → sumar → escribir», que

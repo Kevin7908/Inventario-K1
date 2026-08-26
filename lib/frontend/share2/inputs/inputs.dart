@@ -4,6 +4,7 @@ export 'campo_busqueda.dart';
 export 'campo_fecha.dart';
 export 'campo_precio_linea.dart';
 export 'campo_texto.dart';
+export 'formateador_miles.dart';
 export 'control_cantidad.dart';
 export 'cuadro_seleccion.dart';
 export 'fila_campos.dart';

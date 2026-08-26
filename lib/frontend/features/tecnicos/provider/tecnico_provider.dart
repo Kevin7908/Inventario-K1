@@ -7,6 +7,7 @@ import '../../../../backend/features/tecnicos/repositorio/repositorio_tecnico.da
 import '../../../../backend/features/tecnicos/repositorio/repositorio_tecnico_impl.dart';
 import '../../../../backend/share/database/app_db_provider.dart';
 import '../../../../core/resultado.dart';
+import '../../persona/provider/persona_provider.dart';
 import '../../ordenes/provider/ordenes_providers.dart';
 import '../../autenticacion/provider/auth_providers.dart';
 
@@ -234,7 +235,26 @@ class TecnicosNotifier extends AsyncNotifier<TecnicosState> {
       );
     }
 
-    return null;
+    return _telefonoLibre(tecnico.telefono, tecnico.personaId);
+  }
+
+  /// El teléfono es único en `personas`, así que el choque puede ser con
+  /// cualquier rol. Es una comprobación de cortesía, para dar un mensaje que
+  /// se entienda; la que impide de verdad es el `UNIQUE` de la tabla.
+  Future<Resultado?> _telefonoLibre(String? telefono, int? personaId) async {
+    final numero = telefono?.trim() ?? '';
+    if (numero.isEmpty) return null;
+
+    final dueno = await ref
+        .read(repositorioPersonaProvider)
+        .duenoDeTelefono(numero, excluirPersonaId: personaId);
+
+    return dueno == null
+        ? null
+        : Fallo(
+            MotivoFallo.telefonoDuplicado,
+            'El teléfono $numero ya está registrado a nombre de $dueno.',
+          );
   }
 }
 

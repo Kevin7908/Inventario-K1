@@ -30,8 +30,6 @@ Proveedor _proveedor({
       ciudad: ciudad,
       contacto: contacto,
       activo: activo,
-      colorHex: '#3B82F6',
-      icono: 'local_shipping',
       creadoEn: DateTime.now(),
       actualizadoEn: DateTime.now(),
     );

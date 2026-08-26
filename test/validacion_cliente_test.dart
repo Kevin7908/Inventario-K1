@@ -14,6 +14,7 @@ import 'package:inventario_k1/frontend/features/clientes/provider/validacion_cli
 import 'soporte/base_en_memoria.dart';
 import 'soporte/sesion_de_prueba.dart';
 import 'package:inventario_k1/backend/share/dominio/sesion_actual.dart';
+import 'package:inventario_k1/backend/features/persona/repositorio/repositorio_persona_impl.dart';
 
 late AppDb db;
 
@@ -21,16 +22,27 @@ late AppDb db;
 late SesionActual sesion;
 late RepositorioClientesImpl clientes;
 late RepositorioMotosImpl motos;
+late RepositorioPersonaImpl personas;
 
-Cliente _cliente({int id = 0, String nombres = 'Nuevo', String? documento}) =>
-    Cliente(id: id, nombres: nombres, documento: documento, activo: true);
+Cliente _cliente({
+  int id = 0,
+  String nombres = 'Nuevo',
+  String? documento,
+  String? telefono,
+}) =>
+    Cliente(
+      id: id,
+      nombres: nombres,
+      documento: documento,
+      telefono: telefono,
+      activo: true,
+    );
 
 Moto _moto({
   int id = 0,
   String marca = 'Bajaj',
   String modelo = 'Pulsar',
   String? placa,
-  String? vin,
 }) =>
     Moto(
       id: id,
@@ -38,7 +50,6 @@ Moto _moto({
       marca: marca,
       modelo: modelo,
       placa: placa,
-      vin: vin,
       activo: true,
       creadoEn: DateTime.now(),
       actualizadoEn: DateTime.now(),
@@ -49,6 +60,7 @@ Future<Resultado?> _validar(Cliente cliente, List<Moto> lista) => validarCliente
       motos: lista,
       repoClientes: clientes,
       repoMotos: motos,
+      repoPersonas: personas,
     );
 
 void main() {
@@ -57,6 +69,7 @@ void main() {
     sesion = await sesionDePrueba(db);
     clientes = RepositorioClientesImpl(db, sesion);
     motos = RepositorioMotosImpl(db, sesion);
+    personas = RepositorioPersonaImpl(db);
   });
 
   tearDown(() async => db.close());
@@ -94,19 +107,6 @@ void main() {
       );
     });
 
-    test('el chasis ajeno también se rechaza', () async {
-      await clientes.guardarConMotos(
-        cliente: _cliente(nombres: 'Carlos'),
-        motos: [_moto(placa: 'AAA111', vin: '9C2KC1670LR000001')],
-      );
-
-      final fallo = await _validar(
-        _cliente(nombres: 'Intruso'),
-        [_moto(placa: 'BBB222', vin: '9C2KC1670LR000001')],
-      );
-
-      expect((fallo! as Fallo).motivo, MotivoFallo.placaRegistrada);
-    });
   });
 
   group('motos propias', () {
@@ -187,6 +187,57 @@ void main() {
         await _validar(_cliente(id: id, nombres: 'Carlos', documento: '111'), []),
         isNull,
       );
+    });
+  });
+
+  group('el teléfono no se repite', () {
+    // Vive en `personas`, que comparten los cuatro roles: el número que se
+    // teclea para un cliente puede ser el del proveedor de al lado. La
+    // comprobación es de cortesía —para dar un mensaje que se entienda—; la
+    // que impide de verdad es el `UNIQUE` de la tabla.
+
+    test('el de otro cliente se rechaza y dice de quién es', () async {
+      await clientes.guardarConMotos(
+        cliente: _cliente(nombres: 'Carlos', telefono: '3001234567'),
+        motos: const [],
+      );
+
+      final fallo = await _validar(
+        _cliente(nombres: 'Intruso', telefono: '3001234567'),
+        const [],
+      );
+
+      expect((fallo! as Fallo).motivo, MotivoFallo.telefonoDuplicado);
+      expect((fallo as Fallo).mensaje, contains('Carlos'));
+    });
+
+    test('un cliente no choca consigo mismo al editarse', () async {
+      await clientes.guardarConMotos(
+        cliente: _cliente(nombres: 'Carlos', telefono: '3001234567'),
+        motos: const [],
+      );
+      final guardado = (await clientes.obtenerTodos()).single;
+
+      expect(
+        await _validar(
+          _cliente(
+            id: guardado.id,
+            nombres: 'Carlos',
+            telefono: '3001234567',
+          ).copyWith(personaId: guardado.personaId),
+          const [],
+        ),
+        isNull,
+      );
+    });
+
+    test('sin teléfono no se compara nada', () async {
+      await clientes.guardarConMotos(
+        cliente: _cliente(nombres: 'Carlos'),
+        motos: const [],
+      );
+
+      expect(await _validar(_cliente(nombres: 'Otro'), const []), isNull);
     });
   });
 }

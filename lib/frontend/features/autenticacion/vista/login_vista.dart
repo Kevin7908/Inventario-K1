@@ -91,8 +91,8 @@ class _LoginVistaState extends ConsumerState<LoginVista> {
   @override
   Widget build(BuildContext context) {
     return MarcoAutenticacion(
-      titulo: 'Entra a tu cuenta',
-      subtitulo: 'Con tu usuario o tu correo.',
+      titulo: 'Bienvenido de nuevo',
+      subtitulo: 'Escribe tus datos para entrar.',
       child: AtajosFormulario(
         alGuardar: _entrando ? null : _entrar,
         child: Form(
@@ -145,11 +145,14 @@ class _LoginVistaState extends ConsumerState<LoginVista> {
                 expandido: true,
                 alPresionar: _entrando ? null : _entrar,
               ),
-              const SizedBox(height: 16),
-              Text(
-                'Las cuentas las crea el administrador del taller.',
-                style: TipografiaApp.caption.copyWith(
-                  color: ColoresApp.textMuted,
+              const SizedBox(height: 18),
+              Center(
+                child: Text(
+                  'Las cuentas las crea el administrador del taller.',
+                  textAlign: TextAlign.center,
+                  style: TipografiaApp.caption.copyWith(
+                    color: ColoresApp.textMuted,
+                  ),
                 ),
               ),
             ],

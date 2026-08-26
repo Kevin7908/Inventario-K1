@@ -16,9 +16,67 @@ import '../enum/enum_ventas.dart';
 /// contables, las referencian `deudores.venta_id` y
 /// `movimientos_inventario.venta_id`, y el consecutivo `FAC-` sigue saliendo
 /// de `consecutivos`.
+/// Una página del historial: las ventas visibles y el total real.
+final class PaginaVentas {
+  const PaginaVentas({required this.items, required this.total});
+
+  final List<VentaResumen> items;
+
+  /// Cuántas ventas cumplen el filtro en total, no solo en esta página.
+  final int total;
+
+  static const vacia = PaginaVentas(items: [], total: 0);
+}
+
+/// Criterios que se aplican **en SQL**, no recorriendo la lista.
+final class FiltroVentas {
+  const FiltroVentas({
+    this.tipo,
+    this.estado,
+    this.usuarioId,
+    this.desde,
+    this.hasta,
+    this.busqueda = '',
+  });
+
+  /// Mostrador o facturada desde una orden de servicio.
+  final TipoVenta? tipo;
+
+  final EstadoPago? estado;
+
+  /// Solo lo que vendió esta cuenta.
+  final int? usuarioId;
+
+  /// Rango de fechas, inclusivo por los dos lados.
+  final DateTime? desde;
+  final DateTime? hasta;
+
+  /// Texto libre contra el número de factura, el cliente y el cajero.
+  final String busqueda;
+
+  bool get hayFiltro =>
+      tipo != null ||
+      estado != null ||
+      usuarioId != null ||
+      desde != null ||
+      hasta != null ||
+      busqueda.trim().isNotEmpty;
+}
+
 abstract interface class RepositorioVentas {
   /// Historial de ventas, de la más nueva a la más vieja.
   Stream<List<VentaResumen>> observarTodas();
+
+  /// Una página del historial, de la más reciente a la más antigua.
+  ///
+  /// Filtra, cuenta y recorta **en SQL**: el historial de un taller crece sin
+  /// techo y es la última lista que puede traerse entera para filtrarla en
+  /// memoria (`REGLAS_BD.md` §5).
+  Stream<PaginaVentas> observarPagina({
+    required FiltroVentas filtro,
+    required int pagina,
+    required int tamano,
+  });
 
   /// Una venta con sus líneas.
   Future<VentaDetalle> obtenerDetalle(int id);

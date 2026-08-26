@@ -89,9 +89,6 @@ abstract class RepositorioMotos {
   /// guardar sin tocar la placa se rechazaría a sí mismo.
   Future<Moto?> duenoDePlaca(String placa, {int? excluirMotoId});
 
-  /// Igual que [duenoDePlaca] pero por número de chasis, que también es único.
-  Future<Moto?> duenoDeVin(String vin, {int? excluirMotoId});
-
   Future<int> crear(Moto moto);
 
   Future<void> actualizar(Moto moto);

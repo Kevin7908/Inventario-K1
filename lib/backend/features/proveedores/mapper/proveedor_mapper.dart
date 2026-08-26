@@ -23,8 +23,6 @@ abstract final class ProveedorMapper {
       ciudad: persona.ciudad,
       notas: rol.notas,
       activo: rol.activo,
-      colorHex: rol.colorHex,
-      icono: rol.icono,
       creadoEn: rol.creadoEn,
       actualizadoEn: rol.actualizadoEn,
     );
@@ -45,8 +43,6 @@ abstract final class ProveedorMapper {
       contacto: Value(p.contacto),
       notas: Value(p.notas),
       activo: Value(p.activo),
-      colorHex: Value(p.colorHex),
-      icono: Value(p.icono),
       actualizadoEn: Value(DateTime.now()),
     );
   }

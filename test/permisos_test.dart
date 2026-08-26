@@ -8,6 +8,9 @@
 // la equivocación, no a alguien decidido a saltárselo.
 import 'package:flutter_test/flutter_test.dart';
 import 'package:inventario_k1/backend/features/autenticacion/repositorio/repositorio_auth_impl.dart';
+import 'package:inventario_k1/backend/features/bitacora/modelo/entrada_bitacora.dart';
+import 'package:inventario_k1/backend/features/bitacora/repositorio/repositorio_bitacora.dart';
+import 'package:inventario_k1/backend/features/bitacora/repositorio/repositorio_bitacora_impl.dart';
 import 'package:inventario_k1/backend/features/autenticacion/resultado/resultados_auth.dart';
 import 'package:inventario_k1/backend/features/productos/modelo/producto.dart';
 import 'package:inventario_k1/backend/features/productos/repositorio/repositorio_producto_impl.dart';
@@ -271,6 +274,89 @@ void main() {
 
       final restantes = await db.select(db.tablaUsuarioPermiso).get();
       expect(restantes.where((p) => p.usuarioId == anaId), isEmpty);
+    });
+  });
+
+  group('leer la bitácora es su propio permiso', () {
+    // Dice quién movió el inventario y quién borró qué. Que un cajero pueda
+    // editar productos no significa que pueda leer el rastro de todos.
+
+    test('sin el permiso, la consulta no llega a la base', () {
+      final cajero = RepositorioBitacoraImpl(
+        db,
+        _cajeroCon({Permiso.productosVer, Permiso.productosEditar}),
+      );
+
+      // Con closure: `observarPagina` es de cuerpo síncrono, así que la
+      // compuerta lanza antes de que exista el `Stream`.
+      expect(
+        () => cajero.observarPagina(
+          filtro: const FiltroBitacora(),
+          pagina: 0,
+          tamano: 10,
+        ),
+        throwsA(isA<PermisoDenegado>()),
+      );
+    });
+
+    test('el historial de una fila está detrás de la misma compuerta',
+        () async {
+      final cajero = RepositorioBitacoraImpl(
+        db,
+        _cajeroCon({Permiso.productosVer}),
+      );
+
+      await expectLater(
+        cajero.historialDe(EntidadAuditada.producto, 1),
+        throwsA(isA<PermisoDenegado>()),
+      );
+    });
+
+    test('con el permiso, lee', () async {
+      final admin = RepositorioProductosImpl(db, sesion);
+      await admin.crear(_producto());
+
+      final auditor = RepositorioBitacoraImpl(
+        db,
+        _cajeroCon({Permiso.bitacoraVer}),
+      );
+
+      final pagina = await auditor
+          .observarPagina(
+            filtro: const FiltroBitacora(),
+            pagina: 0,
+            tamano: 10,
+          )
+          .first;
+
+      expect(pagina.total, 1);
+    });
+
+    test('anotar no exige permiso: el rastro no es opcional', () async {
+      // Si anotar pidiera `bitacoraVer`, un cajero borraría un producto sin
+      // dejar constancia, que es lo contrario de para lo que existe la tabla.
+      final cajero = _cajeroCon({
+        Permiso.productosVer,
+        Permiso.productosCrear,
+        Permiso.productosEliminar,
+      });
+      final productos = RepositorioProductosImpl(db, cajero);
+      final creado = await productos.crear(_producto());
+
+      await productos.eliminar(creado.id!);
+
+      final todo = await RepositorioBitacoraImpl(db, sesion)
+          .observarPagina(
+            filtro: FiltroBitacora(usuarioId: cajero.usuarioId),
+            pagina: 0,
+            tamano: 10,
+          )
+          .first;
+
+      expect(
+        todo.items.map((e) => e.accion),
+        contains(AccionAuditada.elimino),
+      );
     });
   });
 }

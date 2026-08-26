@@ -33,7 +33,16 @@ class TablaPersona extends Table {
   TextColumn get nombres => text()();
 
   TextColumn get apellidos => text().nullable()();
-  TextColumn get telefono => text().nullable()();
+
+  /// Ya normalizado (solo dígitos) y **único**: el mismo número no puede estar
+  /// en dos fichas. Como vive en `personas`, la restricción es común a los
+  /// cuatro roles —cliente, técnico, proveedor y cuenta—, que es justo lo que
+  /// se busca: si el número ya está, es la misma persona y hay que reusar su
+  /// ficha en vez de crear otra.
+  ///
+  /// Nullable porque no todo el mundo deja teléfono, y SQLite admite varios
+  /// NULL bajo un `UNIQUE`.
+  TextColumn get telefono => text().nullable().unique()();
   TextColumn get email => text().nullable()();
   TextColumn get direccion => text().nullable()();
   TextColumn get ciudad => text().nullable()();

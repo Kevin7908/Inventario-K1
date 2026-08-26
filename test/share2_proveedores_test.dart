@@ -4,6 +4,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:inventario_k1/backend/features/proveedores/modelo/proveedor.dart';
 import 'package:inventario_k1/frontend/features/proveedores/widgets/tarjeta_proveedor.dart';
 import 'package:inventario_k1/frontend/share2/share2.dart';
+import 'package:inventario_k1/frontend/features/proveedores/widgets/identidad_proveedor.dart';
 
 Widget _envolver(Widget child) => MaterialApp(
       home: Scaffold(
@@ -21,8 +22,6 @@ Proveedor _proveedor({
   String? telefono = '3001234567',
   String? ciudad = 'Bogotá',
   bool activo = true,
-  String icono = 'local_shipping',
-  String colorHex = '#3B82F6',
 }) =>
     Proveedor(
       id: 1,
@@ -32,8 +31,6 @@ Proveedor _proveedor({
       telefono: telefono,
       ciudad: ciudad,
       activo: activo,
-      colorHex: colorHex,
-      icono: icono,
     );
 
 void main() {
@@ -171,25 +168,16 @@ void main() {
       expect(find.text('Inactivo'), findsOneWidget);
     });
 
-    testWidgets('usa el ícono guardado del proveedor', (tester) async {
-      await tester.pumpWidget(_envolver(
-        TarjetaProveedor(proveedor: _proveedor(icono: 'factory'), productos: 3),
-      ));
-
-      expect(find.byIcon(Icons.factory_outlined), findsOneWidget);
-      expect(find.byIcon(Icons.local_shipping_outlined), findsNothing);
-    });
-
-    testWidgets('un ícono desconocido cae en el camión del diseño',
+    testWidgets('todos los proveedores llevan el mismo almacén',
         (tester) async {
+      // La apariencia dejó de ser un dato del proveedor: se elegía al crearlo
+      // y dejaba el diseño de la app a merced de lo que alguien hubiera
+      // tecleado. Ahora sale de `IdentidadProveedor`, en un solo sitio.
       await tester.pumpWidget(_envolver(
-        TarjetaProveedor(
-          proveedor: _proveedor(icono: 'inexistente'),
-          productos: 3,
-        ),
+        TarjetaProveedor(proveedor: _proveedor(), productos: 3),
       ));
 
-      expect(find.byIcon(Icons.local_shipping_outlined), findsOneWidget);
+      expect(find.byIcon(IdentidadProveedor.icono), findsOneWidget);
     });
 
     testWidgets('avisa de editar y eliminar por separado', (tester) async {

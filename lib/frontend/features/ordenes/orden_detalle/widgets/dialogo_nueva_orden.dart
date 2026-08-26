@@ -52,14 +52,10 @@ class _DialogoNuevaOrdenState extends ConsumerState<DialogoNuevaOrden> {
     super.dispose();
   }
 
-  void _elegirMoto(Moto? moto) => setState(() {
-        _moto = moto;
-        // El kilometraje inicial de la moto es el mejor punto de partida: casi
-        // siempre hay que subirlo un poco, no teclearlo de cero.
-        if (moto != null && _kilometraje.text.isEmpty) {
-          _kilometraje.text = '${moto.kilometrajeInicial}';
-        }
-      });
+  // El kilometraje se teclea entero: la moto ya no guarda uno «inicial»
+  // —cambiaba en cada visita y nadie lo actualizaba—, así que el dato bueno
+  // es el que se lee del tablero al recibirla.
+  void _elegirMoto(Moto? moto) => setState(() => _moto = moto);
 
   Future<void> _crear() async {
     final moto = _moto;

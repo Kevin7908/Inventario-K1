@@ -4,6 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../../../backend/features/tecnicos/modelo/tecnico.dart';
 import '../../../../../backend/features/servicios/modelo/servicio.dart';
 import '../../../../../core/formato.dart';
+import '../../../../../core/validaciones.dart';
 import '../../../../share2/share2.dart';
 import '../../../tecnicos/provider/tecnico_provider.dart';
 import '../provider/catalogo_orden_providers.dart';
@@ -134,7 +135,7 @@ class _FilaServicioState extends ConsumerState<_FilaServicio> {
 
   void _precargar() {
     final sugerido = widget.servicio.precioSugerido;
-    _precio.text = sugerido > 0 ? '$sugerido' : '';
+    _precio.text = sugerido > 0 ? agruparMiles(sugerido) : '';
 
     final ultimo = ref
         .read(ordenEditorProvider(widget.ordenId))
@@ -148,14 +149,14 @@ class _FilaServicioState extends ConsumerState<_FilaServicio> {
   }
 
   bool get _completo =>
-      _tecnico?.id != null && (int.tryParse(_precio.text) ?? 0) > 0;
+      _tecnico?.id != null && (int.tryParse(normalizarDigitos(_precio.text)) ?? 0) > 0;
 
   Future<void> _agregar() async {
     if (!_completo) return;
     // Se lee antes de ceder el turno: después del `await` el widget puede
     // haberse desmontado y `_tecnico` ya no serviría.
     final tecnicoId = _tecnico!.id!;
-    final precio = int.parse(_precio.text);
+    final precio = int.parse(normalizarDigitos(_precio.text));
 
     widget.alAgregar();
     await ref
@@ -281,8 +282,8 @@ class _FilaServicioState extends ConsumerState<_FilaServicio> {
               CampoTexto(
                 etiqueta: 'Precio *',
                 controlador: _precio,
-                placeholder: '50000',
-                soloEnteros: true,
+                placeholder: '0',
+                comoPrecio: true,
                 // Con el técnico ya puesto, el precio es lo único que puede
                 // faltar: el foco cae ahí y desde ahí se llega al botón con
                 // un Tab (§8).

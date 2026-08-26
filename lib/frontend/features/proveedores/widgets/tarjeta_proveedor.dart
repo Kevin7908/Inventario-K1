@@ -2,39 +2,12 @@ import 'package:flutter/material.dart';
 
 import '../../../../backend/features/proveedores/modelo/proveedor.dart';
 import '../../../share2/share2.dart';
-
-/// Íconos que un proveedor puede tener guardados.
-///
-/// [clave] es lo que va en la columna `icono` de la base —en inglés, porque ya
-/// hay datos guardados así— y [nombre] es la etiqueta que ve el usuario.
-/// Es `const` y de nivel superior: una sola instancia para toda la app, en vez
-/// de una lista nueva por cada tarjeta construida.
-const List<({String clave, IconData icono, String nombre})> iconosProveedor = [
-  (clave: 'local_shipping', icono: Icons.local_shipping_outlined, nombre: 'Camión'),
-  (clave: 'store', icono: Icons.store_outlined, nombre: 'Almacén'),
-  (clave: 'factory', icono: Icons.factory_outlined, nombre: 'Fábrica'),
-  (clave: 'handshake', icono: Icons.handshake_outlined, nombre: 'Acuerdo'),
-  (clave: 'inventory', icono: Icons.inventory_2_outlined, nombre: 'Inventario'),
-  (clave: 'build', icono: Icons.build_outlined, nombre: 'Herramienta'),
-  (clave: 'oil_barrel', icono: Icons.oil_barrel_outlined, nombre: 'Lubricantes'),
-  (clave: 'settings', icono: Icons.settings_outlined, nombre: 'Repuestos'),
-  (clave: 'electrical_services', icono: Icons.electrical_services_outlined, nombre: 'Eléctrico'),
-  (clave: 'construction', icono: Icons.construction_outlined, nombre: 'Taller'),
-];
-
-/// Ícono guardado del proveedor, o el camión del diseño si no reconoce la
-/// clave. El mockup dibuja todos los proveedores con un camión; el modelo ya
-/// guarda cuál eligió el usuario, así que se respeta esa elección.
-IconData iconoDeProveedor(String clave) {
-  for (final opcion in iconosProveedor) {
-    if (opcion.clave == clave) return opcion.icono;
-  }
-  return Icons.local_shipping_outlined;
-}
+import 'identidad_proveedor.dart';
 
 /// Tarjeta de un proveedor en la grilla del catálogo.
 ///
-/// Replica la tarjeta del mockup: marcador con el ícono del proveedor, nombre,
+/// Replica la tarjeta del mockup: el marcador de almacén —igual para todos,
+/// ver [IdentidadProveedor]—, el nombre,
 /// NIT en monoespaciada y las líneas de contacto, teléfono y productos que
 /// surte. Vive en el módulo y no en share2 porque traduce un [Proveedor] —un
 /// modelo de dominio— a la [TarjetaCatalogo] compartida.
@@ -59,13 +32,12 @@ class TarjetaProveedor extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final color = colorDeHex(proveedor.colorHex) ?? ColoresApp.statusInfo;
     final nit = proveedor.nitCedula?.trim() ?? '';
 
     return TarjetaCatalogo(
-      marcador: MarcadorIdentidad(
-        icono: iconoDeProveedor(proveedor.icono),
-        color: color,
+      marcador: const MarcadorIdentidad(
+        icono: IdentidadProveedor.icono,
+        color: IdentidadProveedor.color,
         lado: 48,
         radio: 14,
       ),

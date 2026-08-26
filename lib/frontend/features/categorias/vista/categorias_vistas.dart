@@ -11,6 +11,7 @@ import '../../../share2/share2.dart';
 import '../detalle_categoria/vista/detalle_categoria_vista.dart';
 import '../provider/categorias_provider.dart';
 import '../widgets/dialogo_categorias_widget.dart';
+import '../widgets/identidad_categoria.dart';
 
 /// Pantalla de Categorías: catálogo en grilla de tarjetas.
 ///
@@ -241,7 +242,7 @@ class _GrillaCategoriasState extends ConsumerState<_GrillaCategorias> {
           orientacion: OrientacionTarjeta.vertical,
           marcador: MarcadorIdentidad(
             inicial: inicialDe(categoria.nombre),
-            color: colorDeHex(categoria.colorHex),
+            color: IdentidadCategoria.color,
             lado: 50,
             radio: 14,
           ),

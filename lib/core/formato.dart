@@ -27,6 +27,7 @@ final NumberFormat _decimalCop = NumberFormat('#,##0.##', 'es_CO');
 // `initializeDateFormatting` al arrancar solo para esto.
 final DateFormat _fecha = DateFormat('dd/MM/yyyy');
 final DateFormat _fechaHora = DateFormat('dd/MM/yyyy HH:mm');
+final DateFormat _hora = DateFormat('HH:mm');
 
 /// Pesos colombianos sin decimales: `28000` → `$28.000`.
 String formatearPrecio(num valor) => '\$${_enteroCop.format(valor)}';
@@ -39,6 +40,12 @@ String formatearPrecioCompacto(num valor) {
   return formatearPrecio(valor);
 }
 
+/// Solo el agrupamiento de miles, sin el `$`: `45000` → `45.000`.
+///
+/// Lo usa el campo que formatea el precio mientras se teclea, donde el símbolo
+/// va aparte como prefijo del input.
+String agruparMiles(int valor) => _enteroCop.format(valor);
+
 /// Cantidad con hasta dos decimales, sin ceros de relleno:
 /// `12` → `12`, `12.5` → `12,5`.
 String formatearCantidad(num valor) => _decimalCop.format(valor);
@@ -48,3 +55,7 @@ String formatearFecha(DateTime fecha) => _fecha.format(fecha);
 
 /// Fecha con hora: `04/08/2026 15:30`.
 String formatearFechaHora(DateTime fecha) => _fechaHora.format(fecha);
+
+/// Solo la hora: `15:30`. Para cuando la fecha ya está a la vista y repetirla
+/// en cada renglón estorba, como en la bitácora.
+String formatearHora(DateTime fecha) => _hora.format(fecha);

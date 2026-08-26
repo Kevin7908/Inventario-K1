@@ -127,18 +127,6 @@ void main() {
       expect(categoria.activo, isFalse);
     });
 
-    test('un color que no es hexadecimal se rechaza', () async {
-      expect(
-        () => db.into(db.tablaCategoria).insert(
-              TablaCategoriaCompanion.insert(
-                nombre: 'Suspensión',
-                colorHex: const Value('azul'),
-              ),
-            ),
-        throwsA(isA<Exception>()),
-      );
-    });
-
     test('el nombre de la categoría no se repite', () async {
       await db
           .into(db.tablaCategoria)

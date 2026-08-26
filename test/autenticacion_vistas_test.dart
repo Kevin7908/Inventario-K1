@@ -8,132 +8,23 @@
 // - se entra con usuario **o** con correo;
 // - una cuenta desactivada no dice lo mismo que una contraseña mala;
 // - recuperar la contraseña de un usuario que no existe **no** delata que no
-//   existe: avanza al paso del código igual que si existiera.
+//   existe: avanza al paso del código igual que si existiera;
+// - la tarjeta de entrada muestra la ilustración solo si la ventana da para
+//   las dos mitades, y el formulario nunca se aprieta para dejarla entrar.
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:inventario_k1/backend/features/autenticacion/modelo/usuario.dart';
-import 'package:inventario_k1/backend/features/autenticacion/repositorio/repositorio_auth.dart';
 import 'package:inventario_k1/backend/features/autenticacion/resultado/resultados_auth.dart';
-import 'package:inventario_k1/backend/share/dominio/permiso.dart';
-import 'package:inventario_k1/backend/share/dominio/rol_usuario.dart';
 import 'package:inventario_k1/backend/share/servicios/servicio_correo.dart';
-import 'package:inventario_k1/core/resultado.dart';
 import 'package:inventario_k1/frontend/features/autenticacion/provider/auth_providers.dart';
 import 'package:inventario_k1/frontend/features/autenticacion/vista/login_vista.dart';
 import 'package:inventario_k1/frontend/features/autenticacion/vista/portal_sesion.dart';
 import 'package:inventario_k1/frontend/features/autenticacion/vista/primer_admin_vista.dart';
 import 'package:inventario_k1/frontend/features/autenticacion/vista/recuperar_vista.dart';
 import 'package:inventario_k1/frontend/features/autenticacion/widgets/campo_codigo.dart';
+import 'package:inventario_k1/frontend/features/autenticacion/widgets/ilustracion/ilustracion_gatos.dart';
 
-Usuario _usuario({
-  int id = 1,
-  String usuario = 'juan',
-  String email = 'juan@taller.com',
-  RolUsuario rol = RolUsuario.admin,
-}) =>
-    Usuario(
-      id: id,
-      personaId: id,
-      nombre: 'Juan García',
-      usuario: usuario,
-      email: email,
-      rol: rol,
-      estaActivo: true,
-      creadoEn: DateTime(2026, 8, 1),
-    );
-
-/// Un repositorio de mentira: responde lo que le digan sin tocar SQLite.
-///
-/// Hace falta porque estos tests miran la vista, no la base. Lo del backend ya
-/// está cubierto en `repositorio_auth_test.dart` contra Drift en memoria.
-class _AuthFalso implements RepositorioAuth {
-  _AuthFalso({
-    this.hay = true,
-    this.acceso = const CredencialesIncorrectas(),
-    this.porIdentificador,
-  });
-
-  bool hay;
-  ResultadoAcceso acceso;
-  Usuario? porIdentificador;
-
-  String? identificadorPedido;
-
-  @override
-  Future<bool> hayUsuarios() async => hay;
-
-  @override
-  Future<ResultadoAcceso> autenticar({
-    required String identificador,
-    required String password,
-  }) async {
-    identificadorPedido = identificador;
-    return acceso;
-  }
-
-  @override
-  Future<Usuario?> obtenerPorIdentificador(String identificador) async {
-    identificadorPedido = identificador;
-    return porIdentificador;
-  }
-
-  @override
-  Future<ResultadoCuenta> crearCuenta({
-    required String nombre,
-    required String usuario,
-    required String email,
-    required String password,
-    required RolUsuario rol,
-    String? documento,
-  }) async =>
-      CuentaCreada(_usuario(usuario: usuario, email: email, rol: rol));
-
-  @override
-  Future<Resultado> cambiarPassword({
-    required int usuarioId,
-    required String passwordNueva,
-  }) async =>
-      const Exito();
-
-  @override
-  Future<Resultado> cambiarEstado({
-    required int adminId,
-    required int usuarioId,
-    required bool activo,
-  }) async =>
-      const Exito();
-
-  @override
-  Future<Resultado> cambiarRol({
-    required int adminId,
-    required int usuarioId,
-    required RolUsuario rol,
-  }) async =>
-      const Exito();
-
-  @override
-  Future<Usuario?> obtenerPorId(int id) async => porIdentificador;
-
-  @override
-  Stream<List<Usuario>> observarUsuarios() => Stream.value(const []);
-
-  @override
-  Future<Set<Permiso>> permisosDe(int usuarioId) async =>
-      Permiso.values.toSet();
-
-  @override
-  Stream<Set<Permiso>> observarPermisos(int usuarioId) =>
-      Stream.value(Permiso.values.toSet());
-
-  @override
-  Future<Resultado> fijarPermisos({
-    required int adminId,
-    required int usuarioId,
-    required Set<Permiso> permisos,
-  }) async =>
-      const Exito();
-}
+import 'soporte/repositorio_auth_falso.dart';
 
 /// Un servicio de correo que no manda nada pero deja ver qué se le pidió.
 class _CorreoFalso extends ServicioCorreo {
@@ -154,11 +45,15 @@ class _CorreoFalso extends ServicioCorreo {
   }
 }
 
+/// [sinMovimiento] apaga la ilustración animada de la pantalla de entrada.
+/// Hace falta en cuanto la ventana es lo bastante ancha para que aparezca: con
+/// una animación en bucle, `pumpAndSettle` no converge nunca.
 Future<void> _montar(
   WidgetTester tester,
   Widget vista, {
-  required _AuthFalso auth,
+  required RepositorioAuthFalso auth,
   ServicioCorreo? correo,
+  bool sinMovimiento = false,
 }) async {
   await tester.pumpWidget(
     ProviderScope(
@@ -167,7 +62,14 @@ Future<void> _montar(
         repositorioAuthAnonimoProvider.overrideWithValue(auth),
         if (correo != null) servicioCorreoProvider.overrideWithValue(correo),
       ],
-      child: MaterialApp(home: vista),
+      child: MaterialApp(
+        home: sinMovimiento
+            ? MediaQuery(
+                data: const MediaQueryData(disableAnimations: true),
+                child: vista,
+              )
+            : vista,
+      ),
     ),
   );
   await tester.pumpAndSettle();
@@ -180,7 +82,7 @@ void main() {
       await _montar(
         tester,
         const PortalSesion(),
-        auth: _AuthFalso(hay: false),
+        auth: RepositorioAuthFalso(hay: false),
       );
 
       expect(find.byType(PrimerAdminVista), findsOneWidget);
@@ -188,7 +90,7 @@ void main() {
     });
 
     testWidgets('con cuentas creadas abre el login', (tester) async {
-      await _montar(tester, const PortalSesion(), auth: _AuthFalso());
+      await _montar(tester, const PortalSesion(), auth: RepositorioAuthFalso());
 
       expect(find.byType(LoginVista), findsOneWidget);
       // El login no ofrece registrarse: las cuentas las crea el admin.
@@ -199,7 +101,7 @@ void main() {
   group('login', () {
     testWidgets('no llama al repositorio con los campos vacíos',
         (tester) async {
-      final auth = _AuthFalso();
+      final auth = RepositorioAuthFalso();
       await _montar(tester, const LoginVista(), auth: auth);
 
       await tester.tap(find.text('Iniciar sesión'));
@@ -210,7 +112,7 @@ void main() {
     });
 
     testWidgets('manda el correo tal cual se escribió', (tester) async {
-      final auth = _AuthFalso();
+      final auth = RepositorioAuthFalso();
       await _montar(tester, const LoginVista(), auth: auth);
 
       await tester.enterText(
@@ -226,7 +128,7 @@ void main() {
 
     testWidgets('una cuenta desactivada no se confunde con una clave mala',
         (tester) async {
-      final auth = _AuthFalso(acceso: const CuentaDesactivada());
+      final auth = RepositorioAuthFalso(acceso: const CuentaDesactivada());
       await _montar(tester, const LoginVista(), auth: auth);
 
       await tester.enterText(find.byType(TextFormField).first, 'juan');
@@ -239,7 +141,7 @@ void main() {
     });
 
     testWidgets('el acceso concedido abre la sesión', (tester) async {
-      final auth = _AuthFalso(acceso: AccesoConcedido(_usuario()));
+      final auth = RepositorioAuthFalso(acceso: AccesoConcedido(usuarioDePrueba()));
       late WidgetRef refDeLaVista;
 
       await tester.pumpWidget(
@@ -278,7 +180,7 @@ void main() {
       await _montar(
         tester,
         const RecuperarVista(),
-        auth: _AuthFalso(porIdentificador: null),
+        auth: RepositorioAuthFalso(porIdentificador: null),
         correo: correo,
       );
 
@@ -295,7 +197,7 @@ void main() {
       await _montar(
         tester,
         const RecuperarVista(),
-        auth: _AuthFalso(porIdentificador: _usuario(email: '')),
+        auth: RepositorioAuthFalso(porIdentificador: usuarioDePrueba(email: '')),
         correo: _CorreoFalso(),
       );
 
@@ -312,7 +214,7 @@ void main() {
       await _montar(
         tester,
         const RecuperarVista(),
-        auth: _AuthFalso(porIdentificador: _usuario()),
+        auth: RepositorioAuthFalso(porIdentificador: usuarioDePrueba()),
         correo: _CorreoFalso(respuesta: const CorreoNoConfigurado()),
       );
 
@@ -329,7 +231,7 @@ void main() {
       await _montar(
         tester,
         const RecuperarVista(),
-        auth: _AuthFalso(porIdentificador: _usuario()),
+        auth: RepositorioAuthFalso(porIdentificador: usuarioDePrueba()),
         correo: correo,
       );
 
@@ -340,6 +242,76 @@ void main() {
       expect(correo.enviados, 1);
       expect(find.textContaining('ju***n@taller.com'), findsOneWidget);
       expect(find.textContaining('juan@taller.com'), findsNothing);
+    });
+  });
+
+  group('el marco de las pantallas de entrada', () {
+    // El tamaño de ventana de un test es 800x600: la ilustración no cabe y la
+    // tarjeta se queda con el formulario solo. Estos dos tests fijan las dos
+    // caras de esa decisión, que es puro layout y no la ve el analizador.
+    Future<void> conVentana(
+      WidgetTester tester,
+      Size tamano,
+      Future<void> Function() cuerpo,
+    ) async {
+      tester.view.physicalSize = tamano;
+      tester.view.devicePixelRatio = 1;
+      addTearDown(tester.view.reset);
+      await cuerpo();
+    }
+
+    testWidgets('en una ventana ancha la tarjeta trae la ilustración',
+        (tester) async {
+      await conVentana(tester, const Size(1280, 800), () async {
+        await _montar(
+          tester,
+          const LoginVista(),
+          auth: RepositorioAuthFalso(),
+          sinMovimiento: true,
+        );
+
+        expect(find.text('Todo el taller en un solo sitio.'), findsOneWidget);
+        expect(find.text('Bienvenido de nuevo'), findsOneWidget);
+      });
+    });
+
+    testWidgets('en una ventana angosta se va la ilustración, no el formulario',
+        (tester) async {
+      await conVentana(tester, const Size(700, 800), () async {
+        await _montar(tester, const LoginVista(), auth: RepositorioAuthFalso());
+
+        expect(find.text('Todo el taller en un solo sitio.'), findsNothing);
+        expect(find.text('Iniciar sesión'), findsOneWidget);
+        expect(find.byType(TextFormField), findsNWidgets(2));
+      });
+    });
+  });
+
+  group('la ilustración de la entrada', () {
+    // El SVG traía su animación en SMIL y `flutter_svg` la ignora. Ahora son
+    // capas quietas que mueve Flutter, y lo que hay que fijar es que el reloj
+    // arranque… y que se detenga cuando el sistema pide no mover nada.
+    testWidgets('se mueve sola', (tester) async {
+      await tester.pumpWidget(
+        const MaterialApp(home: Scaffold(body: IlustracionGatos())),
+      );
+      await tester.pump(const Duration(milliseconds: 100));
+
+      expect(tester.hasRunningAnimations, isTrue);
+    });
+
+    testWidgets('con «reducir movimiento» se queda quieta', (tester) async {
+      await tester.pumpWidget(
+        const MaterialApp(
+          home: MediaQuery(
+            data: MediaQueryData(disableAnimations: true),
+            child: Scaffold(body: IlustracionGatos()),
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      expect(tester.hasRunningAnimations, isFalse);
     });
   });
 
