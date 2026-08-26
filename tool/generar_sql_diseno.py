@@ -69,7 +69,7 @@ son ROLES: apuntan aquí con persona_id y solo guardan lo suyo. Antes las
 cuatro repetían documento, nombres, apellidos, teléfono y email, y el mismo
 señor registrado dos veces tenía dos teléfonos que se desincronizaban solos.""",
   ['personas', 'clientes', 'tecnicos', 'proveedores', 'usuarios',
-   'especializaciones']),
+   'usuario_permisos', 'especializaciones']),
 
  ('2. CATÁLOGO', """Lo que el taller vende y con qué lo mide. Los catálogos no se borran: llevan
 `activo` porque los documentos emitidos los referencian.""",
@@ -87,14 +87,34 @@ FK polimórfica no la puede verificar la base.""",
   ['movimientos_inventario']),
 
  ('4. TALLER', """La moto del cliente y su paso por el taller.""",
-  ['motos', 'ordenes_servicio', 'ordenes_tareas', 'ordenes_repuestos']),
+  ['motos', 'ordenes_servicio', 'ordenes_tareas', 'ordenes_repuestos',
+   'ordenes_cargos']),
 
  ('5. DOCUMENTOS DE VENTA', """La factura es un documento contable: no se borra, se anula (ver las guardas
 del final). Sus líneas congelan descripción, precio y costo a propósito: si
 mañana sube el precio del catálogo, la factura de ayer no puede cambiar.""",
   ['ventas', 'venta_detalles']),
 
- ('6. COTIZACIONES Y RESERVAS', """La cotización no guarda `total` (es subtotal + iva, dos columnas de su misma
+ ('6. DEVOLUCIONES', """Lo que el cliente trae de vuelta. NO ES LO MISMO QUE ANULAR: anular deshace la
+venta entera y la deja en ANULADA; una devolución le quita una parte y la
+factura sigue viva, con su número y su estado. Por eso es un documento aparte
+y no una columna en ventas: se pueden devolver dos piezas hoy y otra la semana
+que viene, y cada una tiene su fecha, su motivo y su autor.
+
+devolucion_detalles apunta a venta_detalles, no a productos: lo que se
+devuelve es ESA línea de ESA venta. El producto y la descripción congelada se
+leen por JOIN desde allá; el único snapshot propio es precio_unitario, porque
+una segunda devolución de la misma línea tiene que valer lo mismo que la
+primera.
+
+Que la suma devuelta no pase de lo vendido NO CABE EN UN CHECK —necesita un
+agregado sobre las demás filas—: lo cierra una guarda, al final del archivo.
+
+devoluciones.total es caché de SUM(cantidad * precio_unitario) de sus líneas,
+como el stock y como monto_pagado.""",
+  ['devoluciones', 'devolucion_detalles']),
+
+ ('7. COTIZACIONES Y RESERVAS', """La cotización no guarda `total` (es subtotal + iva, dos columnas de su misma
 fila) ni `estado` (depende de la fecha de hoy). Los dos se calculan.
 
 `reservas.pagado_acumulado` es caché de SUM(reserva_abonos.monto), como el
@@ -102,7 +122,7 @@ stock.""",
   ['cotizaciones', 'cotizacion_items', 'reservas', 'reserva_items',
    'reserva_abonos']),
 
- ('7. CARTERA', """Lo que queda por cobrar. `monto_pagado` es caché de SUM(deudor_pagos.monto).
+ ('8. CARTERA', """Lo que queda por cobrar. `monto_pagado` es caché de SUM(deudor_pagos.monto).
 
 La deuda NACE EN CUENTAS POR COBRAR, no en una factura. Hubo una columna
 venta_id que apuntaba a la venta que la originó; se quitó cuando el mostrador
@@ -129,13 +149,30 @@ cobrar?" necesita las dos cosas a la vez, y esa es la condición que aplican
 RepositorioDeudores en SQL y DeudorResumen.estaVencida en Dart.""",
   ['deudores', 'deudor_items', 'deudor_pagos']),
 
- ('8. SOPORTE', """Datos del negocio y numeración de documentos.
+ ('9. SOPORTE', """Datos del negocio y numeración de documentos.
 
 El número de un documento sale de `consecutivos`, pedido DENTRO de la
 transacción que lo crea. Nunca del id autoincremental (deja huecos) ni de
 MAX(numero)+1 (reutiliza el número del último documento borrado, que en
 facturación es lo peor que puede pasar).""",
   ['configuracion', 'consecutivos']),
+
+ ('10. AUDITORÍA', """Quién editó o borró qué. Es el complemento de las columnas usuario_id: una
+columna no puede contar un borrado, porque cuando la fila se va se lleva su
+columna. Y una bitácora no debería ser el único sitio donde consta el autor de
+una venta, porque es un renglón paralelo que un método nuevo puede olvidar
+escribir.
+
+entidad_id NO ES UNA FK, y es la única excepción del esquema: es polimórfica
+—apunta a productos o a clientes según `entidad`— y las dos políticas posibles
+rompen lo que la tabla existe para conservar (RESTRICT impediría el borrado,
+CASCADE se llevaría el renglón que lo cuenta). `descripcion` guarda el nombre
+de lo afectado como snapshot: es la parte legible que sobrevive al borrado.
+
+Es de SOLO ESCRITURA, con su guarda: una bitácora que se puede corregir no
+prueba nada, porque quien quisiera tapar algo empezaría por su propio
+renglón.""",
+  ['bitacora']),
 ]
 
 L = '=' * 76
@@ -185,7 +222,25 @@ for titulo, nota, tablas in SECCIONES:
             salida.extend(idx)
         salida.append('')
 
-salida.append(f"\n-- {L}\n--  9. GUARDAS\n-- {L}\n--")
+# El documento no puede desincronizarse de la base EN SILENCIO, que es justo
+# lo que decía evitar: `bitacora`, `usuario_permisos` y `ordenes_cargos`
+# llevaban tiempo fuera del .sql porque nadie las metió en SECCIONES y el
+# generador las descartaba sin decir nada. Ahora revienta.
+_declaradas = {t for _, _, tablas in SECCIONES for t in tablas}
+_reales = {n for n in objetos['table'] if n != 'sqlite_sequence'}
+_huerfanas = _reales - _declaradas
+if _huerfanas:
+    raise SystemExit(
+        'Estas tablas están en la base y en ninguna sección de SECCIONES, '
+        'así que el documento las perdería: ' + ', '.join(sorted(_huerfanas)) +
+        '.\nAgrégalas a la sección que les toque en tool/generar_sql_diseno.py.')
+_sobrantes = _declaradas - _reales
+if _sobrantes:
+    raise SystemExit(
+        'SECCIONES nombra tablas que ya no existen en la base: ' +
+        ', '.join(sorted(_sobrantes)) + '.')
+
+salida.append(f"\n-- {L}\n--  11. GUARDAS\n-- {L}\n--")
 for linea in """Lo que la aplicación NO PUEDE hacer, ni siquiera por error.
 
 Son triggers que solo PROHÍBEN. Ninguno deriva ni mantiene datos: un trigger
