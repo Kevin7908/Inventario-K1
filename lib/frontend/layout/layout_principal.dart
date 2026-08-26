@@ -9,6 +9,7 @@ import '../features/clientes/vista/cliente_vista.dart';
 import '../features/configuracion/vista/configuracion_vista.dart';
 import '../features/cotizaciones/vista/cotizaciones_vista.dart';
 import '../features/deudores/vista/deudores_vista.dart';
+import '../features/inventario/vista/movimientos_vista.dart';
 import '../features/pos/vista/punto_venta_vista.dart';
 import '../features/ventas/vista/historial_ventas_vista.dart';
 import '../features/productos/vista/producto_vista.dart';
@@ -45,6 +46,7 @@ class _LayoutPrincipalState extends ConsumerState<LayoutPrincipal> {
     '/venta',
     '/historial-ventas',
     '/productos',
+    '/movimientos',
     '/categorias',
     '/proveedores',
     '/ordenes',
@@ -64,6 +66,7 @@ class _LayoutPrincipalState extends ConsumerState<LayoutPrincipal> {
     PuntoVentaVista(),
     HistorialVentasVista(),
     ProductosVista(),
+    MovimientosVista(),
     CategoriasVista(),
     ProveedoresVista(),
     OrdenesVista(),
@@ -95,6 +98,7 @@ class _LayoutPrincipalState extends ConsumerState<LayoutPrincipal> {
   static const Map<String, Permiso> _permisoPorRuta = {
     '/venta': Permiso.posVer,
     '/productos': Permiso.productosVer,
+    '/movimientos': Permiso.inventarioMovimientosVer,
     '/categorias': Permiso.categoriasVer,
     '/proveedores': Permiso.proveedoresVer,
     '/ordenes': Permiso.ordenesVer,
@@ -147,6 +151,12 @@ class _LayoutPrincipalState extends ConsumerState<LayoutPrincipal> {
           etiqueta: 'Productos',
           ruta: '/productos',
           alPresionar: () => _navegar('/productos'),
+        ),
+        ItemNavDato(
+          icono: Icons.swap_vert_rounded,
+          etiqueta: 'Movimientos',
+          ruta: '/movimientos',
+          alPresionar: () => _navegar('/movimientos'),
         ),
         ItemNavDato(
           icono: Icons.layers_outlined,

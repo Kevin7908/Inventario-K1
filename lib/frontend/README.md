@@ -43,6 +43,7 @@ Cada módulo del negocio tiene su propia carpeta. Las vistas de un módulo no im
 | `cotizaciones/` | Cotizaciones de venta |
 | `deudores/` | Cuentas por cobrar |
 | `especializacion/` | Especializaciones de técnicos |
+| `inventario/` | Movimientos de stock: el kardex del taller, el panel de la ficha de producto y la entrada por compra |
 | `motos/` | Registro de motos |
 | `ordenes/` | Órdenes de servicio: listado y editor |
 | `pos/` | Punto de venta (mostrador) |
@@ -52,13 +53,16 @@ Cada módulo del negocio tiene su propia carpeta. Las vistas de un módulo no im
 | `servicios/` | Catálogo de servicios del taller |
 | `tecnicos/` | Técnicos del taller |
 | `unidades_medida/` | Unidades de medida |
-| `ventas/` | Historial de ventas: qué se vendió, cuándo y quién lo cobró |
+| `ventas/` | Historial de ventas: qué se vendió, cuándo y quién lo cobró, y desde dónde se devuelve o se anula |
 
 > **Facturación se borró el 21/08/2026.** Órdenes y servicios subieron un
 > nivel, y el backend de las ventas de mostrador —las tablas `ventas` y
 > `venta_detalles`, que el POS sigue escribiendo— vive en
-> `backend/features/pos/`. La carpeta `ventas/` volvió el 25/08/2026, pero
-> solo de **lectura**: es el historial, no un módulo para armar facturas.
+> `backend/features/pos/`. La carpeta `ventas/` volvió el 25/08/2026 como
+> historial de solo lectura, y el 26/08/2026 ganó lo único que se le hace a una
+> factura emitida: **deshacerla**. Devolver una parte o anularla entera, las dos
+> detrás de `POS_ANULAR`. Lo que sigue sin existir es armar una factura a mano:
+> para eso está el POS.
 
 ---
 
@@ -104,6 +108,7 @@ aparte, no un descuido —está anotada en `DEUDA_TECNICA.md`—.
   |---|---|---|
   | `GrillaProductosCatalogo` | `productos/widgets/` | POS, cotizaciones, órdenes |
   | `MiniaturaProducto` | `productos/vista/` | las mismas |
+  | `PanelMovimientosProducto`, `DialogoEntradaCompra` | `inventario/widgets/` | productos |
   | `PanelCategoriasCatalogo` | `categorias/widgets/` | productos, POS, cotizaciones, órdenes |
   | `catalogoCategoriasProvider`, `catalogoServiciosProvider` | su módulo | quien arme un documento |
 

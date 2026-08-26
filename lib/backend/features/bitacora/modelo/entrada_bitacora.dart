@@ -38,7 +38,12 @@ enum AccionAuditada {
   creo('CREO', 'Creó'),
   modifico('MODIFICO', 'Modificó'),
   elimino('ELIMINO', 'Eliminó'),
-  anulo('ANULO', 'Anuló');
+  anulo('ANULO', 'Anuló'),
+
+  /// Aparte de [anulo] a propósito: anular deshace la venta entera y la deja
+  /// sin valor; devolver le quita una parte y la deja viva. Quien revisa la
+  /// caja necesita distinguirlas de un vistazo.
+  devolvio('DEVOLVIO', 'Devolvió');
 
   const AccionAuditada(this.codigo, this.etiqueta);
 

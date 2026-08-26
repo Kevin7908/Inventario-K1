@@ -27,6 +27,7 @@ abstract final class VentasMapper {
       metodoPago: MetodoPago.desdeCodigo(row['metodo_pago'] as String? ?? 'EFECTIVO'),
       creadoEn: _parseFecha(row['creado_en']),
       cajero: (row['cajero'] as String?)?.trim() ?? '',
+      totalDevuelto: _pesos(row['total_devuelto']),
     );
   }
 

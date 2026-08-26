@@ -3,6 +3,7 @@
 enum ModuloPermiso {
   puntoVenta('Punto de venta'),
   productos('Productos'),
+  inventario('Inventario'),
   categorias('Categorías'),
   proveedores('Proveedores'),
   ordenes('Órdenes de servicio'),
@@ -46,8 +47,9 @@ enum Permiso {
       'Cerrar una venta y recibir el pago.'),
   posDescuento('POS_DESCUENTO', ModuloPermiso.puntoVenta, 'Aplicar descuentos',
       'Bajar el total de una venta antes de cobrarla.'),
-  posAnular('POS_ANULAR', ModuloPermiso.puntoVenta, 'Anular ventas',
-      'Deshacer una venta ya cobrada y devolver su mercancía al inventario.'),
+  posAnular('POS_ANULAR', ModuloPermiso.puntoVenta, 'Anular y devolver ventas',
+      'Deshacer una venta ya cobrada, o devolver parte de ella, y regresar '
+      'la mercancía al inventario.'),
 
   // Productos
   productosVer('PRODUCTOS_VER', ModuloPermiso.productos, 'Ver el inventario',
@@ -61,6 +63,14 @@ enum Permiso {
   productosStock('PRODUCTOS_STOCK', ModuloPermiso.productos,
       'Ajustar stock a mano',
       'Corregir existencias sin que medie una venta o una compra.'),
+
+  // Inventario
+  inventarioMovimientosVer('INVENTARIO_MOVIMIENTOS_VER',
+      ModuloPermiso.inventario, 'Ver los movimientos',
+      'Consultar el libro de entradas y salidas del inventario.'),
+  inventarioEntrada('INVENTARIO_ENTRADA', ModuloPermiso.inventario,
+      'Registrar entradas de compra',
+      'Dar entrada a la mercancía que llega del proveedor.'),
 
   // Categorías
   categoriasVer('CATEGORIAS_VER', ModuloPermiso.categorias, 'Ver categorías',

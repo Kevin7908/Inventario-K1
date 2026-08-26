@@ -1,10 +1,12 @@
 import 'package:drift/drift.dart' show Variable;
 import 'package:flutter_test/flutter_test.dart';
 import 'package:inventario_k1/backend/features/inventario/modelo/movimiento_inventario.dart';
+import 'package:inventario_k1/backend/features/inventario/repositorio/repositorio_inventario.dart';
 import 'package:inventario_k1/backend/features/inventario/repositorio/repositorio_inventario_impl.dart';
 import 'package:inventario_k1/backend/features/productos/modelo/producto.dart';
 import 'package:inventario_k1/backend/features/productos/repositorio/repositorio_producto_impl.dart';
 import 'package:inventario_k1/backend/share/database/app_db.dart';
+import 'package:inventario_k1/backend/share/dominio/permiso.dart';
 
 import 'soporte/base_en_memoria.dart';
 import 'soporte/sesion_de_prueba.dart';
@@ -199,6 +201,163 @@ void main() {
 
       expect(await _stockCache(creado.id!), 10);
       expect(await inventario.stockReconstruido(creado.id!), 10);
+    });
+  });
+
+  group('el kardex filtra, cuenta y recorta en SQL', () {
+    test('trae el producto y el autor ya resueltos', () async {
+      final creado = await productos.crear(_producto(stock: 10));
+
+      final pagina = await inventario
+          .observarPagina(
+            filtro: const FiltroMovimientos(),
+            pagina: 0,
+            tamano: 20,
+          )
+          .first;
+
+      expect(pagina.total, 1);
+      expect(pagina.items.single.productoNombre, 'Pastilla');
+      expect(pagina.items.single.productoSku, creado.sku);
+      expect(pagina.items.single.usuario, 'Usuario de prueba');
+      // Un ajuste de alta no viene de ningún documento.
+      expect(pagina.items.single.numeroDocumento, isNull);
+    });
+
+    test('el total es el real, no el recortado por el LIMIT', () async {
+      final creado = await productos.crear(_producto(stock: 1));
+      for (var i = 0; i < 6; i++) {
+        await productos.ajustarStock(creado.id!, 1);
+      }
+
+      final pagina = await inventario
+          .observarPagina(
+            filtro: const FiltroMovimientos(),
+            pagina: 0,
+            tamano: 2,
+          )
+          .first;
+
+      expect(pagina.items, hasLength(2));
+      expect(pagina.total, 7);
+    });
+
+    test('filtrar por producto no trae los del otro', () async {
+      final a = await productos.crear(_producto(sku: 'A-1', stock: 5));
+      await productos.crear(_producto(sku: 'B-1', nombre: 'Aceite', stock: 5));
+
+      final pagina = await inventario
+          .observarPagina(
+            filtro: FiltroMovimientos(productoId: a.id!),
+            pagina: 0,
+            tamano: 20,
+          )
+          .first;
+
+      expect(pagina.total, 1);
+      expect(pagina.items.single.productoSku, 'A-1');
+    });
+
+    test('soloEntradas sale del signo, no de una lista de tipos', () async {
+      final creado = await productos.crear(_producto(stock: 10));
+      await productos.ajustarStock(creado.id!, -4);
+
+      final entradas = await inventario
+          .observarPagina(
+            filtro: const FiltroMovimientos(soloEntradas: true),
+            pagina: 0,
+            tamano: 20,
+          )
+          .first;
+      final salidas = await inventario
+          .observarPagina(
+            filtro: const FiltroMovimientos(soloEntradas: false),
+            pagina: 0,
+            tamano: 20,
+          )
+          .first;
+
+      expect(entradas.total, 1);
+      expect(entradas.items.single.cantidad, 10);
+      expect(salidas.total, 1);
+      expect(salidas.items.single.cantidad, -4);
+    });
+
+    test('la búsqueda pega contra nombre, SKU y notas', () async {
+      await productos.crear(_producto(sku: 'ACE-9', nombre: 'Aceite', stock: 3));
+
+      for (final texto in ['Aceit', 'ACE-9', 'Alta del']) {
+        final pagina = await inventario
+            .observarPagina(
+              filtro: FiltroMovimientos(busqueda: texto),
+              pagina: 0,
+              tamano: 20,
+            )
+            .first;
+        expect(pagina.total, 1, reason: 'buscando «$texto»');
+      }
+    });
+
+    test('sin INVENTARIO_MOVIMIENTOS_VER no se abre el kardex', () async {
+      final sinPermiso = RepositorioInventarioImpl(
+        db,
+        await sesionDePrueba(
+          db,
+          permisos: {Permiso.productosVer},
+          usuario: 'cajero',
+        ),
+      );
+
+      expect(
+        () => sinPermiso.observarPagina(
+          filtro: const FiltroMovimientos(),
+          pagina: 0,
+          tamano: 20,
+        ),
+        throwsA(isA<PermisoDenegado>()),
+      );
+    });
+  });
+
+  group('entrada por compra', () {
+    test('suma al stock y queda como ENTRADA_COMPRA', () async {
+      final creado = await productos.crear(_producto(stock: 4));
+
+      await inventario.registrarEntradaCompra(
+        productoId: creado.id!,
+        cantidad: 12,
+        notas: 'Remisión 881',
+      );
+
+      final movimientos =
+          await inventario.observarPorProducto(creado.id!).first;
+
+      expect(await _stockCache(creado.id!), 16);
+      expect(movimientos.first.tipo, TipoMovimiento.entradaCompra);
+      expect(movimientos.first.cantidad, 12);
+      expect(movimientos.first.notas, 'Remisión 881');
+      expect(await inventario.descuadres(), isEmpty);
+    });
+
+    test('sin INVENTARIO_ENTRADA no se da entrada a nada', () async {
+      final creado = await productos.crear(_producto(stock: 4));
+      final sinPermiso = RepositorioInventarioImpl(
+        db,
+        await sesionDePrueba(
+          db,
+          permisos: {Permiso.productosVer},
+          usuario: 'cajero',
+        ),
+      );
+
+      expect(
+        () => sinPermiso.registrarEntradaCompra(
+          productoId: creado.id!,
+          cantidad: 1,
+        ),
+        throwsA(isA<PermisoDenegado>()),
+      );
+      expect(await _stockCache(creado.id!), 4);
     });
   });
 

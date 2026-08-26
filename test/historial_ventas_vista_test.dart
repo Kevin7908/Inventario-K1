@@ -5,7 +5,9 @@
 // - cada fila dice **quién cobró**, que es lo que hace útil el historial;
 // - una anulada se ve tachada en vez de desaparecer: el documento existe;
 // - filtrar «hasta» un día incluye ese día entero, no hasta su medianoche;
-// - sin permisos de por medio: esta pantalla la ve cualquiera.
+// - **leerla** no pide permisos: la ve cualquiera. Deshacer una venta sí:
+//   devolver y anular están detrás de `POS_ANULAR`, y una factura ya anulada
+//   no ofrece ninguna de las dos.
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -14,6 +16,7 @@ import 'package:inventario_k1/backend/features/pos/modelo/linea_venta_mostrador.
 import 'package:inventario_k1/backend/features/pos/modelo/venta_detalle.dart';
 import 'package:inventario_k1/backend/features/pos/modelo/venta_resumen.dart';
 import 'package:inventario_k1/backend/features/pos/repositorio/repositorio_ventas.dart';
+import 'package:inventario_k1/backend/share/dominio/permiso.dart';
 import 'package:inventario_k1/frontend/features/autenticacion/provider/auth_providers.dart';
 import 'package:inventario_k1/frontend/features/pos/provider/pos_providers.dart';
 import 'package:inventario_k1/frontend/features/ventas/provider/historial_ventas_providers.dart';
@@ -27,6 +30,7 @@ VentaResumen _venta({
   String cliente = 'Carlos Ramírez',
   String cajero = 'Marta Ríos',
   int total = 120000,
+  int devuelto = 0,
   EstadoPago estado = EstadoPago.pagado,
   TipoVenta tipo = TipoVenta.mostrador,
 }) =>
@@ -42,6 +46,7 @@ VentaResumen _venta({
       metodoPago: MetodoPago.efectivo,
       creadoEn: DateTime(2026, 8, 25, 14, 5),
       cajero: cajero,
+      totalDevuelto: devuelto,
     );
 
 /// Un repositorio de ventas de mentira que recuerda con qué filtro se le
@@ -79,12 +84,19 @@ class _VentasFalsas implements RepositorioVentas {
   }) =>
       throw UnimplementedError('la pantalla no vende');
 
+  /// Los ids que se mandaron anular. La pantalla no debe llamar sin que el
+  /// usuario confirme.
+  final List<int> anuladas = [];
+
   @override
-  Future<void> anular(int id) =>
-      throw UnimplementedError('la pantalla no anula');
+  Future<void> anular(int id) async => anuladas.add(id);
 }
 
-Future<void> _montar(WidgetTester tester, _VentasFalsas ventas) async {
+Future<void> _montar(
+  WidgetTester tester,
+  _VentasFalsas ventas, {
+  Set<Permiso> permisos = const {},
+}) async {
   tester.view.physicalSize = const Size(1400, 900);
   tester.view.devicePixelRatio = 1;
   addTearDown(tester.view.reset);
@@ -98,6 +110,7 @@ Future<void> _montar(WidgetTester tester, _VentasFalsas ventas) async {
         repositorioAuthProvider.overrideWithValue(auth),
         repositorioAuthAnonimoProvider.overrideWithValue(auth),
         usuarioEnSesionProvider.overrideWithValue(usuarioDePrueba()),
+        permisosSesionProvider.overrideWith((ref) => Stream.value(permisos)),
       ],
       child: const MaterialApp(home: Scaffold(body: HistorialVentasVista())),
     ),
@@ -168,5 +181,68 @@ void main() {
       findsOneWidget,
     );
     expect(find.text('Quitar los filtros'), findsNothing);
+  });
+
+  group('deshacer una venta', () {
+    testWidgets('sin POS_ANULAR no se ofrece ni devolver ni anular',
+        (tester) async {
+      await _montar(tester, _VentasFalsas(ventas: [_venta()]));
+
+      expect(find.byTooltip('Recibir una devolución'), findsNothing);
+      expect(find.byTooltip('Anular la venta entera'), findsNothing);
+    });
+
+    testWidgets('con POS_ANULAR aparecen las dos acciones', (tester) async {
+      await _montar(
+        tester,
+        _VentasFalsas(ventas: [_venta()]),
+        permisos: {Permiso.posAnular},
+      );
+
+      expect(find.byTooltip('Recibir una devolución'), findsOneWidget);
+      expect(find.byTooltip('Anular la venta entera'), findsOneWidget);
+    });
+
+    testWidgets('una factura anulada ya no ofrece nada', (tester) async {
+      await _montar(
+        tester,
+        _VentasFalsas(ventas: [_venta(estado: EstadoPago.anulada)]),
+        permisos: {Permiso.posAnular},
+      );
+
+      expect(find.byTooltip('Recibir una devolución'), findsNothing);
+      expect(find.byTooltip('Anular la venta entera'), findsNothing);
+    });
+
+    testWidgets('anular pide confirmación antes de tocar la base',
+        (tester) async {
+      final ventas = _VentasFalsas(ventas: [_venta()]);
+      await _montar(tester, ventas, permisos: {Permiso.posAnular});
+
+      await tester.tap(find.byTooltip('Anular la venta entera'));
+      await tester.pumpAndSettle();
+
+      // El diálogo está, pero todavía no se anuló nada.
+      expect(find.text('¿Anular FAC-0001?'), findsOneWidget);
+      expect(ventas.anuladas, isEmpty);
+
+      await tester.tap(find.text('Anular'));
+      await tester.pumpAndSettle();
+
+      expect(ventas.anuladas, [1]);
+    });
+
+    testWidgets('lo devuelto se ve bajo el total, sin cambiarlo',
+        (tester) async {
+      await _montar(
+        tester,
+        _VentasFalsas(ventas: [_venta(total: 120000, devuelto: 30000)]),
+      );
+
+      // La factura sigue diciendo lo que se cobró...
+      expect(find.text(r'$120.000'), findsOneWidget);
+      // ...y aparte, cuánto volvió.
+      expect(find.text(r'−$30.000 devuelto'), findsOneWidget);
+    });
   });
 }

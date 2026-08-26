@@ -17,6 +17,7 @@ class VentaResumen extends Equatable {
     required this.metodoPago,
     this.creadoEn,
     this.cajero = '',
+    this.totalDevuelto = 0,
   });
 
   final int id;
@@ -37,6 +38,19 @@ class VentaResumen extends Equatable {
   /// solo si la consulta no lo pidió: la columna `usuario_id` es `NOT NULL`.
   final String cajero;
 
+  /// Lo que el cliente ya trajo de vuelta, en pesos enteros: la suma de las
+  /// devoluciones parciales de esta factura.
+  ///
+  /// **No se le resta a [total]**, y eso es a propósito: la factura de ayer
+  /// dice lo que se cobró ayer. Lo que quedó neto es [totalNeto], y el
+  /// historial pinta los dos.
+  final int totalDevuelto;
+
+  /// Lo cobrado menos lo devuelto.
+  int get totalNeto => total - totalDevuelto;
+
+  bool get tieneDevoluciones => totalDevuelto > 0;
+
   @override
   List<Object?> get props => [
         id,
@@ -52,5 +66,6 @@ class VentaResumen extends Equatable {
         metodoPago,
         creadoEn,
         cajero,
+        totalDevuelto,
       ];
 }

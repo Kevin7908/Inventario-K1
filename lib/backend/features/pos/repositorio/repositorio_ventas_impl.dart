@@ -72,7 +72,9 @@ class RepositorioVentasImpl with FirmaDeSesion implements RepositorioVentas {
     SELECT
       v.*,
       COALESCE(pe.nombres || ' ' || COALESCE(pe.apellidos, ''), '— Sin cliente —') AS cliente_nombre,
-      TRIM(pu.nombres || ' ' || COALESCE(pu.apellidos, '')) AS cajero
+      TRIM(pu.nombres || ' ' || COALESCE(pu.apellidos, '')) AS cajero,
+      COALESCE((SELECT SUM(d.total) FROM devoluciones d WHERE d.venta_id = v.id), 0)
+        AS total_devuelto
     FROM ventas v
     LEFT JOIN clientes c  ON c.id  = v.cliente_id
     LEFT JOIN personas pe ON pe.id = c.persona_id
@@ -87,6 +89,9 @@ class RepositorioVentasImpl with FirmaDeSesion implements RepositorioVentas {
         _db.tablaCliente,
         _db.tablaPersona,
         _db.tablaUsuario,
+        // Sin esta, registrar una devolución no refrescaría el historial: el
+        // `total_devuelto` de la columna sale de aquí.
+        _db.tablaDevolucion,
       };
 
   // Lecturas
@@ -343,19 +348,30 @@ class RepositorioVentasImpl with FirmaDeSesion implements RepositorioVentas {
               ..where((t) => t.ventaId.equals(id)))
             .get();
 
+        // Lo que una devolución parcial ya repuso **no se repone otra vez**.
+        // Sin este descuento, vender 5, devolver 2 y anular después dejaba 7
+        // en la estantería: el libro mayor lo contaba dos veces.
+        final yaDevuelto = await _devueltoPorLinea(id);
+
         for (final item in items) {
-          if (item.tipoItem == TipoItem.producto.aTexto &&
-              item.productoId != null) {
-            await _inventario.registrar(
-              SolicitudMovimiento.entrada(
-                productoId: item.productoId!,
-                cantidad: item.cantidad,
-                tipo: TipoMovimiento.devolucionVenta,
-                ventaId: id,
-                notas: 'Venta anulada',
-              ),
-            );
+          if (item.tipoItem != TipoItem.producto.aTexto ||
+              item.productoId == null) {
+            continue;
           }
+
+          final pendiente = item.cantidad - (yaDevuelto[item.id] ?? 0);
+          // Una línea devuelta entera no deja nada por reponer.
+          if (pendiente <= 0.0001) continue;
+
+          await _inventario.registrar(
+            SolicitudMovimiento.entrada(
+              productoId: item.productoId!,
+              cantidad: pendiente,
+              tipo: TipoMovimiento.devolucionVenta,
+              ventaId: id,
+              notas: 'Venta anulada',
+            ),
+          );
         }
       }
 
@@ -380,6 +396,29 @@ class RepositorioVentasImpl with FirmaDeSesion implements RepositorioVentas {
   }
 
   // Helpers
+
+  /// Cuánto se devolvió ya de cada línea de la venta, por `venta_detalles.id`.
+  ///
+  /// Una consulta agregada y no una por línea: es el N+1 que prohíbe §5. Va en
+  /// SQL crudo porque cruza dos módulos y este repositorio no debe cargar con
+  /// el de devoluciones solo para esto.
+  Future<Map<int, double>> _devueltoPorLinea(int ventaId) async {
+    final filas = await _db.customSelect(
+      '''
+      SELECT dd.venta_detalle_id AS linea, SUM(dd.cantidad) AS devuelta
+      FROM devolucion_detalles dd
+      INNER JOIN venta_detalles vd ON vd.id = dd.venta_detalle_id
+      WHERE vd.venta_id = ?
+      GROUP BY dd.venta_detalle_id
+      ''',
+      variables: [Variable.withInt(ventaId)],
+      readsFrom: {_db.tablaDevolucionDetalle, _tablaItems},
+    ).get();
+
+    return {
+      for (final f in filas) f.read<int>('linea'): f.read<double>('devuelta'),
+    };
+  }
 
   /// Lanza si no alcanza el stock, con el mensaje que ve el usuario.
   ///

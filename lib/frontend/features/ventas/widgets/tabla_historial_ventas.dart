@@ -4,8 +4,13 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../../backend/features/pos/enum/enum_ventas.dart';
 import '../../../../backend/features/pos/modelo/venta_resumen.dart';
 import '../../../../core/formato.dart';
+import '../../../../backend/share/dominio/permiso.dart';
+import '../../../../backend/share/dominio/sesion_actual.dart';
 import '../../../share2/share2.dart';
+import '../../autenticacion/widgets/si_puede.dart';
+import '../../pos/provider/pos_providers.dart';
 import '../provider/historial_ventas_providers.dart';
+import 'dialogo_devolucion.dart';
 
 /// Color de cada estado de pago, en un solo sitio.
 ///
@@ -83,20 +88,13 @@ class TablaHistorialVentas extends ConsumerWidget {
           titulo: 'Total',
           flex: 2,
           alineacion: Alignment.centerRight,
-          constructor: (v) => Text(
-            formatearPrecio(v.total),
-            textAlign: TextAlign.right,
-            style: TipografiaApp.cuerpoMedium.copyWith(
-              // Una anulada ya no vale lo que dice: se tacha en vez de
-              // borrarla, porque el documento sigue existiendo.
-              decoration: v.estadoPago == EstadoPago.anulada
-                  ? TextDecoration.lineThrough
-                  : null,
-              color: v.estadoPago == EstadoPago.anulada
-                  ? ColoresApp.textMuted
-                  : ColoresApp.textPrimary,
-            ),
-          ),
+          constructor: (v) => _Total(venta: v),
+        ),
+        ColumnaTabla<VentaResumen>(
+          titulo: '',
+          ancho: 92,
+          alineacion: Alignment.centerRight,
+          constructor: (v) => _Acciones(venta: v),
         ),
       ],
     );
@@ -157,6 +155,110 @@ class _Factura extends StatelessWidget {
           style: TipografiaApp.caption.copyWith(color: ColoresApp.textMuted),
         ),
       ],
+    );
+  }
+}
+
+/// Lo cobrado, y debajo lo que ya volvió si hubo devoluciones.
+///
+/// **El total no se recalcula**: la factura dice lo que se cobró. Lo devuelto
+/// va en su propio renglón para que quien cuadra la caja vea las dos cifras.
+class _Total extends StatelessWidget {
+  const _Total({required this.venta});
+
+  final VentaResumen venta;
+
+  @override
+  Widget build(BuildContext context) {
+    final anulada = venta.estadoPago == EstadoPago.anulada;
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.end,
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Text(
+          formatearPrecio(venta.total),
+          textAlign: TextAlign.right,
+          style: TipografiaApp.cuerpoMedium.copyWith(
+            // Una anulada ya no vale lo que dice: se tacha en vez de
+            // borrarla, porque el documento sigue existiendo.
+            decoration: anulada ? TextDecoration.lineThrough : null,
+            color: anulada ? ColoresApp.textMuted : ColoresApp.textPrimary,
+          ),
+        ),
+        if (venta.tieneDevoluciones && !anulada)
+          Text(
+            '−${formatearPrecio(venta.totalDevuelto)} devuelto',
+            textAlign: TextAlign.right,
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            style: TipografiaApp.caption
+                .copyWith(color: ColoresApp.statusDanger),
+          ),
+      ],
+    );
+  }
+}
+
+/// Devolver una parte, o anular la venta entera.
+///
+/// Las dos compuertas son `POS_ANULAR`: devolver es estrictamente menos que
+/// anular. Esconder los botones es orden; el control está en el repositorio
+/// (`CLAUDE.md` §7 bis).
+class _Acciones extends ConsumerWidget {
+  const _Acciones({required this.venta});
+
+  final VentaResumen venta;
+
+  Future<void> _anular(BuildContext context, WidgetRef ref) async {
+    final confirmado = await DialogoConfirmacion.mostrar(
+      context,
+      titulo: '¿Anular ${venta.numeroFactura}?',
+      mensaje: 'La factura queda anulada con su número —no se borra— y toda '
+          'la mercancía que quede sin devolver vuelve al inventario. No tiene '
+          'vuelta atrás.',
+      textoConfirmar: 'Anular',
+    );
+    if (confirmado != true || !context.mounted) return;
+
+    try {
+      await ref.read(repositorioVentasProvider).anular(venta.id);
+      if (!context.mounted) return;
+      MensajeApp.exito(context, '${venta.numeroFactura} quedó anulada.');
+    } on PermisoDenegado catch (e) {
+      if (!context.mounted) return;
+      MensajeApp.error(context, e.mensaje);
+    } on Exception catch (e) {
+      if (!context.mounted) return;
+      MensajeApp.error(context, 'No se pudo anular: $e');
+    }
+  }
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    // Una factura anulada está cerrada: ni se devuelve ni se vuelve a anular.
+    if (venta.estadoPago == EstadoPago.anulada) {
+      return const SizedBox.shrink();
+    }
+
+    return SiPuede(
+      permiso: Permiso.posAnular,
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          BotonIcono(
+            icono: Icons.keyboard_return_rounded,
+            tooltip: 'Recibir una devolución',
+            alPresionar: () => DialogoDevolucion.mostrar(context, venta: venta),
+          ),
+          BotonIcono(
+            icono: Icons.block_outlined,
+            tooltip: 'Anular la venta entera',
+            color: ColoresApp.statusDanger,
+            alPresionar: () => _anular(context, ref),
+          ),
+        ],
+      ),
     );
   }
 }

@@ -11,7 +11,10 @@ enum DocumentoConsecutivo {
   // (`ORD-0041`): cambiarlo rompería la referencia con la que el cliente
   // reclama su moto.
   orden('ORDEN', 'ORD', digitos: 4, porAnio: false),
-  deuda('DEUDA', 'DEU', digitos: 3, porAnio: false);
+  deuda('DEUDA', 'DEU', digitos: 3, porAnio: false),
+  // Por año: lo que se devuelve se cuadra contra la caja del año, y el
+  // número lo lee un cliente que trae la pieza de vuelta.
+  devolucion('DEVOLUCION', 'DEV', digitos: 4, porAnio: true);
 
   const DocumentoConsecutivo(
     this.codigo,

@@ -58,10 +58,20 @@ final class EstiloAccion {
     icono: Icons.block_outlined,
   );
 
+  /// Ámbar como [_anulo] —las dos deshacen plata— pero con la flecha de
+  /// vuelta: devolver le quita una parte a la venta, anular la deshace entera,
+  /// y quien revisa la caja tiene que distinguirlas sin leer el renglón.
+  static const _devolvio = EstiloAccion._(
+    color: ColoresApp.statusWarning,
+    fondo: ColoresApp.statusWarningBg,
+    icono: Icons.keyboard_return_rounded,
+  );
+
   static EstiloAccion de(AccionAuditada accion) => switch (accion) {
         AccionAuditada.creo => _creo,
         AccionAuditada.modifico => _modifico,
         AccionAuditada.elimino => _elimino,
         AccionAuditada.anulo => _anulo,
+        AccionAuditada.devolvio => _devolvio,
       };
 }

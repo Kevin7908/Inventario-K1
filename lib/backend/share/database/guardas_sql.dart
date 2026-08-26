@@ -151,6 +151,75 @@ const List<String> guardasSql = [
   END;
   ''',
 
+  // ── Una devolución no devuelve más de lo que se vendió ──────────────────
+  //
+  // La invariante es un agregado sobre las otras filas de la tabla, así que
+  // no cabe en un `CHECK`: hay que sumar lo ya devuelto de esa línea y
+  // compararlo con lo que decía la factura. El repositorio lo valida antes
+  // para poder dar un mensaje; esto es la red, y es lo que impide que dos
+  // devoluciones seguidas de la misma línea se pasen entre las dos.
+  //
+  // El margen de 0.0001 es por la coma flotante de `cantidad`: devolver 0.3 y
+  // 0.7 de una línea de 1.0 no puede fallar por el último bit.
+  '''
+  CREATE TRIGGER IF NOT EXISTS guarda_devolucion_no_excede_vendido
+  BEFORE INSERT ON devolucion_detalles
+  FOR EACH ROW
+  WHEN NEW.cantidad
+       + COALESCE((SELECT SUM(d.cantidad) FROM devolucion_detalles d
+                   WHERE d.venta_detalle_id = NEW.venta_detalle_id), 0)
+       > (SELECT vd.cantidad FROM venta_detalles vd
+          WHERE vd.id = NEW.venta_detalle_id) + 0.0001
+  BEGIN
+    SELECT RAISE(ABORT,
+      'No se puede devolver más de lo que se vendió en esa línea.');
+  END;
+  ''',
+
+  // ── Una venta anulada ya no admite devoluciones ─────────────────────────
+  //
+  // Anular ya devolvió lo que quedaba por devolver. Aceptar una devolución
+  // encima sería reponer dos veces el mismo stock.
+  '''
+  CREATE TRIGGER IF NOT EXISTS guarda_devolucion_venta_anulada
+  BEFORE INSERT ON devoluciones
+  FOR EACH ROW
+  WHEN (SELECT estado_pago FROM ventas WHERE id = NEW.venta_id) = 'ANULADA'
+  BEGIN
+    SELECT RAISE(ABORT,
+      'La venta está anulada: ya se devolvió todo lo que quedaba.');
+  END;
+  ''',
+
+  // ── Una devolución tampoco se corrige ───────────────────────────────────
+  //
+  // Mismo argumento que el libro mayor: movió stock y movió plata, y ya dejó
+  // su renglón en `movimientos_inventario`. Editarla o borrarla dejaría ese
+  // movimiento explicando un documento que dice otra cosa. Si se recibió mal,
+  // el camino es anular la venta entera.
+  '''
+  CREATE TRIGGER IF NOT EXISTS guarda_devoluciones_inmutables
+  BEFORE UPDATE ON devoluciones
+  FOR EACH ROW
+  WHEN OLD.venta_id IS NOT NEW.venta_id
+    OR OLD.total    IS NOT NEW.total
+    OR OLD.numero   IS NOT NEW.numero
+  BEGIN
+    SELECT RAISE(ABORT,
+      'Una devolución no se edita: es un documento que ya movió stock.');
+  END;
+  ''',
+
+  '''
+  CREATE TRIGGER IF NOT EXISTS guarda_devoluciones_sin_borrado
+  BEFORE DELETE ON devoluciones
+  FOR EACH ROW
+  BEGIN
+    SELECT RAISE(ABORT,
+      'Una devolución no se borra: anula la venta si hay que deshacerla.');
+  END;
+  ''',
+
   // ── La bitácora es de solo escritura ────────────────────────────────────
   //
   // Mismo argumento que el libro mayor del inventario, y más fuerte: una

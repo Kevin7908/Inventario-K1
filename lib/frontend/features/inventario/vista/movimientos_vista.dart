@@ -4,33 +4,35 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
-import '../../../../backend/features/pos/enum/enum_ventas.dart';
+import '../../../../backend/features/inventario/modelo/movimiento_inventario.dart';
+import '../../../../backend/share/dominio/permiso.dart';
 import '../../../../core/formato.dart';
 import '../../../layout/encabezado_con_cuenta.dart';
 import '../../../share2/share2.dart';
-import '../provider/historial_ventas_providers.dart';
-import '../widgets/tabla_historial_ventas.dart';
+import '../../autenticacion/widgets/si_puede.dart';
+import '../provider/inventario_providers.dart';
+import '../widgets/dialogo_entrada_compra.dart';
+import '../widgets/estilo_movimiento.dart';
+import '../widgets/tabla_movimientos.dart';
 
-/// Historial de ventas: qué se vendió, cuándo, a quién y quién lo cobró.
+/// Movimientos de inventario: el libro mayor del taller.
 ///
-/// **La ven todos**, a diferencia de la bitácora: un cajero necesita poder
-/// buscar la factura de un cliente que vuelve a reclamar, y esconderle el
-/// historial no le quita a nadie la posibilidad de mirar el cajón.
+/// Cada entrada y cada salida de mercancía deja aquí su renglón, con quién la
+/// hizo y de qué documento vino. **No se edita nada**: un movimiento mal
+/// registrado se corrige con otro que lo compense —lo impide además una guarda
+/// de la base—.
 ///
-/// **Una factura no se corrige: se deshace.** Desde aquí se puede recibir una
-/// devolución parcial —vuelve la mercancía elegida y la factura sigue viva— o
-/// anular la venta entera, que la deja en `ANULADA` con su número y devuelve
-/// todo lo que quedaba. Las dos piden `POS_ANULAR`. Lo que no hay es editar:
-/// ni el total, ni las líneas, ni el cliente.
-class HistorialVentasVista extends ConsumerStatefulWidget {
-  const HistorialVentasVista({super.key});
+/// Es la pantalla que responde «¿dónde se fueron las doce pastillas?», que es
+/// la pregunta que antes no tenía respuesta porque el stock se escribía con
+/// seis `UPDATE` repartidos por la app.
+class MovimientosVista extends ConsumerStatefulWidget {
+  const MovimientosVista({super.key});
 
   @override
-  ConsumerState<HistorialVentasVista> createState() =>
-      _HistorialVentasVistaState();
+  ConsumerState<MovimientosVista> createState() => _MovimientosVistaState();
 }
 
-class _HistorialVentasVistaState extends ConsumerState<HistorialVentasVista> {
+class _MovimientosVistaState extends ConsumerState<MovimientosVista> {
   final _busqueda = TextEditingController();
   final _focoBusqueda = FocusNode();
   Timer? _debounce;
@@ -48,13 +50,13 @@ class _HistorialVentasVistaState extends ConsumerState<HistorialVentasVista> {
     _debounce?.cancel();
     _debounce = Timer(const Duration(milliseconds: 280), () {
       if (!mounted) return;
-      ref.read(historialVentasProvider.notifier).buscar(texto);
+      ref.read(movimientosProvider.notifier).buscar(texto);
     });
   }
 
   void _limpiarFiltros() {
     _busqueda.clear();
-    ref.read(historialVentasProvider.notifier).limpiarFiltros();
+    ref.read(movimientosProvider.notifier).limpiarFiltros();
   }
 
   /// La raíz no observa el listado: cada bloque se suscribe al suyo.
@@ -71,8 +73,8 @@ class _HistorialVentasVistaState extends ConsumerState<HistorialVentasVista> {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             const EncabezadoConCuenta(
-              titulo: 'Historial de ventas',
-              subtitulo: 'Qué se vendió, cuándo y quién lo cobró',
+              titulo: 'Movimientos de inventario',
+              subtitulo: 'Todo lo que entró y salió, y quién lo movió',
             ),
             const SizedBox(height: 20),
             Row(
@@ -81,12 +83,23 @@ class _HistorialVentasVistaState extends ConsumerState<HistorialVentasVista> {
                   child: BarraBusqueda(
                     controlador: _busqueda,
                     focoTeclado: _focoBusqueda,
-                    placeholder: 'Buscar por factura, cliente o cajero...',
+                    placeholder: 'Buscar por producto, SKU o nota...',
                     alCambiar: _alBuscar,
                   ),
                 ),
                 const SizedBox(width: 20),
-                const Flexible(child: _ChipsEstado()),
+                const Flexible(child: _ChipsSentido()),
+                const SizedBox(width: 20),
+                // Esconder el botón es orden; la compuerta que impide de
+                // verdad está en el repositorio (`CLAUDE.md` §7 bis).
+                SiPuede(
+                  permiso: Permiso.inventarioEntrada,
+                  child: BotonPrimario(
+                    etiqueta: 'Dar entrada',
+                    icono: Icons.local_shipping_outlined,
+                    alPresionar: () => DialogoEntradaCompra.mostrar(context),
+                  ),
+                ),
               ],
             ),
             const SizedBox(height: 16),
@@ -97,7 +110,7 @@ class _HistorialVentasVistaState extends ConsumerState<HistorialVentasVista> {
             // `Expanded` porque `TablaGenerica` lleva encabezado fijo y exige
             // un padre acotado (`CLAUDE.md` §4).
             Expanded(
-              child: TablaHistorialVentas(alLimpiarFiltros: _limpiarFiltros),
+              child: TablaMovimientos(alLimpiarFiltros: _limpiarFiltros),
             ),
             const SizedBox(height: 16),
             const _Paginador(),
@@ -108,34 +121,40 @@ class _HistorialVentasVistaState extends ConsumerState<HistorialVentasVista> {
   }
 }
 
-/// Pagada, pendiente o anulada. Tocar la que ya está puesta la quita.
-class _ChipsEstado extends ConsumerWidget {
-  const _ChipsEstado();
+/// Entradas o salidas. Tocar el que ya está puesto lo quita.
+class _ChipsSentido extends ConsumerWidget {
+  const _ChipsSentido();
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final activo = ref.watch(
-      historialVentasProvider.select((s) => s.value?.estado),
-    );
-    final notifier = ref.read(historialVentasProvider.notifier);
+    final activo =
+        ref.watch(movimientosProvider.select((s) => s.value?.soloEntradas));
+    final notifier = ref.read(movimientosProvider.notifier);
 
     return Wrap(
       spacing: 8,
       runSpacing: 8,
       children: [
-        for (final estado in EstadoPago.values)
-          ChipFiltro(
-            etiqueta: estado.etiqueta,
-            seleccionado: activo == estado,
-            colorActivo: colorDeEstadoPago(estado).color,
-            alPresionar: () => notifier.filtrarPorEstado(estado),
-          ),
+        ChipFiltro(
+          etiqueta: 'Entradas',
+          icono: Icons.south_west_rounded,
+          seleccionado: activo == true,
+          colorActivo: ColoresApp.statusSuccess,
+          alPresionar: () => notifier.filtrarPorSentido(true),
+        ),
+        ChipFiltro(
+          etiqueta: 'Salidas',
+          icono: Icons.north_east_rounded,
+          seleccionado: activo == false,
+          colorActivo: ColoresApp.statusDanger,
+          alPresionar: () => notifier.filtrarPorSentido(false),
+        ),
       ],
     );
   }
 }
 
-/// De dónde salió la venta y entre qué fechas.
+/// Por qué se movió y entre qué fechas.
 class _Filtros extends ConsumerWidget {
   const _Filtros();
 
@@ -145,22 +164,23 @@ class _Filtros extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final estado = ref.watch(historialVentasProvider).value;
+    final estado = ref.watch(movimientosProvider).value;
     if (estado == null) return const SizedBox.shrink();
 
-    final notifier = ref.read(historialVentasProvider.notifier);
+    final notifier = ref.read(movimientosProvider.notifier);
 
     return FilaCampos(
       pesos: const [3, 2, 2],
       hijos: [
         SelectorWidget<String>(
-          etiqueta: 'Origen',
-          valor: estado.tipo?.aTexto ?? _todos,
-          opciones: [_todos, for (final t in TipoVenta.values) t.aTexto],
-          constructorEtiqueta: (valor) =>
-              valor == _todos ? 'Todas' : TipoVenta.desdeTexto(valor).etiqueta,
+          etiqueta: 'Por qué',
+          valor: estado.tipo?.codigo ?? _todos,
+          opciones: [_todos, for (final t in TipoMovimiento.values) t.codigo],
+          constructorEtiqueta: (valor) => valor == _todos
+              ? 'Todos los motivos'
+              : TipoMovimiento.desdeCodigo(valor).etiqueta,
           alCambiar: (valor) => notifier.filtrarPorTipo(
-            valor == _todos ? null : TipoVenta.desdeTexto(valor),
+            valor == _todos ? null : TipoMovimiento.desdeCodigo(valor),
           ),
         ),
         CampoFecha(
@@ -190,40 +210,36 @@ class _Filtros extends ConsumerWidget {
   }
 }
 
-/// Cuántas ventas hay y cuánto suman las de la página.
+/// Cuántos movimientos hay y qué saldo dejan los de esta página.
 class _Resumen extends ConsumerWidget {
   const _Resumen();
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final estado = ref.watch(historialVentasProvider).value;
+    final estado = ref.watch(movimientosProvider).value;
     if (estado == null) return const SizedBox.shrink();
 
     // Solo lo visible, y la etiqueta lo dice: sumar todas las páginas pide su
     // propia consulta con `SUM`, no recorrer una lista que no está entera.
-    //
-    // Va el **neto**: lo que se devolvió salió de la caja, y una cifra que no
-    // lo descuenta no sirve para cuadrarla.
-    final sumaPagina = estado.items
-        .where((v) => v.estadoPago != EstadoPago.anulada)
-        .fold<int>(0, (acumulado, v) => acumulado + v.totalNeto);
+    final saldo = estado.items
+        .fold<double>(0, (acumulado, m) => acumulado + m.cantidad);
 
     return Row(
       children: [
         Text(
-          estado.total == 1 ? '1 venta' : '${estado.total} ventas',
+          estado.total == 1 ? '1 movimiento' : '${estado.total} movimientos',
           style: TipografiaApp.caption.copyWith(color: ColoresApp.textMuted),
         ),
         const SizedBox(width: 12),
         Text(
-          'En esta página: ${formatearPrecio(sumaPagina)}',
+          'En esta página: ${formatearCantidadMovimiento(saldo)} unidades',
           style: TipografiaApp.caption.copyWith(color: ColoresApp.textMuted),
         ),
         if (estado.hayFiltro) ...[
           const SizedBox(width: 12),
           TextButton(
             onPressed: () =>
-                ref.read(historialVentasProvider.notifier).limpiarFiltros(),
+                ref.read(movimientosProvider.notifier).limpiarFiltros(),
             child: Text(
               'Quitar los filtros',
               style: TipografiaApp.enlace(TipografiaApp.caption),
@@ -240,7 +256,7 @@ class _Paginador extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final estado = ref.watch(historialVentasProvider).value;
+    final estado = ref.watch(movimientosProvider).value;
     if (estado == null || estado.total == 0) return const SizedBox.shrink();
 
     return PaginacionWidget(
@@ -249,7 +265,7 @@ class _Paginador extends ConsumerWidget {
       totalItems: estado.total,
       itemsPorPagina: estado.tamanoPagina,
       alCambiarPagina: (pagina) =>
-          ref.read(historialVentasProvider.notifier).irAPagina(pagina),
+          ref.read(movimientosProvider.notifier).irAPagina(pagina),
     );
   }
 }

@@ -7,6 +7,10 @@ import '../../../../core/formato.dart';
 import '../../../../backend/features/productos/modelo/producto.dart';
 import '../../../share2/share2.dart';
 import '../widgets/badget_estado_stock_widget.dart';
+import '../../../../backend/share/dominio/permiso.dart';
+import '../../autenticacion/widgets/si_puede.dart';
+import '../../inventario/widgets/dialogo_entrada_compra.dart';
+import '../../inventario/widgets/panel_movimientos_producto.dart';
 
 /// Ficha de un producto: imagen, datos de inventario y acciones.
 ///
@@ -200,6 +204,20 @@ class _Ficha extends StatelessWidget {
         _Compatibilidad(descripcion: producto.descripcion),
         if (alEditar != null || alEliminar != null) ...[
           const SizedBox(height: 22),
+          // Dar entrada vive aquí además de en Movimientos: cuando llega la
+          // remisión, quien la recibe está mirando el producto, no el kardex.
+          // Es el mismo diálogo, con el producto ya elegido.
+          SiPuede(
+            permiso: Permiso.inventarioEntrada,
+            child: BotonSecundario(
+              etiqueta: 'Dar entrada',
+              icono: Icons.local_shipping_outlined,
+              expandido: true,
+              alPresionar: () =>
+                  DialogoEntradaCompra.mostrar(context, producto: producto),
+            ),
+          ),
+          const SizedBox(height: 12),
           Row(
             children: [
               if (alEditar != null)
@@ -358,7 +376,7 @@ class _PanelesSecundarios extends StatelessWidget {
     return LayoutBuilder(
       builder: (context, constraints) {
         final proveedor = _PanelProveedor(producto: producto);
-        const movimientos = _PanelMovimientos();
+        final movimientos = PanelMovimientosProducto(productoId: producto.id!);
 
         // En ventanas angostas los dos paneles se apilan.
         if (constraints.maxWidth < 900) {
@@ -377,7 +395,7 @@ class _PanelesSecundarios extends StatelessWidget {
           children: [
             Expanded(child: proveedor),
             const SizedBox(width: 22),
-            const Expanded(child: movimientos),
+            Expanded(child: movimientos),
           ],
         );
       },
@@ -432,47 +450,6 @@ class _PanelProveedor extends StatelessWidget {
             ),
           ),
         ],
-      ),
-    );
-  }
-}
-
-/// Bloque "Movimientos recientes" del diseño.
-///
-/// Marcador: no existe todavía una tabla de movimientos de inventario en el
-/// backend, así que no hay datos reales que mostrar.
-class _PanelMovimientos extends StatelessWidget {
-  const _PanelMovimientos();
-
-  @override
-  Widget build(BuildContext context) {
-    return PanelSeccion(
-      titulo: 'Movimientos recientes',
-      child: Container(
-        width: double.infinity,
-        padding: const EdgeInsets.symmetric(vertical: 26, horizontal: 16),
-        decoration: BoxDecoration(
-          color: ColoresApp.bgInput,
-          borderRadius: BorderRadius.circular(12),
-          border: Border.all(color: ColoresApp.borderFila),
-        ),
-        child: Column(
-          children: [
-            const Icon(
-              Icons.swap_vert_rounded,
-              size: 26,
-              color: ColoresApp.textDisabled,
-            ),
-            const SizedBox(height: 8),
-            Text(
-              'Aún no se registran movimientos',
-              style: TipografiaApp.caption.copyWith(
-                color: ColoresApp.textDisabled,
-              ),
-              textAlign: TextAlign.center,
-            ),
-          ],
-        ),
       ),
     );
   }
