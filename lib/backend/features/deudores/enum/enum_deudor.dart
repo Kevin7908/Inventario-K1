@@ -10,11 +10,3 @@ enum EstadoDeudor {
   static EstadoDeudor desdeValor(String v) =>
       EstadoDeudor.values.firstWhere((e) => e.valor == v);
 }
-
-const List<String> kMetodosPagoDeudor = [
-  'Efectivo',
-  'Transferencia',
-  'Tarjeta',
-  'Nequi',
-  'Daviplata',
-];

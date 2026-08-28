@@ -1,10 +1,11 @@
-// Modelo puro de dominio para Categoría (sin dependencia de Drift)
+/// Modelo puro de dominio para Categoría (sin dependencia de Drift).
+///
+/// **Sin color ni ícono**: cómo se pinta una categoría lo decide la vista con
+/// los tokens de `ColoresApp`. Ver el docstring de `TablaCategoria`.
 class Categoria {
   final int? id;
   final String nombre;
   final String? descripcion;
-  final String colorHex;
-  final String icono;
   final DateTime creadoEn;
   final DateTime actualizadoEn;
 
@@ -15,8 +16,6 @@ class Categoria {
     this.id,
     required this.nombre,
     this.descripcion,
-    this.colorHex = '#3B82F6',
-    this.icono = 'category',
     required this.creadoEn,
     required this.actualizadoEn,
     this.totalProductos = 0,
@@ -27,8 +26,6 @@ class Categoria {
     int? id,
     String? nombre,
     String? descripcion,
-    String? colorHex,
-    String? icono,
     DateTime? creadoEn,
     DateTime? actualizadoEn,
     int? totalProductos,
@@ -37,8 +34,6 @@ class Categoria {
       id: id ?? this.id,
       nombre: nombre ?? this.nombre,
       descripcion: descripcion ?? this.descripcion,
-      colorHex: colorHex ?? this.colorHex,
-      icono: icono ?? this.icono,
       creadoEn: creadoEn ?? this.creadoEn,
       actualizadoEn: actualizadoEn ?? this.actualizadoEn,
       totalProductos: totalProductos ?? this.totalProductos,

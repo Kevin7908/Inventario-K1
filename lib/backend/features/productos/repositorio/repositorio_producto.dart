@@ -21,6 +21,7 @@ class FiltroProductos {
     this.soloStockBajo = false,
     this.soloSinStock = false,
     this.soloEnStock = false,
+    this.soloActivos = false,
   });
 
   /// Coincide contra nombre, SKU o nombre de categoría.
@@ -29,6 +30,11 @@ class FiltroProductos {
   final bool soloStockBajo;
   final bool soloSinStock;
   final bool soloEnStock;
+
+  /// Deja fuera lo dado de baja. Lo piden las pantallas que **venden** —punto
+  /// de venta y cotizaciones—, no el catálogo: en Productos, un producto
+  /// inactivo tiene que verse para poder reactivarlo.
+  final bool soloActivos;
 }
 
 /// Contrato abstracto del repositorio de productos.
@@ -84,6 +90,14 @@ abstract class RepositorioProducto {
   /// Usa [excludirId] para excluir el producto actual al editar.
   Future<bool> existeSku(String sku, {int? excludirId});
 
+  /// El SKU que le tocaría al siguiente producto de [categoriaId], **sin
+  /// consumirlo**.
+  ///
+  /// Es para enseñarlo en el formulario mientras se escribe. El definitivo lo
+  /// asigna [crear] dentro de su transacción: abrir el formulario y
+  /// arrepentirse no puede quemar un código.
+  Future<String> previsualizarSku(int? categoriaId);
+
   /// Retorna el total de productos activos registrados.
   Future<int> contarActivos();
 
@@ -108,6 +122,23 @@ abstract class RepositorioProducto {
   /// Se resuelve con un `GROUP BY`, no cargando los productos en memoria.
   Stream<Map<int, int>> observarConteoPorCategoria();
 
-  /// Observa el total de productos y cuántos no están en stock normal.
-  Stream<({int total, int stockBajo})> observarResumen();
+  /// Observa cuántos productos surte cada proveedor, indexado por su id.
+  ///
+  /// Igual que [observarConteoPorCategoria], sale de un `GROUP BY`: es el
+  /// "N productos" que muestra cada tarjeta de proveedor.
+  Stream<Map<int, int>> observarConteoPorProveedor();
+
+  /// Observa cuántos productos hay en cada estado de stock.
+  ///
+  /// Los tres estados son excluyentes y suman `total`, para que los chips de
+  /// filtro puedan mostrar su conteo sin recorrer el catálogo:
+  /// - `enStock`: `stockActual > stockMinimo`
+  /// - `stockBajo`: `0 < stockActual <= stockMinimo`
+  /// - `sinStock`: `stockActual <= 0`
+  ///
+  /// De [filtro] solo se aplican la búsqueda y la categoría: los tramos de
+  /// stock son justamente lo que se está contando. Sin filtro cuenta todo el
+  /// catálogo, que es lo que necesita el encabezado de la pantalla.
+  Stream<({int total, int enStock, int stockBajo, int sinStock})>
+      observarResumen({FiltroProductos filtro});
 }

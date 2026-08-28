@@ -10,8 +10,6 @@ class CategoriaMapper {
       id: fila.id,
       nombre: fila.nombre,
       descripcion: fila.descripcion,
-      colorHex: fila.colorHex,
-      icono: fila.icono,
       creadoEn: fila.creadoEn,
       actualizadoEn: fila.actualizadoEn,
     );
@@ -23,8 +21,6 @@ class CategoriaMapper {
       id: categoria.id != null ? Value(categoria.id!) : const Value.absent(),
       nombre: Value(categoria.nombre),
       descripcion: Value(categoria.descripcion),
-      colorHex: Value(categoria.colorHex),
-      icono: Value(categoria.icono),
       actualizadoEn: Value(DateTime.now()),
     );
   }

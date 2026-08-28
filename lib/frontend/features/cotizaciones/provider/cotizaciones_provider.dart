@@ -1,228 +1,191 @@
-import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:flutter_riverpod/legacy.dart';
-import 'package:inventario_k1/backend/features/clientes/repositorio/repositorio_cliente_impl.dart';
-import 'package:inventario_k1/backend/features/motos/repositorio/repositorio_moto_impl.dart';
-import 'package:inventario_k1/backend/features/motos/modelo/moto.dart';
-import 'package:inventario_k1/backend/features/clientes/modelo/cliente.dart';
-import 'package:inventario_k1/backend/features/productos/modelo/producto.dart';
-import 'package:inventario_k1/backend/features/productos/repositorio/repositorio_producto_impl.dart';
-import 'package:inventario_k1/backend/share/database/app_db_provider.dart';
+import 'dart:async';
 
-import '../../../../backend/features/cotizaciones/enum/enum_cotizacion.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+
 import '../../../../backend/features/cotizaciones/modelo/cotizacion_detalle.dart';
 import '../../../../backend/features/cotizaciones/modelo/cotizacion_resumen.dart';
 import '../../../../backend/features/cotizaciones/repositorio/repositorio_cotizaciones.dart';
 import '../../../../backend/features/cotizaciones/repositorio/repositorio_cotizaciones_impl.dart';
+import '../../../../backend/share/database/app_db_provider.dart';
+import '../../../../core/resultado.dart';
+import '../../autenticacion/provider/auth_providers.dart';
 
-// ── Repositorio ──────────────────────────────────────────────────────────────
+// Repositorio
 
 final repositorioCotizacionesProvider = Provider<RepositorioCotizaciones>(
   name: 'repositorioCotizacionesProvider',
-  (ref) => RepositorioCotizacionesImpl(ref.watch(appDatabaseProvider)),
+  (ref) => RepositorioCotizacionesImpl(
+    ref.watch(appDatabaseProvider),
+    // Quién firma lo que este repositorio escriba. Es una dependencia
+    // del constructor, no un registro global (`CLAUDE.md` §3).
+    ref.watch(sesionActualProvider),
+  ),
 );
 
-// ── Estado ────────────────────────────────────────────────────────────────────
+// Estado
 
+/// Estado del listado de cotizaciones: **solo la página visible**.
+///
+/// El filtrado por texto, el filtro de estado, el conteo y el recorte los
+/// resuelve SQLite. Antes esta clase guardaba la lista entera y filtraba en
+/// Dart, así que el conteo de los chips y el total de la paginación se
+/// recalculaban en cada repintado sobre todas las cotizaciones del taller.
 final class CotizacionesState {
   const CotizacionesState({
-    this.cotizaciones = const [],
-    this.filtroBusqueda = '',
+    this.items = const [],
+    this.total = 0,
+    this.pagina = 0,
+    this.tamanoPagina = 12,
+    this.busqueda = '',
     this.filtroEstado,
-    this.filtroMes,
-    this.paginaActual = 0,
   });
 
-  final List<CotizacionResumen> cotizaciones;
-  final String filtroBusqueda;
-  final EstadoCotizacion? filtroEstado;
-  final int? filtroMes;
-  final int paginaActual;
+  /// Cotizaciones de la página actual.
+  final List<CotizacionResumen> items;
 
-  static const int itemsPorPagina = 10;
+  /// Total de cotizaciones que cumplen el filtro, en todas las páginas.
+  final int total;
+
+  /// Página actual, de base cero.
+  final int pagina;
+  final int tamanoPagina;
+
+  final String busqueda;
+
+  /// `null` = todos los estados.
+  final EstadoCotizacion? filtroEstado;
+
+  int get totalPaginas =>
+      total <= 0 ? 1 : (total + tamanoPagina - 1) ~/ tamanoPagina;
+
+  bool get hayFiltro => busqueda.isNotEmpty || filtroEstado != null;
+
+  /// Traduce los filtros de la interfaz a los que entiende el repositorio.
+  FiltroCotizaciones get filtro =>
+      FiltroCotizaciones(busqueda: busqueda, estado: filtroEstado);
+
+  /// Centinela para distinguir "no tocar [filtroEstado]" de "ponerlo en null"
+  /// (= quitar el filtro), que con `??` serían lo mismo.
+  static const Object _sinCambio = Object();
 
   CotizacionesState copyWith({
-    List<CotizacionResumen>? cotizaciones,
-    String? filtroBusqueda,
-    Object? filtroEstado = _sentinel,
-    Object? filtroMes = _sentinel,
-    int? paginaActual,
-  }) {
-    return CotizacionesState(
-      cotizaciones: cotizaciones ?? this.cotizaciones,
-      filtroBusqueda: filtroBusqueda ?? this.filtroBusqueda,
-      filtroEstado: filtroEstado == _sentinel
-          ? this.filtroEstado
-          : filtroEstado as EstadoCotizacion?,
-      filtroMes:
-          filtroMes == _sentinel ? this.filtroMes : filtroMes as int?,
-      paginaActual: paginaActual ?? this.paginaActual,
-    );
-  }
-
-  static const Object _sentinel = Object();
-
+    List<CotizacionResumen>? items,
+    int? total,
+    int? pagina,
+    int? tamanoPagina,
+    String? busqueda,
+    Object? filtroEstado = _sinCambio,
+  }) =>
+      CotizacionesState(
+        items: items ?? this.items,
+        total: total ?? this.total,
+        pagina: pagina ?? this.pagina,
+        tamanoPagina: tamanoPagina ?? this.tamanoPagina,
+        busqueda: busqueda ?? this.busqueda,
+        filtroEstado: identical(filtroEstado, _sinCambio)
+            ? this.filtroEstado
+            : filtroEstado as EstadoCotizacion?,
+      );
 }
 
-// ── Notifier ──────────────────────────────────────────────────────────────────
+// Notifier
 
 class CotizacionesNotifier extends AsyncNotifier<CotizacionesState> {
   late final RepositorioCotizaciones _repo;
+  StreamSubscription<PaginaCotizaciones>? _sub;
 
   @override
   Future<CotizacionesState> build() async {
     _repo = ref.watch(repositorioCotizacionesProvider);
+    ref.onDispose(() => _sub?.cancel());
 
-    final sub = _repo.observarTodas().listen(
-      (lista) {
+    const inicial = CotizacionesState();
+    final primera = await _repo
+        .observarPagina(
+          filtro: inicial.filtro,
+          pagina: inicial.pagina,
+          tamano: inicial.tamanoPagina,
+        )
+        .first;
+
+    _suscribir(inicial);
+    return inicial.copyWith(items: primera.items, total: primera.total);
+  }
+
+  /// Reabre el stream con los filtros y la página vigentes.
+  ///
+  /// Cada cambio de filtro es una consulta nueva: por eso se cancela la
+  /// suscripción anterior en vez de recortar en memoria.
+  void _suscribir(CotizacionesState estado) {
+    _sub?.cancel();
+    _sub = _repo
+        .observarPagina(
+          filtro: estado.filtro,
+          pagina: estado.pagina,
+          tamano: estado.tamanoPagina,
+        )
+        .listen(
+      (pagina) {
         final actual = state.value;
+        if (actual == null) return;
         state = AsyncData(
-          actual != null
-              ? actual.copyWith(cotizaciones: lista)
-              : CotizacionesState(cotizaciones: lista),
+          actual.copyWith(items: pagina.items, total: pagina.total),
         );
       },
       onError: (Object e, StackTrace st) => state = AsyncError(e, st),
     );
-    ref.onDispose(sub.cancel);
-
-    final lista = await _repo.obtenerTodas();
-    return CotizacionesState(cotizaciones: lista);
   }
 
-  // ── Filtros ──────────────────────────────────────────────────────────────────
+  void _aplicar(CotizacionesState nuevo) {
+    state = AsyncData(nuevo);
+    _suscribir(nuevo);
+  }
 
-  void buscar(String q) {
+  // Filtros — todos vuelven a la primera página, porque el conjunto cambió.
+
+  void buscar(String query) {
     final actual = state.value;
     if (actual == null) return;
-    state = AsyncData(actual.copyWith(filtroBusqueda: q.trim(), paginaActual: 0));
+    final limpio = query.trim();
+    if (actual.busqueda == limpio) return;
+    _aplicar(actual.copyWith(busqueda: limpio, pagina: 0));
   }
 
-  void filtrarEstado(EstadoCotizacion? e) {
+  /// Filtra por vigencia. `null` quita el filtro y muestra todas.
+  void filtrarPorEstado(EstadoCotizacion? estado) {
     final actual = state.value;
-    if (actual == null) return;
-    state = AsyncData(actual.copyWith(filtroEstado: e, paginaActual: 0));
+    if (actual == null || actual.filtroEstado == estado) return;
+    _aplicar(actual.copyWith(filtroEstado: estado, pagina: 0));
   }
 
-  void filtrarMes(int? mes) {
+  void irAPagina(int pagina) {
     final actual = state.value;
-    if (actual == null) return;
-    state = AsyncData(actual.copyWith(filtroMes: mes, paginaActual: 0));
+    if (actual == null || pagina == actual.pagina) return;
+    if (pagina < 0 || pagina >= actual.totalPaginas) return;
+    _aplicar(actual.copyWith(pagina: pagina));
   }
 
-  void cambiarPagina(int pagina) {
-    final actual = state.value;
-    if (actual == null) return;
-    state = AsyncData(actual.copyWith(paginaActual: pagina));
-  }
+  // Mutaciones
 
-  // ── CRUD ──────────────────────────────────────────────────────────────────────
-
-  Future<String?> crear({
-    int? clienteId,
-    int? motoId,
-    required String vigenciaHasta,
-    String? notas,
-    required List<ItemDraft> items,
-  }) async {
-    try {
-      await _repo.crear(
-        clienteId: clienteId,
-        motoId: motoId,
-        vigenciaHasta: vigenciaHasta,
-        notas: notas,
-        items: items,
-      );
-      return null;
-    } catch (e) {
-      return e.toString();
-    }
-  }
-
-  Future<String?> actualizar({
-    required int id,
-    int? clienteId,
-    int? motoId,
-    required String vigenciaHasta,
-    String? notas,
-    required List<ItemDraft> items,
-  }) async {
-    try {
-      await _repo.actualizar(
-        id: id,
-        clienteId: clienteId,
-        motoId: motoId,
-        vigenciaHasta: vigenciaHasta,
-        notas: notas,
-        items: items,
-      );
-      return null;
-    } catch (e) {
-      return e.toString();
-    }
-  }
-
-  Future<String?> eliminar(int id) async {
-    final actual = state.value;
-    if (actual == null) return null;
-
-    final snapshot = actual.cotizaciones;
-    state = AsyncData(actual.copyWith(
-      cotizaciones: snapshot.where((c) => c.id != id).toList(growable: false),
-    ));
+  /// Borra la cotización y su detalle.
+  ///
+  /// No hay borrado optimista: el stream de Drift repinta la página en cuanto
+  /// la fila desaparece, y adelantarse solo abriría la puerta a mostrar una
+  /// lista que no coincide con la base si el `DELETE` falla.
+  Future<Resultado> eliminar(int id) async {
     try {
       await _repo.eliminar(id);
-      return null;
+      return const Exito();
     } catch (e) {
-      state = AsyncData(actual.copyWith(cotizaciones: snapshot));
-      return e.toString();
-    }
-  }
-
-  // ── CRUD Items (desde panel lateral) ─────────────────────────────────────────
-
-  Future<String?> agregarItem({
-    required int cotizacionId,
-    required TipoItemCotizacion tipo,
-    int? referenciaId,
-    required String descripcion,
-    required double cantidad,
-    required int precioUnitario,
-  }) async {
-    try {
-      await _repo.agregarItem(
-        cotizacionId: cotizacionId,
-        tipo: tipo,
-        referenciaId: referenciaId,
-        descripcion: descripcion,
-        cantidad: cantidad,
-        precioUnitario: precioUnitario,
+      return const Fallo(
+        MotivoFallo.persistencia,
+        'No se pudo eliminar la cotización. Puede tener una reserva asociada.',
       );
-      ref.invalidate(cotizacionDetalleProvider(cotizacionId));
-      return null;
-    } catch (e) {
-      return e.toString();
-    }
-  }
-
-  Future<String?> eliminarItem(int itemId, int cotizacionId) async {
-    try {
-      await _repo.eliminarItem(itemId, cotizacionId);
-      ref.invalidate(cotizacionDetalleProvider(cotizacionId));
-      return null;
-    } catch (e) {
-      return e.toString();
     }
   }
 }
 
-// ── Providers públicos ────────────────────────────────────────────────────────
-
-/// ID de la cotización seleccionada en el panel lateral.
-/// autoDispose garantiza que se reinicia al salir de la vista.
-final cotSeleccionadaIdProvider = StateProvider.autoDispose<int?>(
-  (ref) => null,
-  name: 'cotSeleccionadaIdProvider',
-);
+// Providers públicos
 
 final cotizacionesProvider =
     AsyncNotifierProvider<CotizacionesNotifier, CotizacionesState>(
@@ -230,170 +193,21 @@ final cotizacionesProvider =
   name: 'cotizacionesProvider',
 );
 
-final cotizacionDetalleProvider =
-    FutureProvider.family<CotizacionDetalle, int>(
+/// Cotizaciones de la página actual.
+final cotizacionesPaginaProvider = Provider<List<CotizacionResumen>>(
+  name: 'cotizacionesPaginaProvider',
+  (ref) => ref.watch(cotizacionesProvider).value?.items ?? const [],
+);
+
+/// Conteos del encabezado y monto todavía en juego, resueltos con `COUNT` y
+/// `SUM` en SQL.
+final cotizacionesResumenProvider = StreamProvider<ResumenCotizaciones>(
+  name: 'cotizacionesResumenProvider',
+  (ref) => ref.watch(repositorioCotizacionesProvider).observarResumen(),
+);
+
+/// Cotización completa con sus ítems. La usa el editor al abrir una existente.
+final cotizacionDetalleProvider = FutureProvider.family<CotizacionDetalle, int>(
   name: 'cotizacionDetalleProvider',
   (ref, id) => ref.watch(repositorioCotizacionesProvider).obtenerDetalle(id),
 );
-
-// ── Providers de datos de apoyo (para el diálogo) ────────────────────────────
-
-final motosParaCotizacionProvider = FutureProvider<List<Moto>>(
-  name: 'motosParaCotizacionProvider',
-  (ref) => RepositorioMotosImpl(ref.watch(appDatabaseProvider)).obtenerTodos(),
-);
-
-final clientesParaCotizacionProvider = FutureProvider<List<Cliente>>(
-  name: 'clientesParaCotizacionProvider',
-  (ref) =>
-      RepositorioClientesImpl(ref.watch(appDatabaseProvider)).obtenerTodos(),
-);
-
-final productosParaCotizacionProvider = FutureProvider<List<Producto>>(
-  name: 'productosParaCotizacionProvider',
-  (ref) =>
-      RepositorioProductosImpl(ref.watch(appDatabaseProvider)).obtenerActivos(),
-);
-
-// ── Modelos de valor para providers derivados ─────────────────────────────────
-
-final class CotizacionesMetrics {
-  const CotizacionesMetrics({
-    required this.total,
-    required this.valorTotal,
-    required this.cantVigentes,
-    required this.cantVencidas,
-    required this.cantPorVencer,
-  });
-
-  final int total;
-  final int valorTotal;
-  final int cantVigentes;
-  final int cantVencidas;
-  final int cantPorVencer;
-
-  @override
-  bool operator ==(Object other) =>
-      identical(this, other) ||
-      other is CotizacionesMetrics &&
-          total == other.total &&
-          valorTotal == other.valorTotal &&
-          cantVigentes == other.cantVigentes &&
-          cantVencidas == other.cantVencidas &&
-          cantPorVencer == other.cantPorVencer;
-
-  @override
-  int get hashCode =>
-      Object.hash(total, valorTotal, cantVigentes, cantVencidas, cantPorVencer);
-}
-
-final class PaginacionCotizaciones {
-  const PaginacionCotizaciones({
-    required this.paginadas,
-    required this.paginaActual,
-    required this.totalPaginas,
-    required this.totalFiltradas,
-  });
-
-  final List<CotizacionResumen> paginadas;
-  final int paginaActual;
-  final int totalPaginas;
-  final int totalFiltradas;
-}
-
-// ── Providers derivados ───────────────────────────────────────────────────────
-
-/// Solo recalcula cuando cambia la lista base, sin importar filtros ni página.
-final cotizacionesMetricsProvider = Provider<CotizacionesMetrics>(
-  name: 'cotizacionesMetricsProvider',
-  (ref) {
-    final lista = ref.watch(
-      cotizacionesProvider.select(
-        (s) => s.asData?.value.cotizaciones ?? const [],
-      ),
-    );
-    return CotizacionesMetrics(
-      total: lista.length,
-      valorTotal: lista.fold(0, (acc, c) => acc + c.total),
-      cantVigentes:
-          lista.where((c) => c.estado == EstadoCotizacion.vigente).length,
-      cantVencidas:
-          lista.where((c) => c.estado == EstadoCotizacion.vencida).length,
-      cantPorVencer:
-          lista.where((c) => c.estado == EstadoCotizacion.porVencer).length,
-    );
-  },
-);
-
-/// Solo recalcula cuando cambia la lista base o alguno de los tres filtros.
-/// Cambiar solo la página NO dispara este provider.
-final cotizacionesFiltradasProvider = Provider<List<CotizacionResumen>>(
-  name: 'cotizacionesFiltradasProvider',
-  (ref) {
-    // Dart records tienen igualdad estructural → .select compara campo a campo.
-    final p = ref.watch(cotizacionesProvider.select((s) {
-      final v = s.asData?.value;
-      if (v == null) {
-        return (
-          lista: <CotizacionResumen>[],
-          estado: null as EstadoCotizacion?,
-          mes: null as int?,
-          busqueda: '',
-        );
-      }
-      return (
-        lista: v.cotizaciones,
-        estado: v.filtroEstado,
-        mes: v.filtroMes,
-        busqueda: v.filtroBusqueda,
-      );
-    }));
-
-    var lista = p.lista;
-    if (p.estado != null) {
-      lista = lista.where((c) => c.estado == p.estado).toList();
-    }
-    if (p.mes != null) {
-      lista = lista.where((c) => c.creadoEn.month == p.mes).toList();
-    }
-    final q = p.busqueda.toLowerCase();
-    if (q.isNotEmpty) {
-      lista = lista
-          .where(
-            (c) =>
-                c.numero.toLowerCase().contains(q) ||
-                c.nombreCliente.toLowerCase().contains(q) ||
-                c.nombreMoto.toLowerCase().contains(q),
-          )
-          .toList();
-    }
-    return lista;
-  },
-);
-
-/// Recalcula cuando cambia la lista filtrada O el número de página activa.
-final paginacionProvider = Provider<PaginacionCotizaciones>(
-  name: 'paginacionProvider',
-  (ref) {
-    final filtradas = ref.watch(cotizacionesFiltradasProvider);
-    final paginaActual = ref.watch(
-      cotizacionesProvider.select((s) => s.asData?.value.paginaActual ?? 0),
-    );
-
-    const items = CotizacionesState.itemsPorPagina;
-    final total = filtradas.length;
-    final totalPaginas = (total / items).ceil().clamp(1, 9999);
-    final inicio = paginaActual * items;
-    final fin = (inicio + items).clamp(0, total);
-    final paginadas =
-        inicio >= total ? const <CotizacionResumen>[] : filtradas.sublist(inicio, fin);
-
-    return PaginacionCotizaciones(
-      paginadas: paginadas,
-      paginaActual: paginaActual,
-      totalPaginas: totalPaginas,
-      totalFiltradas: total,
-    );
-  },
-);
-

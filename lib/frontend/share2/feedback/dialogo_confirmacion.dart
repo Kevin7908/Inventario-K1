@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../botones/boton_destructivo.dart';
+import '../botones/boton_primario.dart';
 import '../temas/colores_app.dart';
 import '../temas/tipografia_app.dart';
 
@@ -11,6 +12,9 @@ import '../temas/tipografia_app.dart';
 /// - [mensaje]: texto adicional debajo del título. Opcional.
 /// - [textoConfirmar]: texto del botón destructivo. Por defecto 'Eliminar'.
 /// - [textoCancelar]: texto del botón de cancelar. Por defecto 'Cancelar'.
+/// - [destructivo]: `true` —lo normal— pinta el botón de confirmar en rojo.
+///   Ponlo en `false` cuando lo que se confirma no destruye nada y solo pide
+///   una decisión, como «esta cédula ya está registrada, ¿la reutilizo?».
 ///
 /// Se muestra con el método estático [mostrar], que devuelve `true` si el
 /// usuario confirmó, o `null`/`false` si canceló o cerró el diálogo.
@@ -31,12 +35,14 @@ class DialogoConfirmacion extends StatelessWidget {
     this.mensaje,
     this.textoConfirmar = 'Eliminar',
     this.textoCancelar = 'Cancelar',
+    this.destructivo = true,
   });
 
   final String titulo;
   final String? mensaje;
   final String textoConfirmar;
   final String textoCancelar;
+  final bool destructivo;
 
   static Future<bool?> mostrar(
     BuildContext context, {
@@ -44,6 +50,7 @@ class DialogoConfirmacion extends StatelessWidget {
     String? mensaje,
     String textoConfirmar = 'Eliminar',
     String textoCancelar = 'Cancelar',
+    bool destructivo = true,
   }) {
     return showDialog<bool>(
       context: context,
@@ -52,6 +59,7 @@ class DialogoConfirmacion extends StatelessWidget {
         mensaje: mensaje,
         textoConfirmar: textoConfirmar,
         textoCancelar: textoCancelar,
+        destructivo: destructivo,
       ),
     );
   }
@@ -102,10 +110,16 @@ class DialogoConfirmacion extends StatelessWidget {
                   ),
                 ),
                 const SizedBox(width: 12),
-                BotonDestructivo(
-                  etiqueta: textoConfirmar,
-                  alPresionar: () => Navigator.of(context).pop(true),
-                ),
+                if (destructivo)
+                  BotonDestructivo(
+                    etiqueta: textoConfirmar,
+                    alPresionar: () => Navigator.of(context).pop(true),
+                  )
+                else
+                  BotonPrimario(
+                    etiqueta: textoConfirmar,
+                    alPresionar: () => Navigator.of(context).pop(true),
+                  ),
               ],
             ),
           ],

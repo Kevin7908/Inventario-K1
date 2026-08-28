@@ -5,11 +5,25 @@ import 'package:flutter/material.dart';
 import 'package:flutter/rendering.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:inventario_k1/backend/share/dominio/permiso.dart';
+import 'package:inventario_k1/frontend/features/autenticacion/provider/auth_providers.dart';
 import 'package:inventario_k1/frontend/features/categorias/vista/categorias_vistas.dart';
 import 'package:inventario_k1/frontend/features/productos/vista/producto_vista.dart';
-import 'package:inventario_k1/frontend/features/ventas/principal/vista/venta_vista.dart';
+import 'package:inventario_k1/frontend/features/pos/vista/punto_venta_vista.dart';
 import 'package:inventario_k1/frontend/layout/layout_principal.dart';
 import 'package:inventario_k1/frontend/share2/nav/barra_lateral.dart';
+
+/// El sidebar se filtra por permisos, así que un layout sin sesión no pinta
+/// ninguna sección. Estos tests miran otra cosa —qué vistas se construyen y
+/// dónde va el `RepaintBoundary`—, así que entran con todos los permisos.
+ProviderScope _conTodosLosPermisos(Widget hijo) => ProviderScope(
+      overrides: [
+        permisosSesionProvider.overrideWith(
+          (ref) => Stream.value(Permiso.values.toSet()),
+        ),
+      ],
+      child: hijo,
+    );
 
 void main() {
   testWidgets('al arrancar solo se construye la pantalla inicial',
@@ -19,8 +33,9 @@ void main() {
     addTearDown(tester.view.reset);
 
     await tester.pumpWidget(
-      const ProviderScope(child: MaterialApp(home: LayoutPrincipal())),
+      _conTodosLosPermisos(const MaterialApp(home: LayoutPrincipal())),
     );
+    await tester.pump();
 
     // El sidebar sí se pinta entero: es la navegación.
     expect(find.byType(BarraLateral), findsOneWidget);
@@ -30,7 +45,7 @@ void main() {
     // construyera, además pediría base de datos y reventaría el test.
     expect(find.byType(ProductosVista), findsNothing);
     expect(find.byType(CategoriasVista), findsNothing);
-    expect(find.byType(VentasVista), findsNothing);
+    expect(find.byType(PuntoVentaVista), findsNothing);
     expect(tester.takeException(), isNull);
   });
 
@@ -42,8 +57,9 @@ void main() {
     addTearDown(tester.view.reset);
 
     await tester.pumpWidget(
-      const ProviderScope(child: MaterialApp(home: LayoutPrincipal())),
+      _conTodosLosPermisos(const MaterialApp(home: LayoutPrincipal())),
     );
+    await tester.pump();
 
     // Se comprueba sobre el render object, no con un finder de ancestros:
     // Scaffold y ListView ya insertan RepaintBoundary por su cuenta, así que

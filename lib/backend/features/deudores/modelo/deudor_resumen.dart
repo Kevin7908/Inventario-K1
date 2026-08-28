@@ -8,8 +8,10 @@ class DeudorResumen extends Equatable {
     required this.numero,
     required this.clienteId,
     required this.nombreCliente,
-    this.ventaId,
-    required this.concepto,
+    this.motoId,
+    this.nombreMoto,
+    this.placaMoto,
+    this.concepto,
     required this.montoTotal,
     required this.montoPagado,
     required this.estado,
@@ -22,27 +24,51 @@ class DeudorResumen extends Equatable {
   final String numero;
   final int clienteId;
   final String nombreCliente;
-  final int? ventaId;
-  final String concepto;
+  final int? motoId;
+  final String? nombreMoto;
+  final String? placaMoto;
+
+  /// Por qué se debe, si se escribió. Las líneas ya dicen qué se llevó, así
+  /// que esto es opcional: sirve para nombrar el fiado («Reparación del
+  /// motor») cuando el listado de repuestos no lo explica solo.
+  final String? concepto;
   final int montoTotal;
   final int montoPagado;
   final EstadoDeudor estado;
-  final String? fechaVencimiento;
+  final DateTime? fechaVencimiento;
   final String? notas;
   final DateTime creadoEn;
 
   int get saldo => (montoTotal - montoPagado).clamp(0, montoTotal);
 
+  /// La moto en una línea, para las cabeceras. `null` si no se anotó ninguna.
+  String? get descripcionMoto {
+    final partes = [?nombreMoto, ?placaMoto];
+    return partes.isEmpty ? null : partes.join(' · ');
+  }
+
   double get porcentajePagado =>
       montoTotal > 0 ? (montoPagado / montoTotal).clamp(0.0, 1.0) : 0.0;
 
+  /// Si la deuda sigue esperando plata. Es lo contrario de estar cerrada:
+  /// `PAGADA` se cobró e `INCOBRABLE` se dio por perdida.
+  bool get estaViva =>
+      estado == EstadoDeudor.activa || estado == EstadoDeudor.vencida;
+
+  /// Si el plazo se pasó. Son dos cosas a la vez y por eso están juntas: la
+  /// marca `VENCIDA` que pone el usuario —puede darla por vencida antes de
+  /// tiempo— y el calendario, que la vence sola en cuanto pasa la fecha.
+  ///
+  /// Una deuda cerrada no vence: ya no espera nada. Es la misma condición que
+  /// aplica `RepositorioDeudores` en SQL, y tiene que seguir siéndolo para que
+  /// el contador de «Vencidas» y el badge de la fila digan lo mismo.
   bool get estaVencida {
-    if (fechaVencimiento == null) return false;
-    if (estado == EstadoDeudor.pagada || estado == EstadoDeudor.incobrable) return false;
-    return fechaVencimiento!.compareTo(
-          DateTime.now().toIso8601String().substring(0, 10),
-        ) <
-        0;
+    if (!estaViva) return false;
+    if (estado == EstadoDeudor.vencida) return true;
+    final limite = fechaVencimiento;
+    if (limite == null) return false;
+    final hoy = DateTime.now();
+    return limite.isBefore(DateTime(hoy.year, hoy.month, hoy.day));
   }
 
   @override
@@ -51,7 +77,9 @@ class DeudorResumen extends Equatable {
         numero,
         clienteId,
         nombreCliente,
-        ventaId,
+        motoId,
+        nombreMoto,
+        placaMoto,
         concepto,
         montoTotal,
         montoPagado,

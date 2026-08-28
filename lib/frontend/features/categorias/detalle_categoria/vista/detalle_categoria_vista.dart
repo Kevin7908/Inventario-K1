@@ -11,8 +11,8 @@ import '../../../../share2/share2.dart';
 import '../../../productos/provider/productos_provider.dart';
 import '../../../productos/vista/producto_detalle_vista.dart';
 import '../../../productos/vista/producto_formulario_vista.dart';
-import '../../vista/categorias_vistas.dart';
 import '../widgets/tabla_productos_categoria.dart';
+import '../../widgets/identidad_categoria.dart';
 
 /// Ficha de una categoría: sus datos y la tabla de productos que contiene.
 ///
@@ -213,7 +213,7 @@ class _Encabezado extends StatelessWidget {
       children: [
         MarcadorIdentidad(
           inicial: inicialDe(categoria.nombre),
-          color: colorDeHex(categoria.colorHex),
+          color: IdentidadCategoria.color,
           lado: 50,
           radio: 14,
         ),

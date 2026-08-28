@@ -1,322 +1,330 @@
+import 'dart:async';
+
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:inventario_k1/backend/features/cotizaciones/enum/enum_cotizacion.dart';
-import 'package:inventario_k1/backend/features/cotizaciones/modelo/cotizacion_resumen.dart';
-import 'package:inventario_k1/backend/features/cotizaciones/repositorio/repositorio_cotizaciones.dart';
-import 'package:inventario_k1/backend/features/motos/modelo/moto.dart';
-import 'package:inventario_k1/backend/features/productos/modelo/producto.dart';
-import 'package:inventario_k1/frontend/features/cotizaciones/provider/cotizaciones_provider.dart';
-import 'package:inventario_k1/frontend/features/cotizaciones/widgets/dialogo/dialogo_cot_items_tabla.dart';
-import 'package:inventario_k1/frontend/features/productos/provider/productos_provider.dart';
 
-// ── Estado ────────────────────────────────────────────────────────────────────
+import '../../../../../backend/features/clientes/modelo/cliente.dart';
+import '../../../../../backend/features/cotizaciones/enum/enum_cotizacion.dart';
+import '../../../../../backend/features/motos/modelo/moto.dart';
+import '../../../../../backend/features/productos/modelo/producto.dart';
+import '../../../../../backend/features/servicios/modelo/servicio.dart';
+import '../../../../../core/resultado.dart';
+import '../../../clientes/provider/cliente_provider.dart';
+import '../../../motos/provider/motos_provider.dart';
+import '../../provider/cotizaciones_provider.dart';
+import '../modelo/cotizacion_editor_state.dart';
+import '../modelo/item_cotizacion_editor.dart';
+import 'guardado_cotizacion.dart';
+import 'validacion_cotizacion.dart';
 
-final class CotizacionEditorState {
-  const CotizacionEditorState({
-    this.cotizacionId,
-    this.cotizacionOriginal,
-    this.moto,
-    this.nombreCliente = '',
-    this.telefono = '',
-    this.items = const [],
-    this.guardando = false,
-    this.cargandoItems = false,
-    this.busquedaProductos = '',
-  });
+// Notifier
 
+/// Editor de una cotización. Recibe el id por `family`, así que la carga pasa
+/// en `build()` y no hace falta el viejo `inicializar()` disparado desde un
+/// `addPostFrameCallback` de la vista.
+class CotizacionEditorNotifier extends AsyncNotifier<CotizacionEditorState> {
+  CotizacionEditorNotifier(this.cotizacionId);
+
+  /// `null` = cotización nueva.
   final int? cotizacionId;
 
-  /// Snapshot de la cotización en BD; fallback de clienteId/motoId cuando el
-  /// usuario no modifica la moto en modo edición.
-  final CotizacionResumen? cotizacionOriginal;
+  /// Cuánto se espera desde el último cambio antes de escribir en la base.
+  ///
+  /// Casi un segundo, no menos: `actualizar` reemplaza todas las líneas de la
+  /// cotización, así que guardar en cada tecla del precio sería borrar e
+  /// insertar la cotización entera varias veces por segundo.
+  static const _retardoGuardado = Duration(milliseconds: 900);
 
-  final Moto? moto;
-  final String nombreCliente;
-  final String telefono;
-  final List<CotItemDraft> items;
-  final bool guardando;
-  final bool cargandoItems;
-  final String busquedaProductos;
+  Timer? _debounce;
 
-  bool get esEdicion => cotizacionId != null;
+  /// Un mes de validez es lo habitual en el taller; se puede cambiar en el
+  /// selector de fecha.
+  static DateTime get _vigenciaPorDefecto =>
+      DateTime.now().add(const Duration(days: 30));
 
-  // ── Totales ─────────────────────────────────────────────────────────────────
-
-  int get subtotal => items.fold(0, (s, i) => s + i.subtotal);
-  int get iva => (subtotal * kTasaIva).round();
-  int get total => subtotal + iva;
-
-  // ── Helpers de stock para la UI ─────────────────────────────────────────────
-
-  int cantidadEnCarrito(int productId) => items
-      .where((i) => i.referenciaId == productId)
-      .fold(0, (s, i) => s + i.cantidad.toInt());
-
-  int stockDisponible(Producto p) =>
-      (p.stockActual.toInt() - cantidadEnCarrito(p.id ?? -1)).clamp(0, 999999);
-
-  // ── Filtrado de productos ───────────────────────────────────────────────────
-
-  List<Producto> filtrarProductos(List<Producto> todos) {
-    if (busquedaProductos.isEmpty) return todos;
-    final q = busquedaProductos.toLowerCase();
-    return todos
-        .where(
-          (p) =>
-              p.nombre.toLowerCase().contains(q) ||
-              p.sku.toLowerCase().contains(q) ||
-              (p.categoriaNombre?.toLowerCase().contains(q) ?? false),
-        )
-        .toList();
-  }
-
-  // ── copyWith ────────────────────────────────────────────────────────────────
-
-  CotizacionEditorState copyWith({
-    int? cotizacionId,
-    Object? cotizacionOriginal = _sentinel,
-    Object? moto = _sentinel,
-    String? nombreCliente,
-    String? telefono,
-    List<CotItemDraft>? items,
-    bool? guardando,
-    bool? cargandoItems,
-    String? busquedaProductos,
-  }) {
-    return CotizacionEditorState(
-      cotizacionId: cotizacionId ?? this.cotizacionId,
-      cotizacionOriginal: cotizacionOriginal == _sentinel
-          ? this.cotizacionOriginal
-          : cotizacionOriginal as CotizacionResumen?,
-      moto: moto == _sentinel ? this.moto : moto as Moto?,
-      nombreCliente: nombreCliente ?? this.nombreCliente,
-      telefono: telefono ?? this.telefono,
-      items: items ?? this.items,
-      guardando: guardando ?? this.guardando,
-      cargandoItems: cargandoItems ?? this.cargandoItems,
-      busquedaProductos: busquedaProductos ?? this.busquedaProductos,
-    );
-  }
-
-  static const Object _sentinel = Object();
-}
-
-// ── Notifier ──────────────────────────────────────────────────────────────────
-
-class CotizacionEditorNotifier extends Notifier<CotizacionEditorState> {
   @override
-  CotizacionEditorState build() => const CotizacionEditorState();
+  Future<CotizacionEditorState> build() async {
+    ref.onDispose(() => _debounce?.cancel());
+    final id = cotizacionId;
+    if (id == null) {
+      return CotizacionEditorState(vigenciaHasta: _vigenciaPorDefecto);
+    }
 
-  // ── Inicialización ──────────────────────────────────────────────────────────
+    final detalle =
+        await ref.read(repositorioCotizacionesProvider).obtenerDetalle(id);
+    final resumen = detalle.resumen;
 
-  /// Llamar una vez desde addPostFrameCallback en el widget.
-  /// No hace nada si [cotizacion] es null (modo nueva).
-  void inicializar(CotizacionResumen? cotizacion) {
-    if (cotizacion == null) return;
-    state = state.copyWith(
-      cotizacionId: cotizacion.id,
-      cotizacionOriginal: cotizacion,
-      nombreCliente: cotizacion.nombreCliente,
-      telefono: cotizacion.telefonoCliente ?? '',
-      cargandoItems: true,
-    );
-    _preCargarDatos(cotizacion);
-  }
+    final cliente = resumen.clienteId == null
+        ? null
+        : await ref
+            .read(repositorioClientesProvider)
+            .obtenerPorId(resumen.clienteId!);
+    final moto = resumen.motoId == null
+        ? null
+        : (await ref.read(repositorioMotosProvider).obtenerTodos())
+            .where((m) => m.id == resumen.motoId)
+            .firstOrNull;
 
-  Future<void> _preCargarDatos(CotizacionResumen cot) async {
-    try {
-      final motos = await ref.read(motosParaCotizacionProvider.future);
-      final moto = motos.where((m) => m.id == cot.motoId).firstOrNull;
-
-      final detalle =
-          await ref.read(repositorioCotizacionesProvider).obtenerDetalle(cot.id);
-
-      final items = detalle.items
+    return CotizacionEditorState(
+      cotizacionId: id,
+      numero: resumen.numero,
+      cliente: cliente,
+      moto: moto,
+      vigenciaHasta: resumen.vigenciaHasta,
+      notas: resumen.notas ?? '',
+      descuento: resumen.descuento,
+      items: detalle.items
           .map(
-            (item) => CotItemDraft(
-              tipo: item.tipoItem,
-              referenciaId: item.referenciaId,
-              descripcion: item.descripcion,
-              cantidad: item.cantidad,
-              precioUnitario: item.precioUnitario,
+            (i) => ItemCotizacionEditor(
+              tipo: i.tipoItem,
+              referenciaId: i.referenciaId,
+              descripcion: i.descripcion,
+              cantidad: i.cantidad,
+              precioUnitario: i.precioUnitario,
             ),
           )
-          .toList();
-
-      state = state.copyWith(moto: moto, items: items, cargandoItems: false);
-    } catch (_) {
-      state = state.copyWith(cargandoItems: false);
-    }
-  }
-
-  // ── Formulario ──────────────────────────────────────────────────────────────
-
-  void seleccionarMoto(Moto? moto) {
-    if (moto == null) return;
-    final clientes = ref.read(clientesParaCotizacionProvider).value ?? [];
-    final cliente = clientes.where((c) => c.id == moto.clienteId).firstOrNull;
-    state = state.copyWith(
-      moto: moto,
-      nombreCliente: moto.nombreCliente ?? '',
-      telefono: cliente?.telefono ?? '',
+          .toList(growable: false),
     );
   }
 
-  void buscarProductos(String q) =>
-      state = state.copyWith(busquedaProductos: q.trim());
-
-  // ── Carrito ─────────────────────────────────────────────────────────────────
-
-  /// Retorna un mensaje de error si el producto no puede agregarse, o null si puede.
-  String? validarAgregarProducto(Producto p) {
-    if (p.stockActual <= 0) {
-      return '"${p.nombre}" no tiene stock disponible.';
-    }
-    final yaEsta = state.cantidadEnCarrito(p.id ?? -1) > 0;
-    final disponible =
-        yaEsta ? p.stockActual.toInt() : state.stockDisponible(p);
-    if (disponible <= 0) {
-      return 'Ya tienes todo el stock de "${p.nombre}" en el carrito.';
-    }
-    return null;
+  /// Cambia el estado sin tocar el guardado. Para lo que no se persiste: los
+  /// filtros del catálogo de la izquierda.
+  void _actualizar(
+    CotizacionEditorState Function(CotizacionEditorState actual) cambio,
+  ) {
+    final actual = state.value;
+    if (actual == null) return;
+    state = AsyncData(cambio(actual));
   }
 
-  /// Datos para construir el diálogo de cantidad.
-  /// Precondición: [validarAgregarProducto] retornó null.
-  ({int disponible, int cantidadInicial, bool esActualizacion})
-      datosDialogoProducto(Producto p) {
-    final enCarrito = state.cantidadEnCarrito(p.id ?? -1);
-    final yaEsta = enCarrito > 0;
-    final disponible =
-        yaEsta ? p.stockActual.toInt() : state.stockDisponible(p);
-    return (
-      disponible: disponible,
-      cantidadInicial: yaEsta ? enCarrito : 1,
-      esActualizacion: yaEsta,
+  /// Cambia algo que **sí** se guarda, y programa el guardado.
+  void _editar(
+    CotizacionEditorState Function(CotizacionEditorState actual) cambio,
+  ) {
+    final actual = state.value;
+    if (actual == null) return;
+    state = AsyncData(
+      cambio(actual).copyWith(
+        guardado: EstadoGuardado.pendiente,
+        motivoBloqueo: null,
+      ),
     );
+    _debounce?.cancel();
+    _debounce = Timer(_retardoGuardado, guardarAhora);
   }
 
-  void confirmarAgregarProducto(Producto p, int cantidad) {
-    final items = List<CotItemDraft>.from(state.items);
-    final idx = items.indexWhere((i) => i.referenciaId == p.id);
-    if (idx >= 0) {
-      final old = items[idx];
-      items[idx] = CotItemDraft(
-        tipo: old.tipo,
-        referenciaId: old.referenciaId,
-        descripcion: old.descripcion,
-        cantidad: cantidad.toDouble(),
-        precioUnitario: old.precioUnitario,
+  // Cabecera
+
+  /// Al elegir una moto se adopta su dueño, salvo que ya haya un cliente
+  /// puesto a mano: la moto sabe de quién es y volver a teclearlo sobra.
+  Future<void> seleccionarMoto(Moto? moto) async {
+    final actual = state.value;
+    if (actual == null) return;
+
+    var cliente = actual.cliente;
+    if (moto != null && cliente == null) {
+      cliente =
+          await ref.read(repositorioClientesProvider).obtenerPorId(moto.clienteId);
+    }
+    _editar((a) => a.copyWith(moto: moto, cliente: cliente));
+  }
+
+  void seleccionarCliente(Cliente? cliente) => _editar((a) {
+        // Si la moto elegida es de otro dueño, deja de tener sentido.
+        final moto =
+            a.moto != null && cliente != null && a.moto!.clienteId != cliente.id
+                ? null
+                : a.moto;
+        return a.copyWith(cliente: cliente, moto: moto);
+      });
+
+  void cambiarVigencia(DateTime fecha) =>
+      _editar((a) => a.copyWith(vigenciaHasta: fecha));
+
+  /// Las notas se teclean en un `TextEditingController` de la vista; esto es
+  /// lo que las mete en el estado y dispara el guardado.
+  void cambiarNotas(String notas) {
+    if (state.value?.notas == notas) return;
+    _editar((a) => a.copyWith(notas: notas));
+  }
+
+  // Catálogo de la izquierda
+
+  void cambiarTipo(TipoItemCotizacion tipo) => _actualizar(
+        (a) => a.copyWith(
+          tipoActivo: tipo,
+          busquedaCatalogo: '',
+          paginaCatalogo: 0,
+        ),
       );
-    } else {
-      items.add(CotItemDraft(
-        tipo: TipoItemCotizacion.producto,
-        referenciaId: p.id,
-        descripcion: p.nombre,
-        cantidad: cantidad.toDouble(),
-        precioUnitario: p.precioVenta.round(),
-      ));
+
+  /// Buscar y filtrar **vuelven a la primera página**: quedarse en la cuarta
+  /// después de acotar el catálogo deja la rejilla vacía sin explicar por qué.
+  void buscarEnCatalogo(String texto) => _actualizar(
+        (a) => a.copyWith(busquedaCatalogo: texto.trim(), paginaCatalogo: 0),
+      );
+
+  void filtrarPorCategoria(int? categoriaId) => _actualizar(
+        (a) => a.copyWith(categoriaId: categoriaId, paginaCatalogo: 0),
+      );
+
+  void irAPaginaCatalogo(int pagina) =>
+      _actualizar((a) => a.copyWith(paginaCatalogo: pagina < 0 ? 0 : pagina));
+
+  // Líneas
+
+  void _agregar(ItemCotizacionEditor nuevo) => _editar((a) => a.conItem(nuevo));
+
+  /// El precio sale del catálogo y no se toca: una cotización que se despega
+  /// de la lista de precios deja de servir para comparar contra el inventario.
+  void agregarProducto(Producto producto) => _agregar(
+        ItemCotizacionEditor(
+          tipo: TipoItemCotizacion.producto,
+          referenciaId: producto.id,
+          descripcion: producto.nombre,
+          cantidad: 1,
+          precioUnitario: producto.precioVenta.round(),
+        ),
+      );
+
+  /// El servicio entra con su **precio sugerido**, que es de referencia: la
+  /// línea se puede ajustar después sin tocar el catálogo, y lo que se cobró
+  /// queda en la cotización. Con `0` la línea nace vacía y hay que ponerle
+  /// precio antes de guardar.
+  void agregarServicio(Servicio servicio) => _agregar(
+        ItemCotizacionEditor(
+          tipo: TipoItemCotizacion.servicio,
+          referenciaId: servicio.id,
+          descripcion: servicio.nombre,
+          cantidad: 1,
+          precioUnitario: servicio.precioSugerido,
+        ),
+      );
+
+  void agregarLibre({required String descripcion, required int precio}) =>
+      _agregar(
+        ItemCotizacionEditor(
+          tipo: TipoItemCotizacion.libre,
+          descripcion: descripcion,
+          cantidad: 1,
+          precioUnitario: precio,
+        ),
+      );
+
+  void cambiarCantidad(int indice, double cantidad) =>
+      _editar((a) => a.conCantidad(indice, cantidad));
+
+  void cambiarPrecio(int indice, int precio) =>
+      _editar((a) => a.conPrecio(indice, precio));
+
+  void eliminarItem(int indice) => _editar((a) => a.sinItem(indice));
+
+  /// El valor se recorta al subtotal en el estado, así que teclear de más no
+  /// deja el total en negativo ni llega al `CHECK` de la tabla.
+  void cambiarDescuento(int valor) => _editar((a) => a.conDescuento(valor));
+
+  // Persistencia
+
+  /// Guarda ya, sin esperar el retardo.
+  ///
+  /// La llama el temporizador tras cada cambio, y también la vista antes de
+  /// cerrar el editor: si no, el último cambio se perdería con el `Timer`
+  /// pendiente.
+  ///
+  /// Una cotización nueva y **vacía no se crea**: quemaría un consecutivo
+  /// `COT-` para nada. Si lo que hay no se puede guardar —una línea sin precio,
+  /// una vigencia ya pasada— no se guarda a medias: el estado queda en
+  /// [EstadoGuardado.bloqueado] con el motivo, y la barra superior lo dice.
+  Future<Resultado> guardarAhora() async {
+    _debounce?.cancel();
+
+    final actual = state.value;
+    if (actual == null) {
+      return const Fallo(
+        MotivoFallo.validacion,
+        'La cotización todavía se está cargando.',
+      );
     }
-    state = state.copyWith(items: items);
-  }
+    if (actual.guardado == EstadoGuardado.guardando) return const Exito();
 
-  void eliminarItem(int index) {
-    final items = List<CotItemDraft>.from(state.items)..removeAt(index);
-    state = state.copyWith(items: items);
-  }
+    if (actual.items.isEmpty && !actual.esEdicion) {
+      _actualizar((a) => a.copyWith(guardado: EstadoGuardado.sinCambios));
+      return const Exito();
+    }
 
-  // ── Catálogo ─────────────────────────────────────────────────────────────────
+    final invalida = validarCotizacion(
+      items: actual.items,
+      vigenciaHasta: actual.vigenciaHasta,
+    );
+    if (invalida != null) {
+      _actualizar(
+        (a) => a.copyWith(
+          guardado: EstadoGuardado.bloqueado,
+          motivoBloqueo: switch (invalida) {
+            Fallo(:final mensaje) => mensaje,
+            Exito() => null,
+          },
+        ),
+      );
+      return invalida;
+    }
 
-  Future<String?> eliminarProductoCatalogo(Producto p) async {
-    if (p.id == null) return null;
+    _actualizar(
+      (a) => a.copyWith(
+        guardado: EstadoGuardado.guardando,
+        motivoBloqueo: null,
+      ),
+    );
+
     try {
-      await ref.read(repositorioProductosProvider).eliminar(p.id!);
-      final items =
-          state.items.where((i) => i.referenciaId != p.id).toList();
-      state = state.copyWith(items: items);
-      ref.invalidate(productosParaCotizacionProvider);
-      return null;
-    } catch (e) {
-      return 'No se pudo eliminar: $e';
-    }
-  }
+      final guardada = await GuardadoCotizacion(
+        ref.read(repositorioCotizacionesProvider),
+      ).guardar(
+        id: actual.cotizacionId,
+        clienteId: actual.cliente?.id,
+        motoId: actual.moto?.id,
+        vigenciaHasta: actual.vigenciaHasta,
+        notas: actual.notas,
+        items: actual.items,
+        descuento: actual.descuento,
+      );
 
-  // ── Persistencia ─────────────────────────────────────────────────────────────
-
-  /// Guarda (crea o actualiza) la cotización con ajuste de stock atómico.
-  /// Retorna null en éxito o un mensaje de error si falla.
-  Future<String?> guardar({
-    required String vigencia,
-    required String? notas,
-  }) async {
-    if (!state.esEdicion && state.moto == null) {
-      return 'Selecciona una moto para continuar.';
-    }
-    if (vigencia.isEmpty) {
-      return 'Ingresa la fecha de vigencia.';
-    }
-
-    state = state.copyWith(guardando: true);
-    final itemsDraft = state.items.map((i) => i.toItemDraft()).toList();
-
-    return state.esEdicion
-        ? await _actualizar(vigencia: vigencia, notas: notas, itemsDraft: itemsDraft)
-        : await _crear(vigencia: vigencia, notas: notas, itemsDraft: itemsDraft);
-  }
-
-  Future<String?> _crear({
-    required String vigencia,
-    required String? notas,
-    required List<ItemDraft> itemsDraft,
-  }) async {
-    try {
-      // El repositorio inserta cotización, ítems y descuenta stock en una
-      // sola transacción SQLite.
-      final nuevoId = await ref.read(repositorioCotizacionesProvider).crear(
-            clienteId: state.moto!.clienteId,
-            motoId: state.moto!.id,
-            vigenciaHasta: vigencia,
-            notas: notas,
-            items: itemsDraft,
-          );
-      ref.invalidate(productosParaCotizacionProvider);
-      state = state.copyWith(cotizacionId: nuevoId, guardando: false);
-      return null;
-    } catch (e) {
-      state = state.copyWith(guardando: false);
-      return 'Error al crear: $e';
-    }
-  }
-
-  Future<String?> _actualizar({
-    required String vigencia,
-    required String? notas,
-    required List<ItemDraft> itemsDraft,
-  }) async {
-    // El repositorio restaura el stock anterior, actualiza la cotización y
-    // descuenta el stock nuevo, todo en una sola transacción SQLite.
-    final error = await ref.read(cotizacionesProvider.notifier).actualizar(
-          id: state.cotizacionId!,
-          clienteId:
-              state.moto?.clienteId ?? state.cotizacionOriginal?.clienteId,
-          motoId: state.moto?.id ?? state.cotizacionOriginal?.motoId,
-          vigenciaHasta: vigencia,
-          notas: notas,
-          items: itemsDraft,
+      if (actual.esEdicion) {
+        ref.invalidate(cotizacionDetalleProvider(guardada.id));
+      } else {
+        // A partir de aquí el editor deja de ser "nueva": los guardados que
+        // vengan actualizan esta cotización en vez de crear otra.
+        _actualizar(
+          (a) => a.copyWith(cotizacionId: guardada.id, numero: guardada.numero),
         );
-    if (error != null) {
-      state = state.copyWith(guardando: false);
-      return error;
+      }
+      _marcarGuardado();
+      return const Exito();
+    } catch (e) {
+      _actualizar(
+        (a) => a.copyWith(
+          guardado: EstadoGuardado.bloqueado,
+          motivoBloqueo: 'No se pudo guardar: $e',
+        ),
+      );
+      return Fallo(MotivoFallo.persistencia, 'No se pudo guardar: $e');
     }
-    ref.invalidate(productosParaCotizacionProvider);
-    state = state.copyWith(guardando: false);
-    return null;
   }
+
+  /// Marca como guardado, salvo que mientras se escribía en la base haya
+  /// entrado otro cambio: en ese caso el temporizador ya está corriendo y
+  /// decir "guardado" sería mentira.
+  void _marcarGuardado() => _actualizar(
+        (a) => a.guardado == EstadoGuardado.guardando
+            ? a.copyWith(guardado: EstadoGuardado.guardado, motivoBloqueo: null)
+            : a,
+      );
 }
 
-// ── Provider público ──────────────────────────────────────────────────────────
+// Providers públicos
 
-final cotizacionEditorProvider =
-    NotifierProvider.autoDispose<CotizacionEditorNotifier, CotizacionEditorState>(
+/// Editor de la cotización [int?]: `null` abre una nueva.
+final cotizacionEditorProvider = AsyncNotifierProvider.autoDispose
+    .family<CotizacionEditorNotifier, CotizacionEditorState, int?>(
   CotizacionEditorNotifier.new,
   name: 'cotizacionEditorProvider',
 );

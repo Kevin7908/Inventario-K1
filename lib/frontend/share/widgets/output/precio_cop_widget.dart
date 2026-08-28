@@ -20,7 +20,7 @@ class PrecioCopWidget extends StatelessWidget {
   final TextEditingController controller;
 
   /// Si no es null, el resultado mostrado es `campo × multiplicador`.
-  final double? multiplicador;
+  final num? multiplicador;
 
   /// Texto que aparece antes del valor (ej. "Subtotal:").
   final String? etiqueta;

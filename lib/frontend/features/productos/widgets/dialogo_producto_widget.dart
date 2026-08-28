@@ -1,9 +1,7 @@
 import 'package:flutter/material.dart';
-import 'package:provider/provider.dart';
 
 import '../../../../backend/features/productos/modelo/producto.dart';
 import '../../../share2/share2.dart';
-import '../../proveedores/view_model/proveedores_view_model.dart';
 import 'formulario_producto.dart';
 
 /// Diálogo de alta y edición de un producto.
@@ -15,32 +13,20 @@ import 'formulario_producto.dart';
 /// Ambos comparten el mismo [FormularioProducto], así que la lógica del
 /// formulario no está duplicada.
 class DialogoProducto extends StatelessWidget {
-  const DialogoProducto({
-    super.key,
-    this.productoAEditar,
-    required this.proveedoresVm,
-  });
+  const DialogoProducto({super.key, this.productoAEditar});
 
   final Producto? productoAEditar;
-  final ProveedoresViewModel proveedoresVm;
 
   bool get esEdicion => productoAEditar != null;
 
   static Future<void> mostrar(
     BuildContext context, {
     Producto? productoAEditar,
-    required ProveedoresViewModel proveedoresVm,
   }) {
     return showDialog(
       context: context,
       barrierDismissible: false,
-      builder: (_) => ChangeNotifierProvider.value(
-        value: proveedoresVm,
-        child: DialogoProducto(
-          productoAEditar: productoAEditar,
-          proveedoresVm: proveedoresVm,
-        ),
-      ),
+      builder: (_) => DialogoProducto(productoAEditar: productoAEditar),
     );
   }
 
@@ -105,7 +91,6 @@ class DialogoProducto extends StatelessWidget {
                 padding: const EdgeInsets.fromLTRB(24, 20, 24, 24),
                 child: FormularioProducto(
                   productoAEditar: productoAEditar,
-                  proveedoresVm: proveedoresVm,
                   alTerminar: () => Navigator.of(context).pop(),
                   alCancelar: () => Navigator.of(context).pop(),
                 ),

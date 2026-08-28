@@ -1,0 +1,231 @@
+import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+
+import '../../../../../core/formato.dart';
+import '../../../../share2/share2.dart';
+import '../modelo/cotizacion_editor_state.dart';
+import '../provider/catalogo_cotizacion_providers.dart';
+import '../provider/cotizacion_editor_provider.dart';
+import 'dialogo_datos_cotizacion.dart';
+import 'linea_cotizacion.dart';
+import 'totales_cotizacion.dart';
+
+/// Panel derecho del editor: la cotización que se está armando.
+///
+/// Replica el aside de "Venta actual" del diseño: 360 px, borde a la
+/// izquierda, cabecera con el contador de ítems, lista scrolleable y pie sobre
+/// fondo tenue. Cliente y moto son opcionales: se cotiza a quien entra a
+/// preguntar un precio, y muchas veces todavía no es cliente de nadie.
+class PanelCotizacion extends ConsumerWidget {
+  const PanelCotizacion({
+    super.key,
+    required this.cotizacionId,
+    required this.alReservar,
+    required this.alImprimir,
+  });
+
+  static const double ancho = PanelDocumento.ancho;
+
+  final int? cotizacionId;
+  final VoidCallback alReservar;
+  final VoidCallback alImprimir;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    return PanelDocumento(
+      cabecera: _Cabecera(cotizacionId: cotizacionId),
+      contenido: _Lineas(cotizacionId: cotizacionId),
+      pie: _Pie(
+        cotizacionId: cotizacionId,
+        alReservar: alReservar,
+        alImprimir: alImprimir,
+      ),
+    );
+  }
+}
+
+/// Título, contador de ítems y la ficha de a quién se le cotiza.
+///
+/// La ficha va arriba y no en el pie —donde estaban los tres campos— porque
+/// así el pie queda con lo que se mira al cerrar la venta (totales y acciones)
+/// y la lista de líneas recupera el alto que le comían tres inputs apilados.
+class _Cabecera extends ConsumerWidget {
+  const _Cabecera({required this.cotizacionId});
+
+  final int? cotizacionId;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final datos = ref.watch(
+      cotizacionEditorProvider(cotizacionId).select((s) => (
+            numero: s.value?.numero ?? '',
+            cliente: s.value?.cliente?.nombreCompleto,
+            placa: s.value?.moto?.placa,
+            vigencia: s.value?.vigenciaHasta,
+            items: s.value?.items.length ?? 0,
+          )),
+    );
+
+    final referencia = datos.numero.isEmpty ? 'Sin guardar' : '#${datos.numero}';
+    final vigencia = datos.vigencia;
+    final subtitulo = [
+      if (datos.placa != null) datos.placa!,
+      if (vigencia != null) 'Vence ${formatearFecha(vigencia)}',
+    ].join(' · ');
+
+    return Container(
+      padding: const EdgeInsets.fromLTRB(22, 22, 22, 14),
+      decoration: const BoxDecoration(
+        border: Border(bottom: BorderSide(color: ColoresApp.borderFila)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              const Expanded(
+                child: Text('Cotización actual', style: TipografiaApp.heading3),
+              ),
+              IndicadorEstado(
+                etiqueta: datos.items == 1 ? '1 ítem' : '${datos.items} ítems',
+                color: ColoresApp.castletonGreen,
+                colorFondo: ColoresApp.statusSuccessBg,
+              ),
+            ],
+          ),
+          const SizedBox(height: 6),
+          Text(
+            referencia,
+            style: TipografiaApp.caption.copyWith(
+              fontSize: 12,
+              color: ColoresApp.textMuted,
+            ),
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+          ),
+          const SizedBox(height: 12),
+          FichaResumen(
+            titulo: datos.cliente ?? 'Mostrador',
+            subtitulo: subtitulo,
+            inicial: datos.cliente == null ? null : inicialDe(datos.cliente!),
+            icono: datos.cliente == null ? Icons.storefront_outlined : null,
+            tenue: datos.cliente == null,
+            etiquetaAccion: 'Cliente, moto, vigencia y notas',
+            alPresionar: () => DialogoDatosCotizacion.mostrar(
+              context,
+              cotizacionId: cotizacionId,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+/// Las líneas de la cotización, agrupadas por tipo. Es lo único del panel que
+/// cambia al agregar o quitar algo, así que va en su propio widget.
+///
+/// Los productos y los servicios van en bloques separados con su subtotal:
+/// mezclados, no había forma de ver de un vistazo cuánto es mano de obra y
+/// cuánto repuestos, que es justo lo que se discute con el cliente.
+class _Lineas extends ConsumerWidget {
+  const _Lineas({required this.cotizacionId});
+
+  final int? cotizacionId;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final provider = cotizacionEditorProvider(cotizacionId);
+    final items = ref.watch(provider.select((s) => s.value?.items ?? const []));
+
+    if (items.isEmpty) {
+      return const EstadoVacio(
+        icono: Icons.request_quote_outlined,
+        titulo: 'La cotización está vacía',
+        pista: 'Toca un producto o un servicio de la izquierda.',
+      );
+    }
+
+    final notifier = ref.read(provider.notifier);
+    final fotos = ref.watch(imagenPorProductoProvider);
+    // El `select` de arriba es sobre `items`, que conserva identidad mientras
+    // las líneas no cambien: esta pasada solo corre cuando cambiaron de
+    // verdad, no en cada repintado. La regla de agrupación vive en el estado.
+    final grupos = CotizacionEditorState.agrupar(items);
+
+    // `ListView` concreto y no `.builder`: los grupos son tres como mucho y
+    // aplanarlos a índices para el builder obligaría a recalcular a qué grupo
+    // pertenece cada fila en cada llamada.
+    return ListView(
+      padding: const EdgeInsets.symmetric(horizontal: 22),
+      children: [
+        for (final grupo in grupos) ...[
+          EncabezadoGrupoLineas(
+            icono: LineaCotizacion.iconoDe(grupo.tipo),
+            titulo: grupo.titulo,
+            subtotal: grupo.subtotal,
+          ),
+          for (final (:indice, :item) in grupo.lineas)
+            LineaCotizacion(
+              // El tipo y la referencia identifican la línea; el índice solo,
+              // no: al borrar una de en medio reutilizaría el estado de la
+              // siguiente y el campo de precio mostraría el importe de otra.
+              key: ValueKey('${item.tipo.valor}-${item.referenciaId}-$indice'),
+              item: item,
+              imagen: item.tipo.esReservable ? fotos[item.referenciaId] : null,
+              // Los índices son los de `items`, no los del grupo: agrupar es
+              // cosa de la vista y no puede renumerar lo que espera el
+              // notifier.
+              alCambiarCantidad: (cantidad) =>
+                  notifier.cambiarCantidad(indice, cantidad),
+              alCambiarPrecio: (precio) =>
+                  notifier.cambiarPrecio(indice, precio),
+              alEliminar: () => notifier.eliminarItem(indice),
+            ),
+        ],
+      ],
+    );
+  }
+}
+/// Totales y acciones, sobre el fondo tenue del diseño.
+class _Pie extends StatelessWidget {
+  const _Pie({
+    required this.cotizacionId,
+    required this.alReservar,
+    required this.alImprimir,
+  });
+
+  final int? cotizacionId;
+  final VoidCallback alReservar;
+  final VoidCallback alImprimir;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.fromLTRB(22, 18, 22, 22),
+      decoration: const BoxDecoration(
+        color: ColoresApp.bgInput,
+        border: Border(top: BorderSide(color: ColoresApp.borderFila)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          TotalesCotizacion(cotizacionId: cotizacionId),
+          const SizedBox(height: 16),
+          BotonPrimario(
+            etiqueta: 'Imprimir cotización',
+            icono: Icons.print_outlined,
+            alPresionar: alImprimir,
+          ),
+          const SizedBox(height: 10),
+          BotonSecundario(
+            etiqueta: 'Reservar productos',
+            icono: Icons.bookmark_outline_rounded,
+            expandido: true,
+            alPresionar: alReservar,
+          ),
+        ],
+      ),
+    );
+  }
+}

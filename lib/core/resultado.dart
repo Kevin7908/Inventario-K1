@@ -47,6 +47,21 @@ enum MotivoFallo {
   /// Ya existe otro producto con ese SKU.
   skuDuplicado,
 
+  /// Ya existe otro registro con ese documento (NIT, cédula…).
+  documentoDuplicado,
+
+  /// Ya hay otra ficha con ese teléfono. Es aparte de [documentoDuplicado]
+  /// porque el conflicto puede ser con **otro rol**: el número que se está
+  /// escribiendo para un cliente puede ser el de un proveedor, y el mensaje
+  /// tiene que poder decirlo.
+  telefonoDuplicado,
+
+  /// La moto ya está registrada a nombre de otro cliente. Es distinto de
+  /// [documentoDuplicado] porque el campo en conflicto no es del registro que
+  /// se está guardando, sino de una de sus motos: la vista necesita saberlo
+  /// para señalar la fila correcta.
+  placaRegistrada,
+
   /// El dato no cumple una regla de negocio (vacío, muy corto…).
   validacion,
 

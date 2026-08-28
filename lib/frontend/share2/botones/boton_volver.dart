@@ -50,12 +50,20 @@ class BotonVolver extends StatelessWidget {
                   color: ColoresApp.textMuted,
                 ),
                 const SizedBox(width: 8),
-                Text(
-                  etiqueta,
-                  style: TipografiaApp.caption.copyWith(
-                    fontSize: 13,
-                    fontWeight: FontWeight.w600,
-                    color: ColoresApp.textMuted,
+                // `Flexible` + recorte: la etiqueta nombra el destino y puede
+                // ser larga ("Volver al inicio de sesión"). En una columna
+                // angosta —el formulario de login mide 380— la fila se
+                // desbordaba por medio píxel.
+                Flexible(
+                  child: Text(
+                    etiqueta,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: TipografiaApp.caption.copyWith(
+                      fontSize: 13,
+                      fontWeight: FontWeight.w600,
+                      color: ColoresApp.textMuted,
+                    ),
                   ),
                 ),
               ],

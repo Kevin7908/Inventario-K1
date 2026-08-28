@@ -1,9 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../../../../backend/features/productos/modelo/producto.dart';
-import '../../../../backend/share/database/locator.dart';
 import '../../../share2/share2.dart';
-import '../../proveedores/view_model/proveedores_view_model.dart';
 import '../widgets/formulario_producto.dart';
 
 /// Página de alta y edición de un producto.
@@ -75,7 +73,6 @@ class ProductoFormularioVista extends StatelessWidget {
             const SizedBox(height: 24),
             FormularioProducto(
               productoAEditar: productoAEditar,
-              proveedoresVm: locator<ProveedoresViewModel>(),
               alTerminar: alCerrar,
               alCancelar: alCerrar,
             ),

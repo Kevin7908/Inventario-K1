@@ -32,6 +32,10 @@ enum OrientacionTarjeta {
 ///   [MarcadorIdentidad] con la inicial del nombre).
 /// - [subtitulo]: dato secundario debajo del título (ej. "3 técnicos").
 /// - [acciones]: widget con los botones del ítem (editar, eliminar…).
+/// - [pie]: bloque opcional debajo del cuerpo, para los ítems que necesitan
+///   más de una línea de datos (el contacto y el teléfono de un proveedor,
+///   por ejemplo). Va a ancho completo, así que la grilla que contiene la
+///   tarjeta debe reservarle alto.
 /// - [orientacion]: disposición de la tarjeta. Por defecto horizontal.
 /// - [colorIcono]: color del ícono. Por defecto `ColoresApp.goGreen`.
 /// - [colorFondoIcono]: fondo del cuadro. Por defecto `ColoresApp.greenChipBg`.
@@ -62,6 +66,7 @@ class TarjetaCatalogo extends StatelessWidget {
     this.marcador,
     this.subtitulo,
     this.acciones,
+    this.pie,
     this.orientacion = OrientacionTarjeta.horizontal,
     this.colorIcono,
     this.colorFondoIcono,
@@ -77,6 +82,7 @@ class TarjetaCatalogo extends StatelessWidget {
   final Widget? marcador;
   final String? subtitulo;
   final Widget? acciones;
+  final Widget? pie;
   final OrientacionTarjeta orientacion;
   final Color? colorIcono;
   final Color? colorFondoIcono;
@@ -87,9 +93,18 @@ class TarjetaCatalogo extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final cuerpo = _esVertical ? _cuerpoVertical() : _cuerpoHorizontal();
+    final propio = pie;
+
     final contenido = Padding(
       padding: EdgeInsets.all(_esVertical ? 22 : 20),
-      child: _esVertical ? _cuerpoVertical() : _cuerpoHorizontal(),
+      child: propio == null
+          ? cuerpo
+          : Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [cuerpo, const SizedBox(height: 15), propio],
+            ),
     );
 
     return Container(

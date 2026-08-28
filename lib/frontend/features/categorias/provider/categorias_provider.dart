@@ -6,13 +6,18 @@ import '../../../../backend/features/categorias/modelo/categoria.dart';
 import '../../../../backend/features/categorias/repositorio/repositorio_categorias.dart';
 import '../../../../backend/features/categorias/repositorio/repositorio_categorias_impl.dart';
 import '../../../../backend/share/database/app_db_provider.dart';
-import '../../../../backend/share/utils/sku_utils.dart';
 import '../../../../core/resultado.dart';
 import '../../productos/provider/productos_provider.dart';
+import '../../autenticacion/provider/auth_providers.dart';
 
 final repositorioCategoriasProvider = Provider<RepositorioCategorias>(
   name: 'repositorioCategoriasProvider',
-  (ref) => RepositorioCategoriasImpl(ref.watch(appDatabaseProvider)),
+  (ref) => RepositorioCategoriasImpl(
+    ref.watch(appDatabaseProvider),
+    // Quién firma lo que este repositorio escriba. Es una dependencia
+    // del constructor, no un registro global (`CLAUDE.md` §3).
+    ref.watch(sesionActualProvider),
+  ),
 );
 
 /// Estado del catálogo de categorías: **solo la página visible**.
@@ -120,8 +125,6 @@ class CategoriasNotifier extends AsyncNotifier<CategoriasState> {
   Future<Resultado> crear({
     required String nombre,
     String? descripcion,
-    String colorHex = '#3B82F6',
-    String icono = 'category',
   }) async {
     try {
       final repo = ref.read(repositorioCategoriasProvider);
@@ -146,8 +149,6 @@ class CategoriasNotifier extends AsyncNotifier<CategoriasState> {
       await repo.crear(Categoria(
         nombre: nombre.trim(),
         descripcion: descripcion?.trim(),
-        colorHex: colorHex,
-        icono: icono,
         creadoEn: DateTime.now(),
         actualizadoEn: DateTime.now(),
       ));
@@ -161,8 +162,6 @@ class CategoriasNotifier extends AsyncNotifier<CategoriasState> {
     required int id,
     required String nombre,
     String? descripcion,
-    String? colorHex,
-    String? icono,
   }) async {
     try {
       final repo = ref.read(repositorioCategoriasProvider);
@@ -194,47 +193,14 @@ class CategoriasNotifier extends AsyncNotifier<CategoriasState> {
       await repo.actualizar(actual.copyWith(
         nombre: nombre.trim(),
         descripcion: descripcion?.trim(),
-        colorHex: colorHex,
-        icono: icono,
         actualizadoEn: DateTime.now(),
       ));
-
-      // Si el nombre cambió, regenera el SKU de todos sus productos.
-      if (nombre.trim().toLowerCase() != actual.nombre.toLowerCase()) {
-        await _actualizarSkusProductos(id, nombre.trim());
-      }
       return const Exito();
     } catch (e) {
       return Fallo(
         MotivoFallo.persistencia,
         'Error al actualizar la categoría: $e',
       );
-    }
-  }
-
-  Future<void> _actualizarSkusProductos(
-    int categoriaId,
-    String nuevoNombreCategoria,
-  ) async {
-    final repoProductos = ref.read(repositorioProductosProvider);
-
-    final productosCategoria =
-        await repoProductos.obtenerPorCategoria(categoriaId);
-    if (productosCategoria.isEmpty) return;
-
-    // Obtiene todos los demás productos para detectar conflictos de prefijo.
-    final todos = await repoProductos.obtenerTodos();
-    final otrosProductos =
-        todos.where((p) => p.categoriaId != categoriaId).toList();
-
-    final nuevoPrefijo = prefijoPara(nuevoNombreCategoria, otrosProductos);
-
-    for (final p in productosCategoria) {
-      // Mantiene el número secuencial del SKU actual (parte después del último guión).
-      final partes = p.sku.split('-');
-      if (partes.length < 2) continue; // SKU sin formato estándar → no tocar
-      final numero = partes.last;
-      await repoProductos.actualizar(p.copyWith(sku: '$nuevoPrefijo-$numero'));
     }
   }
 

@@ -1,30 +1,37 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../backend/share/dominio/permiso.dart';
+import '../features/autenticacion/provider/auth_providers.dart';
+import '../features/bitacora/vista/bitacora_vista.dart';
 import '../features/categorias/vista/categorias_vistas.dart';
 import '../features/clientes/vista/cliente_vista.dart';
 import '../features/configuracion/vista/configuracion_vista.dart';
 import '../features/cotizaciones/vista/cotizaciones_vista.dart';
 import '../features/deudores/vista/deudores_vista.dart';
-import '../features/motos/vista/motos_vista.dart';
+import '../features/inventario/vista/movimientos_vista.dart';
+import '../features/pos/vista/punto_venta_vista.dart';
+import '../features/ventas/vista/historial_ventas_vista.dart';
 import '../features/productos/vista/producto_vista.dart';
 import '../features/proveedores/vista/proveedores_vista.dart';
 import '../features/reservas/vista/reservas_vista.dart';
 import '../features/tecnicos/vista/tecnico_vista.dart';
-import '../features/ventas/principal/vista/venta_vista.dart';
+import '../features/ordenes/vista/ordenes_vista.dart';
+import '../share2/feedback/dialogo_confirmacion.dart';
 import '../share2/nav/barra_lateral.dart';
 import '../share2/nav/item_nav_dato.dart';
 import '../share2/nav/seccion_nav_dato.dart';
 import '../share2/temas/colores_app.dart';
 import '../share2/temas/tipografia_app.dart';
 
-class LayoutPrincipal extends StatefulWidget {
+class LayoutPrincipal extends ConsumerStatefulWidget {
   const LayoutPrincipal({super.key});
 
   @override
-  State<LayoutPrincipal> createState() => _LayoutPrincipalState();
+  ConsumerState<LayoutPrincipal> createState() => _LayoutPrincipalState();
 }
 
-class _LayoutPrincipalState extends State<LayoutPrincipal> {
+class _LayoutPrincipalState extends ConsumerState<LayoutPrincipal> {
   int _indiceActivo = 0;
 
   /// Índices ya visitados. El `IndexedStack` mantiene vivas sus hijas, así que
@@ -37,15 +44,18 @@ class _LayoutPrincipalState extends State<LayoutPrincipal> {
   static const List<String> _rutas = [
     '/dashboard',
     '/venta',
+    '/historial-ventas',
     '/productos',
+    '/movimientos',
     '/categorias',
     '/proveedores',
-    '/motos',
+    '/ordenes',
     '/cotizaciones',
     '/reservas',
     '/tecnicos',
     '/clientes',
     '/deudores',
+    '/bitacora',
     '/configuracion',
   ];
 
@@ -53,16 +63,19 @@ class _LayoutPrincipalState extends State<LayoutPrincipal> {
   /// nada: lo que cuesta es construirlas, y eso solo pasa al visitarlas.
   static const List<Widget> _vistas = [
     _PlaceholderVista(etiqueta: 'Dashboard'),
-    VentasVista(),
+    PuntoVentaVista(),
+    HistorialVentasVista(),
     ProductosVista(),
+    MovimientosVista(),
     CategoriasVista(),
     ProveedoresVista(),
-    MotosVista(),
+    OrdenesVista(),
     CotizacionesVista(),
     ReservasVista(),
     TecnicosVista(),
     ClientesVista(),
     DeudoresVista(),
+    BitacoraVista(),
     ConfiguracionVista(),
   ];
 
@@ -76,6 +89,30 @@ class _LayoutPrincipalState extends State<LayoutPrincipal> {
       _visitadas.add(idx);
     });
   }
+
+  /// Qué permiso hace falta para ver cada sección del sidebar.
+  ///
+  /// Vive aparte de [_secciones] porque `ItemNavDato` es un DTO de
+  /// presentación de share2 y no tiene por qué conocer el dominio: share2
+  /// pinta lo que le den, y quién puede ver qué lo decide esta capa.
+  static const Map<String, Permiso> _permisoPorRuta = {
+    '/venta': Permiso.posVer,
+    '/productos': Permiso.productosVer,
+    '/movimientos': Permiso.inventarioMovimientosVer,
+    '/categorias': Permiso.categoriasVer,
+    '/proveedores': Permiso.proveedoresVer,
+    '/ordenes': Permiso.ordenesVer,
+    '/cotizaciones': Permiso.cotizacionesVer,
+    '/reservas': Permiso.reservasVer,
+    '/tecnicos': Permiso.tecnicosVer,
+    '/clientes': Permiso.clientesVer,
+    '/deudores': Permiso.deudoresVer,
+    '/bitacora': Permiso.bitacoraVer,
+    '/configuracion': Permiso.configuracionVer,
+    // `/dashboard` no lleva permiso: es la pantalla a la que cae quien no
+    // tiene ninguna otra, y dejar a alguien sin sitio donde aterrizar es peor
+    // que enseñarle un resumen vacío.
+  };
 
   /// Los datos de navegación no dependen del estado: se arman una sola vez.
   /// Como getters, cada `build` creaba doce `ItemNavDato` con closures nuevas
@@ -96,6 +133,14 @@ class _LayoutPrincipalState extends State<LayoutPrincipal> {
           ruta: '/venta',
           alPresionar: () => _navegar('/venta'),
         ),
+        // Sin permiso a propósito: lo ven todos. Un cajero necesita poder
+        // buscar la factura de un cliente que vuelve a reclamar.
+        ItemNavDato(
+          icono: Icons.receipt_long_outlined,
+          etiqueta: 'Historial de ventas',
+          ruta: '/historial-ventas',
+          alPresionar: () => _navegar('/historial-ventas'),
+        ),
       ],
     ),
     SeccionNavDato(
@@ -106,6 +151,12 @@ class _LayoutPrincipalState extends State<LayoutPrincipal> {
           etiqueta: 'Productos',
           ruta: '/productos',
           alPresionar: () => _navegar('/productos'),
+        ),
+        ItemNavDato(
+          icono: Icons.swap_vert_rounded,
+          etiqueta: 'Movimientos',
+          ruta: '/movimientos',
+          alPresionar: () => _navegar('/movimientos'),
         ),
         ItemNavDato(
           icono: Icons.layers_outlined,
@@ -119,17 +170,17 @@ class _LayoutPrincipalState extends State<LayoutPrincipal> {
           ruta: '/proveedores',
           alPresionar: () => _navegar('/proveedores'),
         ),
-        ItemNavDato(
-          icono: Icons.motorcycle_outlined,
-          etiqueta: 'Motos',
-          ruta: '/motos',
-          alPresionar: () => _navegar('/motos'),
-        ),
       ],
     ),
     SeccionNavDato(
       titulo: 'Taller',
       items: [
+        ItemNavDato(
+          icono: Icons.build_outlined,
+          etiqueta: 'Órdenes de servicio',
+          ruta: '/ordenes',
+          alPresionar: () => _navegar('/ordenes'),
+        ),
         ItemNavDato(
           icono: Icons.request_quote_outlined,
           etiqueta: 'Cotizaciones',
@@ -167,6 +218,19 @@ class _LayoutPrincipalState extends State<LayoutPrincipal> {
         ),
       ],
     ),
+    // La sección entera desaparece para quien no tenga `bitacoraVer`: la
+    // recorta `_seccionesVisibles`, que no deja títulos sueltos sin ítems.
+    SeccionNavDato(
+      titulo: 'Administración',
+      items: [
+        ItemNavDato(
+          icono: Icons.history_rounded,
+          etiqueta: 'Bitácora',
+          ruta: '/bitacora',
+          alPresionar: () => _navegar('/bitacora'),
+        ),
+      ],
+    ),
   ];
 
   late final List<ItemNavDato> _itemsInferiores = [
@@ -180,19 +244,65 @@ class _LayoutPrincipalState extends State<LayoutPrincipal> {
       icono: Icons.logout_outlined,
       etiqueta: 'Salir',
       ruta: '',
-      alPresionar: () {},
+      alPresionar: _cerrarSesion,
     ),
   ];
 
+  /// Se pregunta antes porque la sesión no se guarda: salir obliga a volver a
+  /// teclear la contraseña, y el ítem está pegado al de Configuración.
+  Future<void> _cerrarSesion() async {
+    final confirmado = await DialogoConfirmacion.mostrar(
+      context,
+      titulo: '¿Cerrar sesión?',
+      mensaje: 'Tendrás que volver a escribir tu usuario y tu contraseña.',
+      textoConfirmar: 'Cerrar sesión',
+      destructivo: false,
+    );
+
+    if (confirmado == true) ref.read(sesionProvider.notifier).salir();
+  }
+
+  /// Las secciones que esta cuenta puede ver.
+  ///
+  /// Se filtra en `build` y no una sola vez porque los permisos cambian en
+  /// vivo: si el administrador le quita el mostrador a un cajero, el ítem
+  /// tiene que irse sin que vuelva a entrar. Filtrar cuesta un `contains` por
+  /// ítem sobre doce, y los `ItemNavDato` que sobreviven son **las mismas
+  /// instancias**, así que sus `ItemNav` no se reconstruyen.
+  List<SeccionNavDato> _seccionesVisibles(Set<Permiso> permisos) {
+    final visibles = <SeccionNavDato>[];
+
+    for (final seccion in _secciones) {
+      final items = seccion.items.where((item) {
+        final permiso = _permisoPorRuta[item.ruta];
+        return permiso == null || permisos.contains(permiso);
+      }).toList();
+
+      // Una sección sin ítems visibles no deja su título suelto.
+      if (items.isNotEmpty) {
+        visibles.add(SeccionNavDato(titulo: seccion.titulo, items: items));
+      }
+    }
+
+    return visibles;
+  }
+
   @override
   Widget build(BuildContext context) {
+    final permisos = ref.watch(permisosSesionProvider).value ?? const {};
+
     return Scaffold(
       backgroundColor: ColoresApp.bgApp,
       body: Row(
         children: [
           BarraLateral(
-            secciones: _secciones,
-            itemsInferiores: _itemsInferiores,
+            secciones: _seccionesVisibles(permisos),
+            itemsInferiores: _itemsInferiores
+                .where((item) =>
+                    item.ruta.isEmpty ||
+                    _permisoPorRuta[item.ruta] == null ||
+                    permisos.contains(_permisoPorRuta[item.ruta]))
+                .toList(),
             rutaActiva: _rutaActiva,
           ),
           Expanded(

@@ -11,9 +11,7 @@ class Moto {
   final int? anio;
   final int? cilindraje;
   final String? color;
-  final String? vin;
   final String? numeroMotor;
-  final int kilometrajeInicial;
   final String? notas;
   final bool activo;
   final DateTime creadoEn;
@@ -29,9 +27,7 @@ class Moto {
     this.anio,
     this.cilindraje,
     this.color,
-    this.vin,
     this.numeroMotor,
-    this.kilometrajeInicial = 0,
     this.notas,
     required this.activo,
     required this.creadoEn,
@@ -62,9 +58,7 @@ class Moto {
     int? anio,
     int? cilindraje,
     String? color,
-    String? vin,
     String? numeroMotor,
-    int? kilometrajeInicial,
     String? notas,
     bool? activo,
     DateTime? creadoEn,
@@ -80,9 +74,7 @@ class Moto {
       anio: anio ?? this.anio,
       cilindraje: cilindraje ?? this.cilindraje,
       color: color ?? this.color,
-      vin: vin ?? this.vin,
       numeroMotor: numeroMotor ?? this.numeroMotor,
-      kilometrajeInicial: kilometrajeInicial ?? this.kilometrajeInicial,
       notas: notas ?? this.notas,
       activo: activo ?? this.activo,
       creadoEn: creadoEn ?? this.creadoEn,

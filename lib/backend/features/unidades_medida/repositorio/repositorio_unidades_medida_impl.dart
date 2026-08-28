@@ -2,11 +2,43 @@ import 'package:drift/drift.dart';
 import 'package:inventario_k1/backend/share/database/app_db.dart';
 import '../modelo/unidad_medida.dart';
 import 'repositorio_unidades_medida.dart';
+import '../../../share/dominio/sesion_actual.dart';
+import '../../bitacora/modelo/entrada_bitacora.dart';
+import '../../bitacora/repositorio/repositorio_bitacora.dart';
+import '../../bitacora/repositorio/repositorio_bitacora_impl.dart';
+import '../../../share/dominio/permiso.dart';
 
-class RepositorioUnidadesMedidaImpl implements RepositorioUnidadesMedida {
+class RepositorioUnidadesMedidaImpl with FirmaDeSesion implements RepositorioUnidadesMedida {
   final AppDb _db;
 
-  RepositorioUnidadesMedidaImpl(this._db);
+  RepositorioUnidadesMedidaImpl(this._db, this.sesion);
+
+  /// Quién firma lo que este repositorio escribe. La inyecta Riverpod por el
+  /// constructor, no la busca en ningún registro global.
+  @override
+  final SesionActual? sesion;
+
+  late final RepositorioBitacora _bitacora =
+      RepositorioBitacoraImpl(_db, sesion);
+
+  /// Deja el renglón de la bitácora. Se llama **dentro** de la transacción del
+  /// cambio: si la escritura se revierte, el renglón se va con ella.
+  Future<void> _anotar(
+    AccionAuditada accion,
+    int? id,
+    String descripcion, {
+    String? detalle,
+  }) =>
+      _bitacora.anotar(
+        Anotacion(
+          entidad: EntidadAuditada.unidadMedida,
+          accion: accion,
+          entidadId: id,
+          descripcion: descripcion,
+          detalle: detalle,
+        ),
+      );
+
 
   UnidadMedida _filaAModelo(TablaUnidadesMedidaData fila) {
     return UnidadMedida(
@@ -62,28 +94,43 @@ class RepositorioUnidadesMedidaImpl implements RepositorioUnidadesMedida {
   }
 
   @override
-  Future<UnidadMedida> crear(UnidadMedida unidad) async {
-    final companion = _modeloACompanion(unidad);
-    final id = await _db.into(_db.tablaUnidadesMedida).insert(companion);
-    final creada = await obtenerPorId(id);
-    return creada!;
+  Future<UnidadMedida> crear(UnidadMedida unidad) {
+    exigir(Permiso.configuracionEditar);
+    return _db.transaction(() async {
+      final companion = _modeloACompanion(unidad);
+      final id = await _db.into(_db.tablaUnidadesMedida).insert(companion);
+      await _anotar(AccionAuditada.creo, id, unidad.nombre);
+      return (await obtenerPorId(id))!;
+    });
   }
 
   @override
-  Future<UnidadMedida> actualizar(UnidadMedida unidad) async {
-    final companion = _modeloACompanion(unidad);
-    await (_db.update(
-      _db.tablaUnidadesMedida,
-    )..where((t) => t.id.equals(unidad.id!))).write(companion);
-    final actualizada = await obtenerPorId(unidad.id!);
-    return actualizada!;
+  Future<UnidadMedida> actualizar(UnidadMedida unidad) {
+    exigir(Permiso.configuracionEditar);
+    return _db.transaction(() async {
+      final companion = _modeloACompanion(unidad);
+      await (_db.update(
+        _db.tablaUnidadesMedida,
+      )..where((t) => t.id.equals(unidad.id!))).write(companion);
+      await _anotar(AccionAuditada.modifico, unidad.id, unidad.nombre);
+      return (await obtenerPorId(unidad.id!))!;
+    });
   }
 
   @override
-  Future<void> eliminar(int id) async {
-    await (_db.delete(
-      _db.tablaUnidadesMedida,
-    )..where((t) => t.id.equals(id))).go();
+  Future<void> eliminar(int id) {
+    exigir(Permiso.configuracionEditar);
+    return _db.transaction(() async {
+      final antes = await obtenerPorId(id);
+      await (_db.delete(
+        _db.tablaUnidadesMedida,
+      )..where((t) => t.id.equals(id))).go();
+      await _anotar(
+        AccionAuditada.elimino,
+        id,
+        antes?.nombre ?? 'Unidad #$id',
+      );
+    });
   }
 
   @override

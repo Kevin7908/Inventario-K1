@@ -10,9 +10,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../../backend/features/productos/modelo/producto.dart';
 import '../../../layout/encabezado_con_cuenta.dart';
 import '../../../share2/share2.dart';
-import '../../../../backend/features/categorias/modelo/categoria.dart';
-import '../../categorias/provider/categorias_provider.dart';
-import '../../categorias/vista/categorias_vistas.dart';
+import '../../categorias/widgets/panel_categorias_catalogo.dart';
 import '../provider/productos_provider.dart';
 import '../widgets/columnas_tabla_producto.dart';
 import 'producto_detalle_vista.dart';
@@ -166,7 +164,9 @@ class _ProductosVistaState extends ConsumerState<ProductosVista> {
                       ),
                     ],
                   ),
-                  const SizedBox(height: 18),
+                  const SizedBox(height: 16),
+                  const _ChipsStock(),
+                  const SizedBox(height: 16),
                   Expanded(child: _TablaProductos(alVerDetalle: _verDetalle)),
                 ],
               ),
@@ -190,12 +190,81 @@ class _EncabezadoProductos extends ConsumerWidget {
     final resumen = ref.watch(productosResumenProvider).value;
     final total = resumen?.total ?? 0;
     final bajos = resumen?.stockBajo ?? 0;
+    final agotados = resumen?.sinStock ?? 0;
+
+    // "Stock bajo" y "agotado" son tramos distintos desde que existen los
+    // chips; el subtítulo nombra el segundo solo cuando hay algo que reponer.
+    final buffer = StringBuffer('$total repuestos en catálogo')
+      ..write(' · $bajos con stock bajo');
+    if (agotados > 0) buffer.write(' · $agotados agotados');
 
     return EncabezadoConCuenta(
       titulo: 'Productos',
-      subtitulo: '$total repuestos en catálogo · $bajos con stock bajo',
+      subtitulo: buffer.toString(),
     );
   }
+}
+
+/// Chips de filtro por estado de stock, con el conteo de cada tramo.
+///
+/// No están en el mockup —ahí solo se filtra por categoría—, pero el catálogo
+/// se revisa sobre todo para reponer, y llegar a "lo que falta" no debería
+/// obligar a recorrer la tabla. Cada chip lleva el color del semáforo que ya
+/// usa `BadgeEstadoStock`, así que el filtro y la columna Estado se leen igual.
+///
+/// Observa el resumen y el filtro activo por separado: cambiar de chip no
+/// vuelve a consultar los conteos, y que entre un producto nuevo no repinta
+/// la selección.
+class _ChipsStock extends ConsumerWidget {
+  const _ChipsStock();
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final activo = ref.watch(
+      productosProvider.select(
+        (s) => s.value?.filtroStock ?? FiltroStock.todos,
+      ),
+    );
+    final resumen = ref.watch(conteoStockProvider).value;
+
+    void filtrar(FiltroStock filtro) =>
+        ref.read(productosProvider.notifier).filtrarPorStock(filtro);
+
+    return Wrap(
+      spacing: 9,
+      runSpacing: 9,
+      children: [
+        ChipFiltro(
+          etiqueta: _conConteo('Todos', resumen?.total),
+          seleccionado: activo == FiltroStock.todos,
+          alPresionar: () => filtrar(FiltroStock.todos),
+        ),
+        ChipFiltro(
+          etiqueta: _conConteo('En stock', resumen?.enStock),
+          seleccionado: activo == FiltroStock.enStock,
+          colorActivo: ColoresApp.stockOk,
+          alPresionar: () => filtrar(FiltroStock.enStock),
+        ),
+        ChipFiltro(
+          etiqueta: _conConteo('Stock bajo', resumen?.stockBajo),
+          seleccionado: activo == FiltroStock.stockBajo,
+          colorActivo: ColoresApp.stockLow,
+          alPresionar: () => filtrar(FiltroStock.stockBajo),
+        ),
+        ChipFiltro(
+          etiqueta: _conConteo('Agotado', resumen?.sinStock),
+          seleccionado: activo == FiltroStock.sinStock,
+          colorActivo: ColoresApp.stockOut,
+          alPresionar: () => filtrar(FiltroStock.sinStock),
+        ),
+      ],
+    );
+  }
+
+  /// Mientras el conteo no llega, el chip va sin número en vez de mostrar un
+  /// cero que sería falso.
+  static String _conConteo(String etiqueta, int? cantidad) =>
+      cantidad == null ? etiqueta : '$etiqueta $cantidad';
 }
 
 /// Tabla del catálogo.
@@ -264,79 +333,34 @@ class _TablaProductos extends ConsumerWidget {
   }
 }
 
-/// Adaptador entre `categoriasProvider` y [PanelCategorias].
+/// El panel de categorías del catálogo, atado al filtro de la tabla.
 ///
-/// Traduce el modelo de dominio al DTO del panel y aplica la búsqueda local
-/// de categorías. "Todas" —que pinta el propio panel— limpia el filtro.
-/// El estado del panel (abierto/cerrado y su búsqueda) vive aquí y no en la
-/// página: es UI local, y tenerlo arriba hacía que teclear una categoría
-/// reconstruyera también la tabla y el encabezado.
-class _PanelCategorias extends ConsumerStatefulWidget {
+/// El adaptador —traducir `Categoria` al DTO del panel, la búsqueda local y el
+/// abrir/cerrar— vive en el módulo de Categorías y lo comparten esta pantalla,
+/// el punto de venta y los dos editores. Aquí solo queda de qué provider sale
+/// la categoría activa.
+class _PanelCategorias extends ConsumerWidget {
   const _PanelCategorias();
 
   @override
-  ConsumerState<_PanelCategorias> createState() => _PanelCategoriasState();
-}
-
-class _PanelCategoriasState extends ConsumerState<_PanelCategorias> {
-  final _controladorBusqueda = TextEditingController();
-  String _busqueda = '';
-  bool _expandido = true;
-
-  @override
-  void dispose() {
-    _controladorBusqueda.dispose();
-    super.dispose();
-  }
-
-  /// Contrae o expande el panel.
-  ///
-  /// Al contraerlo limpia su búsqueda: en la tira de íconos no se ve el
-  /// buscador, y dejar una lista recortada sin explicar por qué confunde.
-  void _alternar() => setState(() {
-    _expandido = !_expandido;
-    if (!_expandido) {
-      _busqueda = '';
-      _controladorBusqueda.clear();
-    }
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    // `select` en ambos: el panel solo rebuilda si cambia la categoría activa
-    // o la lista de categorías, no con cada tecla del buscador de productos.
-    final seleccionada = ref.watch(
-      productosProvider.select((s) => s.value?.filtroCategoriaId),
-    );
-    final categorias =
-        ref.watch(catalogoCategoriasProvider).value ?? const <Categoria>[];
-
-    final query = _busqueda.trim().toLowerCase();
-    final items = [
-      for (final categoria in categorias)
-        if (categoria.id != null &&
-            (query.isEmpty || categoria.nombre.toLowerCase().contains(query)))
-          CategoriaPanelDato(
-            id: categoria.id!,
-            nombre: categoria.nombre,
-            color: colorDeHex(categoria.colorHex),
-          ),
-    ];
-
-    return PanelCategorias(
-      categorias: items,
-      seleccionada: seleccionada,
+  Widget build(BuildContext context, WidgetRef ref) {
+    return PanelCategoriasCatalogo(
+      // `select`: el panel solo rebuilda si cambia la categoría activa, no con
+      // cada tecla del buscador de productos.
+      seleccionada: ref.watch(
+        productosProvider.select((s) => s.value?.filtroCategoriaId),
+      ),
       alSeleccionar: (id) =>
           ref.read(productosProvider.notifier).filtrarPorCategoria(id),
-      expandido: _expandido,
-      alAlternar: _alternar,
-      controladorBusqueda: _controladorBusqueda,
-      alBuscar: (texto) => setState(() => _busqueda = texto),
     );
   }
 }
 
-/// Miniatura cuadrada del producto, con marcador cuando no hay imagen.
+/// Miniatura del producto, con marcador cuando no hay imagen.
+///
+/// Cuadrada por defecto —la de las filas de la tabla— y rectangular si se le
+/// pasa [ancho]: así sirve también para la franja superior de
+/// [TarjetaProducto], que es ancho completo por 120 de alto.
 ///
 /// Vive en el módulo (no en share2) porque lee un archivo del disco, y share2
 /// no toca dependencias externas ni el sistema de archivos.
@@ -345,12 +369,24 @@ class MiniaturaProducto extends StatelessWidget {
     super.key,
     required this.rutaImagen,
     this.lado = 44,
+    this.ancho,
     this.radio = 11,
+    this.conBorde = true,
   });
 
   final String? rutaImagen;
+
+  /// Alto de la miniatura, y también su ancho cuando [ancho] es `null`.
   final double lado;
+
+  /// Ancho explícito. `double.infinity` para ocupar todo el espacio del padre.
+  final double? ancho;
+
   final double radio;
+
+  /// El borde estorba cuando la miniatura ya va dentro de un cuadro con el
+  /// suyo, como en la tarjeta de producto.
+  final bool conBorde;
 
   @override
   Widget build(BuildContext context) {
@@ -358,12 +394,12 @@ class MiniaturaProducto extends StatelessWidget {
     final hayRuta = ruta != null && ruta.isNotEmpty;
 
     return Container(
-      width: lado,
+      width: ancho ?? lado,
       height: lado,
       decoration: BoxDecoration(
         color: ColoresApp.bgInput,
         borderRadius: BorderRadius.circular(radio),
-        border: Border.all(color: ColoresApp.border),
+        border: conBorde ? Border.all(color: ColoresApp.border) : null,
       ),
       clipBehavior: Clip.antiAlias,
       child: hayRuta ? _imagen(context, ruta) : _marcador(),
@@ -371,14 +407,18 @@ class MiniaturaProducto extends StatelessWidget {
   }
 
   Widget _imagen(BuildContext context, String ruta) {
-    // `cacheWidth` decodifica al tamaño en que se pinta: una foto de 4000 px no
-    // tiene por qué ocupar memoria completa para una miniatura de 44.
+    // Decodifica al tamaño en que se pinta: una foto de 4000 px no tiene por
+    // qué ocupar memoria completa para una miniatura de 44. Con ancho
+    // infinito no hay número que pasar, así que se acota por el alto.
     final escala = MediaQuery.devicePixelRatioOf(context);
+    final anchoReal = ancho ?? lado;
+    final acotaPorAncho = anchoReal.isFinite;
 
     return Image.file(
       File(ruta),
       fit: BoxFit.cover,
-      cacheWidth: (lado * escala).round(),
+      cacheWidth: acotaPorAncho ? (anchoReal * escala).round() : null,
+      cacheHeight: acotaPorAncho ? null : (lado * escala).round(),
       // Sin `existsSync()`: era I/O síncrono en el build de cada fila y de cada
       // hover de tarjeta. `errorBuilder` ya cubre el archivo que no está.
       errorBuilder: (_, _, _) => _marcador(),

@@ -1,8 +1,13 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../layout/encabezado_con_cuenta.dart';
 import '../../../share2/share2.dart';
+import '../../../../backend/share/dominio/permiso.dart';
+import '../../autenticacion/provider/auth_providers.dart';
+import '../../autenticacion/vista/usuarios_vista.dart';
 import '../../especializacion/vista/especializacion_vista.dart';
+import '../../motos/vista/motos_vista.dart';
 import '../../unidades_medida/vista/unidad_medida_vista.dart';
 import '../widgets/tab_servicios.dart';
 
@@ -10,20 +15,33 @@ import '../widgets/tab_servicios.dart';
 ///
 /// Consolida, como pestañas, catálogos que antes eran secciones propias del
 /// sidebar (Unidades de medida, Especializaciones, Servicios).
-class ConfiguracionVista extends StatefulWidget {
+///
+/// **Usuarios solo aparece para un administrador.** Esconder la pestaña es
+/// cortesía, no seguridad: quien llegue a la vista por otro camino encuentra
+/// un aviso, y toda escritura la vuelve a comprobar el repositorio contra la
+/// base.
+class ConfiguracionVista extends ConsumerStatefulWidget {
   const ConfiguracionVista({super.key});
 
   @override
-  State<ConfiguracionVista> createState() => _ConfiguracionVistaState();
+  ConsumerState<ConfiguracionVista> createState() => _ConfiguracionVistaState();
 }
 
-class _ConfiguracionVistaState extends State<ConfiguracionVista> {
+class _ConfiguracionVistaState extends ConsumerState<ConfiguracionVista> {
   int _tabActivo = 0;
 
   void _cambiarTab(int indice) => setState(() => _tabActivo = indice);
 
   @override
   Widget build(BuildContext context) {
+    // Se pregunta por el permiso, no por el rol: el rol solo decide con qué
+    // permisos nace una cuenta, y de ahí en adelante manda `usuario_permisos`.
+    final esAdmin = ref.watch(puedeProvider(Permiso.usuariosAdministrar));
+
+    // Al perder el rol con la pestaña de Usuarios abierta, el índice apuntaría
+    // a una pestaña que ya no existe.
+    final tabActivo = _tabActivo.clamp(0, esAdmin ? 5 : 4);
+
     return Padding(
       padding: const EdgeInsets.fromLTRB(32, 28, 32, 28),
       child: Column(
@@ -35,7 +53,7 @@ class _ConfiguracionVistaState extends State<ConfiguracionVista> {
           ),
           const SizedBox(height: 20),
           BarraTabsSecundaria(
-            indiceActivo: _tabActivo,
+            indiceActivo: tabActivo,
             tabs: [
               TabSecundariaDato(
                 etiqueta: 'General',
@@ -53,17 +71,28 @@ class _ConfiguracionVistaState extends State<ConfiguracionVista> {
                 etiqueta: 'Servicios',
                 alPresionar: () => _cambiarTab(3),
               ),
+              TabSecundariaDato(
+                etiqueta: 'Motos',
+                alPresionar: () => _cambiarTab(4),
+              ),
+              if (esAdmin)
+                TabSecundariaDato(
+                  etiqueta: 'Usuarios',
+                  alPresionar: () => _cambiarTab(5),
+                ),
             ],
           ),
           const SizedBox(height: 20),
           Expanded(
             child: IndexedStack(
-              index: _tabActivo,
-              children: const [
-                _TabGeneral(),
-                UnidadesMedidaVista(),
-                EspecializacionesVista(),
-                TabServicios(),
+              index: tabActivo,
+              children: [
+                const _TabGeneral(),
+                const UnidadesMedidaVista(),
+                const EspecializacionesVista(),
+                const TabServicios(),
+                const MotosVista(),
+                if (esAdmin) const UsuariosVista(),
               ],
             ),
           ),

@@ -1,4 +1,14 @@
+export 'encabezado_grupo_lineas.dart';
+export 'ficha_resumen.dart';
+export 'fila_documento.dart';
+export 'fila_dato.dart';
+export 'fila_movimiento.dart';
 export 'marcador_identidad.dart';
+export 'panel_documento.dart';
 export 'panel_seccion.dart';
+export 'pie_totales.dart';
+export 'renglon_cuenta.dart';
 export 'tarjeta_catalogo.dart';
 export 'tarjeta_info.dart';
+export 'tarjeta_metrica.dart';
+export 'tarjeta_producto.dart';

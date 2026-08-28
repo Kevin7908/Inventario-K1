@@ -15,6 +15,7 @@ class CotizacionMapper {
     required String nombreCliente,
     String? telefonoCliente,
     required String nombreMoto,
+    int cantidadItems = 0,
   }) {
     return CotizacionResumen(
       id: row.id,
@@ -25,11 +26,12 @@ class CotizacionMapper {
       telefonoCliente: telefonoCliente,
       nombreMoto: nombreMoto,
       subtotal: row.subtotal,
+      descuento: row.descuento,
       iva: row.iva,
-      total: row.total,
       vigenciaHasta: row.vigenciaHasta,
       notas: row.notas,
       creadoEn: row.creadoEn,
+      cantidadItems: cantidadItems,
     );
   }
 
@@ -37,8 +39,11 @@ class CotizacionMapper {
     return CotizacionItem(
       id: row.id,
       cotizacionId: row.cotizacionId,
-      tipoItem: TipoItemCotizacionExt.desdeTexto(row.tipoItem),
-      referenciaId: row.referenciaId,
+      tipoItem: TipoItemCotizacion.desdeTexto(row.tipoItem),
+      // La tabla guarda la referencia en la columna que corresponde al tipo,
+      // para que la FK la pueda verificar; el modelo la expone como una sola,
+      // que es como se lee bien desde la vista.
+      referenciaId: row.productoId ?? row.servicioId,
       descripcion: row.descripcion,
       cantidad: row.cantidad,
       precioUnitario: row.precioUnitario,
@@ -47,30 +52,38 @@ class CotizacionMapper {
   }
 
   static TablaCotizacionCompanion nuevaACompanion({
+    required int usuarioId,
     required String numero,
     int? clienteId,
     int? motoId,
     required int subtotal,
+    int descuento = 0,
     required int iva,
-    required int total,
-    required String vigenciaHasta,
+    required DateTime vigenciaHasta,
     String? notas,
   }) {
     return TablaCotizacionCompanion.insert(
+      usuarioId: usuarioId,
       numero: numero,
       clienteId: Value(clienteId),
       motoId: Value(motoId),
       subtotal: Value(subtotal),
+      descuento: Value(descuento),
       iva: Value(iva),
-      total: Value(total),
       vigenciaHasta: vigenciaHasta,
       notas: Value(notas),
+      actualizadoEn: Value(DateTime.now()),
     );
   }
 
+  /// Reparte [referenciaId] en la columna que le toca según [tipo].
+  ///
+  /// Es el único punto donde se decide, y por eso el `CHECK` de la tabla no
+  /// puede saltarse: una línea `LIBRE` deja las dos en NULL, y las otras dos
+  /// llenan exactamente una.
   static TablaCotizacionItemCompanion itemACompanion({
     required int cotizacionId,
-    required String tipoItem,
+    required TipoItemCotizacion tipo,
     int? referenciaId,
     required String descripcion,
     required double cantidad,
@@ -79,8 +92,13 @@ class CotizacionMapper {
   }) {
     return TablaCotizacionItemCompanion.insert(
       cotizacionId: cotizacionId,
-      tipoItem: tipoItem,
-      referenciaId: Value(referenciaId),
+      tipoItem: tipo.valor,
+      productoId: Value(
+        tipo == TipoItemCotizacion.producto ? referenciaId : null,
+      ),
+      servicioId: Value(
+        tipo == TipoItemCotizacion.servicio ? referenciaId : null,
+      ),
       descripcion: descripcion,
       cantidad: cantidad,
       precioUnitario: precioUnitario,

@@ -30,6 +30,11 @@ import 'categoria_panel_dato.dart';
 /// - [expandidas]: ids cuyas [CategoriaPanelDato.subcategorias] están abiertas.
 /// - [alAlternarSubcategorias]: se llama con el id al pulsar su control de
 ///   despliegue. Si es `null`, las subcategorías no se pueden abrir.
+/// - [habilitado]: en `false` el panel se sigue viendo y se sigue pudiendo
+///   contraer, pero ninguna categoría se puede elegir y todas se pintan
+///   apagadas. Es para las pantallas donde el filtro no aplica a lo que se
+///   está mostrando: esconder el panel entero movería el resto de la interfaz
+///   de sitio cada vez que se cambia de modo.
 /// - [anchoExpandido] / [anchoContraido]: anchos del panel en cada estado.
 ///
 /// Ejemplo:
@@ -58,6 +63,7 @@ class PanelCategorias extends StatelessWidget {
     this.etiquetaTodas = 'Todas',
     this.expandidas = const {},
     this.alAlternarSubcategorias,
+    this.habilitado = true,
     this.anchoExpandido = 208,
     this.anchoContraido = 52,
   });
@@ -73,6 +79,7 @@ class PanelCategorias extends StatelessWidget {
   final String etiquetaTodas;
   final Set<int> expandidas;
   final ValueChanged<int>? alAlternarSubcategorias;
+  final bool habilitado;
   final double anchoExpandido;
   final double anchoContraido;
 
@@ -137,7 +144,8 @@ class PanelCategorias extends StatelessWidget {
             child: BarraBusqueda(
               controlador: controlador,
               placeholder: 'Buscar',
-              alCambiar: alBuscar,
+              // Buscar en una lista que no se puede elegir no lleva a nada.
+              alCambiar: habilitado ? alBuscar : null,
             ),
           ),
         Expanded(
@@ -148,6 +156,7 @@ class PanelCategorias extends StatelessWidget {
                 etiqueta: etiquetaTodas,
                 icono: Icons.grid_view_rounded,
                 activa: seleccionada == null,
+                habilitado: habilitado,
                 alPresionar: () => alSeleccionar(null),
               ),
               for (final categoria in categorias) ...[
@@ -157,6 +166,7 @@ class PanelCategorias extends StatelessWidget {
                   inicial: categoria.inicial,
                   color: categoria.color,
                   activa: seleccionada == categoria.id,
+                  habilitado: habilitado,
                   alPresionar: () => alSeleccionar(categoria.id),
                   desplegada: expandidas.contains(categoria.id),
                   alDesplegar: categoria.subcategorias.isEmpty ||
@@ -206,6 +216,7 @@ class PanelCategorias extends StatelessWidget {
                 etiqueta: etiquetaTodas,
                 icono: Icons.grid_view_rounded,
                 activa: seleccionada == null,
+                habilitado: habilitado,
                 alPresionar: () => alSeleccionar(null),
               ),
               for (final categoria in categorias)
@@ -215,6 +226,7 @@ class PanelCategorias extends StatelessWidget {
                   inicial: categoria.inicial,
                   color: categoria.color,
                   activa: seleccionada == categoria.id,
+                  habilitado: habilitado,
                   alPresionar: () => alSeleccionar(categoria.id),
                 ),
             ],
@@ -264,6 +276,7 @@ class _FilaCategoria extends StatelessWidget {
     required this.etiqueta,
     required this.activa,
     required this.alPresionar,
+    this.habilitado = true,
     this.icono,
     this.inicial,
     this.color,
@@ -274,6 +287,7 @@ class _FilaCategoria extends StatelessWidget {
   final String etiqueta;
   final bool activa;
   final VoidCallback alPresionar;
+  final bool habilitado;
   final IconData? icono;
   final String? inicial;
   final Color? color;
@@ -283,19 +297,22 @@ class _FilaCategoria extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final estilo = TipografiaApp.caption.copyWith(
-      fontWeight: activa ? FontWeight.w600 : FontWeight.w500,
-      color: activa ? ColoresApp.castletonGreen : ColoresApp.textPrimary,
+      fontWeight: activa && habilitado ? FontWeight.w600 : FontWeight.w500,
+      color: !habilitado
+          ? ColoresApp.textDisabled
+          : (activa ? ColoresApp.castletonGreen : ColoresApp.textPrimary),
     );
+    final resaltada = activa && habilitado;
 
     return Padding(
       padding: const EdgeInsets.only(bottom: 2),
       child: Material(
-        color: activa ? ColoresApp.greenChipBg : Colors.transparent,
+        color: resaltada ? ColoresApp.greenChipBg : Colors.transparent,
         borderRadius: BorderRadius.circular(8),
         clipBehavior: Clip.antiAlias,
         child: InkWell(
-          onTap: alPresionar,
-          hoverColor: activa ? Colors.transparent : ColoresApp.bgCardHover,
+          onTap: habilitado ? alPresionar : null,
+          hoverColor: resaltada ? Colors.transparent : ColoresApp.bgCardHover,
           child: Padding(
             padding: const EdgeInsets.fromLTRB(7, 6, 4, 6),
             child: Row(
@@ -333,7 +350,11 @@ class _FilaCategoria extends StatelessWidget {
   /// El ícono va suelto y solo la inicial se enmarca: en la tira contraída un
   /// recuadro alrededor de cada ícono se leería como un botón.
   Widget _marcador() {
-    final acento = color ?? (activa ? ColoresApp.goGreen : ColoresApp.textMuted);
+    // Deshabilitado, el color propio de la categoría también se apaga: dejar
+    // los puntos de color encendidos haría parecer que se pueden pulsar.
+    final acento = !habilitado
+        ? ColoresApp.textDisabled
+        : (color ?? (activa ? ColoresApp.goGreen : ColoresApp.textMuted));
     final propio = icono;
     if (propio != null) return Icon(propio, size: 16, color: acento);
 
@@ -353,6 +374,7 @@ class _MarcadorCategoria extends StatelessWidget {
     required this.etiqueta,
     required this.activa,
     required this.alPresionar,
+    this.habilitado = true,
     this.icono,
     this.inicial,
     this.color,
@@ -361,23 +383,26 @@ class _MarcadorCategoria extends StatelessWidget {
   final String etiqueta;
   final bool activa;
   final VoidCallback alPresionar;
+  final bool habilitado;
   final IconData? icono;
   final String? inicial;
   final Color? color;
 
   @override
   Widget build(BuildContext context) {
+    final resaltada = activa && habilitado;
+
     return Tooltip(
       message: etiqueta,
       child: Padding(
         padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
         child: Material(
-          color: activa ? ColoresApp.greenChipBg : Colors.transparent,
+          color: resaltada ? ColoresApp.greenChipBg : Colors.transparent,
           borderRadius: BorderRadius.circular(8),
           clipBehavior: Clip.antiAlias,
           child: InkWell(
-            onTap: alPresionar,
-            hoverColor: activa ? Colors.transparent : ColoresApp.bgCardHover,
+            onTap: habilitado ? alPresionar : null,
+            hoverColor: resaltada ? Colors.transparent : ColoresApp.bgCardHover,
             child: SizedBox(
               height: 32,
               child: Center(
@@ -393,7 +418,11 @@ class _MarcadorCategoria extends StatelessWidget {
   /// El ícono va suelto y solo la inicial se enmarca: en la tira contraída un
   /// recuadro alrededor de cada ícono se leería como un botón.
   Widget _marcador() {
-    final acento = color ?? (activa ? ColoresApp.goGreen : ColoresApp.textMuted);
+    // Deshabilitado, el color propio de la categoría también se apaga: dejar
+    // los puntos de color encendidos haría parecer que se pueden pulsar.
+    final acento = !habilitado
+        ? ColoresApp.textDisabled
+        : (color ?? (activa ? ColoresApp.goGreen : ColoresApp.textMuted));
     final propio = icono;
     if (propio != null) return Icon(propio, size: 16, color: acento);
 

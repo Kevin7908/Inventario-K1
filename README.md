@@ -84,7 +84,7 @@ lib/
 - Separar frontend y backend por carpetas
 - Cada feature tiene su propia estructura tanto en frontend como en backend
 - Usar Drift para evitar SQL manual y errores de tipos
-- Inyección de dependencias con `get_it`
+- Inyección de dependencias con Riverpod, un solo mecanismo para toda la app
 - Validar datos en el backend, no solo en la UI
 - Manejar errores y mostrar mensajes amigables
 - Escribir pruebas unitarias para servicios y repositorios
@@ -101,7 +101,19 @@ lib/
 1. Clonar el repositorio
 2. Ejecutar `flutter pub get`
 3. Ejecutar `dart run build_runner build` (para generar el código de Drift)
-4. Ejecutar `flutter run`
+4. Copiar `.env.ejemplo` como `.env` y llenar las credenciales de correo
+5. Ejecutar `flutter run`
+
+### El archivo `.env`
+
+Las credenciales del servidor SMTP —la cuenta desde la que salen los correos y
+su contraseña de aplicación— viven en un `.env` en la raíz del proyecto, o
+junto al ejecutable en una instalación real. **Está en `.gitignore` y no sube
+al repositorio.** `.env.ejemplo` documenta las claves.
+
+Si el archivo falta, la app arranca igual: lo único que deja de funcionar es el
+envío de correos, y recuperar la contraseña lo dice en pantalla en vez de
+fallar en silencio.
 
 ## Características principales
 

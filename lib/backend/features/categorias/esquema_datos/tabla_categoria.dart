@@ -1,29 +1,35 @@
 import 'package:drift/drift.dart';
 
-// Tabla de categorías en la base de datos Drift
+/// Cómo se agrupan los productos del catálogo.
+///
+/// Lleva `activo` como todo catálogo referenciado por documentos: una
+/// categoría que ya no se usa se da de baja, no se borra. Borrarla dejaría sin
+/// clasificar a los productos que la usaban.
+///
+/// **Sin color ni ícono.** Los tuvo, y era un error de modelado: cómo se pinta
+/// una categoría en una rejilla es una decisión de la vista, que ya tiene sus
+/// tokens en `ColoresApp`. Guardarlo aquí obligaba a elegir un color al crear
+/// cada categoría, permitía dos categorías del mismo color y dejaba el diseño
+/// de la app a merced de lo que alguien hubiera tecleado en 2026.
+@TableIndex(name: 'idx_categorias_activo', columns: {#activo})
 class TablaCategoria extends Table {
-  // Clave primaria autoincremental
+  @override
+  String get tableName => 'categorias';
+
   IntColumn get id => integer().autoIncrement()();
 
-  // Nombre de la categoría (único y requerido)
-  TextColumn get nombre => text().withLength(min: 1, max: 100)();
+  TextColumn get nombre => text().withLength(min: 1, max: 100).unique()();
 
-  // Descripción opcional de la categoría
   TextColumn get descripcion => text().nullable()();
 
-  // Color en formato hex (ej: '#3B82F6')
-  TextColumn get colorHex => text().withDefault(const Constant('#3B82F6'))();
+  BoolColumn get activo => boolean().withDefault(const Constant(true))();
 
-  // Ícono (nombre del ícono de Material Icons como string)
-  TextColumn get icono => text().withDefault(const Constant('category'))();
-
-  // Fecha de creación
   DateTimeColumn get creadoEn => dateTime().withDefault(currentDateAndTime)();
-
-  // Fecha de última actualización
   DateTimeColumn get actualizadoEn =>
       dateTime().withDefault(currentDateAndTime)();
 
   @override
-  String get tableName => 'categorias';
+  List<String> get customConstraints => [
+        'CHECK (length(trim(nombre)) > 0)',
+      ];
 }

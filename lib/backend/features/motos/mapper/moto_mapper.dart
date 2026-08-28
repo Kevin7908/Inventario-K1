@@ -18,11 +18,9 @@ class MotoMapper {
       anio: fila.anio,
       cilindraje: fila.cilindraje,
       color: fila.color,
-      vin: fila.vin,
       numeroMotor: fila.numeroMotor,
-      kilometrajeInicial: fila.kilometrajeInicial,
       notas: fila.notas,
-      activo: fila.activo == 1,
+      activo: fila.activo,
       creadoEn: fila.creadoEn,
       actualizadoEn: fila.actualizadoEn,
     );
@@ -39,11 +37,9 @@ class MotoMapper {
       anio: Value(moto.anio),
       cilindraje: Value(moto.cilindraje),
       color: Value(moto.color),
-      vin: Value(moto.vin),
       numeroMotor: Value(moto.numeroMotor),
-      kilometrajeInicial: Value(moto.kilometrajeInicial),
       notas: Value(moto.notas),
-      activo: Value(moto.activo ? 1 : 0),
+      activo: Value(moto.activo),
       actualizadoEn: Value(DateTime.now()),
     );
   }

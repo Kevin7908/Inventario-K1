@@ -11,6 +11,7 @@ import '../../../share2/share2.dart';
 import '../detalle_categoria/vista/detalle_categoria_vista.dart';
 import '../provider/categorias_provider.dart';
 import '../widgets/dialogo_categorias_widget.dart';
+import '../widgets/identidad_categoria.dart';
 
 /// Pantalla de Categorías: catálogo en grilla de tarjetas.
 ///
@@ -241,7 +242,7 @@ class _GrillaCategoriasState extends ConsumerState<_GrillaCategorias> {
           orientacion: OrientacionTarjeta.vertical,
           marcador: MarcadorIdentidad(
             inicial: inicialDe(categoria.nombre),
-            color: colorDeHex(categoria.colorHex),
+            color: IdentidadCategoria.color,
             lado: 50,
             radio: 14,
           ),
@@ -309,17 +310,4 @@ class _Vacio extends StatelessWidget {
       ),
     );
   }
-}
-
-/// Inicial en mayúscula de un nombre. Cadena vacía si el nombre lo está.
-String inicialDe(String nombre) =>
-    nombre.trim().isEmpty ? '' : nombre.trim()[0].toUpperCase();
-
-/// Convierte `#RRGGBB` en [Color]. Devuelve `null` si el texto no es un hex
-/// válido, y quien lo use cae a su color por defecto.
-Color? colorDeHex(String hex) {
-  final limpio = hex.replaceAll('#', '').trim();
-  if (limpio.length != 6) return null;
-  final valor = int.tryParse(limpio, radix: 16);
-  return valor == null ? null : Color(0xFF000000 | valor);
 }

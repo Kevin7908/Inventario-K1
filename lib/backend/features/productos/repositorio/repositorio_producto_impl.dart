@@ -1,14 +1,61 @@
 import 'package:drift/drift.dart';
 
 import '../../../share/database/app_db.dart';
+import '../../../share/dominio/sesion_actual.dart';
+import '../../bitacora/modelo/entrada_bitacora.dart';
+import '../../bitacora/repositorio/repositorio_bitacora.dart';
+import '../../bitacora/repositorio/repositorio_bitacora_impl.dart';
+import '../../inventario/modelo/movimiento_inventario.dart';
+import '../../inventario/repositorio/repositorio_inventario.dart';
+import '../../inventario/repositorio/repositorio_inventario_impl.dart';
+import '../../../share/consecutivos/repositorio_consecutivos.dart';
+import '../../../share/utils/sku_utils.dart';
 import '../mapper/producto_mapper.dart';
 import '../modelo/producto.dart';
 import 'repositorio_producto.dart';
+import '../../../share/dominio/permiso.dart';
 
-class RepositorioProductosImpl implements RepositorioProducto {
+class RepositorioProductosImpl with FirmaDeSesion implements RepositorioProducto {
+  RepositorioProductosImpl(this._db, this.sesion);
+
   final AppDb _db;
 
-  RepositorioProductosImpl(this._db);
+  /// Quién firma lo que este repositorio escribe. La inyecta Riverpod por el
+  /// constructor, no la busca en ningún registro global.
+  @override
+  final SesionActual? sesion;
+
+  /// Todo cambio de stock pasa por aquí. Ni este repositorio escribe
+  /// `stock_actual` a mano.
+  late final RepositorioInventario _inventario =
+      RepositorioInventarioImpl(_db, sesion);
+
+  late final RepositorioBitacora _bitacora =
+      RepositorioBitacoraImpl(_db, sesion);
+
+  /// Reparte los números del SKU. Es el mismo mecanismo de las facturas: un
+  /// `UPSERT ... RETURNING` por serie, que no repite ni reutiliza el número de
+  /// lo que se borró.
+  late final RepositorioConsecutivos _consecutivos =
+      RepositorioConsecutivos(_db);
+
+  /// Deja el renglón de la bitácora. Se llama **dentro** de la transacción del
+  /// cambio: si la escritura se revierte, el renglón se va con ella.
+  Future<void> _anotar(
+    AccionAuditada accion,
+    int? id,
+    String descripcion, {
+    String? detalle,
+  }) =>
+      _bitacora.anotar(
+        Anotacion(
+          entidad: EntidadAuditada.producto,
+          accion: accion,
+          entidadId: id,
+          descripcion: descripcion,
+          detalle: detalle,
+        ),
+      );
 
   // Helper: JOIN base
 
@@ -21,6 +68,11 @@ class RepositorioProductosImpl implements RepositorioProducto {
       leftOuterJoin(
         _db.tablaProveedor,
         _db.tablaProveedor.id.equalsExp(_db.tablaProducto.proveedorId),
+      ),
+      // La razón social del proveedor vive en `personas`.
+      leftOuterJoin(
+        _db.tablaPersona,
+        _db.tablaPersona.id.equalsExp(_db.tablaProveedor.personaId),
       ),
       leftOuterJoin(
         _db.tablaUnidadesMedida,
@@ -114,45 +166,187 @@ class RepositorioProductosImpl implements RepositorioProducto {
 
   // Escrituras
 
-  @override
-  Future<Producto> crear(Producto producto) async {
-    final companion = ProductoMapper.modeloACompanion(producto);
-    final id = await _db.into(_db.tablaProducto).insert(companion);
-    // No hay SELECT extra: el stream de Drift emite el dato completo.
-    return producto.copyWith(id: id);
+  /// El prefijo que le corresponde a [categoriaId].
+  ///
+  /// Trae los nombres de las categorías porque el desempate necesita saber
+  /// cuáles empiezan igual. Es un catálogo de decenas de filas y solo se
+  /// consulta al dar de alta un producto, no en cada repintado.
+  Future<String> _prefijoDe(int? categoriaId) async {
+    if (categoriaId == null) return prefijoSinCategoria;
+
+    final filas = await (_db.select(_db.tablaCategoria)
+          ..orderBy([(c) => OrderingTerm.asc(c.id)]))
+        .get();
+
+    final anteriores = <String>[];
+    for (final fila in filas) {
+      if (fila.id == categoriaId) {
+        return prefijoDeCategoria(fila.nombre, anteriores);
+      }
+      anteriores.add(fila.nombre);
+    }
+
+    // La categoría se borró entre que se eligió y se guardó.
+    return prefijoSinCategoria;
   }
 
   @override
-  Future<Producto> actualizar(Producto producto) async {
-    final companion = ProductoMapper.modeloACompanion(producto);
-    await (_db.update(_db.tablaProducto)
-          ..where((t) => t.id.equals(producto.id!)))
-        .write(companion);
-    // No hay SELECT extra: el stream emite el resultado actualizado.
-    return producto;
+  Future<String> previsualizarSku(int? categoriaId) async {
+    final prefijo = await _prefijoDe(categoriaId);
+    final numero = await _consecutivos.proximoDeSerie(_serie(prefijo));
+    return formatearSku(prefijo, numero);
+  }
+
+  /// La serie del consecutivo, una por prefijo.
+  static String _serie(String prefijo) => 'SKU_$prefijo';
+
+  /// Toma el siguiente número de la serie del prefijo. Se llama **dentro** de
+  /// la transacción del alta.
+  Future<String> _generarSku(int? categoriaId) async {
+    final prefijo = await _prefijoDe(categoriaId);
+    final numero = await _consecutivos.siguienteDeSerie(_serie(prefijo));
+    return formatearSku(prefijo, numero);
+  }
+
+  @override
+  Future<Producto> crear(Producto producto) {
+    exigir(Permiso.productosCrear);
+    // El producto nace con stock 0 y el inventario inicial entra como
+    // movimiento, no como columna: si el alta pusiera `stock_actual` a mano,
+    // el libro mayor arrancaría descuadrado desde la primera fila.
+    return _db.transaction(() async {
+      // El SKU se asigna aquí y no en la vista: es una regla de negocio, y
+      // dentro de la transacción un alta que falle devuelve el número a la
+      // serie en vez de dejar un hueco en la estantería.
+      final conSku = producto.sku.trim().isEmpty
+          ? producto.copyWith(sku: await _generarSku(producto.categoriaId))
+          : producto;
+
+      final id = await _db
+          .into(_db.tablaProducto)
+          .insert(ProductoMapper.modeloACompanion(conSku));
+
+      if (producto.stockActual != 0) {
+        await _inventario.registrar(
+          SolicitudMovimiento(
+            productoId: id,
+            cantidad: producto.stockActual,
+            tipo: TipoMovimiento.ajusteInicial,
+            notas: 'Alta del producto',
+          ),
+        );
+      }
+
+      await _anotar(AccionAuditada.creo, id, _nombreDe(conSku));
+
+      // No hay SELECT extra: el stream de Drift emite el dato completo.
+      return conSku.copyWith(id: id);
+    });
+  }
+
+  @override
+  Future<Producto> actualizar(Producto producto) {
+    exigir(Permiso.productosEditar);
+    // `stock_actual` no viaja en el companion —el mapper lo excluye a
+    // propósito, §7 de las reglas de base de datos—, así que editar el campo
+    // en la ficha no escribía nada y el valor volvía al de antes en cuanto el
+    // stream reemitía. La corrección no es escribir la columna: es registrar
+    // el ajuste que explica la diferencia, en la misma transacción que el
+    // resto de la edición.
+    return _db.transaction(() async {
+      final antes = await (_db.select(_db.tablaProducto)
+            ..where((t) => t.id.equals(producto.id!)))
+          .getSingleOrNull();
+
+      await (_db.update(_db.tablaProducto)
+            ..where((t) => t.id.equals(producto.id!)))
+          .write(ProductoMapper.modeloACompanion(producto));
+
+      final diferencia = producto.stockActual - (antes?.stockActual ?? 0);
+      if (diferencia != 0) {
+        await _inventario.registrar(
+          SolicitudMovimiento(
+            productoId: producto.id!,
+            cantidad: diferencia,
+            tipo: diferencia > 0
+                ? TipoMovimiento.ajustePositivo
+                : TipoMovimiento.ajusteNegativo,
+            notas: 'Ajuste desde la ficha del producto',
+          ),
+        );
+      }
+
+      await _anotar(
+        AccionAuditada.modifico,
+        producto.id,
+        _nombreDe(producto),
+        detalle: diferencia == 0
+            ? null
+            : 'Stock ajustado en ${diferencia > 0 ? '+' : ''}$diferencia',
+      );
+
+      // No hay SELECT extra: el stream emite el resultado actualizado.
+      return producto;
+    });
   }
 
   @override
   Future<Producto> ajustarStock(int id, double cantidad) async {
-    // Un solo UPDATE atómico en vez del ciclo read→modify→write.
-    await _db.customUpdate(
-      'UPDATE productos SET stock_actual = stock_actual + ?, '
-      'actualizado_en = ? WHERE id = ?',
-      variables: [
-        Variable.withReal(cantidad),
-        Variable.withDateTime(DateTime.now()),
-        Variable.withInt(id),
-      ],
-      updates: {_db.tablaProducto},
-    );
-    final actualizado = await obtenerPorId(id);
-    return actualizado!;
+    exigir(Permiso.productosStock);
+    if (cantidad == 0) return (await obtenerPorId(id))!;
+
+    // El movimiento ya lleva su `usuario_id`, pero el ajuste a mano también va
+    // a la bitácora: es una decisión de una persona, no la consecuencia de una
+    // venta, y es justo lo que alguien va a querer revisar.
+    await _db.transaction(() async {
+      await _inventario.registrar(
+        SolicitudMovimiento(
+          productoId: id,
+          cantidad: cantidad,
+          tipo: cantidad > 0
+              ? TipoMovimiento.ajustePositivo
+              : TipoMovimiento.ajusteNegativo,
+          notas: 'Ajuste manual',
+        ),
+      );
+
+      final producto = await obtenerPorId(id);
+      await _anotar(
+        AccionAuditada.modifico,
+        id,
+        producto == null ? 'Producto #$id' : _nombreDe(producto),
+        detalle: 'Ajuste manual de stock: ${cantidad > 0 ? '+' : ''}$cantidad',
+      );
+    });
+
+    return (await obtenerPorId(id))!;
   }
 
   @override
   Future<void> eliminar(int id) async {
-    await (_db.delete(_db.tablaProducto)..where((t) => t.id.equals(id))).go();
+    exigir(Permiso.productosEliminar);
+    // Se lee **antes** de borrar: después no hay a quién preguntarle cómo se
+    // llamaba, y un renglón que dice «eliminó el producto 47» no le sirve a
+    // nadie.
+    await _db.transaction(() async {
+      final antes = await (_db.select(_db.tablaProducto)
+            ..where((t) => t.id.equals(id)))
+          .getSingleOrNull();
+
+      await (_db.delete(_db.tablaProducto)..where((t) => t.id.equals(id))).go();
+
+      await _anotar(
+        AccionAuditada.elimino,
+        id,
+        antes == null ? 'Producto #$id' : '${antes.nombre} (${antes.sku})',
+      );
+    });
   }
+
+  /// Cómo se lee un producto en la bitácora: nombre y SKU, que es lo que
+  /// permite reconocerlo cuando la fila ya no existe.
+  static String _nombreDe(Producto producto) =>
+      '${producto.nombre} (${producto.sku})';
 
   // Validaciones
 
@@ -201,9 +395,12 @@ class RepositorioProductosImpl implements RepositorioProducto {
 
   // Paginación — WHERE, COUNT y LIMIT los resuelve SQLite, no el frontend.
 
-  /// Traduce [FiltroProductos] a una expresión SQL reutilizable por la
-  /// consulta de la página y por la del total.
-  Expression<bool> _condicion(FiltroProductos filtro) {
+  /// Parte del filtro que **no** mira el stock: búsqueda y categoría.
+  ///
+  /// Va aparte porque `observarResumen` necesita contar los tres tramos de
+  /// stock dentro del mismo ámbito que la tabla está mostrando; si aplicara
+  /// también el tramo activo, cada chip contaría solo sus propias filas.
+  Expression<bool> _condicionAmbito(FiltroProductos filtro) {
     final p = _db.tablaProducto;
     Expression<bool> acumulado = const Constant(true);
 
@@ -220,6 +417,19 @@ class RepositorioProductosImpl implements RepositorioProducto {
     if (categoria != null) {
       acumulado = acumulado & p.categoriaId.equals(categoria);
     }
+
+    if (filtro.soloActivos) {
+      acumulado = acumulado & p.activo.equals(true);
+    }
+
+    return acumulado;
+  }
+
+  /// Traduce [FiltroProductos] a una expresión SQL reutilizable por la
+  /// consulta de la página y por la del total.
+  Expression<bool> _condicion(FiltroProductos filtro) {
+    final p = _db.tablaProducto;
+    var acumulado = _condicionAmbito(filtro);
 
     if (filtro.soloSinStock) {
       acumulado = acumulado & p.stockActual.isSmallerOrEqualValue(0);
@@ -286,19 +496,59 @@ class RepositorioProductosImpl implements RepositorioProducto {
   }
 
   @override
-  Stream<({int total, int stockBajo})> observarResumen() {
+  Stream<Map<int, int>> observarConteoPorProveedor() {
+    final cantidad = _db.tablaProducto.id.count();
+    final consulta = _db.selectOnly(_db.tablaProducto)
+      ..addColumns([_db.tablaProducto.proveedorId, cantidad])
+      ..where(_db.tablaProducto.proveedorId.isNotNull())
+      ..groupBy([_db.tablaProducto.proveedorId]);
+
+    return consulta.watch().map((filas) {
+      final conteo = <int, int>{};
+      for (final fila in filas) {
+        final id = fila.read(_db.tablaProducto.proveedorId);
+        if (id != null) conteo[id] = fila.read(cantidad) ?? 0;
+      }
+      return conteo;
+    });
+  }
+
+  @override
+  Stream<({int total, int enStock, int stockBajo, int sinStock})>
+      observarResumen({FiltroProductos filtro = const FiltroProductos()}) {
     final p = _db.tablaProducto;
     final total = p.id.count();
+
+    // Los mismos tres tramos que `_condicion`, para que el número del chip
+    // coincida siempre con las filas que ese chip termina mostrando.
+    final enStock = p.id.count(
+      filter: p.stockActual.isBiggerThan(p.stockMinimo),
+    );
     final bajos = p.id.count(
-      filter: p.stockActual.isSmallerOrEqual(p.stockMinimo),
+      filter: p.stockActual.isBiggerThanValue(0) &
+          p.stockActual.isSmallerOrEqual(p.stockMinimo),
+    );
+    final agotados = p.id.count(
+      filter: p.stockActual.isSmallerOrEqualValue(0),
     );
 
-    final consulta = _db.selectOnly(p)..addColumns([total, bajos]);
+    // El join con categorías es el mismo de `observarPagina`: la búsqueda del
+    // ámbito también mira el nombre de la categoría.
+    final consulta = _db.selectOnly(p).join([
+      leftOuterJoin(
+        _db.tablaCategoria,
+        _db.tablaCategoria.id.equalsExp(p.categoriaId),
+      ),
+    ])
+      ..addColumns([total, enStock, bajos, agotados])
+      ..where(_condicionAmbito(filtro));
 
     return consulta.watchSingleOrNull().map(
           (fila) => (
             total: fila?.read(total) ?? 0,
+            enStock: fila?.read(enStock) ?? 0,
             stockBajo: fila?.read(bajos) ?? 0,
+            sinStock: fila?.read(agotados) ?? 0,
           ),
         );
   }

@@ -8,7 +8,7 @@ Este directorio es la **fuente única de verdad** para todos los widgets reutili
 
 ## Filosofía
 
-El objetivo es **máxima granularidad, mínima repetición**. Cada widget resuelve una sola responsabilidad visual. Los módulos del proyecto (ventas, deudores, inventario) ensamblan estos bloques para construir sus vistas sin duplicar código.
+El objetivo es **máxima granularidad, mínima repetición**. Cada widget resuelve una sola responsabilidad visual. Los módulos del proyecto (punto de venta, órdenes, inventario) ensamblan estos bloques para construir sus vistas sin duplicar código.
 
 Tres preguntas para saber si algo pertenece a `share2`:
 
@@ -43,6 +43,7 @@ share2/
 ├── temas/                          ← tokens de diseño (colores, tipografía)
 │   ├── colores_app.dart
 │   ├── tipografia_app.dart
+│   ├── hex_color.dart              ← colorDeHex / inicialDe
 │   └── README.md
 │
 ├── encabezados/                    ← título y subtítulo de cada pantalla
@@ -61,35 +62,65 @@ share2/
 │   ├── boton_secundario.dart
 │   ├── boton_destructivo.dart
 │   ├── boton_icono.dart
-│   ├── boton_con_carga.dart
+│   ├── boton_volver.dart
 │   └── botones.dart                ← barrel de categoría
 │
 ├── inputs/                         ← captura de datos
 │   ├── campo_texto.dart
-│   ├── campo_moneda.dart
 │   ├── selector_widget.dart
-│   ├── checkbox_app.dart
+│   ├── cuadro_seleccion.dart
+│   ├── grupo_radio.dart
+│   ├── fila_campos.dart
+│   ├── formulario_abono.dart
+│   ├── interruptor_campo.dart
+│   ├── atajos_formulario.dart
+│   ├── barra_busqueda.dart
+│   ├── campo_busqueda.dart
+│   ├── campo_fecha.dart
+│   ├── campo_precio_linea.dart
+│   ├── control_cantidad.dart
 │   └── inputs.dart
+│
+├── filtros/                        ← acotar una colección
+│   │  (el panel de categorías **con datos** es
+│   │   `features/categorias/widgets/panel_categorias_catalogo.dart`)
+│   ├── panel_categorias.dart
+│   ├── categoria_panel_dato.dart
+│   ├── chip_filtro.dart
+│   └── filtros.dart
 │
 ├── tablas/                         ← visualización de colecciones
 │   ├── tabla_generica.dart
 │   ├── columna_tabla.dart
 │   ├── fila_tabla.dart
 │   ├── paginacion_widget.dart
-│   ├── estado_vacio_widget.dart
 │   └── tablas.dart
 │
 ├── cards/                          ← contenedores de información
+│   ├── fila_documento.dart
+│   ├── panel_documento.dart
+│   ├── encabezado_grupo_lineas.dart
 │   ├── tarjeta_info.dart
+│   ├── tarjeta_metrica.dart
+│   ├── tarjeta_catalogo.dart
+│   ├── tarjeta_producto.dart
+│   ├── ficha_resumen.dart
+│   ├── pie_totales.dart
+│   ├── renglon_cuenta.dart
+│   ├── fila_movimiento.dart
+│   ├── marcador_identidad.dart
+│   ├── fila_dato.dart
 │   ├── panel_seccion.dart
-│   ├── contenedor_modal.dart
 │   └── cards.dart
 │
 ├── feedback/                       ← respuesta visual al usuario
+│   ├── aviso_en_linea.dart
 │   ├── badge_contador.dart
-│   ├── snackbar_app.dart
-│   ├── loader_pantalla.dart
+│   ├── barra_progreso.dart
+│   ├── mensaje_app.dart
 │   ├── dialogo_confirmacion.dart
+│   ├── estado_vacio.dart
+│   ├── icono_notificaciones.dart
 │   ├── indicador_estado.dart
 │   └── feedback.dart
 │
@@ -125,7 +156,7 @@ Widgets para todas las acciones que puede ejecutar el usuario. Se diferencian po
 | `BotonSecundario` | Acción alternativa (Cancelar, Volver) |
 | `BotonDestructivo` | Acciones irreversibles (Eliminar, Anular) |
 | `BotonIcono` | Acciones compactas que se entienden con un ícono |
-| `BotonConCarga` | Igual que `BotonPrimario` pero muestra un spinner mientras `enCarga: true` |
+| `BotonVolver` | Flecha de regreso de las pantallas de detalle |
 
 ---
 
@@ -135,11 +166,19 @@ Widgets para formularios y entrada de datos. Aplican el estilo visual del proyec
 
 | Widget | Cuándo usarlo |
 |---|---|
-| `CampoTexto` | Entrada de texto general (nombre, descripción) |
-| `CampoMoneda` | Entrada de valores numéricos con formato de moneda |
+| `CampoTexto` | Entrada de texto general (nombre, descripción). Con `oculto` sirve de contraseña, y con `alAlternarOculto` aparece el ojo — el estado del ojo lo lleva la vista, no el widget |
 | `SelectorWidget` | Dropdown de opciones predefinidas |
-| `CheckboxApp` | Selección booleana estilizada |
+| `CuadroSeleccion` | Selección booleana estilizada |
+| `GrupoRadio` | Elegir una opción de pocas, en fila |
 | `BarraBusqueda` | Campo de búsqueda con ícono, para filtrar listas o tablas |
+| `CampoBusqueda` | Selector con buscador, para listas largas (clientes, motos) |
+| `CampoFecha` | Fecha con etiqueta que abre el calendario del sistema |
+| `CampoPrecioLinea` | El precio tecleable de una línea, sin cajón, alineado con el precio fijo |
+| `ControlCantidad` | Cantidad de una línea: `–`, `+` y el número editable a mano |
+| `FilaCampos` | Reparte campos en una fila y los apila cuando falta ancho |
+| `InterruptorCampo` | Switch con etiqueta y una línea que explica qué implica el estado |
+| `FormularioAbono<T>` | Recibir plata contra un documento: monto acotado al saldo, método de pago y «Todo el saldo». Lo comparten el abono de una reserva y el pago de una deuda |
+| `AtajosFormulario` | Esc cancela, Ctrl/Cmd+Enter guarda |
 
 ---
 
@@ -153,7 +192,6 @@ Widgets para mostrar listas y colecciones de datos de forma tabular. `TablaGener
 | `ColumnaTabla` | Define el encabezado, ancho y builder de celda de cada columna |
 | `FilaTabla` | Fila individual con estilos de hover y selección |
 | `PaginacionWidget` | Navegación entre páginas de una tabla |
-| `EstadoVacioWidget` | Pantalla cuando no hay datos que mostrar |
 
 ---
 
@@ -164,8 +202,19 @@ Widgets para agrupar y presentar información con estilos consistentes.
 | Widget | Cuándo usarlo |
 |---|---|
 | `TarjetaInfo` | Muestra un KPI o dato destacado (ej: total ventas del día) |
+| `TarjetaCatalogo` | Ítem de catálogo en grilla o fila: marcador, título, subtítulo, acciones y `pie` opcional |
+| `TarjetaProducto` | Tarjeta de las rejillas de venta: foto, SKU, stock, ubicación en bodega, precio y botón de agregar |
+| `TarjetaMetrica` | Contador grande que además filtra al tocarlo |
+| `FilaDocumento` | Una línea del documento que se arma: cuadro de 48, título, precio y controles. La usan el carrito, la cotización y la orden |
+| `PanelDocumento` | El aside de 360 px con cabecera, contenido y pie |
+| `EncabezadoGrupoLineas` | Separador de un bloque de líneas con su subtotal |
+| `FichaResumen` | Bloque de datos de una entidad, para cabeceras de detalle |
+| `PieTotales` | Pie de un documento: subtotal, descuento editable, total e IVA incluido |
+| `RenglonCuenta` | Un renglón «etiqueta … importe» del bloque de cuentas. El color lo decide quien lo usa: un saldo pendiente no significa lo mismo en una reserva que en una deuda |
+| `FilaMovimiento` | Una línea del historial de dinero: ícono, qué fue, cuándo y cuánto. La comparten los abonos de una reserva y los pagos de una deuda |
+| `MarcadorIdentidad` | Cuadro con el ícono de la entidad o la inicial de su nombre sobre su color |
+| `FilaDato` | Línea "ícono + texto" dentro de una tarjeta (contacto, teléfono, ciudad) |
 | `PanelSeccion` | Agrupa un bloque de contenido con título y borde |
-| `ContenedorModal` | Wrapper base para el contenido de diálogos y modales |
 
 ---
 
@@ -175,13 +224,15 @@ Widgets para agrupar y presentar información con estilos consistentes.
 
 | Widget | Cuándo usarlo |
 |---|---|
-| `SnackbarApp` | Notificaciones temporales (éxito, error, advertencia) |
-| `LoaderPantalla` | Overlay de carga mientras una operación está en curso |
+| `MensajeApp` | El aviso breve de abajo: `MensajeApp.exito(context, …)` / `.error(…)`. No es un widget sino dos funciones, como `colorDeHex` |
+| `AvisoEnLinea` | El aviso que **se queda** dentro del contenido, con su tono (`información`, `éxito`, `alerta`, `error`). Para lo que el usuario todavía tiene que leer mientras decide: «la contraseña no coincide», «el correo no está configurado». `MensajeApp` confirma lo que ya pasó; este acompaña |
 | `DialogoConfirmacion` | Pide confirmación antes de una acción irreversible |
 | `BadgeContador` | Círculo con número para conteos (notificaciones, ítems pendientes) |
 | `IndicadorEstado` | Badge/chip de color para mostrar un estado (Pagado, Pendiente, Anulado) |
+| `EstadoVacio` | El hueco de una lista sin nada: ícono, qué falta y cómo llenarlo |
+| `BarraProgreso` | Cuánto se lleva de un total: reservas abonadas, deudas cobradas |
 
-Todos los módulos deben usar estos widgets para feedback en lugar de implementar sus propios snackbars o loaders.
+Todos los módulos deben usar estos widgets para feedback en lugar de implementar sus propios snackbars o loaders. Quedan pantallas legacy con su `_avisar` propio: se pasan a `MensajeApp` al tocarlas.
 
 ---
 
@@ -304,6 +355,23 @@ Antes de crear un widget en `share2`, verificar:
 | Parámetros | `camelCase` en español | `alPresionar`, `etiqueta`, `enCarga` |
 | Barrel de categoría | nombre de carpeta + `.dart` | `botones/botones.dart` |
 | Callbacks | prefijo `al` + acción | `alPresionar`, `alSeleccionar`, `alCambiar` |
+
+---
+
+## Lo que se comparte pero no cabe aquí
+
+Hay piezas que usan tres pantallas y aun así **no** pueden vivir en `share2`,
+porque consultan un provider o conocen el modelo de dominio. Esas viven en el
+módulo dueño del dato, y el resto las importa:
+
+| Pieza | Vive en | Por qué no es share2 |
+|---|---|---|
+| `GrillaProductosCatalogo` | `features/productos/widgets/` | Conoce `Producto` y lee la foto del disco |
+| `PanelCategoriasCatalogo` | `features/categorias/widgets/` | Observa `catalogoCategoriasProvider` |
+| `MiniaturaLinea` | `features/productos/widgets/` | Lee la foto del disco vía `MiniaturaProducto` |
+
+La regla no cambia: **una tarea, un widget**. Que no quepa en `share2` no
+autoriza a tener tres copias con nombres distintos.
 
 ---
 

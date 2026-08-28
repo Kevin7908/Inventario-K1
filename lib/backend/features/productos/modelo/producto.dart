@@ -1,6 +1,6 @@
 import 'package:equatable/equatable.dart';
 
-const double kTasaIva = 0.19;
+import '../../../../core/iva_app.dart';
 
 enum EstadoStock { enStock, stockBajo, sinStock }
 
@@ -23,9 +23,12 @@ class Producto extends Equatable {
   final String? unidadMedidaNombre;
   final String? proveedorNombre;
 
-  final double precioCompra;
-  final double precioVenta;
-  final double? precioVentaTaller;
+  /// Los tres, en **pesos enteros**. Ver el docstring de `TablaProducto`: el
+  /// peso colombiano no tiene decimales y `double` arrastraba error de coma
+  /// flotante entre el POS y las cotizaciones.
+  final int precioCompra;
+  final int precioVenta;
+  final int? precioVentaTaller;
 
   final double stockActual;
   final double stockMinimo;
@@ -108,9 +111,9 @@ class Producto extends Equatable {
     String? categoriaNombre,
     String? unidadMedidaNombre,
     String? proveedorNombre,
-    double? precioCompra,
-    double? precioVenta,
-    double? precioVentaTaller,
+    int? precioCompra,
+    int? precioVenta,
+    int? precioVentaTaller,
     double? stockActual,
     double? stockMinimo,
     String? ubicacionBodega,
@@ -161,9 +164,16 @@ class Producto extends Equatable {
   /// Alias booleano para compatibilidad con filtros del ViewModel.
   bool get sinStock => estadoStock == EstadoStock.sinStock;
 
-  /// Precio de venta con IVA aplicado según kTasaIva.
-  double get precioVentaConIva =>
-      aplicaIva ? precioVenta * (1 + kTasaIva) : precioVenta;
+  /// Cuánto IVA va **dentro** de [precioVenta], según la tasa global [kIva].
+  ///
+  /// [precioVenta] ya es el precio final: el IVA no se le suma encima, se le
+  /// extrae para poder discriminarlo. Es informativo —para ver en la ficha
+  /// cuánto del precio es impuesto—; los documentos lo recalculan sobre su
+  /// propio total con [ivaIncluidoEn].
+  int get ivaDelPrecio => aplicaIva ? ivaIncluidoEn(precioVenta) : 0;
+
+  /// Lo que queda del precio una vez descontado su IVA.
+  int get precioSinIva => precioVenta - ivaDelPrecio;
 
   /// Margen de ganancia en porcentaje sobre el precio de compra.
   double get margenGanancia => precioCompra > 0
