@@ -4,7 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../../backend/features/proveedores/modelo/proveedor.dart';
 import '../../../../core/resultado.dart';
 import '../../../../core/validaciones.dart';
-import '../../../share2/share2.dart';
+import '../../../share/share.dart';
 import '../provider/proveedores_provider.dart';
 
 /// Formulario de alta y edición de un proveedor.

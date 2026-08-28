@@ -3,7 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../../backend/features/bitacora/modelo/entrada_bitacora.dart';
 import '../../../../core/formato.dart';
-import '../../../share2/share2.dart';
+import '../../../share/share.dart';
 import '../provider/bitacora_providers.dart';
 import 'estilo_accion.dart';
 

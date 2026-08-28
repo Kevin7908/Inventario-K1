@@ -1,12 +1,12 @@
 import 'package:flutter/widgets.dart';
 
 import '../../../../backend/features/cotizaciones/modelo/cotizacion_resumen.dart';
-import '../../../share2/share2.dart';
+import '../../../share/share.dart';
 
 /// Cómo se ve cada estado de vigencia en la interfaz.
 ///
-/// Vive en el módulo y no en share2 porque traduce un concepto del negocio —qué
-/// tan cerca está de vencer una cotización— a los tokens de color. `share2`
+/// Vive en el módulo y no en share porque traduce un concepto del negocio —qué
+/// tan cerca está de vencer una cotización— a los tokens de color. `share`
 /// aporta el chip ([IndicadorEstado]); aquí solo se decide qué texto y qué
 /// pareja de colores le toca a cada estado.
 ///

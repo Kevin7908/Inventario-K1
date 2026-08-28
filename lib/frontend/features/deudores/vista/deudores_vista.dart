@@ -6,7 +6,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../../backend/features/deudores/modelo/deudor_resumen.dart';
 import '../../../layout/encabezado_con_cuenta.dart';
-import '../../../share2/share2.dart';
+import '../../../share/share.dart';
 import '../deuda_detalle/vista/deuda_detalle_vista.dart';
 import '../deuda_detalle/widgets/dialogo_nueva_deuda.dart';
 import '../provider/deudores_providers.dart';

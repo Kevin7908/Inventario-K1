@@ -6,7 +6,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../../backend/features/proveedores/modelo/proveedor.dart';
 import '../../../layout/encabezado_con_cuenta.dart';
-import '../../../share2/share2.dart';
+import '../../../share/share.dart';
 import '../provider/proveedores_provider.dart';
 import '../widgets/grilla_proveedores.dart';
 import 'proveedor_formulario_vista.dart';

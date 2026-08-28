@@ -10,7 +10,7 @@ import '../../../../backend/features/unidades_medida/modelo/unidad_medida.dart';
 import '../../../../core/iva_app.dart';
 import '../../../../core/resultado.dart';
 import '../../../../core/validaciones.dart';
-import '../../../share2/share2.dart';
+import '../../../share/share.dart';
 import '../../categorias/provider/categorias_provider.dart';
 import '../../proveedores/provider/proveedores_provider.dart';
 import '../../unidades_medida/provider/unidades_medida_provider.dart';

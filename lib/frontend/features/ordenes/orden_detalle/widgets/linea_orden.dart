@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../../../../../core/formato.dart';
 import '../../../../features/productos/widgets/miniatura_linea.dart';
-import '../../../../share2/share2.dart';
+import '../../../../share/share.dart';
 import '../modelo/linea_orden_editor.dart';
 
 /// Una línea de la orden, sobre la fila común de los tres documentos

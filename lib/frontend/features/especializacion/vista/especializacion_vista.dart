@@ -4,7 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../../backend/features/especializacion/modelo/especializacion.dart';
-import '../../../share2/share2.dart';
+import '../../../share/share.dart';
 import '../../tecnicos/provider/tecnico_provider.dart';
 import '../provider/especializacion_provider.dart';
 import '../widgets/dialogo_especializacion.dart';
@@ -12,8 +12,8 @@ import '../widgets/dialogo_especializacion.dart';
 /// Pestaña "Especializaciones" de Configuración: catálogo de áreas técnicas
 /// presentado como grilla de tarjetas, con creación, edición y eliminación.
 ///
-/// Vive fuera de `share2` porque conecta con [especializacionesProvider] y
-/// [catalogoTecnicosProvider] (Riverpod) — share2 es puramente presentacional.
+/// Vive fuera de `share` porque conecta con [especializacionesProvider] y
+/// [catalogoTecnicosProvider] (Riverpod) — share es puramente presentacional.
 class EspecializacionesVista extends ConsumerStatefulWidget {
   const EspecializacionesVista({super.key});
 

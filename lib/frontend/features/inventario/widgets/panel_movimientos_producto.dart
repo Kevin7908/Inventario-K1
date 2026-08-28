@@ -3,14 +3,14 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../../backend/features/inventario/modelo/movimiento_inventario.dart';
 import '../../../../core/formato.dart';
-import '../../../share2/share2.dart';
+import '../../../share/share.dart';
 import '../provider/inventario_providers.dart';
 import 'estilo_movimiento.dart';
 
 /// «Movimientos recientes» de la ficha de un producto: los últimos ocho
 /// renglones de su libro mayor.
 ///
-/// Vive en el módulo de inventario y no en `share2` porque observa un provider
+/// Vive en el módulo de inventario y no en `share` porque observa un provider
 /// y conoce `TipoMovimiento`. La ficha del producto lo importa.
 ///
 /// Parámetros:

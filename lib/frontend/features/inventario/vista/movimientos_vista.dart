@@ -8,7 +8,7 @@ import '../../../../backend/features/inventario/modelo/movimiento_inventario.dar
 import '../../../../backend/share/dominio/permiso.dart';
 import '../../../../core/formato.dart';
 import '../../../layout/encabezado_con_cuenta.dart';
-import '../../../share2/share2.dart';
+import '../../../share/share.dart';
 import '../../autenticacion/widgets/si_puede.dart';
 import '../provider/inventario_providers.dart';
 import '../widgets/dialogo_entrada_compra.dart';

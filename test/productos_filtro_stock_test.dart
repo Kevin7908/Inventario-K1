@@ -3,7 +3,7 @@
 //
 // Es un test de providers, no de widgets: `ProductosVista` arrastra
 // `EncabezadoConCuenta`, que lee la sesión desde `get_it`, y montar todo eso
-// no probaría nada que no cubra ya el widget test de share2.
+// no probaría nada que no cubra ya el widget test de share.
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:inventario_k1/backend/features/categorias/modelo/categoria.dart';

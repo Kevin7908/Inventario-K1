@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../../backend/features/clientes/modelo/cliente.dart';
-import '../../../share2/share2.dart';
+import '../../../share/share.dart';
 import '../provider/cliente_provider.dart';
 import 'tarjeta_cliente.dart';
 

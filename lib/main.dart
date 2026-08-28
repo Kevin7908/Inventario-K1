@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import 'frontend/features/autenticacion/vista/portal_sesion.dart';
-import 'frontend/share2/temas/colores_app.dart';
+import 'frontend/share/temas/colores_app.dart';
 
 void main() {
   WidgetsFlutterBinding.ensureInitialized();

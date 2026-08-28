@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../../core/resultado.dart';
-import '../../../share2/share2.dart';
+import '../../../share/share.dart';
 import '../../../../backend/share/dominio/permiso.dart';
 import '../provider/auth_providers.dart';
 import '../provider/usuarios_provider.dart';

@@ -12,7 +12,7 @@ Todo lo visual de la aplicación vive aquí. La capa de presentación no contien
 frontend/
 ├── layout/          ← app shell (sidebar + área de contenido)
 ├── features/        ← vistas y widgets específicos de cada módulo
-└── share2/          ← widgets y tokens de diseño reutilizables
+└── share/           ← widgets y tokens de diseño reutilizables
 ```
 
 ---
@@ -31,7 +31,7 @@ Quién decide si se ve el login o la app es `PortalSesion`, en
 
 ## `features/`
 
-Cada módulo del negocio tiene su propia carpeta. Las vistas de un módulo no importan nada de la carpeta de otro módulo — se comunican a través de `share2` y los repositorios del backend.
+Cada módulo del negocio tiene su propia carpeta. Las vistas de un módulo no importan nada de la carpeta de otro módulo — se comunican a través de `share` y los repositorios del backend.
 
 | Carpeta | Módulo |
 |---|---|
@@ -66,9 +66,12 @@ Cada módulo del negocio tiene su propia carpeta. Las vistas de un módulo no im
 
 ---
 
-## `share2/`
+## `share/`
 
-Biblioteca de widgets y tokens de diseño reutilizables. Todo componente visual que aparece en más de un módulo vive aquí.
+Biblioteca de widgets y tokens de diseño reutilizables. Todo componente visual
+que aparece en más de un módulo vive aquí. Es la **única**: se llamó `share2`
+mientras convivía con la biblioteca de la versión anterior, que se borró el
+28/08/2026 al quedarse sin consumidores.
 
 | Carpeta | Contenido |
 |---|---|
@@ -82,18 +85,7 @@ Biblioteca de widgets y tokens de diseño reutilizables. Todo componente visual 
 | `feedback/` | Badges, avisos (`MensajeApp`), diálogos de confirmación |
 | `encabezados/`, `navegacion_secundaria/`, `cuenta/` | Encabezado de pantalla, pestañas y usuario logueado |
 
-→ Ver [`share2/README.md`](share2/README.md)
-
----
-
-## `share/` (legacy — congelado)
-
-Código de la versión anterior. **No se toca, no se extiende.** Existe solo como
-referencia histórica. Todo trabajo nuevo va en `share2/`.
-
-Desde que `autenticacion` se migró, **ningún archivo fuera de `share/` importa
-nada de `share/`**: la carpeta quedó huérfana. Borrarla entera es una decisión
-aparte, no un descuido —está anotada en `DEUDA_TECNICA.md`—.
+→ Ver [`share/README.md`](share/README.md)
 
 ---
 
@@ -101,7 +93,7 @@ aparte, no un descuido —está anotada en `DEUDA_TECNICA.md`—.
 
 - Un módulo de `features/` **no importa las vistas de otro módulo**. Sí puede
   usar sus **piezas de catálogo**, que son las que existen justamente para
-  compartirse y no caben en `share2` porque consultan providers o conocen el
+  compartirse y no caben en `share` porque consultan providers o conocen el
   modelo de dominio:
 
   | Pieza | Vive en | La usan |
@@ -113,10 +105,10 @@ aparte, no un descuido —está anotada en `DEUDA_TECNICA.md`—.
   | `catalogoCategoriasProvider`, `catalogoServiciosProvider` | su módulo | quien arme un documento |
 
   La prueba es la de siempre: **si hay dos widgets con la misma tarea y
-  distinto nombre, sobra uno**. Antes de escribir uno nuevo, mirar `share2/`,
+  distinto nombre, sobra uno**. Antes de escribir uno nuevo, mirar `share/`,
   y después el módulo dueño de ese dato.
-- Un widget de `share2/` nunca importa de `features/`.
-- `layout/` puede importar de `features/` y de `share2/`, pero no al revés.
+- Un widget de `share/` nunca importa de `features/`.
+- `layout/` puede importar de `features/` y de `share/`, pero no al revés.
 - El frontend importa de `lib/backend/` **solo modelos y enums** —`Producto`,
   `EstadoOrden`, `MetodoPago`, `Permiso`—, nunca una base de datos ni un
   repositorio a mano: al repositorio se llega por su provider de Riverpod.

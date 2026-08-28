@@ -6,7 +6,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../../backend/share/dominio/permiso.dart';
 import '../../../layout/encabezado_con_cuenta.dart';
-import '../../../share2/share2.dart';
+import '../../../share/share.dart';
 import '../../autenticacion/provider/auth_providers.dart';
 import '../provider/bitacora_providers.dart';
 import '../widgets/filtros_bitacora.dart';

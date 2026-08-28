@@ -3,12 +3,12 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../../core/formato.dart';
 import '../../../../core/iva_app.dart';
-import '../../../share2/share2.dart';
+import '../../../share/share.dart';
 import '../provider/pos_providers.dart';
 
 /// Pie del carrito: subtotal, descuento, total e IVA incluido.
 ///
-/// Lo pinta [PieTotales] de share2, que es el mismo pie de los editores de
+/// Lo pinta [PieTotales] de share, que es el mismo pie de los editores de
 /// cotizaciones y de órdenes. Aquí solo queda de dónde salen los números.
 ///
 /// El subtotal se pinta **siempre**, con descuento o sin él: en el mostrador

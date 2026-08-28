@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 
-import '../../../../share2/share2.dart';
+import '../../../../share/share.dart';
 import '../../../../../core/validaciones.dart';
 
 /// Formulario del cargo suelto: lo que no está en ningún catálogo.

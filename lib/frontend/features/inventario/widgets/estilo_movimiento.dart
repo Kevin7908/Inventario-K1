@@ -1,11 +1,11 @@
 import 'package:flutter/material.dart';
 
 import '../../../../backend/features/inventario/modelo/movimiento_inventario.dart';
-import '../../../share2/share2.dart';
+import '../../../share/share.dart';
 
 /// Cómo se ve un movimiento de inventario: color, fondo e ícono.
 ///
-/// Vive aquí y no en `share2` porque conoce `TipoMovimiento`, que es dominio.
+/// Vive aquí y no en `share` porque conoce `TipoMovimiento`, que es dominio.
 /// Y vive en **un solo sitio** porque lo pintan tres pantallas —el kardex, la
 /// ficha del producto y los chips del filtro—: con una copia por pantalla, el
 /// día que se agregue un tipo quedaría gris en dos de ellas.

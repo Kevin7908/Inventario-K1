@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../../backend/features/especializacion/modelo/especializacion.dart';
-import '../../../share2/share2.dart';
+import '../../../share/share.dart';
 import '../provider/especializacion_provider.dart';
 
 /// Diálogo de creación y edición de una especialización.

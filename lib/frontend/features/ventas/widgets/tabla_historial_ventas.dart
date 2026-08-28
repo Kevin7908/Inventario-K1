@@ -6,7 +6,7 @@ import '../../../../backend/features/pos/modelo/venta_resumen.dart';
 import '../../../../core/formato.dart';
 import '../../../../backend/share/dominio/permiso.dart';
 import '../../../../backend/share/dominio/sesion_actual.dart';
-import '../../../share2/share2.dart';
+import '../../../share/share.dart';
 import '../../autenticacion/widgets/si_puede.dart';
 import '../../pos/provider/pos_providers.dart';
 import '../provider/historial_ventas_providers.dart';
@@ -14,7 +14,7 @@ import 'dialogo_devolucion.dart';
 
 /// Color de cada estado de pago, en un solo sitio.
 ///
-/// Conoce `EstadoPago`, que es dominio, así que no cabe en share2.
+/// Conoce `EstadoPago`, que es dominio, así que no cabe en share.
 ({Color color, Color fondo}) colorDeEstadoPago(EstadoPago estado) =>
     switch (estado) {
       EstadoPago.pagado => (

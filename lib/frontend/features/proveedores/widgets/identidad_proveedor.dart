@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 
-import '../../../share2/share2.dart';
+import '../../../share/share.dart';
 
 /// Cómo se pinta un proveedor en toda la app.
 ///

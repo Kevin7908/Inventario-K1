@@ -3,7 +3,7 @@ import 'dart:io';
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 
-import '../../../share2/share2.dart';
+import '../../../share/share.dart';
 
 /// Zona de carga de la imagen del producto.
 ///
@@ -11,8 +11,8 @@ import '../../../share2/share2.dart';
 /// subir"); una vez elegida, la reemplaza por la vista previa con el nombre del
 /// archivo y las acciones de cambiar o quitar.
 ///
-/// Vive en el módulo y no en `share2` porque depende de `file_picker` y del
-/// sistema de archivos, y share2 no admite dependencias externas.
+/// Vive en el módulo y no en `share` porque depende de `file_picker` y del
+/// sistema de archivos, y share no admite dependencias externas.
 class SelectorImagenWidget extends StatefulWidget {
   const SelectorImagenWidget({
     super.key,

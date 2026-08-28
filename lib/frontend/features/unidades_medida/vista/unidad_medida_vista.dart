@@ -2,15 +2,15 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../../backend/features/unidades_medida/modelo/unidad_medida.dart';
-import '../../../share2/share2.dart';
+import '../../../share/share.dart';
 import '../provider/unidades_medida_provider.dart';
 
 enum _Modo { lista, formulario }
 
 /// Pestaña "Unidades de medida" de Configuración: tabla paginada y filtrable
-/// por nombre, con creación, edición y eliminación. Vive fuera de `share2`
+/// por nombre, con creación, edición y eliminación. Vive fuera de `share`
 /// porque conecta directamente con [unidadesMedidaProvider] (Riverpod) —
-/// share2 es puramente presentacional.
+/// share es puramente presentacional.
 class UnidadesMedidaVista extends ConsumerStatefulWidget {
   const UnidadesMedidaVista({super.key});
 

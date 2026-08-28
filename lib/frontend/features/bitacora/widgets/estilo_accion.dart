@@ -1,11 +1,11 @@
 import 'package:flutter/material.dart';
 
 import '../../../../backend/features/bitacora/modelo/entrada_bitacora.dart';
-import '../../../share2/share2.dart';
+import '../../../share/share.dart';
 
 /// Cómo se ve cada acción de la bitácora: color, fondo e ícono.
 ///
-/// Vive aquí y no en `share2` porque conoce `AccionAuditada`, que es dominio.
+/// Vive aquí y no en `share` porque conoce `AccionAuditada`, que es dominio.
 /// Y vive en **un solo sitio** porque la tabla, los chips del filtro y
 /// cualquier resumen futuro tienen que pintar «Eliminó» del mismo rojo: con
 /// una copia por pantalla, el día que se agregue una acción quedaría gris en

@@ -3,7 +3,7 @@ import 'package:flutter/material.dart';
 import '../../../../core/formato.dart';
 
 import '../../../../backend/features/productos/modelo/producto.dart';
-import '../../../share2/share2.dart';
+import '../../../share/share.dart';
 import '../vista/producto_vista.dart';
 import 'badget_estado_stock_widget.dart';
 

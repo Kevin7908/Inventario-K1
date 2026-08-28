@@ -3,7 +3,7 @@ import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../../core/resultado.dart';
-import '../../../share2/share2.dart';
+import '../../../share/share.dart';
 import '../provider/pos_providers.dart';
 import '../widgets/dialogo_cobro.dart';
 import '../widgets/panel_catalogo_pos.dart';

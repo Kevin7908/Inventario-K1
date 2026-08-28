@@ -17,12 +17,12 @@ import '../features/proveedores/vista/proveedores_vista.dart';
 import '../features/reservas/vista/reservas_vista.dart';
 import '../features/tecnicos/vista/tecnico_vista.dart';
 import '../features/ordenes/vista/ordenes_vista.dart';
-import '../share2/feedback/dialogo_confirmacion.dart';
-import '../share2/nav/barra_lateral.dart';
-import '../share2/nav/item_nav_dato.dart';
-import '../share2/nav/seccion_nav_dato.dart';
-import '../share2/temas/colores_app.dart';
-import '../share2/temas/tipografia_app.dart';
+import '../share/feedback/dialogo_confirmacion.dart';
+import '../share/nav/barra_lateral.dart';
+import '../share/nav/item_nav_dato.dart';
+import '../share/nav/seccion_nav_dato.dart';
+import '../share/temas/colores_app.dart';
+import '../share/temas/tipografia_app.dart';
 
 class LayoutPrincipal extends ConsumerStatefulWidget {
   const LayoutPrincipal({super.key});
@@ -93,7 +93,7 @@ class _LayoutPrincipalState extends ConsumerState<LayoutPrincipal> {
   /// Qué permiso hace falta para ver cada sección del sidebar.
   ///
   /// Vive aparte de [_secciones] porque `ItemNavDato` es un DTO de
-  /// presentación de share2 y no tiene por qué conocer el dominio: share2
+  /// presentación de share y no tiene por qué conocer el dominio: share
   /// pinta lo que le den, y quién puede ver qué lo decide esta capa.
   static const Map<String, Permiso> _permisoPorRuta = {
     '/venta': Permiso.posVer,

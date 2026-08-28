@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../../../../backend/features/productos/modelo/producto.dart';
-import '../../../share2/share2.dart';
+import '../../../share/share.dart';
 import 'formulario_producto.dart';
 
 /// Diálogo de alta y edición de un producto.

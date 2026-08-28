@@ -7,7 +7,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../../backend/features/cotizaciones/modelo/cotizacion_resumen.dart';
 import '../../../../core/formato.dart';
 import '../../../layout/encabezado_con_cuenta.dart';
-import '../../../share2/share2.dart';
+import '../../../share/share.dart';
 import '../cotizaciones_detalle/vista/cotizacion_detalle_vista.dart';
 import '../provider/cotizaciones_provider.dart';
 import '../widgets/tabla/tabla_cotizaciones.dart';

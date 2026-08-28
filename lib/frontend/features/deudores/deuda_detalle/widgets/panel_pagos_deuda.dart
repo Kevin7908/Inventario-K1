@@ -7,7 +7,7 @@ import '../../../../../backend/features/deudores/modelo/deudor_pago.dart';
 import '../../../../../backend/share/dominio/metodo_pago.dart';
 import '../../../../../core/formato.dart';
 import '../../../../../core/resultado.dart';
-import '../../../../share2/share2.dart';
+import '../../../../share/share.dart';
 import '../provider/deuda_editor_provider.dart';
 
 /// La mitad de dinero de la ficha: contra qué se cobra, el formulario y lo que

@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../../../../backend/features/deudores/enum/enum_deudor.dart';
 import '../../../../backend/features/deudores/modelo/deudor_resumen.dart';
-import '../../../share2/share2.dart';
+import '../../../share/share.dart';
 
 /// Cómo se lee el estado de una deuda, en un solo sitio.
 ///

@@ -3,7 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../../backend/features/deudores/repositorio/repositorio_deudores.dart';
 import '../../../../core/formato.dart';
-import '../../../share2/share2.dart';
+import '../../../share/share.dart';
 import '../provider/deudores_providers.dart';
 
 /// La fila de cuatro contadores que encabeza la cartera.

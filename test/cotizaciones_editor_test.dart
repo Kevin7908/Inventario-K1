@@ -19,7 +19,7 @@ import 'package:inventario_k1/frontend/features/cotizaciones/cotizaciones_detall
 import 'package:inventario_k1/frontend/features/cotizaciones/cotizaciones_detalle/widgets/totales_cotizacion.dart';
 import 'package:inventario_k1/frontend/features/cotizaciones/cotizaciones_detalle/modelo/cotizacion_editor_state.dart';
 import 'package:inventario_k1/frontend/features/cotizaciones/provider/cotizaciones_provider.dart';
-import 'package:inventario_k1/frontend/share2/share2.dart';
+import 'package:inventario_k1/frontend/share/share.dart';
 
 import 'soporte/repositorio_cotizaciones_falso.dart';
 

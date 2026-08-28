@@ -7,7 +7,7 @@ import '../../../../../backend/features/productos/modelo/producto.dart';
 import '../../../../../backend/features/reservas/enum/enum_reserva.dart';
 import '../../../../../backend/features/reservas/modelo/reserva_item.dart';
 import '../../../../../core/formato.dart';
-import '../../../../share2/share2.dart';
+import '../../../../share/share.dart';
 import '../../../productos/provider/productos_provider.dart';
 import '../../widgets/estado_reserva_ui.dart';
 import '../provider/reserva_editor_provider.dart';
