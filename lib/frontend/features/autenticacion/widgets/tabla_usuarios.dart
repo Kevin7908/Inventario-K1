@@ -3,7 +3,7 @@ import 'package:flutter/material.dart';
 import '../../../../backend/features/autenticacion/modelo/usuario.dart';
 import '../../../../backend/share/dominio/rol_usuario.dart';
 import '../../../../core/formato.dart';
-import '../../../share2/share2.dart';
+import '../../../share/share.dart';
 
 /// La tabla de cuentas de Configuración → Usuarios.
 ///

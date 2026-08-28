@@ -6,7 +6,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../../backend/features/ordenes/modelo/orden_resumen.dart';
 import '../../../layout/encabezado_con_cuenta.dart';
-import '../../../share2/share2.dart';
+import '../../../share/share.dart';
 import '../orden_detalle/vista/orden_detalle_vista.dart';
 import '../orden_detalle/widgets/dialogo_nueva_orden.dart';
 import '../provider/ordenes_providers.dart';

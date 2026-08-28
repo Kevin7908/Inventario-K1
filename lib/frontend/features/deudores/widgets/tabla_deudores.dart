@@ -3,7 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../../backend/features/deudores/modelo/deudor_resumen.dart';
 import '../../../../core/formato.dart';
-import '../../../share2/share2.dart';
+import '../../../share/share.dart';
 import '../provider/deudores_providers.dart';
 import 'estado_deuda_ui.dart';
 

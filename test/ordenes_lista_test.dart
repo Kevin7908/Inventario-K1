@@ -17,7 +17,7 @@ import 'package:inventario_k1/core/formato.dart';
 import 'package:inventario_k1/frontend/features/ordenes/provider/ordenes_providers.dart';
 import 'package:inventario_k1/frontend/features/ordenes/widgets/tabla_ordenes.dart';
 import 'package:inventario_k1/frontend/features/ordenes/widgets/tarjetas_ordenes.dart';
-import 'package:inventario_k1/frontend/share2/share2.dart';
+import 'package:inventario_k1/frontend/share/share.dart';
 
 OrdenResumen _orden({
   required int id,

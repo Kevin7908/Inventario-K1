@@ -6,7 +6,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../../backend/features/motos/modelo/moto.dart';
 import '../../../../core/resultado.dart';
-import '../../../share2/share2.dart';
+import '../../../share/share.dart';
 import '../provider/motos_provider.dart';
 import '../widgets/dialogo_motos.dart';
 import '../widgets/grilla_motos.dart';

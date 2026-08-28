@@ -3,12 +3,12 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../../../core/formato.dart';
 import '../../../../../core/iva_app.dart';
-import '../../../../share2/share2.dart';
+import '../../../../share/share.dart';
 import '../provider/cotizacion_editor_provider.dart';
 
 /// Pie de la cotización: subtotal, descuento, IVA y total.
 ///
-/// Lo pinta [PieTotales] de share2, que es el mismo pie del punto de venta y
+/// Lo pinta [PieTotales] de share, que es el mismo pie del punto de venta y
 /// del editor de órdenes. Aquí solo queda de dónde salen los números.
 ///
 /// El subtotal se pinta **solo si hay descuento**: sin él sería un número

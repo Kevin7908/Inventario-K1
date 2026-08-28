@@ -2,12 +2,12 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../features/autenticacion/provider/auth_providers.dart';
-import '../share2/share2.dart';
+import '../share/share.dart';
 
 /// Encabezado de pantalla que agrega la sesión activa (notificaciones y
 /// cuenta) como acciones de [EncabezadoPagina].
 ///
-/// Vive en `layout/` y no en `share2/` porque conecta un widget presentacional
+/// Vive en `layout/` y no en `share/` porque conecta un widget presentacional
 /// con el estado real de la sesión. Es un [ConsumerWidget] y no la raíz de la
 /// pantalla: lo único que se reconstruye cuando cambia el usuario es esta
 /// fila (`CLAUDE.md` §3).

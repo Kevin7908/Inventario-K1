@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../../backend/features/servicios/modelo/servicio.dart';
-import '../../../share2/share2.dart';
+import '../../../share/share.dart';
 import '../../servicios/provider/servicios_provider.dart';
 import '../../servicios/widgets/dialogo_servicios.dart';
 

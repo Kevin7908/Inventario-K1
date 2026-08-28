@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../../../../backend/features/clientes/modelo/cliente.dart';
 import '../../../../backend/features/motos/modelo/moto.dart';
-import '../../../share2/share2.dart';
+import '../../../share/share.dart';
 
 /// Campos de una moto, sin decidir dónde se guardan.
 ///

@@ -1,12 +1,12 @@
 import 'package:flutter/material.dart';
 
 import '../../../../backend/features/ordenes/enum/enum_ordenes.dart';
-import '../../../share2/share2.dart';
+import '../../../share/share.dart';
 
 /// Cómo se ve cada estado de orden: color de texto y de fondo de la pastilla.
 ///
-/// Vive en el módulo y no en `share2` porque traduce un enum del backend, y
-/// `share2` no importa nada de `backend/` (§1).
+/// Vive en el módulo y no en `share` porque traduce un enum del backend, y
+/// `share` no importa nada de `backend/` (§1).
 ///
 /// Los colores salen del diseño: naranja para lo que está en curso, gris para
 /// lo que espera al cliente, verde para lo entregado y rojo para lo anulado.

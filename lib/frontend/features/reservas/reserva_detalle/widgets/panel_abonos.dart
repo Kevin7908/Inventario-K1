@@ -6,7 +6,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../../../backend/features/reservas/modelo/reserva_abono.dart';
 import '../../../../../backend/share/dominio/metodo_pago.dart';
 import '../../../../../core/formato.dart';
-import '../../../../share2/share2.dart';
+import '../../../../share/share.dart';
 import '../provider/reserva_editor_provider.dart';
 
 /// La mitad de dinero del editor: contra qué se abona, el formulario y lo que
@@ -158,9 +158,9 @@ class _Historial extends ConsumerWidget {
 /// Un movimiento de dinero. Los negativos son devoluciones: aparecen cuando se
 /// quita mercancía de una reserva ya abonada y hay que regresar la diferencia.
 ///
-/// Traduce el abono a la fila compartida de share2, que es la misma que usan
+/// Traduce el abono a la fila compartida de share, que es la misma que usan
 /// los pagos de una deuda: el ícono, el rótulo y el color son la lectura que
-/// hace reservas del signo, no algo que share2 pueda saber.
+/// hace reservas del signo, no algo que share pueda saber.
 class _FilaAbono extends StatelessWidget {
   const _FilaAbono({required this.abono});
 

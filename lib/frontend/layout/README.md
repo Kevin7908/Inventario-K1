@@ -45,7 +45,7 @@ enseñarle un resumen vacío.
 ```
 Scaffold
 └── Row
-    ├── BarraLateral (share2)                ← ancho fijo 240
+    ├── BarraLateral (share)                ← ancho fijo 240
     └── Expanded
         └── RepaintBoundary
             └── IndexedStack                 ← las vistas ya visitadas
@@ -93,7 +93,7 @@ del sidebar: son pestañas de Configuración.
 iniciales y el rol de quien está usando la app como acciones de
 `EncabezadoPagina`.
 
-Vive aquí y no en `share2/` porque conecta un widget presentacional con el
+Vive aquí y no en `share/` porque conecta un widget presentacional con el
 estado real de la sesión. Es `Consumer` **él mismo**, no la pantalla que lo
 usa: cuando cambia el usuario, lo único que se reconstruye es esta fila.
 
@@ -101,7 +101,7 @@ usa: cuando cambia el usuario, lo único que se reconstruye es esta fila.
 
 ## Qué NO va en layout/
 
-- Widgets reutilizables → van en `share2/`
+- Widgets reutilizables → van en `share/`
 - Lógica de negocio → va en el controlador del módulo correspondiente
 - Vistas de módulos → van en `features/<modulo>/vista/`
 - Lógica de autenticación → quien decide si se ve el login o la app es

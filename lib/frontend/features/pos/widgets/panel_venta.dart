@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../../backend/features/clientes/modelo/cliente.dart';
-import '../../../share2/share2.dart';
+import '../../../share/share.dart';
 import '../../clientes/provider/cliente_provider.dart';
 import '../provider/pos_providers.dart';
 import 'linea_carrito.dart';

@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../../../../backend/features/persona/repositorio/repositorio_persona.dart';
-import '../../../share2/share2.dart';
+import '../../../share/share.dart';
 
 /// Pregunta si hay que reutilizar a alguien que ya está en `personas`.
 ///

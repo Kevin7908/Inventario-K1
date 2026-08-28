@@ -4,7 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../../backend/features/especializacion/modelo/especializacion.dart';
 import '../../../../backend/features/tecnicos/modelo/tecnico.dart';
 import '../../../../core/resultado.dart';
-import '../../../share2/share2.dart';
+import '../../../share/share.dart';
 import '../../especializacion/provider/especializacion_provider.dart';
 import '../provider/tecnico_provider.dart';
 import 'tarjeta_tecnico.dart';

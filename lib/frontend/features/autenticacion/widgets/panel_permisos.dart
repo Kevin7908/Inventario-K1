@@ -4,7 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../../backend/features/autenticacion/modelo/usuario.dart';
 import '../../../../backend/share/dominio/permiso.dart';
 import '../../../../core/resultado.dart';
-import '../../../share2/share2.dart';
+import '../../../share/share.dart';
 import '../provider/usuarios_provider.dart';
 
 /// Los permisos de **una cuenta**, agrupados por módulo, para prenderlos y

@@ -3,7 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../../backend/features/autenticacion/resultado/resultados_auth.dart';
 import '../../../../backend/share/dominio/rol_usuario.dart';
-import '../../../share2/share2.dart';
+import '../../../share/share.dart';
 import '../provider/usuarios_provider.dart';
 import '../validacion_cuenta.dart';
 import '../validacion_password.dart';

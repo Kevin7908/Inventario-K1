@@ -4,7 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../../../backend/features/cotizaciones/modelo/cotizacion_resumen.dart';
 import '../../../../../core/resultado.dart';
-import '../../../../share2/share2.dart';
+import '../../../../share/share.dart';
 import '../modelo/cotizacion_editor_state.dart';
 import '../provider/cotizacion_editor_provider.dart';
 import '../provider/cotizar_a_reserva_provider.dart';

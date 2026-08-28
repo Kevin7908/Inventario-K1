@@ -4,7 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../../backend/features/clientes/modelo/cliente.dart';
 import '../../../../backend/features/motos/modelo/moto.dart';
 import '../../../../core/formato.dart';
-import '../../../share2/share2.dart';
+import '../../../share/share.dart';
 import '../provider/cliente_provider.dart';
 
 /// Ficha de un cliente: identidad, contacto, sus motos y su estado de cuenta.

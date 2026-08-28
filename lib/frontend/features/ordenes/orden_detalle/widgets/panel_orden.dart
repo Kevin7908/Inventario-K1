@@ -4,7 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../../../core/formato.dart';
-import '../../../../share2/share2.dart';
+import '../../../../share/share.dart';
 import '../../widgets/estado_orden_ui.dart';
 import '../modelo/linea_orden_editor.dart';
 import '../modelo/orden_editor_state.dart';

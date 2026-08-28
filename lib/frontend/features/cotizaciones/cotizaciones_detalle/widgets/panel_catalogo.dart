@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../../../backend/features/cotizaciones/enum/enum_cotizacion.dart';
-import '../../../../share2/share2.dart';
+import '../../../../share/share.dart';
 import '../../../categorias/widgets/panel_categorias_catalogo.dart';
 import '../modelo/cotizacion_editor_state.dart';
 import '../provider/catalogo_cotizacion_providers.dart';

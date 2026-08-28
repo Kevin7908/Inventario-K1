@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../../backend/features/ordenes/enum/enum_ordenes.dart';
-import '../../../share2/share2.dart';
+import '../../../share/share.dart';
 import '../provider/ordenes_providers.dart';
 
 /// La fila de cuatro contadores que encabeza el listado, como en el diseño.

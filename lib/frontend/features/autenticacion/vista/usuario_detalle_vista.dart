@@ -3,7 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../../backend/features/autenticacion/modelo/usuario.dart';
 import '../../../../core/formato.dart';
-import '../../../share2/share2.dart';
+import '../../../share/share.dart';
 import '../provider/usuarios_provider.dart';
 import '../widgets/panel_permisos.dart';
 

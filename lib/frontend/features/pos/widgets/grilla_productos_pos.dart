@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
-import '../../../share2/share2.dart';
+import '../../../share/share.dart';
 import '../../productos/widgets/grilla_productos_catalogo.dart';
 import '../provider/pos_providers.dart';
 

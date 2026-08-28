@@ -6,7 +6,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../../backend/features/tecnicos/modelo/tecnico.dart';
 import '../../../layout/encabezado_con_cuenta.dart';
-import '../../../share2/share2.dart';
+import '../../../share/share.dart';
 import '../provider/tecnico_provider.dart';
 import '../widgets/grilla_tecnicos.dart';
 import 'tecnico_formulario_vista.dart';

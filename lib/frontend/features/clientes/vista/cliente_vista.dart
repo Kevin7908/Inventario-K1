@@ -7,7 +7,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../../backend/features/clientes/modelo/cliente.dart';
 import '../../../../core/resultado.dart';
 import '../../../layout/encabezado_con_cuenta.dart';
-import '../../../share2/share2.dart';
+import '../../../share/share.dart';
 import '../provider/cliente_provider.dart';
 import '../widgets/grilla_clientes.dart';
 import 'cliente_detalle_vista.dart';

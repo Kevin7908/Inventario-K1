@@ -3,7 +3,7 @@ import 'dart:math' as math;
 import 'package:flutter/material.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 
-import '../../../share2/share2.dart';
+import '../../../share/share.dart';
 import 'ilustracion/ilustracion_gatos.dart';
 
 /// Radio de la tarjeta. Lo comparten el contenedor y el panel de la
@@ -20,7 +20,7 @@ const double _radioTarjeta = 20;
 /// para las dos mitades, la ilustración se va y queda la tarjeta del
 /// formulario sola.
 ///
-/// Vive en el módulo y no en `share2` porque solo lo usan estas tres
+/// Vive en el módulo y no en `share` porque solo lo usan estas tres
 /// pantallas y porque conoce el logo y la ilustración de la app.
 ///
 /// Parámetros:

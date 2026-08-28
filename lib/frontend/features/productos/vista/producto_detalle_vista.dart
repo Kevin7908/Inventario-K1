@@ -5,7 +5,7 @@ import 'package:flutter/material.dart';
 import '../../../../core/formato.dart';
 
 import '../../../../backend/features/productos/modelo/producto.dart';
-import '../../../share2/share2.dart';
+import '../../../share/share.dart';
 import '../widgets/badget_estado_stock_widget.dart';
 import '../../../../backend/share/dominio/permiso.dart';
 import '../../autenticacion/widgets/si_puede.dart';

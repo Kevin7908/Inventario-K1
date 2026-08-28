@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../../backend/features/autenticacion/resultado/resultados_auth.dart';
-import '../../../share2/share2.dart';
+import '../../../share/share.dart';
 import '../provider/auth_providers.dart';
 import '../provider/recuperacion_provider.dart';
 import '../widgets/marco_autenticacion.dart';

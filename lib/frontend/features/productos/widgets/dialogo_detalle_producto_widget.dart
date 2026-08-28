@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../../../../backend/features/productos/modelo/producto.dart';
-import '../../../share2/share2.dart';
+import '../../../share/share.dart';
 import '../vista/producto_detalle_vista.dart';
 
 /// Ficha de un producto dentro de un diálogo.

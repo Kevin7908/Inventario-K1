@@ -3,7 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../../../backend/features/reservas/enum/enum_reserva.dart';
 import '../../../../../core/formato.dart';
-import '../../../../share2/share2.dart';
+import '../../../../share/share.dart';
 import '../provider/reserva_editor_provider.dart';
 
 /// La cabecera de la reserva: de dónde salió, hasta cuándo se guarda y dónde

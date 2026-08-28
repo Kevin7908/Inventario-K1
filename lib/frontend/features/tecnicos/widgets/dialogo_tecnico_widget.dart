@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../../../../backend/features/tecnicos/modelo/tecnico.dart';
-import '../../../share2/share2.dart';
+import '../../../share/share.dart';
 import 'formulario_tecnico.dart';
 
 /// Diálogo de alta y edición de un técnico.

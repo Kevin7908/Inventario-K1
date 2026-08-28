@@ -24,7 +24,7 @@ import 'package:inventario_k1/frontend/features/cotizaciones/cotizaciones_detall
 import 'package:inventario_k1/frontend/features/productos/provider/productos_provider.dart';
 import 'package:inventario_k1/frontend/features/servicios/provider/servicios_provider.dart';
 import 'package:inventario_k1/frontend/features/cotizaciones/provider/cotizaciones_provider.dart';
-import 'package:inventario_k1/frontend/share2/share2.dart';
+import 'package:inventario_k1/frontend/share/share.dart';
 
 import 'soporte/repositorio_cotizaciones_falso.dart';
 

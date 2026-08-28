@@ -9,7 +9,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:inventario_k1/backend/features/productos/modelo/producto.dart';
 import 'package:inventario_k1/frontend/features/pos/modelo/item_carrito.dart';
 import 'package:inventario_k1/frontend/features/pos/widgets/linea_carrito.dart';
-import 'package:inventario_k1/frontend/share2/share2.dart';
+import 'package:inventario_k1/frontend/share/share.dart';
 
 Producto _producto({double stock = 12}) => Producto(
       id: 7,

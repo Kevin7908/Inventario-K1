@@ -3,7 +3,7 @@ import 'package:flutter/material.dart';
 import '../../../../../backend/features/reservas/modelo/reserva_item.dart';
 import '../../../../../core/formato.dart';
 import '../../../../features/productos/widgets/miniatura_linea.dart';
-import '../../../../share2/share2.dart';
+import '../../../../share/share.dart';
 
 /// Una línea de la reserva, sobre la fila común de los documentos
 /// ([FilaDocumento]).

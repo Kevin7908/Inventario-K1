@@ -6,7 +6,7 @@ import '../../../../backend/features/motos/modelo/moto.dart';
 import '../../../../backend/features/persona/repositorio/repositorio_persona.dart';
 import '../../../../core/resultado.dart';
 import '../../../../core/validaciones.dart';
-import '../../../share2/share2.dart';
+import '../../../share/share.dart';
 import '../../motos/provider/motos_provider.dart';
 import '../../persona/provider/persona_provider.dart';
 import '../../persona/widgets/confirmar_persona_existente.dart';

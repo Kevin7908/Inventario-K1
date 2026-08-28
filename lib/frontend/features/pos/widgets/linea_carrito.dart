@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../../../../core/formato.dart';
-import '../../../share2/share2.dart';
+import '../../../share/share.dart';
 import '../../productos/widgets/miniatura_linea.dart';
 import '../modelo/item_carrito.dart';
 

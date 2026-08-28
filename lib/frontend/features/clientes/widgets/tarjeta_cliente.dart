@@ -4,13 +4,13 @@ import '../../../../backend/features/clientes/modelo/cliente.dart';
 import '../../../../backend/features/clientes/repositorio/repositorio_cliente.dart';
 import '../../../../backend/features/motos/repositorio/repositorio_motos.dart';
 import '../../../../core/formato.dart';
-import '../../../share2/share2.dart';
+import '../../../share/share.dart';
 
 /// Tarjeta de un cliente en la grilla del catálogo.
 ///
 /// Replica la tarjeta del mockup: avatar verde con las iniciales, nombre y
 /// teléfono, y —en el pie— la moto principal con el conteo de vehículos y el
-/// estado de cuenta. Vive en el módulo y no en share2 porque traduce un
+/// estado de cuenta. Vive en el módulo y no en share porque traduce un
 /// [Cliente] —un modelo de dominio— a la [TarjetaCatalogo] compartida.
 ///
 /// No lleva botones de editar ni eliminar: como en el diseño, la tarjeta

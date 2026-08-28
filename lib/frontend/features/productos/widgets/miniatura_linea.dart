@@ -1,13 +1,13 @@
 import 'package:flutter/material.dart';
 
-import '../../../share2/share2.dart';
+import '../../../share/share.dart';
 import '../vista/producto_vista.dart' show MiniaturaProducto;
 
 /// El cuadro de 48 de una línea de documento: la foto del producto, o el ícono
 /// de lo que sea esa línea cuando no hay foto que mostrar.
 ///
-/// **No vive en share2** aunque lo usen tres pantallas: por dentro lee la
-/// imagen del disco a través de [MiniaturaProducto], y share2 no toca
+/// **No vive en share** aunque lo usen tres pantallas: por dentro lee la
+/// imagen del disco a través de [MiniaturaProducto], y share no toca
 /// archivos. Vive en el módulo dueño del dato, como `GrillaProductosCatalogo`.
 ///
 /// El ícono alterno no es un adorno: una cotización y una orden mezclan

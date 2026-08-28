@@ -3,7 +3,7 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
-import '../../../../share2/share2.dart';
+import '../../../../share/share.dart';
 import '../../../categorias/widgets/panel_categorias_catalogo.dart';
 import '../modelo/linea_orden_editor.dart';
 import '../modelo/orden_editor_state.dart';

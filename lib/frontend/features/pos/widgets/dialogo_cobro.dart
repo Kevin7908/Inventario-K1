@@ -3,7 +3,7 @@ import 'package:flutter/services.dart';
 
 import '../../../../backend/features/pos/enum/enum_ventas.dart';
 import '../../../../core/formato.dart';
-import '../../../share2/share2.dart';
+import '../../../share/share.dart';
 
 /// Cuadro de cobro del punto de venta: cómo paga el cliente y, si es en
 /// efectivo, cuánto entregó y cuánto hay que devolverle.

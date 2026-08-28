@@ -11,7 +11,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:inventario_k1/frontend/features/ordenes/orden_detalle/modelo/linea_orden_editor.dart';
 import 'package:inventario_k1/frontend/features/ordenes/orden_detalle/widgets/linea_orden.dart';
-import 'package:inventario_k1/frontend/share2/share2.dart';
+import 'package:inventario_k1/frontend/share/share.dart';
 
 LineaOrdenEditor _linea(
   TipoLineaOrden tipo, {

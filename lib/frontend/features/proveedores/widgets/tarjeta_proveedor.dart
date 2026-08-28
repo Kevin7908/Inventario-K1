@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../../../../backend/features/proveedores/modelo/proveedor.dart';
-import '../../../share2/share2.dart';
+import '../../../share/share.dart';
 import 'identidad_proveedor.dart';
 
 /// Tarjeta de un proveedor en la grilla del catálogo.
@@ -9,7 +9,7 @@ import 'identidad_proveedor.dart';
 /// Replica la tarjeta del mockup: el marcador de almacén —igual para todos,
 /// ver [IdentidadProveedor]—, el nombre,
 /// NIT en monoespaciada y las líneas de contacto, teléfono y productos que
-/// surte. Vive en el módulo y no en share2 porque traduce un [Proveedor] —un
+/// surte. Vive en el módulo y no en share porque traduce un [Proveedor] —un
 /// modelo de dominio— a la [TarjetaCatalogo] compartida.
 class TarjetaProveedor extends StatelessWidget {
   const TarjetaProveedor({
