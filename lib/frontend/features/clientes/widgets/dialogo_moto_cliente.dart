@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../../../../backend/features/motos/modelo/moto.dart';
-import '../../../share2/share2.dart';
+import '../../../share/share.dart';
 import '../../motos/widgets/formulario_moto.dart';
 
 /// Diálogo con los datos de **una** moto del cliente.

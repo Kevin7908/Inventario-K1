@@ -3,7 +3,7 @@ import 'package:flutter/material.dart';
 import '../../../../../backend/features/cotizaciones/enum/enum_cotizacion.dart';
 import '../../../../../core/formato.dart';
 import '../../../../features/productos/widgets/miniatura_linea.dart';
-import '../../../../share2/share2.dart';
+import '../../../../share/share.dart';
 import '../modelo/item_cotizacion_editor.dart';
 
 /// Una línea de la cotización, sobre la fila común de los tres documentos

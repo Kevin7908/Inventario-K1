@@ -6,7 +6,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../../backend/features/reservas/modelo/reserva_resumen.dart';
 import '../../../layout/encabezado_con_cuenta.dart';
-import '../../../share2/share2.dart';
+import '../../../share/share.dart';
 import '../provider/reservas_providers.dart';
 import '../reserva_detalle/vista/reserva_detalle_vista.dart';
 import '../reserva_detalle/widgets/dialogo_nueva_reserva.dart';

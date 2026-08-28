@@ -3,7 +3,7 @@ import 'package:flutter/material.dart';
 import '../../../../../backend/features/deudores/modelo/deudor_item.dart';
 import '../../../../../core/formato.dart';
 import '../../../../features/productos/widgets/miniatura_linea.dart';
-import '../../../../share2/share2.dart';
+import '../../../../share/share.dart';
 
 /// Una línea de lo fiado, sobre la fila común de los documentos
 /// ([FilaDocumento]).

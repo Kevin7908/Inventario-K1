@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../../backend/features/reservas/modelo/reserva_resumen.dart';
-import '../../../share2/share2.dart';
+import '../../../share/share.dart';
 import '../provider/reservas_providers.dart';
 import 'tarjeta_reserva.dart';
 

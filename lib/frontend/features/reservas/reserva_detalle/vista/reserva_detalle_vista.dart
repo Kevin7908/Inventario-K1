@@ -3,7 +3,7 @@ import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../../../core/resultado.dart';
-import '../../../../share2/share2.dart';
+import '../../../../share/share.dart';
 import '../modelo/reserva_editor_state.dart';
 import '../provider/reserva_editor_provider.dart';
 import '../widgets/panel_catalogo_reserva.dart';

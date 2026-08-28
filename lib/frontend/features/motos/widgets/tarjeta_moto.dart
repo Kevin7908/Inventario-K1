@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../../../../backend/features/motos/modelo/moto.dart';
-import '../../../share2/share2.dart';
+import '../../../share/share.dart';
 
 /// Tarjeta de una moto en la grilla del catálogo.
 ///
@@ -11,7 +11,7 @@ import '../../../share2/share2.dart';
 /// hueco: la placa como subtítulo, el dueño en la franja y la ficha técnica
 /// abajo.
 ///
-/// Vive en el módulo y no en share2 porque traduce una [Moto] —un modelo de
+/// Vive en el módulo y no en share porque traduce una [Moto] —un modelo de
 /// dominio— a la [TarjetaCatalogo] compartida.
 ///
 /// Parámetros:

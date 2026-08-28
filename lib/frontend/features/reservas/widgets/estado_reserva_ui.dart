@@ -2,12 +2,12 @@ import 'package:flutter/material.dart';
 
 import '../../../../backend/features/reservas/enum/enum_reserva.dart';
 import '../../../../backend/features/reservas/modelo/reserva_resumen.dart';
-import '../../../share2/share2.dart';
+import '../../../share/share.dart';
 
 /// Cómo se ven los dos estados de una reserva, que son dos y no uno.
 ///
-/// Vive en el módulo y no en `share2` porque traduce enums del backend, y
-/// `share2` no importa nada de `backend/` (§1).
+/// Vive en el módulo y no en `share` porque traduce enums del backend, y
+/// `share` no importa nada de `backend/` (§1).
 ///
 /// - **El del dinero** ([BadgeSaldoReserva]): `Pagada` o `Abonando`. Es el que
 ///   lleva la tarjeta del diseño, y es derivado —no hay columna que lo guarde—.

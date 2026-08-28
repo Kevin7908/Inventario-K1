@@ -7,7 +7,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../../backend/features/pos/enum/enum_ventas.dart';
 import '../../../../core/formato.dart';
 import '../../../layout/encabezado_con_cuenta.dart';
-import '../../../share2/share2.dart';
+import '../../../share/share.dart';
 import '../provider/historial_ventas_providers.dart';
 import '../widgets/tabla_historial_ventas.dart';
 

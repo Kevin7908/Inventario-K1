@@ -9,7 +9,7 @@ import '../../../../backend/features/tecnicos/modelo/tecnico.dart';
 import '../../../../core/resultado.dart';
 import '../../../../core/formato.dart';
 import '../../../../core/validaciones.dart';
-import '../../../share2/share2.dart';
+import '../../../share/share.dart';
 import '../../especializacion/provider/especializacion_provider.dart';
 import '../../persona/provider/persona_provider.dart';
 import '../../persona/widgets/confirmar_persona_existente.dart';

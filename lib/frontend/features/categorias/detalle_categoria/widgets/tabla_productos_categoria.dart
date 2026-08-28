@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../../../backend/features/productos/modelo/producto.dart';
-import '../../../../share2/share2.dart';
+import '../../../../share/share.dart';
 import '../../../productos/provider/productos_provider.dart';
 import '../../../productos/widgets/columnas_tabla_producto.dart';
 import '../provider/detalle_categoria_provider.dart';

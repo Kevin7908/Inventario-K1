@@ -3,7 +3,7 @@ import 'package:flutter/material.dart';
 import '../../../../backend/features/reservas/enum/enum_reserva.dart';
 import '../../../../backend/features/reservas/modelo/reserva_resumen.dart';
 import '../../../../core/formato.dart';
-import '../../../share2/share2.dart';
+import '../../../share/share.dart';
 import 'estado_reserva_ui.dart';
 
 /// La tarjeta de una reserva en la rejilla, como en el diseño: quién apartó,

@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
-import '../../../share2/share2.dart';
+import '../../../share/share.dart';
 
 /// Las seis casillas del código que llega por correo.
 ///
@@ -10,7 +10,7 @@ import '../../../share2/share2.dart';
 /// Cuando se llena la última, [alCompletar] dispara la verificación sin
 /// obligar a buscar el botón.
 ///
-/// Vive en el módulo y no en `share2` porque hoy solo la usa la recuperación
+/// Vive en el módulo y no en `share` porque hoy solo la usa la recuperación
 /// de contraseña. Si aparece un segundo código —una confirmación de anulación,
 /// por ejemplo—, es candidata a subir.
 ///

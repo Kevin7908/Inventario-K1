@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../../../../../core/formato.dart';
-import '../../../../share2/share2.dart';
+import '../../../../share/share.dart';
 
 /// El estado de cuentas de una deuda y las dos acciones que la cierran.
 ///

@@ -9,7 +9,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../../backend/features/productos/modelo/producto.dart';
 import '../../../layout/encabezado_con_cuenta.dart';
-import '../../../share2/share2.dart';
+import '../../../share/share.dart';
 import '../../categorias/widgets/panel_categorias_catalogo.dart';
 import '../provider/productos_provider.dart';
 import '../widgets/columnas_tabla_producto.dart';
@@ -362,7 +362,7 @@ class _PanelCategorias extends ConsumerWidget {
 /// pasa [ancho]: así sirve también para la franja superior de
 /// [TarjetaProducto], que es ancho completo por 120 de alto.
 ///
-/// Vive en el módulo (no en share2) porque lee un archivo del disco, y share2
+/// Vive en el módulo (no en share) porque lee un archivo del disco, y share
 /// no toca dependencias externas ni el sistema de archivos.
 class MiniaturaProducto extends StatelessWidget {
   const MiniaturaProducto({

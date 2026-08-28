@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../../backend/share/servicios/servicio_verificacion.dart';
-import '../../../share2/share2.dart';
+import '../../../share/share.dart';
 import '../provider/recuperacion_provider.dart';
 import '../validacion_password.dart';
 import '../widgets/campo_codigo.dart';

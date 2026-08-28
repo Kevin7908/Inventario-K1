@@ -1,5 +1,5 @@
 // Las piezas nuevas del módulo de Reservas: la barra de avance que salió a
-// share2 y el pie de cuentas, que es lo único del panel derecho que no es
+// share y el pie de cuentas, que es lo único del panel derecho que no es
 // igual al de los otros tres documentos.
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -8,7 +8,7 @@ import 'package:inventario_k1/backend/features/reservas/modelo/reserva_item.dart
 import 'package:inventario_k1/backend/features/reservas/modelo/reserva_resumen.dart';
 import 'package:inventario_k1/frontend/features/reservas/reserva_detalle/widgets/linea_reserva.dart';
 import 'package:inventario_k1/frontend/features/reservas/reserva_detalle/widgets/pie_reserva.dart';
-import 'package:inventario_k1/frontend/share2/share2.dart';
+import 'package:inventario_k1/frontend/share/share.dart';
 
 Future<void> _pump(WidgetTester tester, Widget hijo) => tester.pumpWidget(
       MaterialApp(

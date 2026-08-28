@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../../../../../backend/features/cotizaciones/modelo/cotizacion_resumen.dart';
 import '../../../../../core/formato.dart';
-import '../../../../share2/share2.dart';
+import '../../../../share/share.dart';
 
 class EncabezadoReserva extends StatelessWidget {
   const EncabezadoReserva({

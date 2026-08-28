@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../layout/layout_principal.dart';
-import '../../../share2/share2.dart';
+import '../../../share/share.dart';
 import '../provider/auth_providers.dart';
 import 'login_vista.dart';
 import 'primer_admin_vista.dart';

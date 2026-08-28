@@ -7,7 +7,7 @@ import '../../../../backend/features/pos/modelo/venta_resumen.dart';
 import '../../../../backend/share/dominio/sesion_actual.dart';
 import '../../../../core/formato.dart';
 import '../../../../core/resultado.dart';
-import '../../../share2/share2.dart';
+import '../../../share/share.dart';
 import '../provider/devoluciones_providers.dart';
 
 /// Recibe una devolución parcial de una venta ya cobrada.

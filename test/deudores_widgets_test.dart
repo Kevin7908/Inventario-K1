@@ -1,4 +1,4 @@
-// Las piezas del módulo de Cuentas por cobrar y las dos que salieron a share2
+// Las piezas del módulo de Cuentas por cobrar y las dos que salieron a share
 // al migrarlo.
 //
 // Lo que fijan estos tests no es cómo se ve, sino las tres reglas que se
@@ -14,7 +14,7 @@ import 'package:inventario_k1/core/formato.dart';
 import 'package:inventario_k1/frontend/features/deudores/deuda_detalle/widgets/linea_deuda.dart';
 import 'package:inventario_k1/frontend/features/deudores/deuda_detalle/widgets/pie_deuda.dart';
 import 'package:inventario_k1/frontend/features/deudores/widgets/estado_deuda_ui.dart';
-import 'package:inventario_k1/frontend/share2/share2.dart';
+import 'package:inventario_k1/frontend/share/share.dart';
 
 Future<void> _pump(WidgetTester tester, Widget hijo) => tester.pumpWidget(
       MaterialApp(

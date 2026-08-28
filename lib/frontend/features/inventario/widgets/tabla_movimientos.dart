@@ -3,7 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../../backend/features/inventario/modelo/movimiento_detalle.dart';
 import '../../../../core/formato.dart';
-import '../../../share2/share2.dart';
+import '../../../share/share.dart';
 import '../provider/inventario_providers.dart';
 import 'estilo_movimiento.dart';
 

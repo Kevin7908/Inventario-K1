@@ -2,11 +2,11 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../../backend/features/categorias/modelo/categoria.dart';
-import '../../../share2/share2.dart';
+import '../../../share/share.dart';
 import '../provider/categorias_provider.dart';
 import 'identidad_categoria.dart';
 
-/// Adaptador entre `catalogoCategoriasProvider` y [PanelCategorias] de share2.
+/// Adaptador entre `catalogoCategoriasProvider` y [PanelCategorias] de share.
 ///
 /// **Es el único.** Había cuatro copias de este mismo archivo —Productos, el
 /// punto de venta, el editor de cotizaciones y el de órdenes—, idénticas salvo
@@ -14,8 +14,8 @@ import 'identidad_categoria.dart';
 /// distintos y la misma tarea es justo lo que prohíbe la regla 0 de
 /// `CLAUDE.md`: lo que cambiaba entre ellos son dos parámetros, no un widget.
 ///
-/// Vive en el módulo de Categorías y no en share2 porque **consulta un
-/// provider**: share2 recibe datos ya resueltos y no observa nada (regla 0.3).
+/// Vive en el módulo de Categorías y no en share porque **consulta un
+/// provider**: share recibe datos ya resueltos y no observa nada (regla 0.3).
 /// Quien lo usa le pasa qué categoría está activa y qué hacer al elegir otra.
 ///
 /// El estado del panel —abierto/cerrado y la búsqueda de categorías— vive

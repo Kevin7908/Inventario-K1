@@ -5,7 +5,7 @@ import '../../../../../backend/features/tecnicos/modelo/tecnico.dart';
 import '../../../../../backend/features/servicios/modelo/servicio.dart';
 import '../../../../../core/formato.dart';
 import '../../../../../core/validaciones.dart';
-import '../../../../share2/share2.dart';
+import '../../../../share/share.dart';
 import '../../../tecnicos/provider/tecnico_provider.dart';
 import '../provider/catalogo_orden_providers.dart';
 import '../provider/orden_editor_provider.dart';

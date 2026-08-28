@@ -7,7 +7,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../../backend/features/categorias/modelo/categoria.dart';
 import '../../../../core/resultado.dart';
 import '../../../layout/encabezado_con_cuenta.dart';
-import '../../../share2/share2.dart';
+import '../../../share/share.dart';
 import '../detalle_categoria/vista/detalle_categoria_vista.dart';
 import '../provider/categorias_provider.dart';
 import '../widgets/dialogo_categorias_widget.dart';

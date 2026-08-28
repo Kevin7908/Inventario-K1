@@ -1,57 +1,56 @@
 import 'package:flutter/material.dart';
 
 class ColoresApp {
-  // Background
-  static const Color bgDark = Color(0xFF1A1D27);
-  static const Color bgSidebar = Color(0xFF13151F);
-  static const Color bgContent = Color(0xFFF4F6FA);
-  static const Color bgCard = Color(0xFFFFFFFF);
-  static const Color bgCardHover = Color(0xFFF8F9FC);
+  // ── Verdes — marca y acciones principales ────────────────────────────
+  static const Color goGreen        = Color(0xFF01B763); // acción: botones primarios, precios, stock ok
+  static const Color castletonGreen = Color(0xFF005B31); // hover de botones/elementos primarios
+  static const Color brightGreen    = Color(0xFF2BD17E); // texto/ícono activo sobre el sidebar oscuro
+  static const Color greenChipBg    = Color(0xFFE4F7EE); // fondo de chips de estado positivo (nunca fondo grande)
 
-  // Primary
-  static const Color primary = Color(0xFF3B82F6);
-  static const Color primaryLight = Color(0xFFEFF6FF);
-  static const Color primaryDark = Color(0xFF1D4ED8);
+  // ── Oscuros — estructura, no acción ──────────────────────────────────
+  static const Color blackChocolate = Color(0xFF16201B); // sidebar y botones secundarios "fuertes"
+  static const Color textPrimary    = Color(0xFF19211D); // texto principal sobre fondo claro
 
-  // Text
-  static const Color textDark = Color(0xFF1E2330);
-  static const Color textMedium = Color(0xFF6B7280);
-  static const Color textLight = Color(0xFF9CA3AF);
-  static const Color textWhite = Color(0xFFFFFFFF);
-  static const Color textSidebar = Color(0xFFCBD5E1);
-  static const Color textSidebarMuted = Color(0xFF64748B);
+  // ── Grises verdosos — SOLO dentro del sidebar oscuro ─────────────────
+  static const Color textSidebar          = Color(0xFF93A29A); // ítem de nav inactivo (el más legible de los tres)
+  static const Color textSidebarSecondary = Color(0xFF6E7F75); // subtítulo del sidebar ("Taller de motos")
+  static const Color textSidebarLabel     = Color(0xFF566256); // etiquetas de sección (PRINCIPAL, TALLER…), el más apagado
 
-  // Status
-  static const Color statusPaid = Color(0xFF10B981);
-  static const Color statusPaidBg = Color(0xFFD1FAE5);
-  static const Color statusPending = Color(0xFFF59E0B);
-  static const Color statusPendingBg = Color(0xFFFEF3C7);
-  static const Color statusDebt = Color(0xFFEF4444);
-  static const Color statusDebtBg = Color(0xFFFEE2E2);
+  // ── Grises neutros — fondo y jerarquía en contenido claro ────────────
+  static const Color bgApp       = Color(0xFFF4F5F6); // fondo general de la app
+  static const Color bgCard      = Color(0xFFFFFFFF); // tarjetas, paneles, topbar
+  static const Color bgCardHover = Color(0xFFFAFBFA); // hover sutil sobre tarjeta/fila
+  static const Color bgInput     = Color(0xFFFAFBFA); // fondo de inputs y encabezado de tabla
+  static const Color bgSidebar   = Color(0xFF16201B);
 
-  // Stock badges
-  static const Color stockOk = Color(0xFF10B981);
-  static const Color stockLow = Color(0xFFF59E0B);
-  static const Color stockOut = Color(0xFFEF4444);
+  static const Color border         = Color(0xFFEAECEA); // borde por defecto de cards, inputs y filas
+  static const Color borderInput    = Color(0xFFE2E6E3); // borde de inputs — un punto más marcado que `border`
+  static const Color borderFila     = Color(0xFFF3F5F3); // separador entre filas de tabla
+  static const Color borderFocus    = Color(0xFF01B763); // borde de input enfocado
+  static const Color borderSidebar  = Color(0xFF243128); // separador dentro del sidebar
 
-  // Accent indicators
-  static const Color accentGreen = Color(0xFF10B981);
-  static const Color accentRed = Color(0xFFEF4444);
-  static const Color accentAmber = Color(0xFFF59E0B);
-  static const Color accentBlue = Color(0xFF3B82F6);
-  static const Color accentPurple = Color(0xFF8B5CF6);
-  static const Color accentOrange = Color(0xFFF97316);
-  static const Color accentTeal = Color(0xFF14B8A6);
-  static const Color accentPink = Color(0xFFEC4899);
+  static const Color textSecondary = Color(0xFF5B6B61); // labels, subtítulos — el más legible de los tres grises
+  static const Color textMuted     = Color(0xFF8A988F); // metadatos (fechas, SKU) — un escalón más suave
+  static const Color textDisabled  = Color(0xFF9AA8A0); // placeholders, deshabilitado — el más tenue
+  static const Color textOnPrimary = Color(0xFFFFFFFF); // texto sobre botón/fondo verde
+  static const Color textLink      = Color(0xFF01B763);
 
-  // Chart bar colors
-  static const Color chartBarActive = Color(0xFF3B82F6);
-  static const Color chartBarInactive = Color(0xFFBFDBFE);
+  // ── Estados / badges (semáforo — uso puntual, no decorativo) ────────
+  static const Color statusSuccess     = Color(0xFF01B763);
+  static const Color statusSuccessBg   = Color(0xFFE4F7EE);
+  static const Color statusWarning     = Color(0xFFE0892A);
+  static const Color statusWarningBg   = Color(0xFFFFF4E5);
+  static const Color statusDanger      = Color(0xFFE74C3C);
+  static const Color statusDangerBg    = Color(0xFFFDECEA);
+  static const Color statusInfo        = Color(0xFF3B82F6);
+  static const Color statusInfoBg      = Color(0xFFEEF1FB);
+  static const Color statusNeutral     = Color(0xFF5B6B61);
+  static const Color statusNeutralBg   = Color(0xFFF0F2F0);
 
-  // Border
-  static const Color border = Color(0xFFE5E7EB);
-  static const Color borderSidebar = Color(0xFF2D3348);
+  static const Color stockOk       = Color(0xFF01B763);
+  static const Color stockLow      = Color(0xFFE0892A);
+  static const Color stockOut      = Color(0xFFE74C3C);
 
-  // Shadow
-  static const Color shadow = Color(0x0A000000);
+  static const Color shadow        = Color(0x0A000000);
+  static const Color shadowMedium  = Color(0x1A000000);
 }

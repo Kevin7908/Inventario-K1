@@ -3,7 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../../backend/features/categorias/modelo/categoria.dart';
 import '../../../../core/resultado.dart';
-import '../../../share2/share2.dart';
+import '../../../share/share.dart';
 import '../provider/categorias_provider.dart';
 
 /// Diálogo de creación y edición de una categoría.

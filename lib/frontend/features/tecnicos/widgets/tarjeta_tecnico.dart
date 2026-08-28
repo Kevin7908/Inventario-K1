@@ -1,14 +1,14 @@
 import 'package:flutter/material.dart';
 
 import '../../../../backend/features/tecnicos/modelo/tecnico.dart';
-import '../../../share2/share2.dart';
+import '../../../share/share.dart';
 
 /// Tarjeta de un técnico en la grilla del catálogo.
 ///
 /// Replica la tarjeta del mockup: marcador oscuro con las iniciales del
 /// técnico, nombre, teléfono y —debajo, en una franja propia— su
 /// especialización y cuántas órdenes tiene asignadas. Vive en el módulo y no
-/// en share2 porque traduce un [Tecnico] —un modelo de dominio— a la
+/// en share porque traduce un [Tecnico] —un modelo de dominio— a la
 /// [TarjetaCatalogo] compartida.
 class TarjetaTecnico extends StatelessWidget {
   const TarjetaTecnico({

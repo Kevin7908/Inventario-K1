@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
-import '../../../../share2/share2.dart';
+import '../../../../share/share.dart';
 import '../../../categorias/widgets/panel_categorias_catalogo.dart';
 import '../modelo/reserva_editor_state.dart';
 import '../provider/catalogo_reserva_providers.dart';

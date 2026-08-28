@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../../../../backend/features/productos/modelo/producto.dart';
 import '../../../../core/formato.dart';
-import '../../../share2/share2.dart';
+import '../../../share/share.dart';
 import '../vista/producto_vista.dart' show MiniaturaProducto;
 
 /// La rejilla de tarjetas con la que se eligen productos para un documento.
@@ -15,9 +15,9 @@ import '../vista/producto_vista.dart' show MiniaturaProducto;
 /// decidía por su cuenta qué pasarle a la tarjeta. Con una sola, o aparece en
 /// las tres o en ninguna.
 ///
-/// No va en share2 porque conoce `Producto` y lee la foto del disco
-/// (`MiniaturaProducto`); share2 recibe textos ya resueltos (regla 0.3 de
-/// `CLAUDE.md`). Lo que sí sale de share2 es la tarjeta.
+/// No va en share porque conoce `Producto` y lee la foto del disco
+/// (`MiniaturaProducto`); share recibe textos ya resueltos (regla 0.3 de
+/// `CLAUDE.md`). Lo que sí sale de share es la tarjeta.
 ///
 /// Parámetros:
 /// - [productos]: la página que se está mostrando, ya recortada por SQL.

@@ -11,7 +11,7 @@ import 'package:inventario_k1/frontend/features/categorias/vista/categorias_vist
 import 'package:inventario_k1/frontend/features/productos/vista/producto_vista.dart';
 import 'package:inventario_k1/frontend/features/pos/vista/punto_venta_vista.dart';
 import 'package:inventario_k1/frontend/layout/layout_principal.dart';
-import 'package:inventario_k1/frontend/share2/nav/barra_lateral.dart';
+import 'package:inventario_k1/frontend/share/nav/barra_lateral.dart';
 
 /// El sidebar se filtra por permisos, así que un layout sin sesión no pinta
 /// ninguna sección. Estos tests miran otra cosa —qué vistas se construyen y

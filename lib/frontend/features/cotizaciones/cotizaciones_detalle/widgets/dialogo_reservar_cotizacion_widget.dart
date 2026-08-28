@@ -5,7 +5,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../../../backend/features/cotizaciones/modelo/cotizacion_resumen.dart';
 import '../../../../../backend/features/reservas/repositorio/repositorio_reservas.dart';
 import '../../../../../core/formato.dart';
-import '../../../../share2/share2.dart';
+import '../../../../share/share.dart';
 import '../provider/cotizar_a_reserva_provider.dart';
 import 'partes_dialogo_reserva.dart';
 

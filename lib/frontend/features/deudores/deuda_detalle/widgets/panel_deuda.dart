@@ -7,7 +7,7 @@ import '../../../../../backend/features/deudores/enum/enum_deudor.dart';
 import '../../../../../backend/features/deudores/modelo/deudor_item.dart';
 import '../../../../../core/formato.dart';
 import '../../../../../core/resultado.dart';
-import '../../../../share2/share2.dart';
+import '../../../../share/share.dart';
 import '../../widgets/estado_deuda_ui.dart';
 import '../provider/catalogo_deuda_providers.dart';
 import '../provider/deuda_editor_provider.dart';

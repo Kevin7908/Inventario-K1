@@ -7,7 +7,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../../../backend/features/categorias/modelo/categoria.dart';
 import '../../../../../backend/features/productos/modelo/producto.dart';
 import '../../../../../core/resultado.dart';
-import '../../../../share2/share2.dart';
+import '../../../../share/share.dart';
 import '../../../productos/provider/productos_provider.dart';
 import '../../../productos/vista/producto_detalle_vista.dart';
 import '../../../productos/vista/producto_formulario_vista.dart';

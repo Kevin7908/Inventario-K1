@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../../../../backend/features/clientes/modelo/cliente.dart';
-import '../../../share2/share2.dart';
+import '../../../share/share.dart';
 import 'formulario_cliente.dart';
 
 /// Diálogo de alta y edición de un cliente.
