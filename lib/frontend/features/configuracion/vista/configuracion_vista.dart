@@ -9,6 +9,7 @@ import '../../autenticacion/vista/usuarios_vista.dart';
 import '../../especializacion/vista/especializacion_vista.dart';
 import '../../motos/vista/motos_vista.dart';
 import '../../unidades_medida/vista/unidad_medida_vista.dart';
+import '../widgets/tab_general.dart';
 import '../widgets/tab_servicios.dart';
 
 /// Pantalla de Configuración: ajustes generales del negocio y catálogos base.
@@ -87,7 +88,7 @@ class _ConfiguracionVistaState extends ConsumerState<ConfiguracionVista> {
             child: IndexedStack(
               index: tabActivo,
               children: [
-                const _TabGeneral(),
+                const TabGeneral(),
                 const UnidadesMedidaVista(),
                 const EspecializacionesVista(),
                 const TabServicios(),
@@ -98,111 +99,6 @@ class _ConfiguracionVistaState extends ConsumerState<ConfiguracionVista> {
           ),
         ],
       ),
-    );
-  }
-}
-
-class _TabGeneral extends StatefulWidget {
-  const _TabGeneral();
-
-  @override
-  State<_TabGeneral> createState() => _TabGeneralState();
-}
-
-class _TabGeneralState extends State<_TabGeneral> {
-  final _nombreController = TextEditingController(text: 'Taller Inventario K1');
-  final _nitController = TextEditingController(text: '901.555.222-8');
-  final _telefonoController = TextEditingController(text: '602 555 7788');
-  final _direccionController =
-      TextEditingController(text: 'Cra. 8 #23-45, Cali');
-  final _monedaController =
-      TextEditingController(text: 'Peso colombiano (COP \$)');
-  final _ivaController = TextEditingController(text: '19%');
-
-  @override
-  void dispose() {
-    _nombreController.dispose();
-    _nitController.dispose();
-    _telefonoController.dispose();
-    _direccionController.dispose();
-    _monedaController.dispose();
-    _ivaController.dispose();
-    super.dispose();
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    return SingleChildScrollView(
-      child: ConstrainedBox(
-        constraints: const BoxConstraints(maxWidth: 760),
-        child: PanelSeccion(
-          titulo: 'Datos del negocio',
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              _Fila(
-                izquierda: CampoTexto(
-                  etiqueta: 'Nombre del taller',
-                  controlador: _nombreController,
-                ),
-                derecha: CampoTexto(
-                  etiqueta: 'NIT',
-                  controlador: _nitController,
-                  monoespaciado: true,
-                ),
-              ),
-              const SizedBox(height: 16),
-              _Fila(
-                izquierda: CampoTexto(
-                  etiqueta: 'Teléfono',
-                  controlador: _telefonoController,
-                ),
-                derecha: CampoTexto(
-                  etiqueta: 'Dirección',
-                  controlador: _direccionController,
-                ),
-              ),
-              const SizedBox(height: 16),
-              _Fila(
-                izquierda: CampoTexto(
-                  etiqueta: 'Moneda',
-                  controlador: _monedaController,
-                ),
-                derecha: CampoTexto(
-                  etiqueta: 'IVA por defecto',
-                  controlador: _ivaController,
-                ),
-              ),
-              const SizedBox(height: 22),
-              BotonPrimario(
-                etiqueta: 'Guardar cambios',
-                icono: Icons.check,
-                alPresionar: () {},
-              ),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
-}
-
-/// Dos campos lado a lado, replicando la grilla de 2 columnas del mockup.
-class _Fila extends StatelessWidget {
-  const _Fila({required this.izquierda, required this.derecha});
-
-  final Widget izquierda;
-  final Widget derecha;
-
-  @override
-  Widget build(BuildContext context) {
-    return Row(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Expanded(child: izquierda),
-        const SizedBox(width: 16),
-        Expanded(child: derecha),
-      ],
     );
   }
 }

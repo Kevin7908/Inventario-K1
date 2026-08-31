@@ -31,6 +31,9 @@ import '../../../../share/share.dart';
 /// - [pagado]: lo entregado hasta ahora.
 /// - [alEntregar]: `null` si la reserva ya está cerrada.
 /// - [alCancelar]: `null` si la reserva ya no se puede cancelar.
+/// - [alImprimir]: abre el comprobante. Va como acción secundaria y **sin
+///   condición de estado**: una reserva entregada o cancelada también se
+///   imprime, porque el cliente puede venir a pedir el papel después.
 class PieReserva extends StatelessWidget {
   const PieReserva({
     super.key,
@@ -38,12 +41,14 @@ class PieReserva extends StatelessWidget {
     required this.pagado,
     this.alEntregar,
     this.alCancelar,
+    this.alImprimir,
   });
 
   final int total;
   final int pagado;
   final VoidCallback? alEntregar;
   final VoidCallback? alCancelar;
+  final VoidCallback? alImprimir;
 
   int get _saldo => (total - pagado).clamp(0, total);
 
@@ -116,8 +121,17 @@ class PieReserva extends StatelessWidget {
             alPresionar: alEntregar,
           ),
         ],
-        if (alCancelar != null) ...[
+        if (alImprimir != null) ...[
           SizedBox(height: alEntregar != null ? 10 : 16),
+          BotonSecundario(
+            etiqueta: 'Imprimir comprobante',
+            icono: Icons.print_outlined,
+            expandido: true,
+            alPresionar: alImprimir,
+          ),
+        ],
+        if (alCancelar != null) ...[
+          const SizedBox(height: 10),
           BotonDestructivo(
             etiqueta: 'Cancelar reserva',
             icono: Icons.cancel_outlined,

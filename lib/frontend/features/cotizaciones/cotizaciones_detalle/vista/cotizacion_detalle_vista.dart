@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -11,6 +13,10 @@ import '../provider/cotizar_a_reserva_provider.dart';
 import '../widgets/dialogo_reservar_cotizacion_widget.dart';
 import '../widgets/panel_catalogo.dart';
 import '../widgets/panel_cotizacion.dart';
+import '../../../documentos/provider/documentos_providers.dart';
+import '../../../documentos/traductores/cotizacion_a_documento.dart';
+import '../../../documentos/widgets/dialogo_vista_previa.dart';
+import '../../provider/cotizaciones_provider.dart';
 
 /// Editor de cotización: dos paneles, como el punto de venta.
 ///
@@ -106,6 +112,34 @@ class _CotizacionDetalleVistaState
     await _cerrar();
   }
 
+  /// Abre la cotización impresa: lo que el cliente se lleva para pensarlo.
+  Future<void> _imprimir() async {
+    final id = _id;
+    // Una cotización sin guardar no tiene número ni consecutivo, y un impreso
+    // sin número no sirve de nada: el editor le asigna uno en cuanto entra la
+    // primera línea.
+    if (id == null) {
+      _avisar('Agrega al menos una línea antes de imprimir.', esError: true);
+      return;
+    }
+
+    try {
+      final cotizacion = await ref.read(cotizacionDetalleProvider(id).future);
+      final negocio =
+          await leerNegocioImpreso(ref.read(repositorioConfiguracionProvider));
+      if (!mounted) return;
+
+      await DialogoVistaPrevia.mostrar(
+        context,
+        documento:
+            documentoDeCotizacion(cotizacion: cotizacion, negocio: negocio),
+      );
+    } catch (e) {
+      if (!mounted) return;
+      _avisar('No se pudo abrir la cotización: $e', esError: true);
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final provider = cotizacionEditorProvider(_id);
@@ -142,8 +176,7 @@ class _CotizacionDetalleVistaState
                   PanelCotizacion(
                     cotizacionId: _id,
                     alReservar: _reservar,
-                    alImprimir: () =>
-                        _avisar('Próximamente: vista previa en PDF.'),
+                    alImprimir: () => unawaited(_imprimir()),
                   ),
                 ],
               ),

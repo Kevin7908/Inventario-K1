@@ -1,8 +1,8 @@
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
 
 import '../../../../backend/features/pos/enum/enum_ventas.dart';
 import '../../../../core/formato.dart';
+import '../../../../core/validaciones.dart';
 import '../../../share/share.dart';
 
 /// Cuadro de cobro del punto de venta: cómo paga el cliente y, si es en
@@ -202,6 +202,12 @@ class _SelectorMetodo extends StatelessWidget {
   }
 }
 
+/// Con cuánto paga el cliente.
+///
+/// Es `CampoTexto` de share y no un `TextField` propio: antes duplicaba el
+/// borde, el relleno y el prefijo `$` a mano, y aun así no agrupaba los miles,
+/// así que en el mismo diálogo el total salía «$85.000» y lo recibido
+/// «85000». Con `comoPrecio` los dos se leen igual.
 class _CampoRecibido extends StatelessWidget {
   const _CampoRecibido({required this.controlador, required this.alCambiar});
 
@@ -210,41 +216,16 @@ class _CampoRecibido extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        const Text('Recibido', style: TipografiaApp.etiquetaCampo),
-        const SizedBox(height: 7),
-        TextField(
-          controller: controlador,
-          autofocus: true,
-          keyboardType: TextInputType.number,
-          inputFormatters: [FilteringTextInputFormatter.digitsOnly],
-          style: TipografiaApp.cuerpo,
-          onChanged: (texto) => alCambiar(int.tryParse(texto) ?? 0),
-          decoration: InputDecoration(
-            isDense: true,
-            prefixText: r'$ ',
-            prefixStyle: TipografiaApp.cuerpo,
-            hintText: 'Con cuánto paga',
-            hintStyle: TipografiaApp.deshabilitado(TipografiaApp.cuerpo),
-            filled: true,
-            fillColor: ColoresApp.bgInput,
-            contentPadding:
-                const EdgeInsets.symmetric(horizontal: 14, vertical: 13),
-            border: _borde(ColoresApp.borderInput),
-            enabledBorder: _borde(ColoresApp.borderInput),
-            focusedBorder: _borde(ColoresApp.borderFocus),
-          ),
-        ),
-      ],
+    return CampoTexto(
+      etiqueta: 'Recibido',
+      controlador: controlador,
+      placeholder: 'Con cuánto paga',
+      comoPrecio: true,
+      autofocus: true,
+      alCambiar: (texto) =>
+          alCambiar(int.tryParse(normalizarDigitos(texto)) ?? 0),
     );
   }
-
-  OutlineInputBorder _borde(Color color) => OutlineInputBorder(
-        borderRadius: BorderRadius.circular(11),
-        borderSide: BorderSide(color: color),
-      );
 }
 
 /// El vuelto, o el aviso de que todavía falta plata.

@@ -8,6 +8,9 @@ import '../../../../backend/share/dominio/permiso.dart';
 import '../../../../backend/share/dominio/sesion_actual.dart';
 import '../../../share/share.dart';
 import '../../autenticacion/widgets/si_puede.dart';
+import '../../documentos/provider/documentos_providers.dart';
+import '../../documentos/traductores/venta_a_documento.dart';
+import '../../documentos/widgets/dialogo_vista_previa.dart';
 import '../../pos/provider/pos_providers.dart';
 import '../provider/historial_ventas_providers.dart';
 import 'dialogo_devolucion.dart';
@@ -234,31 +237,70 @@ class _Acciones extends ConsumerWidget {
     }
   }
 
+  /// Vuelve a abrir la factura ya emitida.
+  ///
+  /// El cliente que pierde el papel vuelve al mostrador, y hasta ahora la
+  /// única forma de imprimir era al cobrar. Sale de lo guardado, así que una
+  /// factura anulada se reimprime diciendo que está anulada.
+  Future<void> _imprimir(BuildContext context, WidgetRef ref) async {
+    try {
+      final detalle =
+          await ref.read(repositorioVentasProvider).obtenerDetalle(venta.id);
+      final negocio =
+          await leerNegocioImpreso(ref.read(repositorioConfiguracionProvider));
+      if (!context.mounted) return;
+
+      await DialogoVistaPrevia.mostrar(
+        context,
+        documento: documentoDeVenta(venta: detalle, negocio: negocio),
+      );
+    } catch (e) {
+      if (!context.mounted) return;
+      MensajeApp.error(context, 'No se pudo abrir la factura: $e');
+    }
+  }
+
   @override
   Widget build(BuildContext context, WidgetRef ref) {
+    // Reimprimir no está detrás de `POS_ANULAR` ni se esconde en una factura
+    // anulada: dar una copia del papel no cambia nada, y el documento anulado
+    // es justo el que a veces hay que enseñar.
+    final imprimir = BotonIcono(
+      icono: Icons.print_outlined,
+      tooltip: 'Imprimir la factura',
+      alPresionar: () => _imprimir(context, ref),
+    );
+
     // Una factura anulada está cerrada: ni se devuelve ni se vuelve a anular.
     if (venta.estadoPago == EstadoPago.anulada) {
-      return const SizedBox.shrink();
+      return imprimir;
     }
 
-    return SiPuede(
-      permiso: Permiso.posAnular,
-      child: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          BotonIcono(
-            icono: Icons.keyboard_return_rounded,
-            tooltip: 'Recibir una devolución',
-            alPresionar: () => DialogoDevolucion.mostrar(context, venta: venta),
+    return Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        imprimir,
+        SiPuede(
+          permiso: Permiso.posAnular,
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              BotonIcono(
+                icono: Icons.keyboard_return_rounded,
+                tooltip: 'Recibir una devolución',
+                alPresionar: () =>
+                    DialogoDevolucion.mostrar(context, venta: venta),
+              ),
+              BotonIcono(
+                icono: Icons.block_outlined,
+                tooltip: 'Anular la venta entera',
+                color: ColoresApp.statusDanger,
+                alPresionar: () => _anular(context, ref),
+              ),
+            ],
           ),
-          BotonIcono(
-            icono: Icons.block_outlined,
-            tooltip: 'Anular la venta entera',
-            color: ColoresApp.statusDanger,
-            alPresionar: () => _anular(context, ref),
-          ),
-        ],
-      ),
+        ),
+      ],
     );
   }
 }

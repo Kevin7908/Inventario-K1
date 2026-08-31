@@ -58,21 +58,39 @@ class PosNotifier extends Notifier<PosState> {
   /// reglas de base de datos).
   ///
   /// Al terminar bien, el carrito queda vacío y listo para la siguiente venta.
-  Future<Resultado> cobrar({required MetodoPago metodoPago}) async {
+  ///
+  /// Devuelve también el **id de la venta creada**, que es lo que necesita
+  /// «Cobrar e imprimir» para levantar la factura recién emitida. Va en un
+  /// record y no dentro de `Exito` porque `Resultado` no es genérico y hacerlo
+  /// genérico tocaría los veinte repositorios para un solo caso. En el fallo
+  /// es `null`.
+  Future<({Resultado resultado, int? ventaId})> cobrar({
+    required MetodoPago metodoPago,
+  }) async {
     if (state.vacio) {
-      return const Fallo(MotivoFallo.validacion, 'El carrito está vacío.');
+      return (
+        resultado: const Fallo(MotivoFallo.validacion, 'El carrito está vacío.'),
+        ventaId: null,
+      );
     }
     if (state.procesando) {
-      return const Fallo(MotivoFallo.validacion, 'La venta ya se está cobrando.');
+      return (
+        resultado: const Fallo(
+            MotivoFallo.validacion, 'La venta ya se está cobrando.'),
+        ventaId: null,
+      );
     }
 
     // `Producto.id` es nulo hasta que el producto se guarda, así que el tipo
     // obliga a descartar el caso. Un producto sin id no está en el catálogo y
     // no se puede vender: mejor no cobrar que cobrar una línea suelta.
     if (state.items.any((i) => i.producto.id == null)) {
-      return const Fallo(
-        MotivoFallo.validacion,
-        'Hay un producto del carrito que ya no está en el catálogo.',
+      return (
+        resultado: const Fallo(
+          MotivoFallo.validacion,
+          'Hay un producto del carrito que ya no está en el catálogo.',
+        ),
+        ventaId: null,
       );
     }
 
@@ -80,7 +98,8 @@ class PosNotifier extends Notifier<PosState> {
     final venta = state;
 
     try {
-      await ref.read(repositorioVentasProvider).registrarVentaMostrador(
+      final resumen =
+          await ref.read(repositorioVentasProvider).registrarVentaMostrador(
             lineas: [
               for (final linea in venta.items)
                 LineaVentaMostrador(
@@ -98,9 +117,13 @@ class PosNotifier extends Notifier<PosState> {
           );
 
       state = const PosState();
-      return const Exito();
+      return (resultado: const Exito(), ventaId: resumen.id);
     } catch (e) {
-      return Fallo(MotivoFallo.persistencia, 'No se pudo cobrar la venta: $e');
+      return (
+        resultado:
+            Fallo(MotivoFallo.persistencia, 'No se pudo cobrar la venta: $e'),
+        ventaId: null,
+      );
     } finally {
       if (state.procesando) state = state.copyWith(procesando: false);
     }

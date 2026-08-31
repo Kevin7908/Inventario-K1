@@ -1,9 +1,15 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../../../core/resultado.dart';
 import '../../../../share/share.dart';
+import '../../../documentos/provider/documentos_providers.dart';
+import '../../../documentos/traductores/orden_a_documento.dart';
+import '../../../documentos/widgets/dialogo_vista_previa.dart';
+import '../../provider/ordenes_providers.dart';
 import '../modelo/orden_editor_state.dart';
 import '../provider/orden_editor_provider.dart';
 import '../widgets/panel_catalogo_orden.dart';
@@ -67,6 +73,31 @@ class _OrdenDetalleVistaState extends ConsumerState<OrdenDetalleVista> {
     widget.alCerrar();
   }
 
+  /// Abre la orden impresa: el papel que se entrega con la moto.
+  ///
+  /// Guarda antes lo que esté pendiente. El editor escribe con retardo, así
+  /// que sin esto la última tarea agregada podría no salir en el impreso.
+  Future<void> _imprimir() async {
+    await ref.read(ordenEditorProvider(widget.ordenId).notifier).guardarAhora();
+    if (!mounted) return;
+
+    try {
+      final orden =
+          await ref.read(ordenDetalleProvider(widget.ordenId).future);
+      final negocio =
+          await leerNegocioImpreso(ref.read(repositorioConfiguracionProvider));
+      if (!mounted) return;
+
+      await DialogoVistaPrevia.mostrar(
+        context,
+        documento: documentoDeOrden(orden: orden, negocio: negocio),
+      );
+    } catch (e) {
+      if (!mounted) return;
+      _avisar('No se pudo abrir la orden: $e', esError: true);
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final provider = ordenEditorProvider(widget.ordenId);
@@ -102,8 +133,7 @@ class _OrdenDetalleVistaState extends ConsumerState<OrdenDetalleVista> {
                   ),
                   PanelOrden(
                     ordenId: widget.ordenId,
-                    alImprimir: () =>
-                        _avisar('Próximamente: vista previa en PDF.'),
+                    alImprimir: () => unawaited(_imprimir()),
                   ),
                 ],
               ),

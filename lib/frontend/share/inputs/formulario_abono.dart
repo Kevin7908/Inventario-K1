@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 
+import '../../../core/formato.dart';
+import '../../../core/validaciones.dart';
 import '../botones/boton_primario.dart';
 import '../botones/boton_secundario.dart';
 import '../cards/panel_seccion.dart';
@@ -100,7 +102,10 @@ class _FormularioAbonoState<T> extends State<FormularioAbono<T>> {
     super.dispose();
   }
 
-  int get _valor => int.tryParse(_monto.text) ?? 0;
+  /// El campo agrupa los miles mientras se escribe, así que su texto lleva
+  /// puntos: `45.000`. Se normaliza con el helper de `core`, no con un regex
+  /// propio, que es el mismo camino que sigue el precio de un producto.
+  int get _valor => int.tryParse(normalizarDigitos(_monto.text)) ?? 0;
 
   bool get _puedeRegistrar =>
       widget.habilitado &&
@@ -108,7 +113,11 @@ class _FormularioAbonoState<T> extends State<FormularioAbono<T>> {
       _valor > 0 &&
       _valor <= widget.saldo;
 
-  void _todoElSaldo() => setState(() => _monto.text = '${widget.saldo}');
+  /// Se escribe ya agrupado: el formateador solo actúa sobre lo que teclea el
+  /// usuario, así que un `text =` a pelo dejaría «45000» al lado de campos que
+  /// muestran «45.000».
+  void _todoElSaldo() =>
+      setState(() => _monto.text = agruparMiles(widget.saldo));
 
   void _registrar() {
     if (!_puedeRegistrar) return;
@@ -160,7 +169,10 @@ class _FormularioAbonoState<T> extends State<FormularioAbono<T>> {
                   etiqueta: 'Monto',
                   controlador: _monto,
                   placeholder: '0',
-                  soloEnteros: true,
+                  // Con el `$` de prefijo y los miles agrupados, como el
+                  // precio de un producto: es plata y se teclea igual en
+                  // todas partes.
+                  comoPrecio: true,
                   habilitado: widget.habilitado,
                   alCambiar: (_) => setState(() {}),
                 ),

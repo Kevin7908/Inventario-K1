@@ -108,7 +108,30 @@ class DeudaEditorNotifier extends AsyncNotifier<DeudaEditorState> {
   }
 
   /// Ejecuta una escritura inmediata: marca «guardando», escribe, relee.
-  Future<Resultado> _escribir(Future<Resultado> Function() operacion) async {
+  /// La cola de escrituras. **Una detrás de otra, nunca a la vez.**
+  ///
+  /// Sin esto, tocar cinco veces seguidas una tarjeta del catálogo lanzaba
+  /// cinco escrituras concurrentes con sus cinco recargas intercaladas: la
+  /// última en responder pisaba a las demás y en pantalla aparecían tres de
+  /// las cinco unidades. El usuario lo veía como que «se buguea al clickear
+  /// rápido», y es de los fallos que no se reproducen despacio.
+  ///
+  /// Encadenar es suficiente y es lo correcto: son escrituras del mismo
+  /// documento, y el orden en que el usuario las pidió es el orden en que
+  /// tienen que quedar.
+  Future<void> _cola = Future<void>.value();
+
+  Future<Resultado> _escribir(Future<Resultado> Function() operacion) {
+    // Se encola antes de nada para que dos llamadas seguidas no puedan
+    // colarse entre el `await` y la asignación.
+    final propia = _cola.then((_) => _escribirEnOrden(operacion));
+    // El `onError` vacío evita que un fallo de una escritura rompa la cadena
+    // y deje la cola envenenada para todas las siguientes.
+    _cola = propia.then((_) {}, onError: (_) {});
+    return propia;
+  }
+
+  Future<Resultado> _escribirEnOrden(Future<Resultado> Function() operacion) async {
     if (state.value == null) {
       return const Fallo(
         MotivoFallo.validacion,

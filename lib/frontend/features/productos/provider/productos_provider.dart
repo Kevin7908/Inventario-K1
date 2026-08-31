@@ -23,7 +23,7 @@ final repositorioProductosProvider = Provider<RepositorioProducto>(
 
 // Enums públicos
 
-enum FiltroStock { todos, enStock, stockBajo, sinStock }
+enum FiltroStock { todos, enStock, stockBajo, sinStock, activo}
 
 // Estado
 
