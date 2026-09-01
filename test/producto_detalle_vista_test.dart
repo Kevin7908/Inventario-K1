@@ -11,6 +11,9 @@ import 'package:inventario_k1/backend/features/productos/modelo/compatibilidad.d
 import 'package:inventario_k1/frontend/features/productos/provider/compatibilidades_provider.dart';
 import 'package:inventario_k1/frontend/features/productos/vista/producto_detalle_vista.dart';
 
+import 'package:inventario_k1/backend/features/compras/modelo/compra_item.dart';
+import 'package:inventario_k1/frontend/features/compras/provider/compras_providers.dart';
+
 import 'soporte/repositorio_inventario_falso.dart';
 
 const _producto = Producto(
@@ -39,6 +42,7 @@ Future<void> _pumpFicha(
   Size tamano, {
   List<MovimientoInventario> movimientos = const [],
   Set<Permiso> permisos = const {},
+  UltimaCompra? ultimaCompra,
   List<Compatibilidad> compatibilidades = const [],
   /// La ficha solo pinta sus acciones cuando es la página completa. Dentro de
   /// `DialogoDetalleProductoWidget` no recibe callbacks y es de solo lectura.
@@ -62,6 +66,11 @@ Future<void> _pumpFicha(
         // `repositorio_marcas_compatibilidad_test.dart`.
         compatibilidadesProvider(_producto.id!)
             .overrideWith((ref) => Stream.value(compatibilidades)),
+        // Lo mismo con la última compra: la ficha la muestra desde que las
+        // remisiones existen, y su consulta la cubre
+        // `repositorio_compras_test.dart`.
+        ultimaCompraProvider(_producto.id!)
+            .overrideWith((ref) => Stream.value(ultimaCompra)),
       ],
       child: MaterialApp(
         home: Scaffold(
@@ -135,15 +144,19 @@ void main() {
     expect(find.text('Aún no se registran movimientos'), findsOneWidget);
   });
 
-  testWidgets('sin INVENTARIO_ENTRADA no se ofrece dar entrada',
+  testWidgets('sin permisos no se ofrece ni comprar ni dar entrada',
       (tester) async {
     await _pumpFicha(tester, const Size(1400, 1200), conAcciones: true);
 
     expect(find.text('Editar producto'), findsOneWidget);
-    expect(find.text('Dar entrada'), findsNothing);
+    expect(find.text('Registrar compra'), findsNothing);
+    expect(find.text('Entrada sin factura'), findsNothing);
   });
 
-  testWidgets('con INVENTARIO_ENTRADA aparece el botón', (tester) async {
+  testWidgets('con INVENTARIO_ENTRADA aparece la entrada sin factura',
+      (tester) async {
+    // Son dos gestos distintos y cada uno tiene su permiso: la remisión con
+    // proveedor y costo es una compra; esto es lo que llega sin papel.
     await _pumpFicha(
       tester,
       const Size(1400, 1200),
@@ -151,7 +164,53 @@ void main() {
       permisos: {Permiso.inventarioEntrada},
     );
 
-    expect(find.text('Dar entrada'), findsOneWidget);
+    expect(find.text('Entrada sin factura'), findsOneWidget);
+    expect(find.text('Registrar compra'), findsNothing);
+  });
+
+  testWidgets('con COMPRAS_CREAR aparece registrar la compra', (tester) async {
+    await _pumpFicha(
+      tester,
+      const Size(1400, 1200),
+      conAcciones: true,
+      permisos: {Permiso.comprasCrear},
+    );
+
+    expect(find.text('Registrar compra'), findsOneWidget);
+  });
+
+  group('la última compra', () {
+    testWidgets('sin remisiones registradas lo dice', (tester) async {
+      await _pumpFicha(tester, const Size(1400, 1200));
+
+      expect(
+        find.text('Todavía no se ha comprado con una remisión registrada.'),
+        findsOneWidget,
+      );
+    });
+
+    testWidgets('con remisión muestra el costo real y el proveedor',
+        (tester) async {
+      // Es lo que el diseño pedía y el backend no tenía: hasta que existieron
+      // las compras, la ficha solo podía enseñar `precio_compra`.
+      await _pumpFicha(
+        tester,
+        const Size(1400, 1200),
+        ultimaCompra: UltimaCompra(
+          compraId: 7,
+          numero: 'COM-2026-0007',
+          fecha: DateTime.now().subtract(const Duration(days: 12)),
+          costoUnitario: 6500,
+          cantidad: 12,
+          proveedorNombre: 'Repuestos JR',
+        ),
+      );
+
+      expect(find.text(r'$6.500'), findsOneWidget);
+      expect(find.textContaining('hace 12 días'), findsOneWidget);
+      expect(find.textContaining('Repuestos JR'), findsOneWidget);
+      expect(find.text('Ver la remisión COM-2026-0007'), findsOneWidget);
+    });
   });
 
   group('compatibilidad', () {

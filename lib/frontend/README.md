@@ -39,12 +39,13 @@ Cada módulo del negocio tiene su propia carpeta. Las vistas de un módulo no im
 | `bitacora/` | Quién hizo qué, y cuándo. Solo la ve quien tenga `BITACORA_VER` |
 | `categorias/` | Categorías de productos |
 | `clientes/` | Gestión de clientes y de las motos de cada uno |
+| `compras/` | Las remisiones del proveedor: qué entró al taller, de quién y a cuánto |
 | `configuracion/` | Ajustes de la aplicación |
 | `cotizaciones/` | Cotizaciones de venta |
 | `deudores/` | Cuentas por cobrar |
 | `documentos/` | Impresión: convierte cualquier documento del negocio en PDF |
 | `especializacion/` | Especializaciones de técnicos |
-| `inventario/` | Movimientos de stock: el kardex del taller, el panel de la ficha de producto y la entrada por compra |
+| `inventario/` | Movimientos de stock: el kardex del taller, el panel de la ficha de producto y la entrada suelta, la que llega sin factura |
 | `motos/` | Registro de motos, y el catálogo de marcas y modelos |
 | `ordenes/` | Órdenes de servicio: listado y editor |
 | `pos/` | Punto de venta (mostrador) |
@@ -102,6 +103,8 @@ mientras convivía con la biblioteca de la versión anterior, que se borró el
   | `GrillaProductosCatalogo` | `productos/widgets/` | POS, cotizaciones, órdenes |
   | `MiniaturaProducto` | `productos/vista/` | las mismas |
   | `PanelMovimientosProducto`, `DialogoEntradaCompra` | `inventario/widgets/` | productos |
+  | `PanelUltimaCompra`, `DialogoNuevaCompra` | `compras/widgets/` | productos |
+  | `LineaComprasProveedor` | `compras/widgets/` | proveedores |
   | `PanelCategoriasCatalogo` | `categorias/widgets/` | productos, POS, cotizaciones, órdenes |
   | `DialogoMarcaMoto`, `DialogoModeloMoto` | `motos/widgets/` | Configuración |
   | `marcasActivasProvider`, `modelosMotoProvider` | `motos/provider/` | productos (compatibilidad), motos |

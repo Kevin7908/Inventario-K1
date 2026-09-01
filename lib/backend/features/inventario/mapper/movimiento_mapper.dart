@@ -17,12 +17,13 @@ abstract final class MovimientoMapper {
       ordenId: fila.ordenId,
       reservaId: fila.reservaId,
       deudorId: fila.deudorId,
+      compraId: fila.compraId,
       notas: fila.notas,
       creadoEn: fila.creadoEn,
     );
   }
 
-  /// El kardex va por `customSelect` —necesita cuatro `LEFT JOIN` para
+  /// El kardex va por `customSelect` —necesita cinco `LEFT JOIN` para
   /// resolver el documento de origen—, así que la fila llega como mapa crudo
   /// y no como `TablaMovimientoInventarioData`.
   static MovimientoDetalle detalleDesdeMapa(Map<String, dynamic> f) {
@@ -36,6 +37,7 @@ abstract final class MovimientoMapper {
         ordenId: f['orden_id'] as int?,
         reservaId: f['reserva_id'] as int?,
         deudorId: f['deudor_id'] as int?,
+        compraId: f['compra_id'] as int?,
         notas: f['notas'] as String?,
         creadoEn: _fecha(f['creado_en']),
       ),
@@ -71,6 +73,7 @@ abstract final class MovimientoMapper {
       ordenId: Value(s.ordenId),
       reservaId: Value(s.reservaId),
       deudorId: Value(s.deudorId),
+      compraId: Value(s.compraId),
       notas: Value(s.notas),
     );
   }

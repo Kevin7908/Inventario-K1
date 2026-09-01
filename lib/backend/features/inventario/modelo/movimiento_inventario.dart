@@ -40,6 +40,7 @@ final class MovimientoInventario extends Equatable {
     this.ordenId,
     this.reservaId,
     this.deudorId,
+    this.compraId,
     this.notas,
     required this.creadoEn,
   });
@@ -55,14 +56,27 @@ final class MovimientoInventario extends Equatable {
   final int? ordenId;
   final int? reservaId;
   final int? deudorId;
+
+  /// La remisión del proveedor que trajo la mercancía.
+  final int? compraId;
   final String? notas;
   final DateTime creadoEn;
 
   bool get entra => cantidad > 0;
 
   @override
-  List<Object?> get props =>
-      [id, productoId, tipo, cantidad, ventaId, ordenId, reservaId, deudorId, creadoEn];
+  List<Object?> get props => [
+        id,
+        productoId,
+        tipo,
+        cantidad,
+        ventaId,
+        ordenId,
+        reservaId,
+        deudorId,
+        compraId,
+        creadoEn,
+      ];
 }
 
 /// Lo que se le pide al repositorio para mover stock.
@@ -78,6 +92,7 @@ final class SolicitudMovimiento {
     this.ordenId,
     this.reservaId,
     this.deudorId,
+    this.compraId,
     this.notas,
   });
 
@@ -92,6 +107,7 @@ final class SolicitudMovimiento {
     int? ordenId,
     int? reservaId,
     int? deudorId,
+    int? compraId,
     String? notas,
   }) =>
       SolicitudMovimiento(
@@ -102,6 +118,7 @@ final class SolicitudMovimiento {
         ordenId: ordenId,
         reservaId: reservaId,
         deudorId: deudorId,
+        compraId: compraId,
         notas: notas,
       );
 
@@ -114,6 +131,7 @@ final class SolicitudMovimiento {
     int? ordenId,
     int? reservaId,
     int? deudorId,
+    int? compraId,
     String? notas,
   }) =>
       SolicitudMovimiento(
@@ -124,6 +142,7 @@ final class SolicitudMovimiento {
         ordenId: ordenId,
         reservaId: reservaId,
         deudorId: deudorId,
+        compraId: compraId,
         notas: notas,
       );
 
@@ -134,5 +153,6 @@ final class SolicitudMovimiento {
   final int? ordenId;
   final int? reservaId;
   final int? deudorId;
+  final int? compraId;
   final String? notas;
 }

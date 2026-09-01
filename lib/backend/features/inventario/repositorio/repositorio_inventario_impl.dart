@@ -143,7 +143,7 @@ class RepositorioInventarioImpl with FirmaDeSesion implements RepositorioInventa
            p.nombre AS producto_nombre,
            p.sku    AS producto_sku,
            TRIM(pe.nombres || ' ' || COALESCE(pe.apellidos, '')) AS usuario,
-           COALESCE(v.numero_factura, o.numero, r.numero, du.numero)
+           COALESCE(v.numero_factura, o.numero, r.numero, du.numero, co.numero)
              AS numero_documento
     FROM movimientos_inventario m
     INNER JOIN productos p  ON p.id  = m.producto_id
@@ -153,6 +153,7 @@ class RepositorioInventarioImpl with FirmaDeSesion implements RepositorioInventa
     LEFT  JOIN ordenes_servicio o ON o.id = m.orden_id
     LEFT  JOIN reservas  r  ON r.id  = m.reserva_id
     LEFT  JOIN deudores  du ON du.id = m.deudor_id
+    LEFT  JOIN compras   co ON co.id = m.compra_id
   ''';
 
   /// Las tablas que hacen re-emitir el stream. Si falta una, el kardex no se
@@ -166,6 +167,7 @@ class RepositorioInventarioImpl with FirmaDeSesion implements RepositorioInventa
         _db.tablaOrdenesServicio,
         _db.tablaReserva,
         _db.tablaDeudor,
+        _db.tablaCompra,
       };
 
   /// El `WHERE` y sus variables, en el mismo orden. Se arma una sola vez y lo

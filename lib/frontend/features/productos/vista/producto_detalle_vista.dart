@@ -7,9 +7,11 @@ import '../../../../core/formato.dart';
 import '../../../../backend/features/productos/modelo/producto.dart';
 import '../../../share/share.dart';
 import '../widgets/badget_estado_stock_widget.dart';
+import '../../compras/widgets/panel_ultima_compra.dart';
 import '../widgets/panel_compatibilidad.dart';
 import '../../../../backend/share/dominio/permiso.dart';
 import '../../autenticacion/widgets/si_puede.dart';
+import '../../compras/widgets/dialogo_nueva_compra.dart';
 import '../../inventario/widgets/dialogo_entrada_compra.dart';
 import '../../inventario/widgets/panel_movimientos_producto.dart';
 
@@ -203,16 +205,32 @@ class _Ficha extends StatelessWidget {
         _GrillaDatos(producto: producto),
         const SizedBox(height: 22),
         PanelCompatibilidad(productoId: producto.id!),
+        const SizedBox(height: 22),
+        PanelUltimaCompra(productoId: producto.id!),
         if (alEditar != null || alEliminar != null) ...[
           const SizedBox(height: 22),
-          // Dar entrada vive aquí además de en Movimientos: cuando llega la
-          // remisión, quien la recibe está mirando el producto, no el kardex.
-          // Es el mismo diálogo, con el producto ya elegido.
+          // Los dos caminos de entrada, y no son lo mismo. **Registrar la
+          // compra** es lo que deja proveedor y costo, así que va primero y
+          // en primario. **Dar entrada** sigue existiendo para lo que llega
+          // sin papel —una devolución del mecánico, un sobrante—, y no puede
+          // decir a cómo se compró porque nadie lo sabe.
+          SiPuede(
+            permiso: Permiso.comprasCrear,
+            child: BotonSecundario(
+              etiqueta: 'Registrar compra',
+              icono: Icons.local_shipping_outlined,
+              oscuro: true,
+              expandido: true,
+              alPresionar: () =>
+                  DialogoNuevaCompra.mostrar(context, producto: producto),
+            ),
+          ),
+          const SizedBox(height: 12),
           SiPuede(
             permiso: Permiso.inventarioEntrada,
             child: BotonSecundario(
-              etiqueta: 'Dar entrada',
-              icono: Icons.local_shipping_outlined,
+              etiqueta: 'Entrada sin factura',
+              icono: Icons.add_box_outlined,
               expandido: true,
               alPresionar: () =>
                   DialogoEntradaCompra.mostrar(context, producto: producto),

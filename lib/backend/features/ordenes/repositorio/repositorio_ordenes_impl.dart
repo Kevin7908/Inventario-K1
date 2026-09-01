@@ -407,6 +407,22 @@ class RepositorioOrdenesImpl with FirmaDeSesion implements RepositorioOrdenes {
         _tablaOrdenes,
       )..where((t) => t.id.equals(id))).getSingleOrNull();
 
+      // Una orden que se fió no se borra: la `restrict` de `deudores.orden_id`
+      // lo impediría igual, pero con un error de SQLite que no se le puede
+      // enseñar a nadie. Y borrarla dejaría la deuda cobrando líneas que ya no
+      // se pueden mirar en ninguna parte.
+      final deuda = await (_db.select(_db.tablaDeudor)
+            ..where((t) => t.ordenId.equals(id))
+            ..limit(1))
+          .getSingleOrNull();
+      if (deuda != null) {
+        throw Exception(
+          'La orden ${antes?.numero ?? '#$id'} se fió en la deuda '
+          '${deuda.numero}: elimina primero la deuda si de verdad hay que '
+          'borrarla.',
+        );
+      }
+
       final deleted = await (_db.delete(
         _tablaOrdenes,
       )..where((t) => t.id.equals(id))).go();

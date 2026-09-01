@@ -12,6 +12,7 @@ import '../../../documentos/widgets/dialogo_vista_previa.dart';
 import '../../provider/ordenes_providers.dart';
 import '../modelo/orden_editor_state.dart';
 import '../provider/orden_editor_provider.dart';
+import '../widgets/dialogo_cerrar_credito.dart';
 import '../widgets/panel_catalogo_orden.dart';
 import '../widgets/panel_orden.dart';
 
@@ -98,6 +99,28 @@ class _OrdenDetalleVistaState extends ConsumerState<OrdenDetalleVista> {
     }
   }
 
+  /// Fía la orden entera: abre la deuda con estas líneas dentro y cierra el
+  /// editor.
+  ///
+  /// **El inventario no se vuelve a mover**: los repuestos salieron del
+  /// estante al anotarse aquí. Al terminar se sale del editor porque la orden
+  /// queda `ENTREGADA` y ya no admite cambios; lo que siga se hace en la
+  /// deuda.
+  Future<void> _cerrarACredito() async {
+    final estado = ref.read(ordenEditorProvider(widget.ordenId)).value;
+    if (estado == null) return;
+
+    final fiada = await DialogoCerrarACredito.mostrar(
+      context,
+      ordenId: widget.ordenId,
+      numero: estado.numero,
+      total: estado.total,
+    );
+    if (fiada != true || !mounted) return;
+
+    widget.alCerrar();
+  }
+
   @override
   Widget build(BuildContext context) {
     final provider = ordenEditorProvider(widget.ordenId);
@@ -134,6 +157,7 @@ class _OrdenDetalleVistaState extends ConsumerState<OrdenDetalleVista> {
                   PanelOrden(
                     ordenId: widget.ordenId,
                     alImprimir: () => unawaited(_imprimir()),
+                    alCerrarACredito: () => unawaited(_cerrarACredito()),
                   ),
                 ],
               ),
