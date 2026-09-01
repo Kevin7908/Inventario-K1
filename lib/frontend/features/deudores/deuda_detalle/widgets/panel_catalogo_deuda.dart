@@ -32,6 +32,7 @@ class PanelCatalogoDeuda extends ConsumerWidget {
       deudaEditorProvider(deudaId).select((s) => (
             panel: s.value?.seccionActiva ?? SeccionDeuda.productos,
             editable: s.value?.editable ?? false,
+            motivo: s.value?.motivoNoEditable,
           )),
     );
 
@@ -70,7 +71,7 @@ class PanelCatalogoDeuda extends ConsumerWidget {
                       ),
                       if (!vista.editable) ...[
                         const SizedBox(height: 12),
-                        const _AvisoCerrada(),
+                        _AvisoCerrada(motivo: vista.motivo),
                       ],
                       const SizedBox(height: 16),
                       Expanded(
@@ -170,7 +171,12 @@ class _BarraState extends ConsumerState<_Barra> {
 
 /// Por qué el panel está apagado.
 class _AvisoCerrada extends StatelessWidget {
-  const _AvisoCerrada();
+  const _AvisoCerrada({this.motivo});
+
+  /// Por qué no se le puede anotar nada. Son dos razones distintas —cerrada,
+  /// o copia de una orden— y decir cuál evita que el usuario busque el botón
+  /// que le falta.
+  final String? motivo;
 
   @override
   Widget build(BuildContext context) {
@@ -180,14 +186,14 @@ class _AvisoCerrada extends StatelessWidget {
         color: ColoresApp.statusWarningBg,
         borderRadius: BorderRadius.circular(10),
       ),
-      child: const Row(
+      child: Row(
         children: [
-          Icon(Icons.lock_outline_rounded,
+          const Icon(Icons.lock_outline_rounded,
               size: 15, color: ColoresApp.statusWarning),
-          SizedBox(width: 8),
+          const SizedBox(width: 8),
           Expanded(
             child: Text(
-              'La deuda está cerrada: no admite más repuestos.',
+              motivo ?? 'La deuda está cerrada: no admite más repuestos.',
               style: TipografiaApp.caption,
             ),
           ),

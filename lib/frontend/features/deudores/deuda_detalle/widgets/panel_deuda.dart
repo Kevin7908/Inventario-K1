@@ -52,6 +52,7 @@ class _Cabecera extends ConsumerWidget {
             cliente: s.value?.clienteNombre ?? '',
             moto: s.value?.motoDescripcion,
             concepto: s.value?.concepto,
+            numeroOrden: s.value?.numeroOrden,
             vence: s.value?.fechaVencimiento,
             vencida: s.value?.estaVencida ?? false,
             estado: s.value?.estado,
@@ -61,7 +62,10 @@ class _Cabecera extends ConsumerWidget {
 
     final subtitulo = [
       ?datos.moto,
-      ?datos.concepto,
+      // De dónde salió, cuando salió de una orden: es lo que lleva al sitio
+      // donde sí se pueden corregir las líneas.
+      if (datos.numeroOrden != null) 'de la orden ${datos.numeroOrden}',
+      if (datos.numeroOrden == null) ?datos.concepto,
       if (datos.vence != null)
         datos.vencida
             ? 'venció el ${formatearFecha(datos.vence!)}'
@@ -252,7 +256,7 @@ class _Pie extends ConsumerWidget {
             pagado: s.value?.montoPagado ?? 0,
             saldo: s.value?.saldo ?? 0,
             lineas: s.value?.lineas.length ?? 0,
-            editable: s.value?.editable ?? false,
+            viva: s.value?.viva ?? false,
             estado: s.value?.estado,
             vencida: s.value?.estaVencida ?? false,
           )),
@@ -260,7 +264,10 @@ class _Pie extends ConsumerWidget {
 
     // Sin nada fiado no hay deuda que dar por perdida: cerrar una vacía solo
     // la saca del listado sin haber hecho nada.
-    final puedeCerrar = datos.editable && datos.lineas > 0;
+    //
+    // Mira `viva` y no `editable`: la que copia una orden no admite líneas
+    // nuevas y aun así se puede dar por perdida, que es un cambio de estado.
+    final puedeCerrar = datos.viva && datos.lineas > 0;
 
     final situacion = switch (datos.estado) {
       EstadoDeudor.pagada => SituacionDeuda.pagada,

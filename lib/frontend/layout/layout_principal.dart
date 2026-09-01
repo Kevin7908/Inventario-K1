@@ -6,6 +6,7 @@ import '../features/autenticacion/provider/auth_providers.dart';
 import '../features/bitacora/vista/bitacora_vista.dart';
 import '../features/categorias/vista/categorias_vistas.dart';
 import '../features/clientes/vista/cliente_vista.dart';
+import '../features/compras/vista/compras_vista.dart';
 import '../features/configuracion/vista/configuracion_vista.dart';
 import '../features/cotizaciones/vista/cotizaciones_vista.dart';
 import '../features/deudores/vista/deudores_vista.dart';
@@ -49,6 +50,7 @@ class _LayoutPrincipalState extends ConsumerState<LayoutPrincipal> {
     '/movimientos',
     '/categorias',
     '/proveedores',
+    '/compras',
     '/ordenes',
     '/cotizaciones',
     '/reservas',
@@ -69,6 +71,7 @@ class _LayoutPrincipalState extends ConsumerState<LayoutPrincipal> {
     MovimientosVista(),
     CategoriasVista(),
     ProveedoresVista(),
+    ComprasVista(),
     OrdenesVista(),
     CotizacionesVista(),
     ReservasVista(),
@@ -101,6 +104,7 @@ class _LayoutPrincipalState extends ConsumerState<LayoutPrincipal> {
     '/movimientos': Permiso.inventarioMovimientosVer,
     '/categorias': Permiso.categoriasVer,
     '/proveedores': Permiso.proveedoresVer,
+    '/compras': Permiso.comprasVer,
     '/ordenes': Permiso.ordenesVer,
     '/cotizaciones': Permiso.cotizacionesVer,
     '/reservas': Permiso.reservasVer,
@@ -169,6 +173,12 @@ class _LayoutPrincipalState extends ConsumerState<LayoutPrincipal> {
           etiqueta: 'Proveedores',
           ruta: '/proveedores',
           alPresionar: () => _navegar('/proveedores'),
+        ),
+        ItemNavDato(
+          icono: Icons.receipt_outlined,
+          etiqueta: 'Compras',
+          ruta: '/compras',
+          alPresionar: () => _navegar('/compras'),
         ),
       ],
     ),

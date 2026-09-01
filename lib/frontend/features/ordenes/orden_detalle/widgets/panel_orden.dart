@@ -3,8 +3,10 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../../../../backend/share/dominio/permiso.dart';
 import '../../../../../core/formato.dart';
 import '../../../../share/share.dart';
+import '../../../autenticacion/widgets/si_puede.dart';
 import '../../widgets/estado_orden_ui.dart';
 import '../modelo/linea_orden_editor.dart';
 import '../modelo/orden_editor_state.dart';
@@ -29,6 +31,7 @@ class PanelOrden extends ConsumerWidget {
     super.key,
     required this.ordenId,
     required this.alImprimir,
+    required this.alCerrarACredito,
   });
 
   static const double ancho = PanelDocumento.ancho;
@@ -36,12 +39,20 @@ class PanelOrden extends ConsumerWidget {
   final int ordenId;
   final VoidCallback alImprimir;
 
+  /// Fiar la orden entera. Lo resuelve la vista, que es la que sabe cerrarse
+  /// después: la deuda vive en otra pantalla.
+  final VoidCallback alCerrarACredito;
+
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     return PanelDocumento(
       cabecera: _Cabecera(ordenId: ordenId),
       contenido: _Lineas(ordenId: ordenId),
-      pie: _Pie(ordenId: ordenId, alImprimir: alImprimir),
+      pie: _Pie(
+        ordenId: ordenId,
+        alImprimir: alImprimir,
+        alCerrarACredito: alCerrarACredito,
+      ),
     );
   }
 }
@@ -208,14 +219,27 @@ class _Lineas extends ConsumerWidget {
   }
 }
 /// Totales y acciones, sobre el fondo tenue del diseño.
-class _Pie extends StatelessWidget {
-  const _Pie({required this.ordenId, required this.alImprimir});
+class _Pie extends ConsumerWidget {
+  const _Pie({
+    required this.ordenId,
+    required this.alImprimir,
+    required this.alCerrarACredito,
+  });
 
   final int ordenId;
   final VoidCallback alImprimir;
+  final VoidCallback alCerrarACredito;
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
+    // Fiar una orden vacía abriría una deuda de cero pesos, y una ya cerrada
+    // no se fía: el repositorio lo rechaza igual, esto evita el viaje.
+    final sePuedeFiar = ref.watch(
+      ordenEditorProvider(ordenId).select(
+        (s) => (s.value?.editable ?? false) && (s.value?.lineas.isNotEmpty ?? false),
+      ),
+    );
+
     return Container(
       padding: const EdgeInsets.fromLTRB(22, 18, 22, 22),
       decoration: const BoxDecoration(
@@ -232,6 +256,21 @@ class _Pie extends StatelessWidget {
             icono: Icons.print_outlined,
             alPresionar: alImprimir,
           ),
+          // Fiar el trabajo entero: abre la deuda con estas mismas líneas y
+          // **no vuelve a tocar el inventario**. Esconderlo es orden; la
+          // compuerta que vale está en el repositorio (`CLAUDE.md` §7 bis).
+          if (sePuedeFiar) ...[
+            const SizedBox(height: 10),
+            SiPuede(
+              permiso: Permiso.deudoresCrear,
+              child: BotonSecundario(
+                etiqueta: 'Cerrar a crédito',
+                icono: Icons.attach_money_rounded,
+                expandido: true,
+                alPresionar: alCerrarACredito,
+              ),
+            ),
+          ],
         ],
       ),
     );

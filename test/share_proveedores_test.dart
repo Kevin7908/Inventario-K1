@@ -1,16 +1,42 @@
 // Widgets agregados o extendidos al migrar Proveedores a share.
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:inventario_k1/backend/features/compras/repositorio/repositorio_compras.dart';
 import 'package:inventario_k1/backend/features/proveedores/modelo/proveedor.dart';
+import 'package:inventario_k1/frontend/features/compras/provider/compras_providers.dart';
 import 'package:inventario_k1/frontend/features/proveedores/widgets/tarjeta_proveedor.dart';
 import 'package:inventario_k1/frontend/share/share.dart';
 import 'package:inventario_k1/frontend/features/proveedores/widgets/identidad_proveedor.dart';
 
-Widget _envolver(Widget child) => MaterialApp(
-      home: Scaffold(
-        body: Padding(
-          padding: const EdgeInsets.all(24),
-          child: SizedBox(width: 360, child: child),
+/// La tarjeta del proveedor lleva desde las compras una línea con lo que se le
+/// lleva comprado, y esa línea observa un provider: de ahí el `ProviderScope`.
+///
+/// El resumen llega **por override y síncrono**: la consulta real es un stream
+/// de Drift, que bajo el `fakeAsync` de `flutter_test` no avanza y deja un
+/// timer pendiente. Lo que se prueba aquí es la tarjeta; que la consulta sume
+/// bien lo cubre `repositorio_compras_test.dart`.
+Widget _envolver(Widget child, {ResumenProveedorCompras? compras}) =>
+    ProviderScope(
+      overrides: [
+        resumenProveedorComprasProvider(1).overrideWith(
+          (ref) => Stream.value(
+            compras ??
+                (
+                  comprasMes: 0,
+                  invertidoMes: 0,
+                  invertidoTotal: 0,
+                  ultimaCompra: null,
+                ),
+          ),
+        ),
+      ],
+      child: MaterialApp(
+        home: Scaffold(
+          body: Padding(
+            padding: const EdgeInsets.all(24),
+            child: SizedBox(width: 360, child: child),
+          ),
         ),
       ),
     );
@@ -198,6 +224,38 @@ void main() {
 
       expect(editados, 1);
       expect(eliminados, 1);
+    });
+  });
+
+  group('lo que se le lleva comprado al proveedor', () {
+    testWidgets('sin remisiones registradas lo dice', (tester) async {
+      await tester.pumpWidget(_envolver(
+        TarjetaProveedor(proveedor: _proveedor(), productos: 3),
+      ));
+      await tester.pump();
+
+      expect(find.text('Sin compras registradas'), findsOneWidget);
+    });
+
+    testWidgets('con compras muestra lo del mes y cuándo fue la última',
+        (tester) async {
+      // Es la tercera pregunta que el taller hace todos los meses y que la app
+      // no podía contestar mientras dar entrada fuera producto + cantidad.
+      await tester.pumpWidget(_envolver(
+        TarjetaProveedor(proveedor: _proveedor(), productos: 3),
+        compras: (
+          comprasMes: 2,
+          invertidoMes: 1240000,
+          invertidoTotal: 4300000,
+          ultimaCompra: DateTime.now().subtract(const Duration(days: 12)),
+        ),
+      ));
+      await tester.pump();
+
+      expect(
+        find.text(r'$1.240.000 este mes · la última hace 12 días'),
+        findsOneWidget,
+      );
     });
   });
 

@@ -68,6 +68,8 @@ class DeudaEditorNotifier extends AsyncNotifier<DeudaEditorState> {
       clienteNombre: d.nombreCliente,
       motoId: d.motoId,
       motoDescripcion: d.descripcionMoto,
+      ordenId: d.ordenId,
+      numeroOrden: d.numeroOrden,
       concepto: d.concepto,
       notas: d.notas,
       estado: d.estado,

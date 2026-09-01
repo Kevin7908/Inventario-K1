@@ -53,6 +53,16 @@ DeudorItem _linea({double cantidad = 2}) => DeudorItem(
       precioUnitario: 30000,
     );
 
+/// Una línea de las que llegan al fiar una orden: mano de obra, sin producto
+/// del catálogo detrás.
+DeudorItem _lineaDeManoDeObra() => const DeudorItem(
+      id: 2,
+      deudorId: 7,
+      descripcion: 'Sincronización',
+      cantidad: 1,
+      precioUnitario: 45000,
+    );
+
 void main() {
   group('la situación de una deuda no es su columna estado', () {
     test('activa con el plazo cumplido se lee «Vencida»', () {
@@ -322,6 +332,27 @@ void main() {
       expect(find.text('FRE-1123'), findsOneWidget);
       // El unitario, no el subtotal: es lo que se compara con el catálogo.
       expect(find.text(r'$30.000'), findsOneWidget);
+    });
+
+    testWidgets('la mano de obra se pinta sin SKU y con su propio ícono',
+        (tester) async {
+      // Desde que una orden se puede cerrar a crédito, no todo lo fiado es una
+      // pieza: la mano de obra y los cargos se cobran igual y no tienen SKU
+      // que enseñar.
+      await _pump(
+        tester,
+        LineaDeuda(
+          linea: _lineaDeManoDeObra(),
+          editable: false,
+          alCambiarCantidad: (_) {},
+          alEliminar: () {},
+        ),
+      );
+
+      expect(find.text('Sincronización'), findsOneWidget);
+      expect(find.text('FRE-1123'), findsNothing);
+      expect(find.byIcon(Icons.build_outlined), findsOneWidget);
+      expect(find.byIcon(Icons.inventory_2_outlined), findsNothing);
     });
 
     testWidgets('el − con cantidad 1 quita la línea', (tester) async {
