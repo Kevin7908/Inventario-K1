@@ -70,6 +70,7 @@ OrdenDetalle _orden({
       motoId: 3,
       motoDescripcion: 'Boxer CT 100',
       motoPlaca: 'KMN12C',
+      motoMarcaId: 1,
       clienteId: 7,
       clienteNombre: 'José Muñoz',
       kilometrajeEntrada: kilometraje,

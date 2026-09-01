@@ -50,8 +50,7 @@ void main() {
         () => db.into(db.tablaMoto).insert(
               TablaMotoCompanion.insert(
                 clienteId: taller.clienteId,
-                marca: 'Yamaha',
-                modelo: 'FZ',
+                marcaId: taller.marcaId,
                 placa: const Value('KMN12C'),
               ),
             ),
@@ -64,8 +63,7 @@ void main() {
         () => db.into(db.tablaMoto).insert(
               TablaMotoCompanion.insert(
                 clienteId: taller.clienteId,
-                marca: 'Yamaha',
-                modelo: 'FZ',
+                marcaId: taller.marcaId,
                 anio: const Value(12),
               ),
             ),
@@ -74,13 +72,27 @@ void main() {
     });
 
     test('un cilindraje de cero se rechaza', () async {
+      // El cilindraje se mudó a `modelos_moto`: es del modelo, no del
+      // ejemplar. El CHECK se mudó con él.
+      expect(
+        () => db.into(db.tablaModeloMoto).insert(
+              TablaModeloMotoCompanion.insert(
+                marcaId: taller.marcaId,
+                nombre: 'Otro',
+                cilindraje: const Value(0),
+              ),
+            ),
+        throwsA(isA<Exception>()),
+      );
+    });
+
+    test('una moto no puede apuntar a una marca que no existe', () async {
+      // La FK es la que lo impide, y solo con `PRAGMA foreign_keys = ON`.
       expect(
         () => db.into(db.tablaMoto).insert(
               TablaMotoCompanion.insert(
                 clienteId: taller.clienteId,
-                marca: 'Yamaha',
-                modelo: 'FZ',
-                cilindraje: const Value(0),
+                marcaId: 9999,
               ),
             ),
         throwsA(isA<Exception>()),

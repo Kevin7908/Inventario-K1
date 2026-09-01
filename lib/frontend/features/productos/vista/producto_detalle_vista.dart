@@ -7,6 +7,7 @@ import '../../../../core/formato.dart';
 import '../../../../backend/features/productos/modelo/producto.dart';
 import '../../../share/share.dart';
 import '../widgets/badget_estado_stock_widget.dart';
+import '../widgets/panel_compatibilidad.dart';
 import '../../../../backend/share/dominio/permiso.dart';
 import '../../autenticacion/widgets/si_puede.dart';
 import '../../inventario/widgets/dialogo_entrada_compra.dart';
@@ -201,7 +202,7 @@ class _Ficha extends StatelessWidget {
         const SizedBox(height: 22),
         _GrillaDatos(producto: producto),
         const SizedBox(height: 22),
-        _Compatibilidad(descripcion: producto.descripcion),
+        PanelCompatibilidad(productoId: producto.id!),
         if (alEditar != null || alEliminar != null) ...[
           const SizedBox(height: 22),
           // Dar entrada vive aquí además de en Movimientos: cuando llega la
@@ -313,53 +314,6 @@ class _GrillaDatos extends StatelessWidget {
             ],
           ),
         ),
-      ],
-    );
-  }
-}
-
-/// Bloque "Compatibilidad" del diseño.
-///
-/// El modelo `Producto` no tiene todavía un campo de motos compatibles, así
-/// que el bloque queda como marcador hasta que exista en el backend.
-class _Compatibilidad extends StatelessWidget {
-  const _Compatibilidad({required this.descripcion});
-
-  final String? descripcion;
-
-  @override
-  Widget build(BuildContext context) {
-    final texto = descripcion?.trim() ?? '';
-
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Text(
-          'Compatibilidad',
-          style: TipografiaApp.caption.copyWith(
-            fontSize: 13,
-            fontWeight: FontWeight.w600,
-          ),
-        ),
-        const SizedBox(height: 8),
-        if (texto.isEmpty)
-          Container(
-            width: double.infinity,
-            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
-            decoration: BoxDecoration(
-              color: ColoresApp.bgInput,
-              borderRadius: BorderRadius.circular(11),
-              border: Border.all(color: ColoresApp.borderFila),
-            ),
-            child: Text(
-              'Sin información de compatibilidad',
-              style: TipografiaApp.caption.copyWith(
-                color: ColoresApp.textDisabled,
-              ),
-            ),
-          )
-        else
-          Text(texto, style: TipografiaApp.caption.copyWith(fontSize: 13)),
       ],
     );
   }

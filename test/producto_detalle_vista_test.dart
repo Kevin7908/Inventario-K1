@@ -7,6 +7,8 @@ import 'package:inventario_k1/backend/features/productos/modelo/producto.dart';
 import 'package:inventario_k1/backend/share/dominio/permiso.dart';
 import 'package:inventario_k1/frontend/features/autenticacion/provider/auth_providers.dart';
 import 'package:inventario_k1/frontend/features/inventario/provider/inventario_providers.dart';
+import 'package:inventario_k1/backend/features/productos/modelo/compatibilidad.dart';
+import 'package:inventario_k1/frontend/features/productos/provider/compatibilidades_provider.dart';
 import 'package:inventario_k1/frontend/features/productos/vista/producto_detalle_vista.dart';
 
 import 'soporte/repositorio_inventario_falso.dart';
@@ -37,6 +39,7 @@ Future<void> _pumpFicha(
   Size tamano, {
   List<MovimientoInventario> movimientos = const [],
   Set<Permiso> permisos = const {},
+  List<Compatibilidad> compatibilidades = const [],
   /// La ficha solo pinta sus acciones cuando es la página completa. Dentro de
   /// `DialogoDetalleProductoWidget` no recibe callbacks y es de solo lectura.
   bool conAcciones = false,
@@ -52,6 +55,13 @@ Future<void> _pumpFicha(
           RepositorioInventarioFalso(movimientos: movimientos),
         ),
         permisosSesionProvider.overrideWith((ref) => Stream.value(permisos)),
+        // Un stream síncrono en vez de la consulta real: los streams de Drift
+        // no avanzan bajo el `fakeAsync` de `flutter_test` y dejan un timer
+        // pendiente al cerrarse. Lo que se prueba aquí es el layout; que la
+        // consulta traiga lo correcto lo cubre
+        // `repositorio_marcas_compatibilidad_test.dart`.
+        compatibilidadesProvider(_producto.id!)
+            .overrideWith((ref) => Stream.value(compatibilidades)),
       ],
       child: MaterialApp(
         home: Scaffold(
@@ -142,5 +152,69 @@ void main() {
     );
 
     expect(find.text('Dar entrada'), findsOneWidget);
+  });
+
+  group('compatibilidad', () {
+    testWidgets('sin compatibilidades declaradas se ve el hueco',
+        (tester) async {
+      await _pumpFicha(tester, const Size(1400, 1000));
+
+      expect(find.text('Sin información de compatibilidad'), findsOneWidget);
+    });
+
+    testWidgets('la de marca se lee distinta de la de modelo', (tester) async {
+      // Es la diferencia que el panel existe para mostrar: una línea de marca
+      // vale por todas las motos de esa marca, la de modelo solo por una.
+      await _pumpFicha(
+        tester,
+        const Size(1400, 1000),
+        compatibilidades: const [
+          Compatibilidad(id: 1, productoId: 1, marcaId: 3, marca: 'Yamaha'),
+          Compatibilidad(
+            id: 2,
+            productoId: 1,
+            modeloId: 7,
+            marca: 'Bajaj',
+            modelo: 'Pulsar NS200',
+            cilindraje: 200,
+          ),
+        ],
+      );
+
+      expect(find.text('Yamaha (toda la marca)'), findsOneWidget);
+      expect(find.text('Bajaj Pulsar NS200 · 200 cc'), findsOneWidget);
+      expect(find.text('Sin información de compatibilidad'), findsNothing);
+    });
+
+    testWidgets('sin PRODUCTOS_EDITAR no se ofrece quitar ni agregar',
+        (tester) async {
+      // Esconder el botón es orden, no control: la compuerta que vale está en
+      // el repositorio (`CLAUDE.md` §7 bis) y la cubre su propio test.
+      await _pumpFicha(
+        tester,
+        const Size(1400, 1000),
+        compatibilidades: const [
+          Compatibilidad(id: 1, productoId: 1, marcaId: 3, marca: 'Yamaha'),
+        ],
+      );
+
+      expect(find.byTooltip('Quitar'), findsNothing);
+      expect(find.byTooltip('Agregar moto compatible'), findsNothing);
+    });
+
+    testWidgets('con PRODUCTOS_EDITAR aparecen los dos gestos',
+        (tester) async {
+      await _pumpFicha(
+        tester,
+        const Size(1400, 1000),
+        permisos: {Permiso.productosEditar},
+        compatibilidades: const [
+          Compatibilidad(id: 1, productoId: 1, marcaId: 3, marca: 'Yamaha'),
+        ],
+      );
+
+      expect(find.byTooltip('Quitar'), findsOneWidget);
+      expect(find.byTooltip('Agregar moto compatible'), findsOneWidget);
+    });
   });
 }

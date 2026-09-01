@@ -126,6 +126,8 @@ class Sembrador {
   List<int> _proveedores = [];
   List<int> _clientes = [];
   List<int> _motos = [];
+  List<int> _marcasMoto = [];
+  List<int> _modelosMoto = [];
   List<int> _productos = [];
   List<int> _unidades = [];
   List<int> _servicios = [];
@@ -210,6 +212,7 @@ class Sembrador {
     }
 
     await _tecnicosYServicios();
+    await _compatibilidades();
     await _ventas();
     await _ordenes();
     await _cotizaciones();
@@ -374,22 +377,55 @@ class Sembrador {
       }
     }
 
+    // El catálogo primero: la marca y el modelo son FK, no texto (§1.3). Se
+    // siembra el producto cartesiano de las dos listas para que cualquier
+    // combinación que salga sorteada exista.
+    final marcaPorNombre = <String, int>{};
+    for (final marca in _marcas) {
+      marcaPorNombre[marca] = await db
+          .into(db.tablaMarcaMoto)
+          .insert(TablaMarcaMotoCompanion.insert(nombre: marca));
+    }
+    final modeloPorClave = <String, int>{};
+    for (final marca in _marcas) {
+      for (final linea in _lineas) {
+        modeloPorClave['$marca|$linea'] = await db.into(db.tablaModeloMoto).insert(
+              TablaModeloMotoCompanion.insert(
+                marcaId: marcaPorNombre[marca]!,
+                nombre: linea,
+                cilindraje:
+                    Value(_uno(const [100, 125, 150, 180, 200, 250])),
+              ),
+            );
+      }
+    }
+
     await db.batch((b) {
       for (var i = 0; i < _clientes.length; i++) {
+        final marca = _uno(_marcas);
+        final linea = _uno(_lineas);
+        // Una de cada diez entra sin modelo: es el caso que la columna admite
+        // —en el mostrador la marca siempre se sabe y el modelo exacto a veces
+        // no está catalogado— y sin sembrarlo no habría con qué probar que las
+        // consultas lo aguantan.
+        final sinModelo = _rnd.nextInt(10) == 0;
         b.insert(
           db.tablaMoto,
           TablaMotoCompanion.insert(
             clienteId: _clientes[i],
             placa: Value('S${100000 + i}'),
-            marca: _uno(_marcas),
-            modelo: _uno(_lineas),
+            marcaId: marcaPorNombre[marca]!,
+            modeloId: sinModelo
+                ? const Value.absent()
+                : Value(modeloPorClave['$marca|$linea']!),
             anio: Value(2010 + _rnd.nextInt(16)),
-            cilindraje: Value(_uno(const [100, 125, 150, 180, 200, 250])),
           ),
         );
       }
     });
     _motos = await _ids('motos');
+    _marcasMoto = marcaPorNombre.values.toList(growable: false);
+    _modelosMoto = modeloPorClave.values.toList(growable: false);
   }
 
   /// Los productos nacen con stock 0: el inventario inicial entra como
@@ -414,6 +450,15 @@ class Sembrador {
             // Seis dígitos: `formatearSku` rellena a tres, así que este
             // formato no lo puede generar la app y nunca chocan.
             sku: 'SEED-${i.toString().padLeft(6, '0')}',
+            // Solo a dos de cada tres: el código de barras viene impreso de
+            // fábrica y falta en todo lo que llega a granel. Sembrarlo en
+            // todos escondería justo el caso que la columna admite —varios
+            // NULL bajo el mismo UNIQUE—.
+            codigoBarras: Value(
+              _rnd.nextInt(3) == 0
+                  ? null
+                  : '77${(10000000000 + desde + i).toString().substring(0, 11)}',
+            ),
             nombre: nombre,
             descripcion: const Value('Producto de prueba'),
             categoriaId: Value(_uno(_categorias)),
@@ -460,6 +505,8 @@ class Sembrador {
     _proveedores = await _ids('proveedores');
     _clientes = await _ids('clientes');
     _motos = await _ids('motos');
+    _marcasMoto = await _ids('marcas_moto');
+    _modelosMoto = await _ids('modelos_moto');
     _unidades = await _ids('unidades_medida');
 
     for (final fila in await db
@@ -482,6 +529,70 @@ class Sembrador {
   // ═══════════════════════════════════════════════════════════════════════
   //  Técnicos y servicios
   // ═══════════════════════════════════════════════════════════════════════
+
+  /// A qué motos le sirve cada repuesto.
+  ///
+  /// **Es acumulativa como el resto**: solo declara lo que falta, así que
+  /// correr el sembrador dos veces no duplica líneas —y no podría, porque la
+  /// comprobación de repetido vive en el repositorio y aquí se inserta a
+  /// pelo—.
+  ///
+  /// Reparte a propósito los dos niveles que la tabla admite: una de cada
+  /// cuatro es de marca —«sirve para cualquier Yamaha», el caso del aceite— y
+  /// el resto de modelo. Sembrar solo uno de los dos dejaría sin datos justo
+  /// la mitad que hay que probar.
+  ///
+  /// Tampoco los declara todos: un catálogo donde **todo** es compatible con
+  /// **todo** hace que el filtro «solo para esta moto» no se note.
+  Future<void> _compatibilidades() async {
+    if (_marcasMoto.isEmpty || _productos.isEmpty) return;
+
+    final yaHay = await _maxId('producto_compatibilidades');
+    if (yaHay > 0) return;
+
+    // Un `Set` por producto para no repetir la misma línea: la `UNIQUE` de la
+    // tabla no la cierra, porque SQLite trata cada NULL como distinto.
+    var puestas = 0;
+    await db.batch((b) {
+      for (final productoId in _productos) {
+        // Dos de cada tres repuestos declaran algo; el resto se queda sin
+        // compatibilidad, que es lo normal en un catálogo real.
+        if (_rnd.nextInt(3) == 0) continue;
+
+        final deMarca = <int>{};
+        final deModelo = <int>{};
+        for (var i = 0; i < 1 + _rnd.nextInt(3); i++) {
+          if (_rnd.nextInt(4) == 0) {
+            deMarca.add(_uno(_marcasMoto));
+          } else if (_modelosMoto.isNotEmpty) {
+            deModelo.add(_uno(_modelosMoto));
+          }
+        }
+
+        for (final marcaId in deMarca) {
+          b.insert(
+            db.tablaProductoCompatibilidad,
+            TablaProductoCompatibilidadCompanion.insert(
+              productoId: productoId,
+              marcaId: Value(marcaId),
+            ),
+          );
+          puestas++;
+        }
+        for (final modeloId in deModelo) {
+          b.insert(
+            db.tablaProductoCompatibilidad,
+            TablaProductoCompatibilidadCompanion.insert(
+              productoId: productoId,
+              modeloId: Value(modeloId),
+            ),
+          );
+          puestas++;
+        }
+      }
+    });
+    assert(puestas >= 0);
+  }
 
   Future<void> _tecnicosYServicios() async {
     _tecnicos = await _ids('tecnicos');
@@ -656,6 +767,7 @@ class Sembrador {
           b.insert(
             db.tablaOrdenesTarea,
             TablaOrdenesTareaCompanion.insert(
+              usuarioId: autor,
               ordenId: ordenId,
               servicioId: _uno(_servicios),
               tecnicoId: _uno(_tecnicos),
@@ -669,6 +781,7 @@ class Sembrador {
           b.insert(
             db.tablaOrdenesCargo,
             TablaOrdenesCargoCompanion.insert(
+              usuarioId: autor,
               ordenId: ordenId,
               descripcion: _uno(const [
                 'Lavado', 'Insumos varios', 'Domicilio', 'Grúa', 'Diagnóstico',
@@ -688,6 +801,7 @@ class Sembrador {
 
         await db.into(db.tablaOrdenesRepuesto).insert(
               TablaOrdenesRepuestoCompanion.insert(
+                usuarioId: autor,
                 ordenId: ordenId,
                 productoId: productoId,
                 cantidad: Value(cantidad),
@@ -764,6 +878,7 @@ class Sembrador {
 
         await db.into(db.tablaCotizacionItem).insert(
               TablaCotizacionItemCompanion.insert(
+                usuarioId: autor,
                 cotizacionId: cotizacionId,
                 tipoItem: esProducto ? 'PRODUCTO' : 'SERVICIO',
                 productoId: Value(productoId),
@@ -813,6 +928,7 @@ class Sembrador {
 
         await db.into(db.tablaReservaItem).insert(
               TablaReservaItemCompanion.insert(
+                usuarioId: autor,
                 reservaId: reservaId,
                 productoId: productoId,
                 cantidad: cantidad,
@@ -897,6 +1013,7 @@ class Sembrador {
 
         await db.into(db.tablaDeudorItem).insert(
               TablaDeudorItemCompanion.insert(
+                usuarioId: autor,
                 deudorId: deudorId,
                 productoId: productoId,
                 cantidad: cantidad,
@@ -1173,7 +1290,8 @@ class Sembrador {
   static const tablas = [
     'categorias', 'unidades_medida', 'especializaciones', 'servicios',
     'personas', 'usuarios', 'usuario_permisos', 'proveedores', 'clientes',
-    'tecnicos', 'motos', 'productos', 'movimientos_inventario',
+    'tecnicos', 'marcas_moto', 'modelos_moto', 'motos',
+    'productos', 'producto_compatibilidades', 'movimientos_inventario',
     'ventas', 'venta_detalles',
     'ordenes_servicio', 'ordenes_tareas', 'ordenes_repuestos', 'ordenes_cargos',
     'cotizaciones', 'cotizacion_items',

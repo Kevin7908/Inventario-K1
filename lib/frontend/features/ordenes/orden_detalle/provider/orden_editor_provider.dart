@@ -108,6 +108,8 @@ class OrdenEditorNotifier extends AsyncNotifier<OrdenEditorState> {
       motoId: detalle.motoId,
       motoDescripcion: detalle.motoDescripcion,
       motoPlaca: detalle.motoPlaca,
+      motoMarcaId: detalle.motoMarcaId,
+      motoModeloId: detalle.motoModeloId,
       kilometrajeEntrada: detalle.kilometrajeEntrada,
       estado: detalle.estado,
       diagnostico: detalle.diagnosticoCliente ?? '',
@@ -119,6 +121,7 @@ class OrdenEditorNotifier extends AsyncNotifier<OrdenEditorState> {
       busquedaCatalogo: conservando?.busquedaCatalogo ?? '',
       categoriaId: conservando?.categoriaId,
       paginaCatalogo: conservando?.paginaCatalogo ?? 0,
+      soloCompatibles: conservando?.soloCompatibles ?? false,
     );
   }
 
@@ -275,6 +278,15 @@ class OrdenEditorNotifier extends AsyncNotifier<OrdenEditorState> {
 
   void filtrarPorCategoria(int? categoriaId) => _actualizar(
         (a) => a.copyWith(categoriaId: categoriaId, paginaCatalogo: 0),
+      );
+
+  /// Acota la rejilla a los repuestos declarados compatibles con esta moto.
+  /// Vuelve a la primera página por lo mismo que buscar y filtrar.
+  void alternarSoloCompatibles() => _actualizar(
+        (a) => a.copyWith(
+          soloCompatibles: !a.soloCompatibles,
+          paginaCatalogo: 0,
+        ),
       );
 
   void irAPaginaCatalogo(int pagina) =>

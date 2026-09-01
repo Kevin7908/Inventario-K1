@@ -482,6 +482,44 @@ void main() {
       );
     });
   });
+
+  group('acotar el catálogo a la moto de la orden', () {
+    test('apagado no filtra; encendido pasa marca y modelo al repositorio',
+        () async {
+      // El filtro se resuelve en SQL: lo que el editor decide es solo si va o
+      // no va, y con qué moto. Traer el conjunto de compatibles a Dart para
+      // descartar filas después rompería el total de la paginación (§5).
+      expect(_estado.soloCompatibles, isFalse);
+      expect(_estado.filtroProductos.compatibleConMarcaId, isNull);
+      expect(_estado.filtroProductos.compatibleConModeloId, isNull);
+
+      _notifier.alternarSoloCompatibles();
+
+      expect(_estado.soloCompatibles, isTrue);
+      expect(_estado.filtroProductos.compatibleConMarcaId, taller.marcaId);
+      expect(_estado.filtroProductos.compatibleConModeloId, taller.modeloId);
+    });
+
+    test('encenderlo vuelve a la primera página', () async {
+      // Por lo mismo que buscar y filtrar por categoría: quedarse en la cuarta
+      // después de acotar deja la rejilla vacía sin explicar por qué.
+      _notifier.irAPaginaCatalogo(3);
+      expect(_estado.paginaCatalogo, 3);
+
+      _notifier.alternarSoloCompatibles();
+
+      expect(_estado.paginaCatalogo, 0);
+    });
+
+    test('apagarlo devuelve el catálogo completo', () async {
+      _notifier.alternarSoloCompatibles();
+      _notifier.alternarSoloCompatibles();
+
+      expect(_estado.soloCompatibles, isFalse);
+      expect(_estado.filtroProductos.compatibleConMarcaId, isNull);
+    });
+  });
+
 }
 
 // Helpers de catálogo — los dos modelos que el editor recibe de la izquierda.

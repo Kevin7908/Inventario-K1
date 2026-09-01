@@ -243,12 +243,54 @@ class _BarraState extends ConsumerState<_Barra> {
             controlador: _busqueda,
             focoTeclado: widget.focoBusqueda,
             placeholder: widget.tipo == TipoLineaOrden.repuesto
-                ? 'Buscar repuesto por nombre o SKU...'
+                ? 'Buscar repuesto por nombre, SKU o código de barras...'
                 : 'Buscar servicio...',
             alCambiar: _notifier.buscarEnCatalogo,
           ),
         ],
+        // Solo con repuestos: un servicio no es compatible con una moto.
+        if (widget.tipo == TipoLineaOrden.repuesto) ...[
+          const SizedBox(height: 12),
+          _ChipCompatibles(ordenId: widget.ordenId),
+        ],
       ],
+    );
+  }
+}
+
+/// «Solo para esta moto»: acota la rejilla a los repuestos declarados
+/// compatibles con la moto de la orden.
+///
+/// Es un `Consumer` propio para que encenderlo no reconstruya el buscador ni
+/// el selector de tipo (§3). Dice **qué moto** en la propia pastilla: el panel
+/// izquierdo no muestra la cabecera, así que sin el nombre no se sabría contra
+/// qué se está filtrando.
+class _ChipCompatibles extends ConsumerWidget {
+  const _ChipCompatibles({required this.ordenId});
+
+  final int ordenId;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final estado = ref.watch(
+      ordenEditorProvider(ordenId).select((s) => (
+            activo: s.value?.soloCompatibles ?? false,
+            moto: s.value?.motoDescripcion ?? '',
+          )),
+    );
+
+    return Align(
+      alignment: Alignment.centerLeft,
+      child: ChipFiltro(
+        etiqueta: estado.moto.isEmpty
+            ? 'Solo para esta moto'
+            : 'Solo para ${estado.moto}',
+        icono: Icons.two_wheeler_outlined,
+        seleccionado: estado.activo,
+        alPresionar: ref
+            .read(ordenEditorProvider(ordenId).notifier)
+            .alternarSoloCompatibles,
+      ),
     );
   }
 }
