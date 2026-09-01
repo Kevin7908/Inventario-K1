@@ -386,13 +386,31 @@ const List<String> guardasSql = [
   END;
   ''',
 
+  // ── Y lo reciente no se borra ───────────────────────────────────────────
+  //
+  // La bitácora **sí se poda**, o crecería para siempre; lo que no se puede
+  // es que la poda sirva para tapar algo. El `WHEN` es el tope duro: dos años
+  // de renglones que ningún `DELETE` toca, ni el de la app ni el de alguien
+  // con el `.sqlite` abierto en un visor.
+  //
+  // Los dos años están **quemados aquí a propósito**. Un trigger no puede
+  // leer la tabla `configuracion` sin volverse otra cosa que una garantía, y
+  // una garantía configurable no lo es. Lo que el taller elige es cuánto
+  // ofrece podar la pantalla —`ClaveConfiguracion.mesesBitacora`—, siempre
+  // por encima de este piso.
+  //
+  // El `CAST(strftime(...) AS INTEGER)` no es adorno: Drift guarda las fechas
+  // como segundos de época, un entero, y `datetime('now', …)` devuelve texto.
+  // Comparar entero con texto en SQLite no da error —da `false` siempre—, así
+  // que sin el CAST esta guarda estaría puesta y no protegería nada.
   '''
   CREATE TRIGGER IF NOT EXISTS guarda_bitacora_sin_borrado
   BEFORE DELETE ON bitacora
   FOR EACH ROW
+  WHEN OLD.creado_en > CAST(strftime('%s', 'now', '-2 years') AS INTEGER)
   BEGIN
     SELECT RAISE(ABORT,
-      'La bitácora no se borra.');
+      'La bitácora de los últimos dos años no se borra.');
   END;
   ''',
 ];

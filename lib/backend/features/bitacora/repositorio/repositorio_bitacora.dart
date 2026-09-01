@@ -73,4 +73,37 @@ abstract class RepositorioBitacora {
     int entidadId, {
     int limite = 20,
   });
+
+  /// Cuántas anotaciones tienen más de [meses], ya recortado al piso.
+  ///
+  /// Es lo que el diálogo de poda enseña **antes** de borrar nada: «se van
+  /// 1.240 renglones». Usa el mismo recorte que [podar], así que el número
+  /// que se muestra es el que de verdad se va.
+  Future<int> cuantasPodaria({required int meses});
+
+  /// Borra las anotaciones con más de [meses] y devuelve cuántas se fueron.
+  ///
+  /// La bitácora crece un renglón por cada alta, edición y borrado de
+  /// catálogo, y no tenía nada que la recortara. Esto es ese recorte, con dos
+  /// candados:
+  ///
+  /// - **[meses] se recorta a [mesesMinimos]**, que es el mismo piso que la
+  ///   guarda de la base impone con un `RAISE(ABORT)`. Sin el recorte, pedir
+  ///   doce meses no borraría de menos: reventaría con un error de SQLite.
+  ///   Cuánto conserva el taller por encima de ese piso lo dice
+  ///   `ClaveConfiguracion.mesesBitacora`.
+  /// - **La poda deja su propio renglón**, en la misma transacción. Sería el
+  ///   único acto de la app sin rastro, y justo el que se usaría para tapar
+  ///   los demás.
+  ///
+  /// Exige `USUARIOS_ADMINISTRAR`: no es leer la bitácora, es recortarla.
+  Future<int> podar({required int meses});
 }
+
+/// El piso que ninguna poda baja: dos años.
+///
+/// Está aquí y no en la configuración porque **es una garantía**, y una
+/// garantía configurable no lo es. La guarda de `guardas_sql.dart` lo repite
+/// en SQL, que es donde de verdad manda: quien abra el `.sqlite` con un visor
+/// tampoco puede borrar lo reciente.
+const int mesesMinimos = 24;

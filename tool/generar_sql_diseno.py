@@ -255,9 +255,15 @@ rompen lo que la tabla existe para conservar (RESTRICT impediría el borrado,
 CASCADE se llevaría el renglón que lo cuenta). `descripcion` guarda el nombre
 de lo afectado como snapshot: es la parte legible que sobrevive al borrado.
 
-Es de SOLO ESCRITURA, con su guarda: una bitácora que se puede corregir no
-prueba nada, porque quien quisiera tapar algo empezaría por su propio
-renglón.""",
+NO SE EDITA, con su guarda: una bitácora que se puede corregir no prueba nada,
+porque quien quisiera tapar algo empezaría por su propio renglón.
+
+SÍ SE PODA, o crecería un renglón por cada alta y cada borrado para siempre,
+pero solo lo de más de DOS AÑOS: la guarda del borrado rechaza cualquier DELETE
+sobre un renglón más reciente, así que recortarla no sirve para tapar nada.
+Cuánto conserva el taller por encima de ese piso es configurable
+(`meses_bitacora`); el piso no, porque una garantía configurable no es una
+garantía. La poda deja su propio renglón.""",
   ['bitacora']),
 ]
 

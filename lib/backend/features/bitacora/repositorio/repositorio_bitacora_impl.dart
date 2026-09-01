@@ -99,6 +99,68 @@ class RepositorioBitacoraImpl with FirmaDeSesion implements RepositorioBitacora 
     return filas.map((f) => BitacoraMapper.filaAModelo(f, _db)).toList();
   }
 
+  @override
+  Future<int> cuantasPodaria({required int meses}) async {
+    exigir(Permiso.bitacoraVer);
+
+    final conteo = _tabla.id.count();
+    final fila = await (_db.selectOnly(_tabla)
+          ..addColumns([conteo])
+          ..where(_tabla.creadoEn.isSmallerThanValue(_corte(meses))))
+        .getSingleOrNull();
+
+    return fila?.read(conteo) ?? 0;
+  }
+
+  @override
+  Future<int> podar({required int meses}) async {
+    // Recortar la bitácora no es leerla: es el gesto que se usaría para tapar
+    // lo demás, así que pide el permiso de administrar cuentas y no el de ver.
+    exigir(Permiso.usuariosAdministrar);
+
+    final corte = _corte(meses);
+
+    return _db.transaction(() async {
+      final cuantas = await (_db.delete(_tabla)
+            ..where((t) => t.creadoEn.isSmallerThanValue(corte)))
+          .go();
+
+      // La poda deja su propio renglón, y en la misma transacción: sería el
+      // único acto de la app sin rastro. Si el borrado se revierte, este se va
+      // con él.
+      if (cuantas > 0) {
+        await anotar(
+          Anotacion(
+            entidad: EntidadAuditada.configuracion,
+            accion: AccionAuditada.elimino,
+            descripcion: 'Bitácora anterior a ${corte.toIso8601String()}',
+            detalle: '$cuantas anotaciones podadas',
+          ),
+        );
+      }
+
+      return cuantas;
+    });
+  }
+
+  /// La fecha antes de la cual se puede podar.
+  ///
+  /// El recorte a [mesesMinimos] es lo que evita que pedir doce meses reviente
+  /// contra la guarda de la base con un error de SQLite en vez de borrar de
+  /// menos. Ver `RepositorioBitacora.podar`.
+  DateTime _corte(int meses) {
+    final conservados = meses < mesesMinimos ? mesesMinimos : meses;
+    final ahora = DateTime.now();
+    return DateTime(
+      ahora.year,
+      ahora.month - conservados,
+      ahora.day,
+      ahora.hour,
+      ahora.minute,
+      ahora.second,
+    );
+  }
+
   /// El renglón sin el nombre de quien lo hizo es ilegible, así que el `JOIN`
   /// va siempre. Son dos `innerJoin` porque el nombre vive en `personas` y la
   /// cuenta en `usuarios`.

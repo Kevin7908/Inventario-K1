@@ -11,7 +11,16 @@ enum ClaveConfiguracion {
   moneda('moneda', 'COP'),
 
   /// Porcentaje entero: `19` es 19%.
-  ivaPorcentaje('iva_porcentaje', '0');
+  ivaPorcentaje('iva_porcentaje', '0'),
+
+  /// Cuántos meses de bitácora conserva el taller antes de poder podarla.
+  ///
+  /// **Nunca por debajo de 24**, y eso no lo decide esta clave: la guarda de
+  /// `guardas_sql.dart` rechaza cualquier `DELETE` sobre un renglón de menos
+  /// de dos años, así que un valor menor no acortaría nada —solo haría que la
+  /// poda no borrara nada—. Por eso el repositorio lo recorta a ese piso.
+  /// Subirlo sí sirve: un taller que quiera guardar cinco años pone `60`.
+  mesesBitacora('meses_bitacora', '24');
 
   const ClaveConfiguracion(this.clave, this.porDefecto);
 

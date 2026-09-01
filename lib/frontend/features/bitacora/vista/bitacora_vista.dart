@@ -7,6 +7,9 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../layout/encabezado_con_cuenta.dart';
 import '../../../share/share.dart';
 import '../provider/bitacora_providers.dart';
+import '../../../../backend/share/dominio/permiso.dart';
+import '../../autenticacion/widgets/si_puede.dart';
+import '../widgets/dialogo_podar.dart';
 import '../widgets/filtros_bitacora.dart';
 import '../widgets/tabla_bitacora.dart';
 
@@ -58,6 +61,20 @@ class _BitacoraVistaState extends ConsumerState<BitacoraVista> {
     });
   }
 
+  /// Recorta lo más viejo de la bitácora. Es lo único que la achica: crece un
+  /// renglón por cada alta, edición y borrado de catálogo, para siempre.
+  Future<void> _podar() async {
+    final podadas = await DialogoPodar.mostrar(context);
+    if (podadas == null || !mounted) return;
+
+    MensajeApp.exito(
+      context,
+      podadas == 1
+          ? 'Se podó 1 anotación.'
+          : 'Se podaron $podadas anotaciones.',
+    );
+  }
+
   void _limpiarFiltros() {
     _busqueda.clear();
     ref.read(bitacoraListaProvider.notifier).limpiarFiltros();
@@ -77,9 +94,20 @@ class _BitacoraVistaState extends ConsumerState<BitacoraVista> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            const EncabezadoConCuenta(
+            EncabezadoConCuenta(
               titulo: 'Bitácora',
               subtitulo: 'Quién hizo qué, y cuándo',
+              // Recortarla no es leerla: es el gesto con el que se taparía lo
+              // demás, así que va detrás del permiso de administrar cuentas y
+              // no del de ver. La compuerta que manda está en `podar`.
+              acciones: SiPuede(
+                permiso: Permiso.usuariosAdministrar,
+                child: BotonSecundario(
+                  etiqueta: 'Podar',
+                  icono: Icons.content_cut_rounded,
+                  alPresionar: _podar,
+                ),
+              ),
             ),
             const SizedBox(height: 20),
             Row(

@@ -76,6 +76,11 @@ class _BitacoraFalsa implements RepositorioBitacora {
     int limite = 20,
   }) async =>
       entradas;
+  @override
+  Future<int> cuantasPodaria({required int meses}) async => 0;
+
+  @override
+  Future<int> podar({required int meses}) async => 0;
 }
 
 Future<void> _montar(

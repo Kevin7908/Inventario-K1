@@ -73,6 +73,12 @@ class _BitacoraFalsa implements RepositorioBitacora {
     ultimaConsulta = (entidad, entidadId);
     return entradas;
   }
+
+  @override
+  Future<int> cuantasPodaria({required int meses}) async => 0;
+
+  @override
+  Future<int> podar({required int meses}) async => 0;
 }
 
 Future<void> _montar(
