@@ -388,6 +388,25 @@ class RepositorioOrdenesImpl with FirmaDeSesion implements RepositorioOrdenes {
       if (updatedCount == 0) {
         throw Exception('No se pudo actualizar la orden #$id.');
       }
+
+      // Solo el **cambio de estado** deja renglón. `actualizar` es también el
+      // autoguardado de la cabecera —diagnóstico y observaciones—, así que
+      // anotarlo entero llenaría la bitácora de renglones por teclear.
+      //
+      // Cerrar y anular sí tienen que constar: son los dos gestos que le
+      // ponen precio a la orden y le devuelven o le quitan la mercancía, y
+      // `ordenes_servicio.usuario_id` solo dice quién la abrió.
+      final estadoAntes = EstadoOrden.desdeTexto(antes.estado);
+      if (estadoAntes != estado) {
+        await _anotar(
+          estado == EstadoOrden.anulada
+              ? AccionAuditada.anulo
+              : AccionAuditada.modifico,
+          id,
+          'Orden ${antes.numero}',
+          detalle: 'Estado: ${estadoAntes.etiqueta} → ${estado.etiqueta}',
+        );
+      }
     });
 
     // Propagar cambio de cliente a la factura vinculada (si existe)

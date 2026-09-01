@@ -11,6 +11,8 @@ import 'package:inventario_k1/backend/features/bitacora/modelo/entrada_bitacora.
 import 'package:inventario_k1/backend/features/bitacora/repositorio/repositorio_bitacora.dart';
 import 'package:inventario_k1/backend/features/bitacora/repositorio/repositorio_bitacora_impl.dart';
 import 'package:inventario_k1/backend/features/inventario/modelo/movimiento_inventario.dart';
+import 'package:inventario_k1/backend/features/ordenes/enum/enum_ordenes.dart';
+import 'package:inventario_k1/backend/features/ordenes/repositorio/repositorio_ordenes_impl.dart';
 import 'package:inventario_k1/backend/features/inventario/repositorio/repositorio_inventario_impl.dart';
 import 'package:inventario_k1/backend/features/pos/modelo/linea_venta_mostrador.dart';
 import 'package:inventario_k1/backend/features/pos/repositorio/repositorio_ventas_impl.dart';
@@ -211,6 +213,64 @@ void main() {
 
       expect(pagina.total, 1);
       expect(pagina.items.single.descripcion, contains('Bujía'));
+    });
+  });
+
+  group('cerrar o anular una orden deja rastro de quién fue', () {
+    // `ordenes_servicio.usuario_id` dice quién la **abrió** y nada más. Cerrar
+    // le pone precio al trabajo y anular devuelve los repuestos al estante:
+    // son los dos gestos que valen plata, y hasta ahora no constaban.
+
+    late RepositorioOrdenesImpl ordenes;
+    late int ordenId;
+
+    setUp(() async {
+      ordenes = RepositorioOrdenesImpl(db, sesion);
+      final orden = await ordenes.agregar(
+        motoId: taller.motoId,
+        clienteId: taller.clienteId,
+        kilometrajeEntrada: 12000,
+      );
+      ordenId = orden.id;
+    });
+
+    Future<void> pasarA(EstadoOrden estado) => ordenes.actualizar(
+          id: ordenId,
+          estado: estado,
+          kilometrajeEntrada: 12000,
+        );
+
+    Future<List<EntradaBitacora>> historial() =>
+        bitacora.historialDe(EntidadAuditada.orden, ordenId);
+
+    test('cerrarla queda anotado, con el estado de dónde a dónde', () async {
+      await pasarA(EstadoOrden.lista);
+
+      final renglon = (await historial()).single;
+      expect(renglon.accion, AccionAuditada.modifico);
+      expect(renglon.usuarioId, sesion.usuarioId);
+      expect(renglon.detalle, 'Estado: Abierta → Lista');
+    });
+
+    test('anularla se anota como anulación, no como edición', () async {
+      // Quien revisa la caja tiene que distinguir de un vistazo la orden que
+      // se deshizo de la que solo cambió de mano.
+      await pasarA(EstadoOrden.anulada);
+
+      expect((await historial()).single.accion, AccionAuditada.anulo);
+    });
+
+    test('guardar la cabecera sin mover el estado no anota nada', () async {
+      // `actualizar` es también el autoguardado: un renglón por pasada
+      // llenaría la bitácora de ruido mientras alguien teclea el diagnóstico.
+      await ordenes.actualizar(
+        id: ordenId,
+        estado: EstadoOrden.abierta,
+        kilometrajeEntrada: 12500,
+        diagnostico: 'Suena la cadena',
+      );
+
+      expect(await historial(), isEmpty);
     });
   });
 
