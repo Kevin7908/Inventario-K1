@@ -19,6 +19,7 @@ import 'dart:math';
 
 import 'package:bcrypt/bcrypt.dart';
 import 'package:drift/drift.dart';
+import 'package:inventario_k1/backend/features/devoluciones/enum/enum_devoluciones.dart';
 import 'package:inventario_k1/backend/features/inventario/modelo/movimiento_inventario.dart';
 import 'package:inventario_k1/backend/share/consecutivos/documento_consecutivo.dart';
 import 'package:inventario_k1/backend/share/database/app_db.dart';
@@ -1408,14 +1409,18 @@ class Sembrador {
 
       final numero = _numero(DocumentoConsecutivo.devolucion, fecha);
 
+      // El motivo decide si la pieza vuelve al estante, igual que en el
+      // repositorio: una defectuosa o una de garantía se le reclama al
+      // proveedor. Sin esto el sembrado diría una cosa y la app otra.
+      final motivo = _uno(MotivoDevolucion.values);
+      final reingresa = motivo.reponeStockPorDefecto;
+
       final devolucionId = await db.into(db.tablaDevolucion).insert(
             TablaDevolucionCompanion.insert(
               numero: numero,
               ventaId: ventaId,
-              motivo: _uno(const [
-                'DEFECTUOSO', 'EQUIVOCADO', 'GARANTIA',
-                'ARREPENTIMIENTO', 'ERROR_CAPTURA',
-              ]),
+              motivo: motivo.codigo,
+              reingresaStock: Value(reingresa),
               total: (cantidad * precio).round(),
               usuarioId: autor,
               creadoEn: Value(fecha),
@@ -1431,19 +1436,22 @@ class Sembrador {
             ),
           );
 
-      // La mercancía vuelve al inventario.
-      _stock[productoId] = (_stock[productoId] ?? 0) + cantidad;
-      await db.into(db.tablaMovimientoInventario).insert(
-            TablaMovimientoInventarioCompanion.insert(
-              productoId: productoId,
-              tipo: TipoMovimiento.devolucionVenta.codigo,
-              cantidad: cantidad,
-              ventaId: Value(ventaId),
-              usuarioId: autor,
-              notas: Value('Devolución $numero'),
-              creadoEn: Value(fecha),
-            ),
-          );
+      // Solo la que repone deja movimiento. La otra se quedó fuera del
+      // inventario a propósito, y el libro mayor tiene que decir eso.
+      if (reingresa) {
+        _stock[productoId] = (_stock[productoId] ?? 0) + cantidad;
+        await db.into(db.tablaMovimientoInventario).insert(
+              TablaMovimientoInventarioCompanion.insert(
+                productoId: productoId,
+                tipo: TipoMovimiento.devolucionVenta.codigo,
+                cantidad: cantidad,
+                ventaId: Value(ventaId),
+                usuarioId: autor,
+                notas: Value('Devolución $numero'),
+                creadoEn: Value(fecha),
+              ),
+            );
+      }
 
       devueltas.add(ventaId);
     }

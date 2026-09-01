@@ -34,7 +34,7 @@ void main() {
     skip: encendido
         ? null
         : 'Apagado. Para sembrar: SEMBRAR=1 flutter test test/datos/sembrar_datos_test.dart',
-    () async {/// Levanta la factura recién emitida y abre la vista previa.
+    () async {
       final ruta = Platform.environment['BD'] ??
           '${Platform.environment['HOME']}/Documentos/InventarioK1.sqlite';
       final archivo = File(ruta);
