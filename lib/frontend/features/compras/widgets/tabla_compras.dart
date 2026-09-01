@@ -6,7 +6,6 @@ import '../../../../backend/features/compras/modelo/compra_resumen.dart';
 import '../../../../core/formato.dart';
 import '../../../share/share.dart';
 import '../provider/compras_providers.dart';
-import 'dialogo_detalle_compra.dart';
 
 /// Color de cada estado de una compra, en un solo sitio.
 ///
@@ -29,9 +28,17 @@ import 'dialogo_detalle_compra.dart';
 /// Observa `comprasPaginaProvider` ella sola para que escribir en el buscador
 /// no reconstruya el encabezado ni los filtros (`CLAUDE.md` §3).
 class TablaCompras extends ConsumerWidget {
-  const TablaCompras({super.key, required this.alLimpiarFiltros});
+  const TablaCompras({
+    super.key,
+    required this.alLimpiarFiltros,
+    required this.alAbrir,
+  });
 
   final VoidCallback alLimpiarFiltros;
+
+  /// Abrir la remisión lleva a su ficha, que es donde se trabaja. La
+  /// navegación la resuelve la pantalla: la tabla solo avisa.
+  final ValueChanged<int> alAbrir;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -44,8 +51,7 @@ class TablaCompras extends ConsumerWidget {
 
     return TablaGenerica<CompraResumen>(
       items: compras,
-      alPresionarFila: (compra) =>
-          DialogoDetalleCompra.mostrar(context, compraId: compra.id),
+      alPresionarFila: (compra) => alAbrir(compra.id),
       columnas: [
         ColumnaTabla<CompraResumen>(
           titulo: 'Cuándo llegó',

@@ -144,19 +144,19 @@ void main() {
     expect(find.text('Aún no se registran movimientos'), findsOneWidget);
   });
 
-  testWidgets('sin permisos no se ofrece ni comprar ni dar entrada',
+  testWidgets('sin INVENTARIO_ENTRADA no se ofrece dar entrada',
       (tester) async {
     await _pumpFicha(tester, const Size(1400, 1200), conAcciones: true);
 
     expect(find.text('Editar producto'), findsOneWidget);
-    expect(find.text('Registrar compra'), findsNothing);
     expect(find.text('Entrada sin factura'), findsNothing);
   });
 
   testWidgets('con INVENTARIO_ENTRADA aparece la entrada sin factura',
       (tester) async {
-    // Son dos gestos distintos y cada uno tiene su permiso: la remisión con
-    // proveedor y costo es una compra; esto es lo que llega sin papel.
+    // Aquí solo vive lo que llega **sin papel**. La remisión con proveedor y
+    // costo se registra desde Compras, porque su ficha es una pantalla entera
+    // y desde la del producto no hay cómo llegar a ella.
     await _pumpFicha(
       tester,
       const Size(1400, 1200),
@@ -165,18 +165,6 @@ void main() {
     );
 
     expect(find.text('Entrada sin factura'), findsOneWidget);
-    expect(find.text('Registrar compra'), findsNothing);
-  });
-
-  testWidgets('con COMPRAS_CREAR aparece registrar la compra', (tester) async {
-    await _pumpFicha(
-      tester,
-      const Size(1400, 1200),
-      conAcciones: true,
-      permisos: {Permiso.comprasCrear},
-    );
-
-    expect(find.text('Registrar compra'), findsOneWidget);
   });
 
   group('la última compra', () {

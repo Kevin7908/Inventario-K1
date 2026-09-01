@@ -30,26 +30,6 @@ final class CompraItem {
   int get subtotal => (cantidad * costoUnitario).round();
 }
 
-/// Una línea antes de que exista la compra: lo que el editor arma en memoria
-/// y manda entero a `RepositorioCompras.registrar`.
-///
-/// Es el equivalente de `LineaVentaMostrador` del POS, y por el mismo motivo:
-/// la remisión se teclea completa y se escribe de un golpe, así que no hay
-/// documento al que agregarle líneas de a una.
-final class LineaCompraNueva {
-  const LineaCompraNueva({
-    required this.productoId,
-    required this.cantidad,
-    required this.costoUnitario,
-  });
-
-  final int productoId;
-  final double cantidad;
-  final int costoUnitario;
-
-  int get subtotal => (cantidad * costoUnitario).round();
-}
-
 /// Lo último que se le compró a alguien de un producto.
 ///
 /// Es lo que la ficha del producto y el panel del proveedor necesitan para

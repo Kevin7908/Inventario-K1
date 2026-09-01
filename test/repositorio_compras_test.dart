@@ -1,9 +1,12 @@
-// Compras: la remisión del proveedor, que es el POS al revés.
+// Compras: la remisión del proveedor.
 //
-// Lo que se prueba aquí es lo mismo que en una venta, con el signo cambiado:
-// que la mercancía entre al inventario con su documento detrás, que el total
-// salga de las líneas y no de lo que mandó la vista, y que anular saque lo que
-// había entrado. Y lo propio de este módulo: que el costo real llegue a
+// Se escribe como una orden y no como una factura —la cabecera primero y las
+// líneas de a una—, así que lo que hay que probar es lo de todo editor que
+// mueve inventario: que cada línea entre con su movimiento, que cambiarla
+// mueva **solo la diferencia**, que quitarla saque lo que había metido y que
+// el total sea siempre la suma de lo guardado.
+//
+// Y lo propio de este módulo: que el costo real llegue a
 // `productos.precio_compra`, que es lo que hacía que el margen de la app fuera
 // el de un número tecleado una vez.
 import 'package:drift/drift.dart' show Variable;
@@ -40,23 +43,33 @@ Future<int> _proveedor({String nombre = 'Repuestos JR'}) async {
       .insert(TablaProveedorCompanion.insert(personaId: personaId));
 }
 
+/// Una remisión con una línea ya anotada, que es como queda al salir del
+/// editor. [cantidad] a [costo] es el total.
 Future<ResultadoCompra> _compra({
   double cantidad = 12,
   int costo = 6500,
   String? factura = 'FV-2291',
   int? deProveedor,
-}) =>
-    compras.registrar(
-      proveedorId: deProveedor ?? proveedorId,
-      numeroFactura: factura,
-      lineas: [
-        LineaCompraNueva(
-          productoId: taller.productoId,
-          cantidad: cantidad,
-          costoUnitario: costo,
-        ),
-      ],
-    );
+}) async {
+  final abierta = await compras.crear(
+    proveedorId: deProveedor ?? proveedorId,
+    numeroFactura: factura,
+  );
+  if (abierta is! CompraRegistrada) return abierta;
+
+  final linea = await compras.agregarLinea(
+    compraId: abierta.compraId,
+    productoId: taller.productoId,
+    cantidad: cantidad,
+    costoUnitario: costo,
+  );
+  expect(linea, isA<Exito>(), reason: 'la línea de partida tiene que entrar');
+  return abierta;
+}
+
+/// La única línea de la remisión.
+Future<CompraItem> _linea(int compraId) async =>
+    (await compras.obtenerDetalle(compraId)).items.single;
 
 Future<double> _stock() async {
   final fila = await db
@@ -136,28 +149,137 @@ void main() {
           reason: 'el SKU sí es el de hoy: sirve para buscarlo');
     });
 
-    test('el mismo producto en dos renglones entra como una sola línea',
+    test('el mismo producto dos veces se suma a su línea, no abre otra',
         () async {
-      final r = await compras.registrar(
-        proveedorId: proveedorId,
-        lineas: [
-          LineaCompraNueva(
-            productoId: taller.productoId,
-            cantidad: 5,
-            costoUnitario: 6000,
-          ),
-          LineaCompraNueva(
-            productoId: taller.productoId,
-            cantidad: 3,
-            costoUnitario: 6500,
-          ),
-        ],
-      ) as CompraRegistrada;
+      final r = await _compra(cantidad: 5, costo: 6000) as CompraRegistrada;
+
+      await compras.agregarLinea(
+        compraId: r.compraId,
+        productoId: taller.productoId,
+        cantidad: 3,
+        costoUnitario: 6500,
+      );
 
       final detalle = await compras.obtenerDetalle(r.compraId);
       expect(detalle.items, hasLength(1));
       expect(detalle.items.single.cantidad, 8);
-      expect(await _stock(), 18);
+      expect(detalle.items.single.costoUnitario, 6500,
+          reason: 'manda el último costo tecleado');
+      expect(await _stock(), 18, reason: 'entraron las dos veces');
+    });
+  });
+
+  group('la remisión se corrige línea a línea', () {
+    test('subir la cantidad mete solo la diferencia', () async {
+      final r = await _compra(cantidad: 5, costo: 6000) as CompraRegistrada;
+      expect(await _stock(), 15);
+
+      await compras.actualizarLinea((await _linea(r.compraId)).id,
+          cantidad: 8);
+
+      expect(await _stock(), 18, reason: 'entraron tres más, no ocho');
+      expect((await compras.obtenerDetalle(r.compraId)).resumen.total, 48000);
+      expect(await inventario.descuadres(), isEmpty);
+    });
+
+    test('bajar la cantidad saca solo la diferencia', () async {
+      final r = await _compra(cantidad: 5, costo: 6000) as CompraRegistrada;
+
+      await compras.actualizarLinea((await _linea(r.compraId)).id,
+          cantidad: 2);
+
+      expect(await _stock(), 12, reason: 'salieron tres');
+      expect((await compras.obtenerDetalle(r.compraId)).resumen.total, 12000);
+    });
+
+    test('bajar más de lo que queda en bodega se rechaza', () async {
+      // La mercancía ya se vendió: deshacer la entrada dejaría el inventario
+      // en negativo.
+      final r = await _compra(cantidad: 12) as CompraRegistrada;
+      await db.customStatement(
+        'UPDATE productos SET stock_actual = 3 WHERE id = ${taller.productoId}',
+      );
+
+      final resultado = await compras
+          .actualizarLinea((await _linea(r.compraId)).id, cantidad: 1);
+
+      expect(resultado, isA<Fallo>());
+      expect((resultado as Fallo).mensaje, contains('ya salió del taller'));
+      expect((await _linea(r.compraId)).cantidad, 12,
+          reason: 'la línea se quedó como estaba');
+    });
+
+    test('cambiar el costo no mueve stock y actualiza el del producto',
+        () async {
+      final r = await _compra(cantidad: 5, costo: 6000) as CompraRegistrada;
+
+      await compras.actualizarLinea((await _linea(r.compraId)).id,
+          costoUnitario: 7000);
+
+      expect(await _stock(), 15);
+      expect(await _precioCompra(), 7000);
+      expect((await compras.obtenerDetalle(r.compraId)).resumen.total, 35000);
+      expect(await compras.descuadres(), isEmpty);
+    });
+
+    test('quitar la línea saca lo que había metido', () async {
+      final r = await _compra(cantidad: 12) as CompraRegistrada;
+
+      await compras.eliminarLinea((await _linea(r.compraId)).id);
+
+      expect(await _stock(), 10);
+      final detalle = await compras.obtenerDetalle(r.compraId);
+      expect(detalle.items, isEmpty);
+      expect(detalle.resumen.total, 0);
+      expect(await inventario.descuadres(), isEmpty);
+    });
+
+    test('la cabecera se puede corregir sin tocar las líneas', () async {
+      final r = await _compra(factura: 'FV-1') as CompraRegistrada;
+      final otro = await _proveedor(nombre: 'Motopartes del Sur');
+
+      final resultado = await compras.actualizarCabecera(
+        id: r.compraId,
+        proveedorId: otro,
+        numeroFactura: 'FV-9',
+        notas: 'La trajo el mensajero',
+      );
+
+      expect(resultado, isA<Exito>());
+      final detalle = await compras.obtenerDetalle(r.compraId);
+      expect(detalle.resumen.proveedorNombre, 'Motopartes del Sur');
+      expect(detalle.resumen.numeroFactura, 'FV-9');
+      expect(detalle.items, hasLength(1));
+      expect(await _stock(), 22, reason: 'la cabecera no mueve inventario');
+    });
+
+    test('la cabecera no puede quedar con una factura ya usada', () async {
+      await _compra(factura: 'FV-1');
+      final segunda = await _compra(factura: 'FV-2') as CompraRegistrada;
+
+      final resultado = await compras.actualizarCabecera(
+        id: segunda.compraId,
+        numeroFactura: 'FV-1',
+      );
+
+      expect(resultado, isA<Fallo>());
+      expect((resultado as Fallo).motivo, MotivoFallo.remisionDuplicada);
+    });
+
+    test('una compra anulada ya no admite líneas', () async {
+      final r = await _compra() as CompraRegistrada;
+      await compras.anular(r.compraId);
+
+      final resultado = await compras.agregarLinea(
+        compraId: r.compraId,
+        productoId: taller.productoId,
+        cantidad: 1,
+        costoUnitario: 100,
+      );
+
+      expect(resultado, isA<Fallo>());
+      expect((resultado as Fallo).mensaje, contains('anulada'));
+      expect(await _stock(), 10, reason: 'y no entró nada');
     });
   });
 
@@ -278,13 +400,15 @@ void main() {
       expect(await _compra(factura: null), isA<CompraRegistrada>());
     });
 
-    test('una compra sin líneas no abre documento', () async {
-      final r = await compras.registrar(proveedorId: proveedorId, lineas: []);
+    test('una remisión repetida no quema consecutivo', () async {
+      await _compra(factura: 'FV-2291');
 
-      expect(r, isA<CompraRechazada>());
-      final filas =
-          await db.customSelect('SELECT COUNT(*) AS n FROM compras').getSingle();
-      expect(filas.read<int>('n'), 0, reason: 'ni quemó consecutivo');
+      await _compra(factura: 'FV-2291');
+
+      final filas = await db
+          .customSelect('SELECT COUNT(*) AS n FROM compras')
+          .getSingle();
+      expect(filas.read<int>('n'), 1, reason: 'la segunda no llegó a existir');
     });
 
     test('sin permiso no se registra nada', () async {
@@ -293,20 +417,23 @@ void main() {
         permisos: {Permiso.comprasVer},
         usuario: 'auxiliar',
       );
+      final soloLectura = RepositorioComprasImpl(db, mirona);
 
-      final r = await RepositorioComprasImpl(db, mirona).registrar(
-        proveedorId: proveedorId,
-        lineas: [
-          LineaCompraNueva(
-            productoId: taller.productoId,
-            cantidad: 1,
-            costoUnitario: 100,
-          ),
-        ],
+      final abierta = await soloLectura.crear(proveedorId: proveedorId);
+      expect(abierta, isA<CompraRechazada>());
+
+      // Y tampoco por la puerta de atrás: con la compra abierta por otra
+      // cuenta, anotarle una línea sigue pidiendo el permiso.
+      final mia = await _compra() as CompraRegistrada;
+      final linea = await soloLectura.agregarLinea(
+        compraId: mia.compraId,
+        productoId: taller.productoId,
+        cantidad: 1,
+        costoUnitario: 100,
       );
 
-      expect(r, isA<CompraRechazada>());
-      expect(await _stock(), 10);
+      expect(linea, isA<Fallo>());
+      expect(await _stock(), 22, reason: 'solo entró la línea legítima');
     });
 
     test('una compra no se borra: se anula', () async {

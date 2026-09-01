@@ -12,8 +12,9 @@ import '../../../layout/encabezado_con_cuenta.dart';
 import '../../../share/share.dart';
 import '../../autenticacion/widgets/si_puede.dart';
 import '../../proveedores/provider/proveedores_provider.dart';
+import '../compra_detalle/vista/compra_detalle_vista.dart';
+import '../compra_detalle/widgets/dialogo_nueva_compra.dart';
 import '../provider/compras_providers.dart';
-import '../widgets/dialogo_nueva_compra.dart';
 import '../widgets/tabla_compras.dart';
 
 /// Compras: las remisiones del proveedor, con lo que de verdad costó cada una.
@@ -23,8 +24,10 @@ import '../widgets/tabla_compras.dart';
 /// cómo compró un repuesto la última vez ni cuánto lleva gastado con un
 /// proveedor este mes.
 ///
-/// **Una compra no se edita**: se abre para leerla y, si se tecleó mal, se
-/// anula —lo que saca del inventario lo que había entrado—.
+/// La remisión se abre desde aquí y se trabaja en su propia ficha, que
+/// **guarda sola**: se anota lo que llegó con su costo y cada línea entra al
+/// inventario en el momento. Si se tecleó mal del todo, se anula —lo que saca
+/// lo que había entrado—.
 class ComprasVista extends ConsumerStatefulWidget {
   const ComprasVista({super.key});
 
@@ -36,6 +39,9 @@ class _ComprasVistaState extends ConsumerState<ComprasVista> {
   final _busqueda = TextEditingController();
   final _focoBusqueda = FocusNode();
   Timer? _debounce;
+
+  /// Qué remisión está abierta en la ficha. `null` = se ve el listado.
+  int? _abierta;
 
   @override
   void dispose() {
@@ -59,9 +65,26 @@ class _ComprasVistaState extends ConsumerState<ComprasVista> {
     ref.read(comprasProvider.notifier).limpiarFiltros();
   }
 
+  /// Una remisión nueva empieza preguntando de quién llegó, porque
+  /// `proveedor_id` es `NOT NULL`. Cancelar el cuadro no crea nada.
+  Future<void> _nueva() async {
+    final id = await DialogoNuevaCompra.mostrar(context);
+    if (id == null || !mounted) return;
+    setState(() => _abierta = id);
+  }
+
+  void _abrir(int compraId) => setState(() => _abierta = compraId);
+
+  void _volverALista() => setState(() => _abierta = null);
+
   /// La raíz no observa el listado: cada bloque se suscribe al suyo.
   @override
   Widget build(BuildContext context) {
+    final abierta = _abierta;
+    if (abierta != null) {
+      return CompraDetalleVista(compraId: abierta, alCerrar: _volverALista);
+    }
+
     return CallbackShortcuts(
       bindings: {
         const SingleActivator(LogicalKeyboardKey.keyF, control: true): () =>
@@ -79,6 +102,9 @@ class _ComprasVistaState extends ConsumerState<ComprasVista> {
             const SizedBox(height: 20),
             const _Tarjetas(),
             const SizedBox(height: 20),
+            // El buscador y el botón ocupan el ancho completo, y los chips
+            // van **debajo**: apretados en la misma fila, el buscador se
+            // quedaba sin sitio y los tres bloques competían por el ancho.
             Row(
               children: [
                 Expanded(
@@ -90,18 +116,18 @@ class _ComprasVistaState extends ConsumerState<ComprasVista> {
                   ),
                 ),
                 const SizedBox(width: 20),
-                const Flexible(child: _ChipsEstado()),
-                const SizedBox(width: 20),
                 SiPuede(
                   permiso: Permiso.comprasCrear,
                   child: BotonPrimario(
                     etiqueta: 'Registrar compra',
                     icono: Icons.add,
-                    alPresionar: () => DialogoNuevaCompra.mostrar(context),
+                    alPresionar: _nueva,
                   ),
                 ),
               ],
             ),
+            const SizedBox(height: 16),
+            const _ChipsEstado(),
             const SizedBox(height: 16),
             const _Filtros(),
             const SizedBox(height: 8),
@@ -109,7 +135,12 @@ class _ComprasVistaState extends ConsumerState<ComprasVista> {
             const SizedBox(height: 12),
             // `Expanded` porque `TablaGenerica` lleva encabezado fijo y exige
             // un padre acotado (`CLAUDE.md` §4).
-            Expanded(child: TablaCompras(alLimpiarFiltros: _limpiarFiltros)),
+            Expanded(
+              child: TablaCompras(
+                alLimpiarFiltros: _limpiarFiltros,
+                alAbrir: _abrir,
+              ),
+            ),
             const SizedBox(height: 16),
             const _Paginador(),
           ],
