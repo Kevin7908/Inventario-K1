@@ -42,6 +42,7 @@ class VolumenSiembra {
     this.cotizaciones = 2000,
     this.reservas = 1200,
     this.deudores = 1000,
+    this.compras = 900,
   });
 
   final int categorias;
@@ -56,6 +57,10 @@ class VolumenSiembra {
   final int cotizaciones;
   final int reservas;
   final int deudores;
+
+  /// Remisiones del proveedor. Van **antes** que los documentos que sacan
+  /// mercancía: lo que entra por una compra es lo que después se vende.
+  final int compras;
 }
 
 const _marcas = ['Bajaj', 'Yamaha', 'Honda', 'Suzuki', 'AKT', 'TVS', 'KTM'];
@@ -213,6 +218,7 @@ class Sembrador {
 
     await _tecnicosYServicios();
     await _compatibilidades();
+    await _compras();
     await _ventas();
     await _ordenes();
     await _cotizaciones();
@@ -671,6 +677,135 @@ class Sembrador {
     return elegidos;
   }
 
+  /// Remisiones del proveedor: **lo único que mete mercancía** además de la
+  /// carga inicial.
+  ///
+  /// Va antes que ventas, órdenes, reservas y cartera porque es de donde sale
+  /// lo que todos ellos descuentan. Cada línea deja su entrada en el libro
+  /// mayor y su costo en `productos.precio_compra`, igual que
+  /// `RepositorioCompras.registrar`: si el sembrador escribiera una cosa y el
+  /// repositorio otra, medir contra estos datos no diría nada.
+  ///
+  /// Una de cada veinte se anula, con su salida en negativo: sin eso el filtro
+  /// de estado del listado no tendría qué filtrar.
+  Future<void> _compras() async {
+    for (var c = 0; c < volumen.compras; c++) {
+      final fecha = _fecha(dias: 300);
+      final autor = _autor();
+      final proveedorId = _uno(_proveedores);
+      final elegidos = _algunos(2 + _rnd.nextInt(6));
+      if (elegidos.isEmpty) continue;
+
+      final compraId = await db.into(db.tablaCompra).insert(
+            TablaCompraCompanion.insert(
+              numero: _numero(DocumentoConsecutivo.compra, fecha),
+              proveedorId: proveedorId,
+              // Una de cada cinco llega sin papel: es el caso que el UNIQUE
+              // compuesto admite con NULL y el que más se ve en el mostrador.
+              numeroFactura: Value(
+                _rnd.nextInt(5) == 0
+                    ? null
+                    : 'FV-${(100000 + _rnd.nextInt(899999))}',
+              ),
+              fecha: Value(fecha),
+              usuarioId: autor,
+              creadoEn: Value(fecha),
+              actualizadoEn: Value(fecha),
+            ),
+          );
+
+      var total = 0;
+      final entradas = <int, double>{};
+      for (final productoId in elegidos) {
+        final precio = _precios[productoId]!;
+        final cantidad = (5 + _rnd.nextInt(40)).toDouble();
+        // El proveedor sube y baja: sin variación no habría con qué probar el
+        // «¿nos subieron el precio?» que el módulo existe para responder.
+        final costo = (precio.compra * (0.9 + _rnd.nextDouble() * 0.3)).round();
+        total += (cantidad * costo).round();
+        entradas[productoId] = cantidad;
+
+        await db.into(db.tablaCompraDetalle).insert(
+              TablaCompraDetalleCompanion.insert(
+                compraId: compraId,
+                productoId: productoId,
+                descripcion: precio.nombre,
+                cantidad: cantidad,
+                costoUnitario: costo,
+              ),
+            );
+
+        await db.into(db.tablaMovimientoInventario).insert(
+              TablaMovimientoInventarioCompanion.insert(
+                productoId: productoId,
+                tipo: TipoMovimiento.entradaCompra.codigo,
+                cantidad: cantidad,
+                compraId: Value(compraId),
+                usuarioId: autor,
+                creadoEn: Value(fecha),
+              ),
+            );
+
+        _stock[productoId] = (_stock[productoId] ?? 0) + cantidad;
+        _precios[productoId] = (
+          venta: precio.venta,
+          compra: costo,
+          nombre: precio.nombre,
+        );
+      }
+
+      await (db.update(db.tablaCompra)..where((t) => t.id.equals(compraId)))
+          .write(TablaCompraCompanion(total: Value(total)));
+
+      // El costo de referencia queda en el último pagado, como hace el
+      // repositorio.
+      await db.batch((b) {
+        for (final productoId in entradas.keys) {
+          b.update(
+            db.tablaProducto,
+            TablaProductoCompanion(
+              precioCompra: Value(_precios[productoId]!.compra),
+            ),
+            where: (p) => p.id.equals(productoId),
+          );
+        }
+      });
+
+      if (_rnd.nextInt(20) != 0) continue;
+
+      // Anulada: sale lo que había entrado, y solo si todavía está.
+      for (final entrada in entradas.entries) {
+        final hay = _stock[entrada.key] ?? 0;
+        if (hay < entrada.value) continue;
+        _stock[entrada.key] = hay - entrada.value;
+        await db.into(db.tablaMovimientoInventario).insert(
+              TablaMovimientoInventarioCompanion.insert(
+                productoId: entrada.key,
+                tipo: TipoMovimiento.ajusteNegativo.codigo,
+                cantidad: -entrada.value,
+                compraId: Value(compraId),
+                usuarioId: autor,
+                notas: const Value('Anulación de la compra'),
+                creadoEn: Value(fecha),
+              ),
+            );
+      }
+      await (db.update(db.tablaCompra)..where((t) => t.id.equals(compraId)))
+          .write(const TablaCompraCompanion(estado: Value('ANULADA')));
+    }
+  }
+
+  /// [cuantos] productos distintos, tengan existencias o no: una compra los
+  /// **trae**, así que no hace falta que quede algo en el estante.
+  Set<int> _algunos(int cuantos) {
+    final elegidos = <int>{};
+    while (elegidos.length < cuantos && _productos.isNotEmpty) {
+      elegidos.add(_uno(_productos));
+      if (elegidos.length >= _productos.length) break;
+    }
+    return elegidos;
+  }
+
   Future<void> _ventas() async {
     for (var v = 0; v < volumen.ventas; v++) {
       final fecha = _fecha();
@@ -837,7 +972,145 @@ class Sembrador {
           ),
         ));
       }
+
+      // Una de cada cinco entregadas se fía. **Sin tocar el inventario**: los
+      // repuestos salieron del estante arriba, al anotarlos. Sembrarlo con un
+      // movimiento más sería reproducir el bug que el cierre a crédito vino a
+      // cerrar, y `descuadres()` lo cantaría.
+      if (estado == 'ENTREGADA' && _rnd.nextInt(5) == 0) {
+        await _fiarOrden(
+          ordenId: ordenId,
+          clienteId: clienteId,
+          motoId: motoId,
+          numeroOrden: await _numeroDeOrden(ordenId),
+          fecha: fecha,
+          autor: autor,
+        );
+      }
     }
+  }
+
+  Future<String> _numeroDeOrden(int ordenId) => db
+      .customSelect(
+        'SELECT numero FROM ordenes_servicio WHERE id = ?',
+        variables: [Variable.withInt(ordenId)],
+      )
+      .getSingle()
+      .then((f) => f.read<String>('numero'));
+
+  /// La deuda que nace de cerrar una orden a crédito.
+  ///
+  /// Copia las tres clases de línea —repuestos, mano de obra y cargos— con su
+  /// descripción congelada, y **no registra un solo movimiento**. El enlace
+  /// `orden_id` se escribe **al final**, después de las líneas: la guarda de
+  /// `guardas_sql.dart` cierra a la edición las líneas de toda deuda que ya lo
+  /// tenga, así que ponerlo antes rechazaría estos mismos `INSERT`.
+  Future<void> _fiarOrden({
+    required int ordenId,
+    required int clienteId,
+    required int motoId,
+    required String numeroOrden,
+    required DateTime fecha,
+    required int autor,
+  }) async {
+    final repuestos = await db.customSelect(
+      'SELECT orp.producto_id, orp.cantidad, orp.precio_unitario, p.nombre '
+      'FROM ordenes_repuestos orp JOIN productos p ON p.id = orp.producto_id '
+      'WHERE orp.orden_id = ?',
+      variables: [Variable.withInt(ordenId)],
+    ).get();
+    final tareas = await db.customSelect(
+      'SELECT ot.precio_pactado, s.nombre FROM ordenes_tareas ot '
+      'JOIN servicios s ON s.id = ot.servicio_id WHERE ot.orden_id = ?',
+      variables: [Variable.withInt(ordenId)],
+    ).get();
+    final cargos = await db.customSelect(
+      'SELECT descripcion, precio FROM ordenes_cargos WHERE orden_id = ?',
+      variables: [Variable.withInt(ordenId)],
+    ).get();
+
+    if (repuestos.isEmpty && tareas.isEmpty && cargos.isEmpty) return;
+
+    final deudorId = await db.into(db.tablaDeudor).insert(
+          TablaDeudorCompanion.insert(
+            numero: _numero(DocumentoConsecutivo.deuda, fecha),
+            clienteId: clienteId,
+            motoId: Value(motoId),
+            concepto: Value('Orden $numeroOrden'),
+            fechaVencimiento:
+                Value(fecha.add(Duration(days: 15 + _rnd.nextInt(30)))),
+            usuarioId: autor,
+            creadoEn: Value(fecha),
+            actualizadoEn: Value(fecha),
+          ),
+        );
+
+    var total = 0;
+    Future<void> linea({
+      int? productoId,
+      required String descripcion,
+      required double cantidad,
+      required int precio,
+    }) async {
+      total += (cantidad * precio).round();
+      await db.into(db.tablaDeudorItem).insert(
+            TablaDeudorItemCompanion.insert(
+              usuarioId: autor,
+              deudorId: deudorId,
+              productoId: Value(productoId),
+              descripcion: descripcion,
+              cantidad: cantidad,
+              precioUnitario: precio,
+            ),
+          );
+    }
+
+    for (final r in repuestos) {
+      await linea(
+        productoId: r.read<int>('producto_id'),
+        descripcion: r.read<String>('nombre'),
+        cantidad: r.read<double>('cantidad'),
+        precio: r.read<int>('precio_unitario'),
+      );
+    }
+    for (final t in tareas) {
+      await linea(
+        descripcion: t.read<String>('nombre'),
+        cantidad: 1,
+        precio: t.read<int>('precio_pactado'),
+      );
+    }
+    for (final c in cargos) {
+      await linea(
+        descripcion: c.read<String>('descripcion'),
+        cantidad: 1,
+        precio: c.read<int>('precio'),
+      );
+    }
+
+    // Una de cada tres ya abonó algo: la cartera necesita fiados de orden en
+    // los dos estados para que el filtro tenga qué mostrar.
+    final pagado = _rnd.nextInt(3) == 0
+        ? (total * (0.2 + _rnd.nextDouble() * 0.5)).round()
+        : 0;
+    if (pagado > 0) {
+      await db.into(db.tablaDeudorPago).insert(
+            TablaDeudorPagoCompanion.insert(
+              deudorId: deudorId,
+              monto: pagado,
+              metodoPago: _uno(_metodosAbono),
+              fechaPago: Value(fecha.add(const Duration(days: 8))),
+              usuarioId: _autor(),
+            ),
+          );
+    }
+
+    await (db.update(db.tablaDeudor)..where((t) => t.id.equals(deudorId)))
+        .write(TablaDeudorCompanion(
+      ordenId: Value(ordenId),
+      montoTotal: Value(total),
+      montoPagado: Value(pagado),
+    ));
   }
 
   /// Cotizaciones: **no mueven stock**. Cotizar no es apartar.
@@ -1294,6 +1567,7 @@ class Sembrador {
     'personas', 'usuarios', 'usuario_permisos', 'proveedores', 'clientes',
     'tecnicos', 'marcas_moto', 'modelos_moto', 'motos',
     'productos', 'producto_compatibilidades', 'movimientos_inventario',
+    'compras', 'compra_detalles',
     'ventas', 'venta_detalles',
     'ordenes_servicio', 'ordenes_tareas', 'ordenes_repuestos', 'ordenes_cargos',
     'cotizaciones', 'cotizacion_items',

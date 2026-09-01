@@ -98,10 +98,35 @@ veces por pantalla, pero la verdad son los movimientos, y hay una consulta que
 comprueba que cuadran.
 
 La cantidad lleva SIGNO —positivo entra, negativo sale— para que reconstruir
-el stock sea un SUM y no un CASE de diez ramas. El origen son tres columnas
+el stock sea un SUM y no un CASE de diez ramas. El origen son CINCO columnas
 nulables con FK real en vez del típico par referencia_tipo/referencia_id: una
-FK polimórfica no la puede verificar la base.""",
-  ['movimientos_inventario']),
+FK polimórfica no la puede verificar la base. Un CHECK garantiza que como
+mucho una esté puesta; un ajuste manual las deja las cinco en NULL.
+
+`compras` es la remisión del proveedor: EL POS AL REVÉS. Existe porque el
+movimiento responde «¿cuántas pastillas entraron el martes?» y el taller
+pregunta además «¿cuánto costó el pedido completo que llegó el martes?» y «¿a
+cómo la compramos la vez pasada?». Sin cabecera no hay documento que abrir, ni
+número que citar, ni forma de saber que catorce entradas sueltas eran un solo
+pedido.
+
+`compra_detalles.costo_unitario` es un SNAPSHOT y ahí está el valor del
+módulo: es LO QUE DE VERDAD SE PAGÓ ese día. Si el costo viviera solo en
+`productos.precio_compra`, cada compra nueva borraría la anterior y el margen
+que muestra la app se calcularía contra un número que alguien tecleó una vez.
+Registrar una compra sí actualiza `precio_compra` al último costo, pero el
+histórico queda aquí.
+
+`compras.total` es caché de SUM(cantidad * costo_unitario), como el stock. El
+UNIQUE (proveedor_id, numero_factura) cierra el error de captura más caro del
+módulo —teclear dos veces la misma remisión mete el doble de mercancía—, y
+admite varios NULL para lo que llega sin papel. Una compra NO SE BORRA: se
+anula, y anular saca del inventario lo que había entrado.
+
+`compra_detalles` no lleva usuario_id, por lo mismo que `venta_detalles`: la
+remisión se escribe entera en una transacción, así que el autor de cada línea
+es siempre el de la cabecera.""",
+  ['compras', 'compra_detalles', 'movimientos_inventario']),
 
  ('4. TALLER', """La moto del cliente y su paso por el taller.
 
@@ -156,11 +181,30 @@ stock.""",
 
  ('8. CARTERA', """Lo que queda por cobrar. `monto_pagado` es caché de SUM(deudor_pagos.monto).
 
-La deuda NACE EN CUENTAS POR COBRAR, no en una factura. Hubo una columna
-venta_id que apuntaba a la venta que la originó; se quitó cuando el mostrador
-dejó de fiar —toda venta se cobra completa— y nadie volvió a escribirla. Si
-algún día se vuelve a fiar desde el POS, es una FK nueva, no una columna que
-llevaba años en NULL.
+La deuda nace en CUENTAS POR COBRAR o AL CERRAR UNA ORDEN A CRÉDITO. Hubo una
+columna venta_id que apuntaba a la venta que la originó; se quitó cuando el
+mostrador dejó de fiar —toda venta se cobra completa— y nadie volvió a
+escribirla. Si algún día se vuelve a fiar desde el POS, es una FK nueva, no una
+columna que llevaba años en NULL.
+
+`deudores.orden_id` sí se escribe, y ES LO QUE CIERRA UN DESCUADRE REAL DE
+INVENTARIO. Antes había que anotar el repuesto en la orden —que lo saca del
+estante— y otra vez en la deuda para que constara qué se fió: salía uno del
+taller y el inventario decía dos. Cerrar la orden a crédito copia sus líneas a
+la deuda SIN REGISTRAR UN SOLO MOVIMIENTO, y tres guardas cierran esas líneas a
+la edición a mano —editarlas movería stock por una salida que ya ocurrió—. El
+UNIQUE de la columna impide fiar dos veces la misma orden.
+
+Por eso `deudor_items.producto_id` es NULLABLE y manda `descripcion`: lo fiado
+no siempre es una pieza del catálogo. La mano de obra y los cargos sueltos de
+la orden se cobran igual y tienen que constar, o el total de la deuda no
+coincidiría con el de la orden. Y por eso NO HAY UNIQUE (deudor_id,
+producto_id): esa regla —«el mismo producto no abre dos líneas»— solo vale
+para lo que se anota a mano, y la sostiene el repositorio; una orden admite el
+mismo repuesto en dos renglones a precios distintos.
+
+`deudores.descuento` existe para que la rebaja de la orden viaje con ella:
+monto_total es SUM(líneas) − descuento.
 
 FIAR SACA LA MERCANCÍA DEL TALLER, y ahí está la diferencia con una reserva:
 lo apartado sigue en la bodega y cancelarlo lo devuelve; lo fiado se fue
