@@ -42,6 +42,9 @@ abstract final class DevolucionesMapper {
       ventaId: f['venta_id'] as int,
       numeroFactura: f['numero_factura'] as String? ?? '',
       motivo: MotivoDevolucion.desdeCodigo(f['motivo'] as String),
+      // SQLite guarda los booleanos como 0/1, y un `customSelect` los devuelve
+      // así: `as bool` reventaría.
+      reingresaStock: (f['reingresa_stock'] as num? ?? 1) != 0,
       total: (f['total'] as num).toInt(),
       notas: f['notas'] as String?,
       usuarioId: f['usuario_id'] as int,

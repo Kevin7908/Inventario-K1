@@ -365,9 +365,14 @@ class RepositorioVentasImpl with FirmaDeSesion implements RepositorioVentas {
               ..where((t) => t.ventaId.equals(id)))
             .get();
 
-        // Lo que una devolución parcial ya repuso **no se repone otra vez**.
-        // Sin este descuento, vender 5, devolver 2 y anular después dejaba 7
-        // en la estantería: el libro mayor lo contaba dos veces.
+        // Lo que el cliente ya trajo de vuelta **no vuelve otra vez**. Sin
+        // este descuento, vender 5, devolver 2 y anular después dejaba 7 en la
+        // estantería: el libro mayor lo contaba dos veces.
+        //
+        // Se descuenta lo devuelto **aunque no haya repuesto stock**
+        // (`devoluciones.reingresa_stock` en `false`, la pieza rota que se le
+        // reclama al proveedor): esas unidades tampoco están en manos del
+        // cliente, así que anular no tiene nada que reponer por ellas.
         final yaDevuelto = await _devueltoPorLinea(id);
 
         for (final item in items) {

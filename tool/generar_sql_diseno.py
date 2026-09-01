@@ -178,7 +178,15 @@ Que la suma devuelta no pase de lo vendido NO CABE EN UN CHECK —necesita un
 agregado sobre las demás filas—: lo cierra una guarda, al final del archivo.
 
 devoluciones.total es caché de SUM(cantidad * precio_unitario) de sus líneas,
-como el stock y como monto_pagado.""",
+como el stock y como monto_pagado.
+
+reingresa_stock dice si la mercancía volvió al estante. En FALSE la devolución
+NO ESCRIBE MOVIMIENTO: la pieza llegó rota y se le reclama al proveedor, no se
+vuelve a vender —la plata se le devuelve al cliente igual—. El motivo lo
+propone (DEFECTUOSO y GARANTIA nacen apagados) pero no lo decide: quien recibe
+puede ver que la pieza está bien. Lo devuelto cuenta como devuelto en las dos:
+la unidad no está en el estante, pero tampoco en manos del cliente, así que
+anular después no la repone.""",
   ['devoluciones', 'devolucion_detalles']),
 
  ('7. COTIZACIONES Y RESERVAS', """La cotización no guarda `total` (es subtotal + iva, dos columnas de su misma
