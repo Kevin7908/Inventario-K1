@@ -6,8 +6,10 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../../../backend/features/productos/modelo/producto.dart';
 import '../../../../../backend/features/reservas/enum/enum_reserva.dart';
 import '../../../../../backend/features/reservas/modelo/reserva_item.dart';
+import '../../../../../backend/share/dominio/permiso.dart';
 import '../../../../../core/formato.dart';
 import '../../../../share/share.dart';
+import '../../../autenticacion/widgets/si_puede.dart';
 import '../../../documentos/provider/documentos_providers.dart';
 import '../../../documentos/traductores/reserva_a_documento.dart';
 import '../../../documentos/widgets/dialogo_vista_previa.dart';
@@ -288,15 +290,22 @@ class _Pie extends ConsumerWidget {
         color: ColoresApp.bgInput,
         border: Border(top: BorderSide(color: ColoresApp.borderFila)),
       ),
-      child: PieReserva(
-        total: datos.total,
-        pagado: datos.pagado,
-        alEntregar: puedeEntregar
-            ? () => unawaited(_entregar(context, ref, datos.saldo))
-            : null,
-        alCancelar:
-            datos.editable ? () => unawaited(_cancelar(context, ref)) : null,
-        alImprimir: () => unawaited(_imprimir(context, ref)),
+      // Cancelar devuelve la mercancía a la bodega, así que pide el mismo
+      // permiso que eliminar. Se apaga en vez de esconderse: en un pie de
+      // acciones un botón que falta hace buscar dónde quedó.
+      child: SegunPermiso(
+        permiso: Permiso.reservasEliminar,
+        constructor: (context, puedeCancelar) => PieReserva(
+          total: datos.total,
+          pagado: datos.pagado,
+          alEntregar: puedeEntregar
+              ? () => unawaited(_entregar(context, ref, datos.saldo))
+              : null,
+          alCancelar: datos.editable && puedeCancelar
+              ? () => unawaited(_cancelar(context, ref))
+              : null,
+          alImprimir: () => unawaited(_imprimir(context, ref)),
+        ),
       ),
     );
   }

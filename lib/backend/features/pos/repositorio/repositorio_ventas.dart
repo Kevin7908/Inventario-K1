@@ -98,6 +98,10 @@ abstract interface class RepositorioVentas {
   /// Toda venta de mostrador se cobra completa: no hay pago parcial ni deuda
   /// automática. Fiar se hace desde Cuentas por cobrar.
   ///
+  /// [descuento] en pesos exige `POS_DESCUENTO`, y solo cuando es mayor que
+  /// cero: rebajar el total es la plata del taller, pero cobrar a precio de
+  /// lista lo puede hacer cualquiera que venda.
+  ///
   /// Lanza si [lineas] está vacía o si a algún producto no le alcanza el
   /// stock.
   Future<VentaResumen> registrarVentaMostrador({

@@ -237,6 +237,11 @@ class RepositorioVentasImpl with FirmaDeSesion implements RepositorioVentas {
   }) {
     exigir(Permiso.posVender);
 
+    // Rebajar el total es una decisión aparte de cobrar: es la plata del
+    // taller. Solo se exige cuando de verdad hay rebaja, para que una cuenta
+    // sin el permiso siga pudiendo cobrar a precio de lista.
+    if (descuento > 0) exigir(Permiso.posDescuento);
+
     if (lineas.isEmpty) {
       throw Exception('La venta no tiene productos.');
     }

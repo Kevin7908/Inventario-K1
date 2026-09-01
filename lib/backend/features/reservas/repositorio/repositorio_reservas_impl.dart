@@ -578,6 +578,13 @@ class RepositorioReservasImpl
 
   @override
   Future<void> cambiarEstado(int id, EstadoReserva nuevoEstado) async {
+    // Cancelar es el mismo gesto que eliminar visto desde otro botón: devuelve
+    // la mercancía apartada a la bodega. Sin esta línea, quien no podía borrar
+    // una reserva la cancelaba y conseguía lo mismo.
+    if (nuevoEstado == EstadoReserva.cancelada) {
+      exigir(Permiso.reservasEliminar);
+    }
+
     await _db.transaction(() async {
       if (nuevoEstado == EstadoReserva.cancelada) {
         await _restaurarStock(id, await _itemsDraft(id));
