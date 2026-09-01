@@ -4,6 +4,7 @@ import '../../../../backend/features/configuracion/modelo/clave_configuracion.da
 import '../../../../backend/features/configuracion/repositorio/repositorio_configuracion.dart';
 import '../../../../backend/features/configuracion/repositorio/repositorio_configuracion_impl.dart';
 import '../../../../backend/share/database/app_db_provider.dart';
+import '../../autenticacion/provider/auth_providers.dart';
 
 /// Los datos del negocio, leídos y escritos de verdad.
 ///
@@ -13,11 +14,16 @@ import '../../../../backend/share/database/app_db_provider.dart';
 /// conecta, y con eso el encabezado de las facturas deja de decir el valor por
 /// defecto y pasa a decir el nombre real del taller.
 ///
-/// No recibe la sesión: `RepositorioConfiguracion` no firma lo que escribe
-/// —son ajustes del negocio, no documentos— y su constructor solo pide la base.
+/// Recibe la sesión **para las compuertas, no para firmar**: los ajustes del
+/// negocio no son documentos y no llevan `usuario_id`. Lo que la sesión decide
+/// aquí es quién puede abrir el formulario entero (`CONFIGURACION_VER`) y
+/// quién puede guardarlo (`CONFIGURACION_EDITAR`).
 final repositorioConfiguracionProvider = Provider<RepositorioConfiguracion>(
   name: 'repositorioConfiguracionProvider',
-  (ref) => RepositorioConfiguracionImpl(ref.watch(appDatabaseProvider)),
+  (ref) => RepositorioConfiguracionImpl(
+    ref.watch(appDatabaseProvider),
+    ref.watch(sesionActualProvider),
+  ),
 );
 
 /// Todas las claves con su valor efectivo. Nunca falta ninguna: el repositorio

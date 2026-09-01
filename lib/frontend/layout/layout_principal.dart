@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../backend/share/dominio/permiso.dart';
+import '../../backend/share/dominio/sesion_actual.dart';
 import '../features/autenticacion/provider/auth_providers.dart';
 import '../features/bitacora/vista/bitacora_vista.dart';
 import '../features/categorias/vista/categorias_vistas.dart';
@@ -18,6 +19,7 @@ import '../features/proveedores/vista/proveedores_vista.dart';
 import '../features/reservas/vista/reservas_vista.dart';
 import '../features/tecnicos/vista/tecnico_vista.dart';
 import '../features/ordenes/vista/ordenes_vista.dart';
+import '../share/feedback/aviso_en_linea.dart';
 import '../share/feedback/dialogo_confirmacion.dart';
 import '../share/nav/barra_lateral.dart';
 import '../share/nav/item_nav_dato.dart';
@@ -272,6 +274,20 @@ class _LayoutPrincipalState extends ConsumerState<LayoutPrincipal> {
     if (confirmado == true) ref.read(sesionProvider.notifier).salir();
   }
 
+  /// ¿La cuenta perdió el permiso de la pantalla que tiene delante?
+  ///
+  /// Esconder el ítem del sidebar no alcanza por dos razones: el
+  /// `IndexedStack` mantiene viva la pantalla ya visitada, así que quitarle el
+  /// permiso a alguien mientras la mira no se la cierra; y una pantalla
+  /// también se alcanza sin tocar el sidebar. La compuerta que manda sigue
+  /// siendo la del repositorio —que corta la consulta—, pero sin esto lo que
+  /// se ve es una pantalla con un error de permiso en cada panel en vez de un
+  /// aviso que se entiende.
+  bool _faltaPermiso(String ruta, Set<Permiso> permisos) {
+    final permiso = _permisoPorRuta[ruta];
+    return permiso != null && !permisos.contains(permiso);
+  }
+
   /// Las secciones que esta cuenta puede ver.
   ///
   /// Se filtra en `build` y no una sola vez porque los permisos cambian en
@@ -321,15 +337,44 @@ class _LayoutPrincipalState extends ConsumerState<LayoutPrincipal> {
                 index: _indiceActivo,
                 children: [
                   for (var i = 0; i < _vistas.length; i++)
-                    if (_visitadas.contains(i))
-                      _vistas[i]
+                    if (!_visitadas.contains(i))
+                      const SizedBox.shrink()
+                    else if (_faltaPermiso(_rutas[i], permisos))
+                      _SinPermiso(permiso: _permisoPorRuta[_rutas[i]]!)
                     else
-                      const SizedBox.shrink(),
+                      _vistas[i],
                 ],
               ),
             ),
           ),
         ],
+      ),
+    );
+  }
+}
+
+/// Lo que se ve en lugar de una pantalla para la que falta el permiso.
+///
+/// El texto sale de [PermisoDenegado], que es el mismo que devuelve el
+/// repositorio al cortar la consulta: así el usuario lee la misma frase le
+/// llegue por donde le llegue, y agregar un permiso no obliga a redactar el
+/// aviso otra vez.
+class _SinPermiso extends StatelessWidget {
+  const _SinPermiso({required this.permiso});
+
+  final Permiso permiso;
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(32, 28, 32, 28),
+      child: Align(
+        alignment: Alignment.topCenter,
+        child: AvisoEnLinea(
+          tono: TonoAviso.alerta,
+          titulo: 'Sin permiso',
+          mensaje: PermisoDenegado(permiso).mensaje,
+        ),
       ),
     );
   }

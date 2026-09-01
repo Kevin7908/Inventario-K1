@@ -3,11 +3,14 @@
 // Lo que fijan estos tests son las decisiones que no se ven en el código de la
 // vista y se pueden romper sin que el analizador diga nada:
 //
-// - la pantalla es del administrador: sin `bitacoraVer` no enseña la tabla,
-//   ni siquiera vacía;
+// - la pantalla es del administrador: sin `bitacoraVer` el layout pinta el
+//   aviso en su lugar, y lo hace también si el permiso se quita con la
+//   pantalla ya abierta —el IndexedStack la mantiene viva—;
 // - los renglones dicen quién, qué hizo y sobre qué;
 // - filtrar «hasta» un día incluye ese día entero, no hasta su medianoche;
 // - quitar los filtros vuelve a la primera página con todo.
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -17,6 +20,7 @@ import 'package:inventario_k1/backend/share/dominio/permiso.dart';
 import 'package:inventario_k1/frontend/features/autenticacion/provider/auth_providers.dart';
 import 'package:inventario_k1/frontend/features/bitacora/provider/bitacora_providers.dart';
 import 'package:inventario_k1/frontend/features/bitacora/vista/bitacora_vista.dart';
+import 'package:inventario_k1/frontend/layout/layout_principal.dart';
 
 import 'soporte/repositorio_auth_falso.dart';
 
@@ -101,22 +105,61 @@ Future<void> _montar(
 
 void main() {
   group('quién puede verla', () {
-    testWidgets('sin el permiso no hay tabla, hay aviso', (tester) async {
-      await _montar(
-        tester,
-        bitacora: _BitacoraFalsa(entradas: [_entrada()]),
-        permisos: {Permiso.productosVer},
-      );
-
-      expect(find.textContaining('Solo para administradores'), findsOneWidget);
-      expect(find.text('Aceite 20W50 (ACE-1)'), findsNothing);
-    });
-
     testWidgets('con el permiso se ve el historial', (tester) async {
       await _montar(tester, bitacora: _BitacoraFalsa(entradas: [_entrada()]));
 
-      expect(find.textContaining('Solo para administradores'), findsNothing);
       expect(find.text('Bitácora'), findsOneWidget);
+      expect(find.text('Aceite 20W50 (ACE-1)'), findsOneWidget);
+    });
+
+    testWidgets('quitarle el permiso cierra la pantalla que ya tenía abierta',
+        (tester) async {
+      // El caso que el sidebar solo no cubre: el ítem desaparece, pero el
+      // IndexedStack conserva viva la vista construida y el usuario se queda
+      // mirándola. Se monta el layout entero porque la compuerta de pantalla
+      // vive ahí, en un solo sitio para las catorce.
+      // Alto de sobra: el ítem de Bitácora es el último del sidebar y con
+      // 900 px se queda fuera de la parte visible del ListView.
+      tester.view.physicalSize = const Size(1400, 1400);
+      tester.view.devicePixelRatio = 1;
+      addTearDown(tester.view.reset);
+
+      final permisos = StreamController<Set<Permiso>>();
+      addTearDown(permisos.close);
+
+      final auth = RepositorioAuthFalso();
+      await tester.pumpWidget(
+        ProviderScope(
+          overrides: [
+            repositorioBitacoraProvider
+                .overrideWithValue(_BitacoraFalsa(entradas: [_entrada()])),
+            repositorioAuthProvider.overrideWithValue(auth),
+            repositorioAuthAnonimoProvider.overrideWithValue(auth),
+            usuarioEnSesionProvider.overrideWithValue(usuarioDePrueba()),
+            permisosSesionProvider.overrideWith((ref) => permisos.stream),
+          ],
+          child: const MaterialApp(home: LayoutPrincipal()),
+        ),
+      );
+
+      permisos.add(Permiso.values.toSet());
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Bitácora'));
+      await tester.pumpAndSettle();
+      expect(find.text('Aceite 20W50 (ACE-1)'), findsOneWidget);
+
+      // El administrador se lo quita mientras la tiene delante.
+      permisos.add({Permiso.posVer});
+      await tester.pumpAndSettle();
+
+      expect(find.byType(BitacoraVista), findsNothing);
+      expect(find.text('Aceite 20W50 (ACE-1)'), findsNothing);
+      // El aviso sale de `PermisoDenegado`, el mismo texto que devuelve el
+      // repositorio al cortar la consulta.
+      expect(
+        find.textContaining('no tiene permiso para ver la bitácora'),
+        findsOneWidget,
+      );
     });
   });
 

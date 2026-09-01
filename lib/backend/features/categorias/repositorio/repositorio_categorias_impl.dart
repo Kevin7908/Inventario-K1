@@ -44,6 +44,7 @@ class RepositorioCategoriasImpl with FirmaDeSesion implements RepositorioCategor
 
   @override
   Stream<List<Categoria>> observarTodas() {
+    exigir(Permiso.categoriasVer);
     return _db
         .select(_db.tablaCategoria)
         .watch()
@@ -52,6 +53,7 @@ class RepositorioCategoriasImpl with FirmaDeSesion implements RepositorioCategor
 
   @override
   Future<Categoria?> obtenerPorId(int id) async {
+    exigir(Permiso.categoriasVer);
     final fila = await (_db.select(
       _db.tablaCategoria,
     )..where((t) => t.id.equals(id))).getSingleOrNull();
@@ -61,6 +63,7 @@ class RepositorioCategoriasImpl with FirmaDeSesion implements RepositorioCategor
 
   @override
   Future<List<Categoria>> buscarPorNombre(String consulta) async {
+    exigir(Permiso.categoriasVer);
     final filas = await (_db.select(
       _db.tablaCategoria,
     )..where((t) => t.nombre.like('%$consulta%'))).get();
@@ -125,6 +128,7 @@ class RepositorioCategoriasImpl with FirmaDeSesion implements RepositorioCategor
     required int pagina,
     required int tamano,
   }) {
+    exigir(Permiso.categoriasVer);
     final t = _db.tablaCategoria;
     final texto = busqueda.trim().toLowerCase();
 

@@ -111,6 +111,7 @@ class RepositorioCotizacionesImpl
 
   @override
   Stream<List<CotizacionResumen>> observarTodas() {
+    exigir(Permiso.cotizacionesVer);
     return (_baseQuery..orderBy(_orden)).watch().map(
       (rows) => rows.map(_rowToResumen).toList(),
     );
@@ -176,6 +177,7 @@ class RepositorioCotizacionesImpl
     required int pagina,
     required int tamano,
   }) {
+    exigir(Permiso.cotizacionesVer);
     final condicion = _condicion(filtro);
 
     final consultaPagina = _baseQuery
@@ -211,6 +213,7 @@ class RepositorioCotizacionesImpl
 
   @override
   Stream<ResumenCotizaciones> observarResumen() {
+    exigir(Permiso.cotizacionesVer);
     // Todo en una consulta y con el query builder: antes era SQL crudo con
     // cinco `COUNT(*) FILTER` interpolados a mano, que el analizador no podía
     // revisar y que se rompía en silencio si cambiaba una columna.
@@ -247,6 +250,7 @@ class RepositorioCotizacionesImpl
 
   @override
   Future<List<CotizacionResumen>> obtenerTodas() async {
+    exigir(Permiso.cotizacionesVer);
     final rows =
         await (_baseQuery
               ..orderBy([OrderingTerm.desc(_db.tablaCotizacion.creadoEn)]))
@@ -256,6 +260,7 @@ class RepositorioCotizacionesImpl
 
   @override
   Future<CotizacionDetalle> obtenerDetalle(int id) async {
+    exigir(Permiso.cotizacionesVer);
     final rows = await (_baseQuery..where(_db.tablaCotizacion.id.equals(id)))
         .get();
     if (rows.isEmpty) throw Exception('Cotización $id no encontrada');

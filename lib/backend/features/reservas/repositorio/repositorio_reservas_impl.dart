@@ -109,6 +109,7 @@ class RepositorioReservasImpl
 
   @override
   Stream<List<ReservaResumen>> observarTodas() {
+    exigir(Permiso.reservasVer);
     return (_baseQuery..orderBy([OrderingTerm.desc(_db.tablaReserva.creadoEn)]))
         .watch()
         .map((rows) => rows.map(_filaAResumen).toList());
@@ -120,6 +121,7 @@ class RepositorioReservasImpl
     required int pagina,
     required int tamano,
   }) {
+    exigir(Permiso.reservasVer);
     final consulta = _baseQuery
       ..orderBy([OrderingTerm.desc(_db.tablaReserva.creadoEn)]);
     _aplicarFiltro(consulta, filtro);
@@ -172,6 +174,7 @@ class RepositorioReservasImpl
 
   @override
   Future<int?> reservaDeCotizacion(int cotizacionId) async {
+    exigir(Permiso.reservasVer);
     final fila =
         await (_db.select(_db.tablaReserva)
               ..where((t) => t.cotizacionId.equals(cotizacionId))
@@ -182,6 +185,7 @@ class RepositorioReservasImpl
 
   @override
   Future<List<ReservaResumen>> obtenerTodas() async {
+    exigir(Permiso.reservasVer);
     final rows =
         await (_baseQuery
               ..orderBy([OrderingTerm.desc(_db.tablaReserva.creadoEn)]))
@@ -191,6 +195,7 @@ class RepositorioReservasImpl
 
   @override
   Future<ReservaDetalle> obtenerDetalle(int id) async {
+    exigir(Permiso.reservasVer);
     final rows = await (_baseQuery..where(_db.tablaReserva.id.equals(id)))
         .get();
     if (rows.isEmpty) throw Exception('Reserva $id no encontrada');

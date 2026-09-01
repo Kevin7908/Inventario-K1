@@ -88,25 +88,32 @@ class RepositorioProductosImpl with FirmaDeSesion implements RepositorioProducto
   // Streams reactivos
 
   @override
-  Stream<List<Producto>> observarTodos() =>
-      _queryConJoin().watch().map(_mapear);
+  Stream<List<Producto>> observarTodos() {
+    exigir(Permiso.productosVer);
+    return _queryConJoin().watch().map(_mapear);
+  }
 
   @override
-  Stream<List<Producto>> observarConStockBajo() =>
-      (_queryConJoin()
-            ..where(_db.tablaProducto.stockActual
-                .isSmallerOrEqual(_db.tablaProducto.stockMinimo)))
-          .watch()
-          .map(_mapear);
+  Stream<List<Producto>> observarConStockBajo() {
+    exigir(Permiso.productosVer);
+    return (_queryConJoin()
+          ..where(_db.tablaProducto.stockActual
+              .isSmallerOrEqual(_db.tablaProducto.stockMinimo)))
+        .watch()
+        .map(_mapear);
+  }
 
   // Consultas únicas
 
   @override
-  Future<List<Producto>> obtenerTodos() async =>
-      _mapear(await _queryConJoin().get());
+  Future<List<Producto>> obtenerTodos() async {
+    exigir(Permiso.productosVer);
+    return _mapear(await _queryConJoin().get());
+  }
 
   @override
   Future<Producto?> obtenerPorId(int id) async {
+    exigir(Permiso.productosVer);
     final fila = await (_db.select(_db.tablaProducto)
           ..where((t) => t.id.equals(id)))
         .getSingleOrNull();
@@ -115,6 +122,7 @@ class RepositorioProductosImpl with FirmaDeSesion implements RepositorioProducto
 
   @override
   Future<Producto?> obtenerPorSku(String sku) async {
+    exigir(Permiso.productosVer);
     final fila = await (_db.select(_db.tablaProducto)
           ..where((t) => t.sku.equals(sku)))
         .getSingleOrNull();
@@ -123,6 +131,7 @@ class RepositorioProductosImpl with FirmaDeSesion implements RepositorioProducto
 
   @override
   Future<List<Producto>> buscarPorNombreOSku(String consulta) async {
+    exigir(Permiso.productosVer);
     final termino = '%$consulta%';
     return _mapear(
       await (_queryConJoin()
@@ -133,37 +142,45 @@ class RepositorioProductosImpl with FirmaDeSesion implements RepositorioProducto
   }
 
   @override
-  Future<List<Producto>> obtenerPorCategoria(int categoriaId) async =>
-      _mapear(
-        await (_queryConJoin()
-              ..where(_db.tablaProducto.categoriaId.equals(categoriaId)))
-            .get(),
-      );
+  Future<List<Producto>> obtenerPorCategoria(int categoriaId) async {
+    exigir(Permiso.productosVer);
+    return _mapear(
+      await (_queryConJoin()
+            ..where(_db.tablaProducto.categoriaId.equals(categoriaId)))
+          .get(),
+    );
+  }
 
   @override
-  Future<List<Producto>> obtenerPorProveedor(int proveedorId) async =>
-      _mapear(
-        await (_queryConJoin()
-              ..where(_db.tablaProducto.proveedorId.equals(proveedorId)))
-            .get(),
-      );
+  Future<List<Producto>> obtenerPorProveedor(int proveedorId) async {
+    exigir(Permiso.productosVer);
+    return _mapear(
+      await (_queryConJoin()
+            ..where(_db.tablaProducto.proveedorId.equals(proveedorId)))
+          .get(),
+    );
+  }
 
   @override
-  Future<List<Producto>> obtenerActivos() async =>
-      _mapear(
-        await (_queryConJoin()
-              ..where(_db.tablaProducto.activo.equals(true)))
-            .get(),
-      );
+  Future<List<Producto>> obtenerActivos() async {
+    exigir(Permiso.productosVer);
+    return _mapear(
+      await (_queryConJoin()
+            ..where(_db.tablaProducto.activo.equals(true)))
+          .get(),
+    );
+  }
 
   @override
-  Future<List<Producto>> obtenerConStockBajo() async =>
-      _mapear(
-        await (_queryConJoin()
-              ..where(_db.tablaProducto.stockActual
-                  .isSmallerOrEqual(_db.tablaProducto.stockMinimo)))
-            .get(),
-      );
+  Future<List<Producto>> obtenerConStockBajo() async {
+    exigir(Permiso.productosVer);
+    return _mapear(
+      await (_queryConJoin()
+            ..where(_db.tablaProducto.stockActual
+                .isSmallerOrEqual(_db.tablaProducto.stockMinimo)))
+          .get(),
+    );
+  }
 
   // Escrituras
 
@@ -375,6 +392,7 @@ class RepositorioProductosImpl with FirmaDeSesion implements RepositorioProducto
 
   @override
   Future<int> contarActivos() async {
+    exigir(Permiso.productosVer);
     final expr = _db.tablaProducto.id.count();
     final query = _db.selectOnly(_db.tablaProducto)
       ..where(_db.tablaProducto.activo.equals(true))
@@ -385,6 +403,7 @@ class RepositorioProductosImpl with FirmaDeSesion implements RepositorioProducto
 
   @override
   Future<int> contarConStockBajo() async {
+    exigir(Permiso.productosVer);
     final expr = _db.tablaProducto.id.count();
     final query = _db.selectOnly(_db.tablaProducto)
       ..where(_db.tablaProducto.stockActual
@@ -559,6 +578,7 @@ class RepositorioProductosImpl with FirmaDeSesion implements RepositorioProducto
     required int pagina,
     required int tamano,
   }) {
+    exigir(Permiso.productosVer);
     final condicion = _condicion(filtro);
     final texto = filtro.busqueda.trim();
 
@@ -594,6 +614,7 @@ class RepositorioProductosImpl with FirmaDeSesion implements RepositorioProducto
 
   @override
   Stream<Map<int, int>> observarConteoPorCategoria() {
+    exigir(Permiso.productosVer);
     final cantidad = _db.tablaProducto.id.count();
     final consulta = _db.selectOnly(_db.tablaProducto)
       ..addColumns([_db.tablaProducto.categoriaId, cantidad])
@@ -612,6 +633,7 @@ class RepositorioProductosImpl with FirmaDeSesion implements RepositorioProducto
 
   @override
   Stream<Map<int, int>> observarConteoPorProveedor() {
+    exigir(Permiso.productosVer);
     final cantidad = _db.tablaProducto.id.count();
     final consulta = _db.selectOnly(_db.tablaProducto)
       ..addColumns([_db.tablaProducto.proveedorId, cantidad])
@@ -631,6 +653,7 @@ class RepositorioProductosImpl with FirmaDeSesion implements RepositorioProducto
   @override
   Stream<({int total, int enStock, int stockBajo, int sinStock})>
       observarResumen({FiltroProductos filtro = const FiltroProductos()}) {
+    exigir(Permiso.productosVer);
     final p = _db.tablaProducto;
     final total = p.id.count();
 

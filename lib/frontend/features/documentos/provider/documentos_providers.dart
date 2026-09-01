@@ -17,6 +17,10 @@ export '../../configuracion/provider/configuracion_provider.dart'
 /// tabla de siete filas contra SQLite local, así que el costo es ninguno
 /// comparado con emitir un documento con los datos equivocados.
 ///
+/// Usa `leerTodas` y no `observarTodas`: la segunda es la pantalla de
+/// Configuración y exige `CONFIGURACION_VER`, que un cajero no tiene. Imprimir
+/// una factura con el nombre del taller no es entrar a Configuración.
+///
 /// Recibe el repositorio por parámetro y no busca un provider por dentro, para
 /// que un test pueda pasarle el suyo (`CLAUDE.md` §3).
 ///
@@ -28,4 +32,4 @@ export '../../configuracion/provider/configuracion_provider.dart'
 Future<NegocioImpreso> leerNegocioImpreso(
   RepositorioConfiguracion repositorio,
 ) async =>
-    NegocioImpreso.desdeConfiguracion(await repositorio.observarTodas().first);
+    NegocioImpreso.desdeConfiguracion(await repositorio.leerTodas());

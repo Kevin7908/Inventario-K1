@@ -83,27 +83,36 @@ class RepositorioClientesImpl with FirmaDeSesion implements RepositorioClientes 
   // Streams y consultas simples
 
   @override
-  Stream<List<Cliente>> observarTodos() =>
-      (_conPersona()..orderBy([OrderingTerm.asc(_persona.nombres)]))
-          .watch()
-          .map(_mapear);
+  Stream<List<Cliente>> observarTodos() {
+    exigir(Permiso.clientesVer);
+    return (_conPersona()..orderBy([OrderingTerm.asc(_persona.nombres)]))
+        .watch()
+        .map(_mapear);
+  }
 
   @override
-  Future<List<Cliente>> obtenerTodos() async => _mapear(
-        await (_conPersona()..orderBy([OrderingTerm.asc(_persona.nombres)]))
-            .get(),
-      );
+  Future<List<Cliente>> obtenerTodos() async {
+    exigir(Permiso.clientesVer);
+    return _mapear(
+      await (_conPersona()..orderBy([OrderingTerm.asc(_persona.nombres)]))
+          .get(),
+    );
+  }
 
   @override
-  Future<List<Cliente>> buscar(String query) async => _mapear(
-        await (_conPersona()
-              ..where(_texto(query))
-              ..orderBy([OrderingTerm.asc(_persona.nombres)]))
-            .get(),
-      );
+  Future<List<Cliente>> buscar(String query) async {
+    exigir(Permiso.clientesVer);
+    return _mapear(
+      await (_conPersona()
+            ..where(_texto(query))
+            ..orderBy([OrderingTerm.asc(_persona.nombres)]))
+          .get(),
+    );
+  }
 
   @override
   Future<Cliente?> obtenerPorId(int id) async {
+    exigir(Permiso.clientesVer);
     final fila = await (_conPersona()..where(_tabla.id.equals(id)))
         .getSingleOrNull();
     return fila == null ? null : ClienteMapper.filaJoinAModelo(fila, _db);
@@ -161,6 +170,7 @@ class RepositorioClientesImpl with FirmaDeSesion implements RepositorioClientes 
     required int pagina,
     required int tamano,
   }) {
+    exigir(Permiso.clientesVer);
     final condicion = _condicion(filtro);
 
     final consultaPagina = _conPersona()
@@ -186,6 +196,7 @@ class RepositorioClientesImpl with FirmaDeSesion implements RepositorioClientes 
 
   @override
   Stream<ResumenClientes> observarResumen() {
+    exigir(Permiso.clientesVer);
     // El total sale de `clientes`; el de "con saldo" cruza con `deudores`, así
     // que va en la misma consulta cruda para no abrir dos streams que habría
     // que combinar a mano.
@@ -215,6 +226,7 @@ class RepositorioClientesImpl with FirmaDeSesion implements RepositorioClientes 
 
   @override
   Stream<Map<int, SaldoCliente>> observarSaldos() {
+    exigir(Permiso.clientesVer);
     // Un `GROUP BY` en SQL, no un recorrido de deudas en memoria. Se filtra
     // por `monto_total > monto_pagado` además de por estado para que una deuda
     // saldada pero aún marcada ACTIVA no deje al cliente en rojo.

@@ -122,6 +122,7 @@ class RepositorioDeudoresImpl
     required int pagina,
     required int tamano,
   }) {
+    exigir(Permiso.deudoresVer);
     final consulta = _baseQuery
       ..orderBy([OrderingTerm.desc(_db.tablaDeudor.creadoEn)]);
     _aplicarFiltro(consulta, filtro);
@@ -206,6 +207,7 @@ class RepositorioDeudoresImpl
 
   @override
   Stream<ResumenCartera> observarResumen() {
+    exigir(Permiso.deudoresVer);
     final t = _db.tablaDeudor;
 
     // Una sola pasada: un `SUM` y tres `COUNT` con su propio `filter`.
@@ -231,6 +233,7 @@ class RepositorioDeudoresImpl
 
   @override
   Future<DeudorDetalle> obtenerDetalle(int id) async {
+    exigir(Permiso.deudoresVer);
     final rows = await (_baseQuery..where(_db.tablaDeudor.id.equals(id))).get();
     if (rows.isEmpty) throw Exception('Deudor $id no encontrado');
 

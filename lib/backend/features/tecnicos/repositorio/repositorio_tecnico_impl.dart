@@ -64,10 +64,12 @@ final class RepositorioTecnicoDrift with FirmaDeSesion implements RepositorioTec
       filas.map((f) => TecnicoMapper.desdeJoin(f, _db)).toList();
 
   @override
-  Stream<List<Tecnico>> observarTodos() =>
-      (_conPersona()..orderBy([OrderingTerm.asc(_persona.nombres)]))
-          .watch()
-          .map(_mapear);
+  Stream<List<Tecnico>> observarTodos() {
+    exigir(Permiso.tecnicosVer);
+    return (_conPersona()..orderBy([OrderingTerm.asc(_persona.nombres)]))
+        .watch()
+        .map(_mapear);
+  }
 
   @override
   Future<bool> existeDocumento(String documento, {int? excluirId}) async {
@@ -176,6 +178,7 @@ final class RepositorioTecnicoDrift with FirmaDeSesion implements RepositorioTec
     required int pagina,
     required int tamano,
   }) {
+    exigir(Permiso.tecnicosVer);
     final condicion = _condicion(filtro);
 
     final consultaPagina = _conPersona()
@@ -201,6 +204,7 @@ final class RepositorioTecnicoDrift with FirmaDeSesion implements RepositorioTec
 
   @override
   Stream<({int total, int activos})> observarResumen() {
+    exigir(Permiso.tecnicosVer);
     final total = _tabla.id.count();
     final activos = _tabla.id.count(filter: _tabla.activo.equals(true));
 

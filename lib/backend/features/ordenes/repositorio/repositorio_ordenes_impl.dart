@@ -135,6 +135,7 @@ class RepositorioOrdenesImpl with FirmaDeSesion implements RepositorioOrdenes {
 
   @override
   Stream<List<OrdenResumen>> observarTodas() {
+    exigir(Permiso.ordenesVer);
     return _db
         .customSelect(
           '$_sqlSelectResumen ORDER BY os.id DESC',
@@ -195,6 +196,7 @@ class RepositorioOrdenesImpl with FirmaDeSesion implements RepositorioOrdenes {
     required int pagina,
     required int tamano,
   }) {
+    exigir(Permiso.ordenesVer);
     final donde = _whereListado(filtro);
 
     final consultaPagina = _db.customSelect(
@@ -227,6 +229,7 @@ class RepositorioOrdenesImpl with FirmaDeSesion implements RepositorioOrdenes {
 
   @override
   Future<List<OrdenResumen>> obtenerTodas() async {
+    exigir(Permiso.ordenesVer);
     final rows = await _db
         .customSelect('$_sqlSelectResumen ORDER BY os.id DESC')
         .get();
@@ -249,6 +252,7 @@ class RepositorioOrdenesImpl with FirmaDeSesion implements RepositorioOrdenes {
 
   @override
   Future<OrdenDetalle> obtenerDetalle(int id) async {
+    exigir(Permiso.ordenesVer);
     // Cabecera (Usamos customSelect para traer datos de moto/cliente)
     final cabeceraRow = await _db
         .customSelect(
@@ -658,6 +662,7 @@ class RepositorioOrdenesImpl with FirmaDeSesion implements RepositorioOrdenes {
 
   @override
   Stream<Map<int, int>> observarConteoTareasPorTecnico() {
+    exigir(Permiso.ordenesVer);
     final ordenesDistintas = _tablaTareas.ordenId.count(distinct: true);
     final consulta = _db.selectOnly(_tablaTareas)
       ..addColumns([_tablaTareas.tecnicoId, ordenesDistintas])
@@ -714,6 +719,7 @@ class RepositorioOrdenesImpl with FirmaDeSesion implements RepositorioOrdenes {
 
   @override
   Stream<ResumenOrdenes> observarResumen() {
+    exigir(Permiso.ordenesVer);
     // Un `COUNT` con `filter` por estado, todo en una pasada. "En proceso" es
     // ABIERTA y "pendientes" LISTA —la moto ya está lista pero no se ha
     // entregado—, que es lo que separan las tarjetas del diseño.

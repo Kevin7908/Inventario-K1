@@ -62,24 +62,30 @@ class RepositorioProveedoresImpl with FirmaDeSesion implements RepositorioProvee
       filas.map((f) => ProveedorMapper.filaJoinAModelo(f, _db)).toList();
 
   @override
-  Stream<List<Proveedor>> observarTodas() =>
-      (_conPersona()..orderBy([OrderingTerm.asc(_persona.nombres)]))
-          .watch()
-          .map(_mapear);
+  Stream<List<Proveedor>> observarTodas() {
+    exigir(Permiso.proveedoresVer);
+    return (_conPersona()..orderBy([OrderingTerm.asc(_persona.nombres)]))
+        .watch()
+        .map(_mapear);
+  }
 
   @override
   Future<Proveedor?> obtenerPorId(int id) async {
+    exigir(Permiso.proveedoresVer);
     final fila =
         await (_conPersona()..where(_tabla.id.equals(id))).getSingleOrNull();
     return fila == null ? null : ProveedorMapper.filaJoinAModelo(fila, _db);
   }
 
   @override
-  Future<List<Proveedor>> buscarPorNombre(String consulta) async => _mapear(
-        await (_conPersona()
-              ..where(_persona.nombres.lower().like('%${consulta.toLowerCase()}%')))
-            .get(),
-      );
+  Future<List<Proveedor>> buscarPorNombre(String consulta) async {
+    exigir(Permiso.proveedoresVer);
+    return _mapear(
+      await (_conPersona()
+            ..where(_persona.nombres.lower().like('%${consulta.toLowerCase()}%')))
+          .get(),
+    );
+  }
 
   @override
   Future<Proveedor> crear(Proveedor proveedor) {
@@ -189,6 +195,7 @@ class RepositorioProveedoresImpl with FirmaDeSesion implements RepositorioProvee
     required int pagina,
     required int tamano,
   }) {
+    exigir(Permiso.proveedoresVer);
     final condicion = _condicion(filtro);
 
     final consultaPagina = _conPersona()
@@ -214,6 +221,7 @@ class RepositorioProveedoresImpl with FirmaDeSesion implements RepositorioProvee
 
   @override
   Stream<({int total, int activos})> observarResumen() {
+    exigir(Permiso.proveedoresVer);
     final total = _tabla.id.count();
     final activos = _tabla.id.count(filter: _tabla.activo.equals(true));
 

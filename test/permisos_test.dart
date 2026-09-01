@@ -13,11 +13,21 @@ import 'package:inventario_k1/backend/features/bitacora/modelo/entrada_bitacora.
 import 'package:inventario_k1/backend/features/bitacora/repositorio/repositorio_bitacora.dart';
 import 'package:inventario_k1/backend/features/bitacora/repositorio/repositorio_bitacora_impl.dart';
 import 'package:inventario_k1/backend/features/autenticacion/resultado/resultados_auth.dart';
+import 'package:inventario_k1/backend/features/categorias/repositorio/repositorio_categorias_impl.dart';
+import 'package:inventario_k1/backend/features/clientes/repositorio/repositorio_cliente_impl.dart';
+import 'package:inventario_k1/backend/features/configuracion/repositorio/repositorio_configuracion_impl.dart';
+import 'package:inventario_k1/backend/features/cotizaciones/repositorio/repositorio_cotizaciones_impl.dart';
+import 'package:inventario_k1/backend/features/deudores/repositorio/repositorio_deudores.dart';
+import 'package:inventario_k1/backend/features/deudores/repositorio/repositorio_deudores_impl.dart';
+import 'package:inventario_k1/backend/features/ordenes/repositorio/repositorio_ordenes_impl.dart';
 import 'package:inventario_k1/backend/features/pos/enum/enum_ventas.dart';
 import 'package:inventario_k1/backend/features/pos/modelo/linea_venta_mostrador.dart';
 import 'package:inventario_k1/backend/features/pos/repositorio/repositorio_ventas_impl.dart';
 import 'package:inventario_k1/backend/features/productos/modelo/producto.dart';
+import 'package:inventario_k1/backend/features/productos/repositorio/repositorio_producto.dart';
 import 'package:inventario_k1/backend/features/productos/repositorio/repositorio_producto_impl.dart';
+import 'package:inventario_k1/backend/features/proveedores/repositorio/repositorio_proveedor_impl.dart';
+import 'package:inventario_k1/backend/features/tecnicos/repositorio/repositorio_tecnico_impl.dart';
 import 'package:inventario_k1/backend/features/reservas/enum/enum_reserva.dart';
 import 'package:inventario_k1/backend/features/reservas/repositorio/repositorio_reservas.dart';
 import 'package:inventario_k1/backend/features/reservas/repositorio/repositorio_reservas_impl.dart';
@@ -282,6 +292,85 @@ void main() {
 
       final restantes = await db.select(db.tablaUsuarioPermiso).get();
       expect(restantes.where((p) => p.usuarioId == anaId), isEmpty);
+    });
+  });
+
+  group('los permisos de ver cortan la consulta, no solo el sidebar', () {
+    // Esconder la sección del sidebar es orden: al catálogo se llega también
+    // desde el editor de órdenes, el de cotizaciones, el de compras y el
+    // mostrador. La compuerta que impide leer va en el repositorio.
+    //
+    // Se prueba con la sesión **sin ningún permiso** y llamando a la lectura
+    // principal de cada módulo: lo que se fija es que exista la compuerta, no
+    // qué devuelve la consulta.
+
+    late Map<String, void Function()> lecturas;
+
+    setUp(() {
+      final ciego = _cajeroCon(const {});
+      lecturas = {
+        'productos': () => RepositorioProductosImpl(db, ciego).observarPagina(
+              filtro: const FiltroProductos(),
+              pagina: 0,
+              tamano: 10,
+            ),
+        'categorías': () =>
+            RepositorioCategoriasImpl(db, ciego).observarTodas(),
+        'proveedores': () =>
+            RepositorioProveedoresImpl(db, ciego).observarTodas(),
+        'clientes': () => RepositorioClientesImpl(db, ciego).observarTodos(),
+        'técnicos': () => RepositorioTecnicoDrift(db, ciego).observarTodos(),
+        'órdenes': () => RepositorioOrdenesImpl(db, ciego).observarTodas(),
+        'cotizaciones': () =>
+            RepositorioCotizacionesImpl(db, ciego).observarTodas(),
+        'reservas': () => RepositorioReservasImpl(db, ciego).observarTodas(),
+        'cuentas por cobrar': () =>
+            RepositorioDeudoresImpl(db, ciego).observarPagina(
+              filtro: const FiltroDeudores(),
+              pagina: 0,
+              tamano: 10,
+            ),
+        'configuración': () =>
+            RepositorioConfiguracionImpl(db, ciego).observarTodas(),
+      };
+    });
+
+    test('ninguna lectura llega a la base sin su permiso', () {
+      for (final entrada in lecturas.entries) {
+        expect(
+          entrada.value,
+          throwsA(isA<PermisoDenegado>()),
+          reason: 'la lectura de ${entrada.key} no tiene compuerta',
+        );
+      }
+    });
+
+    test('con el permiso, la misma lectura pasa', () async {
+      // El contraejemplo: si la compuerta estuviera mal puesta —exigiendo un
+      // permiso que nadie tiene—, el test de arriba pasaría igual.
+      final catalogo = RepositorioProductosImpl(
+        db,
+        _cajeroCon({Permiso.productosVer}),
+      );
+
+      final pagina = await catalogo
+          .observarPagina(
+            filtro: const FiltroProductos(),
+            pagina: 0,
+            tamano: 10,
+          )
+          .first;
+
+      expect(pagina.total, 0);
+    });
+
+    test('imprimir no pasa por la compuerta de Configuración', () async {
+      // `leerTodas` existe aparte de `observarTodas` justo por esto: el
+      // encabezado de una factura lo consulta un cajero, que no tiene
+      // `CONFIGURACION_VER`.
+      final cajero = RepositorioConfiguracionImpl(db, _cajeroCon(const {}));
+
+      expect(await cajero.leerTodas(), isNotEmpty);
     });
   });
 

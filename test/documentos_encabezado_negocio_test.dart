@@ -10,20 +10,35 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:inventario_k1/backend/features/configuracion/modelo/clave_configuracion.dart';
 import 'package:inventario_k1/backend/features/configuracion/repositorio/repositorio_configuracion_impl.dart';
 import 'package:inventario_k1/backend/share/database/app_db.dart';
+import 'package:inventario_k1/backend/share/dominio/permiso.dart';
 import 'package:inventario_k1/frontend/features/documentos/provider/documentos_providers.dart';
 
 import 'soporte/base_en_memoria.dart';
+import 'soporte/sesion_de_prueba.dart';
 
 void main() {
   late AppDb db;
   late RepositorioConfiguracionImpl repositorio;
 
-  setUp(() {
+  setUp(() async {
     db = baseEnMemoria();
-    repositorio = RepositorioConfiguracionImpl(db);
+    repositorio = RepositorioConfiguracionImpl(db, await sesionDePrueba(db));
   });
 
   tearDown(() async => db.close());
+
+  test('imprimir no exige entrar a Configuración', () async {
+    // El encabezado del PDF lo lee un cajero cada vez que cobra, y un cajero
+    // no tiene `CONFIGURACION_VER`. Si esto pidiera permiso, cobrar e imprimir
+    // reventaría en el mostrador.
+    final cajero = RepositorioConfiguracionImpl(
+      db,
+      await sesionDePrueba(db, permisos: {Permiso.posVender}, usuario: 'caja'),
+    );
+
+    expect((await leerNegocioImpreso(cajero)).nombre,
+        ClaveConfiguracion.nombreNegocio.porDefecto);
+  });
 
   test('sin configurar nada usa los valores por defecto', () async {
     final negocio = await leerNegocioImpreso(repositorio);

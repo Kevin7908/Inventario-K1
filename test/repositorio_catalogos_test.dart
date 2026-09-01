@@ -23,7 +23,7 @@ void main() {
     db = baseEnMemoria();
     sesion = await sesionDePrueba(db);
     motos = RepositorioMotosImpl(db, sesion);
-    configuracion = RepositorioConfiguracionImpl(db);
+    configuracion = RepositorioConfiguracionImpl(db, sesion);
     taller = await sembrarTaller(db);
   });
 

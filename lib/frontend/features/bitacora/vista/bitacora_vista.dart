@@ -4,10 +4,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
-import '../../../../backend/share/dominio/permiso.dart';
 import '../../../layout/encabezado_con_cuenta.dart';
 import '../../../share/share.dart';
-import '../../autenticacion/provider/auth_providers.dart';
 import '../provider/bitacora_providers.dart';
 import '../widgets/filtros_bitacora.dart';
 import '../widgets/tabla_bitacora.dart';
@@ -21,47 +19,23 @@ import '../widgets/tabla_bitacora.dart';
 ///
 /// **Solo la ve quien tenga `bitacoraVer`**, que de fábrica es el
 /// administrador. Son tres capas y hacen falta las tres: el ítem no se dibuja
-/// en el sidebar, esta vista muestra un aviso en vez de la tabla, y el
+/// en el sidebar, el layout pinta el aviso en lugar de la pantalla, y el
 /// repositorio corta la consulta con `exigir`. Las dos primeras son orden; la
-/// que manda es la tercera (`CLAUDE.md` §7 bis).
+/// que manda es la tercera (`CLAUDE.md` §7 bis). El aviso no está aquí porque
+/// es el mismo de las catorce pantallas con permiso: lo pinta
+/// `LayoutPrincipal`.
 ///
 /// **No se edita nada.** La tabla es de solo escritura en la base —su guarda
 /// está en `guardas_sql.dart`—, así que aquí no hay filas que abrir ni botones
 /// que guardar: una bitácora que se puede corregir no prueba nada.
-class BitacoraVista extends ConsumerWidget {
+class BitacoraVista extends ConsumerStatefulWidget {
   const BitacoraVista({super.key});
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
-    final puedeVer = ref.watch(puedeProvider(Permiso.bitacoraVer));
-
-    if (!puedeVer) {
-      return const Padding(
-        padding: EdgeInsets.fromLTRB(32, 28, 32, 28),
-        child: Align(
-          alignment: Alignment.topCenter,
-          child: AvisoEnLinea(
-            tono: TonoAviso.alerta,
-            titulo: 'Solo para administradores',
-            mensaje: 'La bitácora dice quién movió el inventario y quién '
-                'borró qué. Pídele acceso a un administrador del taller.',
-          ),
-        ),
-      );
-    }
-
-    return const _PanelBitacora();
-  }
+  ConsumerState<BitacoraVista> createState() => _BitacoraVistaState();
 }
 
-class _PanelBitacora extends ConsumerStatefulWidget {
-  const _PanelBitacora();
-
-  @override
-  ConsumerState<_PanelBitacora> createState() => _PanelBitacoraState();
-}
-
-class _PanelBitacoraState extends ConsumerState<_PanelBitacora> {
+class _BitacoraVistaState extends ConsumerState<BitacoraVista> {
   final _busqueda = TextEditingController();
   final _focoBusqueda = FocusNode();
   Timer? _debounce;
