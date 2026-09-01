@@ -3,19 +3,17 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../../backend/features/compras/modelo/compra_item.dart';
 import '../../../../backend/features/compras/modelo/compra_resumen.dart';
-import '../../../../backend/share/dominio/permiso.dart';
 import '../../../../core/formato.dart';
-import '../../../../core/resultado.dart';
 import '../../../share/share.dart';
-import '../../autenticacion/widgets/si_puede.dart';
 import '../../productos/widgets/miniatura_linea.dart';
 import '../provider/compras_providers.dart';
 
-/// La remisión abierta: qué llegó, a cuánto y de quién.
+/// Un vistazo a la remisión desde fuera del módulo: qué llegó, a cuánto y de
+/// quién.
 ///
-/// **Solo se lee y se anula.** Una compra registrada no se edita, por lo mismo
-/// que una factura: explica entradas de inventario que ya ocurrieron. Anular
-/// saca del stock lo que había entrado, y la base lo refuerza con sus guardas.
+/// **Solo lee.** Existe para el «ver la remisión COM-0007» de la ficha del
+/// producto: corregirla o anularla se hace en su ficha, que es una pantalla
+/// entera dentro de Compras y a la que desde aquí no hay cómo navegar.
 ///
 /// Ejemplo:
 /// ```dart
@@ -31,35 +29,6 @@ class DialogoDetalleCompra extends ConsumerWidget {
         context: context,
         builder: (_) => DialogoDetalleCompra(compraId: compraId),
       );
-
-  Future<void> _anular(
-    BuildContext context,
-    WidgetRef ref,
-    CompraResumen compra,
-  ) async {
-    final confirmado = await DialogoConfirmacion.mostrar(
-      context,
-      titulo: 'Anular la compra ${compra.numero}',
-      mensaje: 'Sale del inventario lo que había entrado con esta remisión. '
-          'La compra no se borra: queda anulada, con su número.',
-      textoConfirmar: 'Anular',
-    );
-    if (confirmado != true || !context.mounted) return;
-
-    final resultado = await ref.read(repositorioComprasProvider).anular(
-          compra.id,
-        );
-    if (!context.mounted) return;
-
-    switch (resultado) {
-      case Exito():
-        ref.invalidate(compraDetalleProvider(compra.id));
-        Navigator.of(context).pop();
-        MensajeApp.exito(context, 'Compra ${compra.numero} anulada');
-      case Fallo(:final mensaje):
-        MensajeApp.error(context, mensaje);
-    }
-  }
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -78,10 +47,7 @@ class DialogoDetalleCompra extends ConsumerWidget {
               mensaje: 'No se pudo abrir la compra: $e',
               tono: TonoAviso.error,
             ),
-            data: (compra) => _Contenido(
-              detalle: compra,
-              alAnular: () => _anular(context, ref, compra.resumen),
-            ),
+            data: (compra) => _Contenido(detalle: compra),
           ),
         ),
       ),
@@ -90,10 +56,9 @@ class DialogoDetalleCompra extends ConsumerWidget {
 }
 
 class _Contenido extends StatelessWidget {
-  const _Contenido({required this.detalle, required this.alAnular});
+  const _Contenido({required this.detalle});
 
   final CompraDetalle detalle;
-  final VoidCallback alAnular;
 
   @override
   Widget build(BuildContext context) {
@@ -177,15 +142,6 @@ class _Contenido extends StatelessWidget {
               )
             else
               const Spacer(),
-            if (!compra.anulada)
-              SiPuede(
-                permiso: Permiso.comprasAnular,
-                child: BotonDestructivo(
-                  etiqueta: 'Anular compra',
-                  alPresionar: alAnular,
-                ),
-              ),
-            const SizedBox(width: 12),
             BotonSecundario(
               etiqueta: 'Cerrar',
               alPresionar: () => Navigator.of(context).pop(),

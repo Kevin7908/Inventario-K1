@@ -103,7 +103,7 @@ mientras convivía con la biblioteca de la versión anterior, que se borró el
   | `GrillaProductosCatalogo` | `productos/widgets/` | POS, cotizaciones, órdenes |
   | `MiniaturaProducto` | `productos/vista/` | las mismas |
   | `PanelMovimientosProducto`, `DialogoEntradaCompra` | `inventario/widgets/` | productos |
-  | `PanelUltimaCompra`, `DialogoNuevaCompra` | `compras/widgets/` | productos |
+  | `PanelUltimaCompra`, `DialogoDetalleCompra` | `compras/widgets/` | productos |
   | `LineaComprasProveedor` | `compras/widgets/` | proveedores |
   | `PanelCategoriasCatalogo` | `categorias/widgets/` | productos, POS, cotizaciones, órdenes |
   | `DialogoMarcaMoto`, `DialogoModeloMoto` | `motos/widgets/` | Configuración |

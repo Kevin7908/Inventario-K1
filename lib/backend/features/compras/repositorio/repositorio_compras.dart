@@ -84,11 +84,16 @@ typedef ResumenProveedorCompras = ({
 
 /// Las remisiones del proveedor: qué entró al taller, de quién y a cuánto.
 ///
-/// Es el otro lado de `RepositorioVentas`, y se escribe igual: la cabecera,
-/// sus líneas y las entradas de inventario, todo en una transacción. Antes de
-/// que existiera, dar entrada preguntaba producto y cantidad, así que la app
-/// no podía decir a cómo se compró nada ni cuánto se le lleva gastado a un
-/// proveedor.
+/// Antes de que existiera, dar entrada preguntaba producto y cantidad, así que
+/// la app no podía decir a cómo se compró nada ni cuánto se le lleva gastado a
+/// un proveedor.
+///
+/// **Se escribe como una orden, no como una factura**: la cabecera primero y
+/// las líneas de a una, cada una con su entrada de inventario en la misma
+/// transacción. Es lo que pide el gesto real —se recibe la caja y se va
+/// tecleando lo que sale de ella— y lo que permite que el editor guarde solo.
+/// La contrapartida es que la remisión existe desde el primer momento; por eso
+/// **no se borra**: se anula.
 abstract class RepositorioCompras {
   /// Una página del listado, de la más reciente a la más antigua. El `WHERE`,
   /// el `COUNT` y el `LIMIT` los resuelve SQLite (§5).
@@ -106,31 +111,69 @@ abstract class RepositorioCompras {
   /// La remisión con sus líneas.
   Future<CompraDetalle> obtenerDetalle(int id);
 
-  /// Registra la remisión entera: cabecera, líneas, entradas de inventario y
-  /// el costo de cada producto.
+  /// Abre la remisión **vacía** y devuelve su número.
   ///
-  /// **Es una sola operación de negocio, así que es un solo método** (§6). Si
-  /// se compusiera desde la vista —cabecera, luego líneas, luego entradas—,
-  /// un fallo a mitad dejaría mercancía en el stock sin documento, o un
-  /// consecutivo quemado sin nada dentro.
-  ///
-  /// El total **no se recibe**: se calcula de las líneas que quedaron
-  /// guardadas. Si la vista y la base no coincidieran, la que manda es la
-  /// base.
-  ///
-  /// Cada línea deja además el costo en `productos.precio_compra`, para que el
-  /// margen que muestra la app se calcule contra lo que de verdad se pagó la
-  /// última vez y no contra un número que alguien tecleó una vez.
+  /// Nace con proveedor, fecha y —si lo trae— el número de factura del
+  /// proveedor; las líneas se le van anotando con [agregarLinea], igual que
+  /// los repuestos de una orden. Se escribe así y no de un golpe porque es
+  /// como se recibe la mercancía en el mostrador: la caja se va vaciando y
+  /// cada producto se cuenta y se teclea cuando sale de ella.
   ///
   /// Rechaza la remisión repetida —mismo proveedor y mismo número de
   /// factura—, que es el error de captura que duplicaría el inventario.
-  Future<ResultadoCompra> registrar({
+  Future<ResultadoCompra> crear({
     required int proveedorId,
-    required List<LineaCompraNueva> lineas,
     DateTime? fecha,
     String? numeroFactura,
     String? notas,
   });
+
+  /// Cambia los datos de la cabecera. **El total no está aquí**: sale de las
+  /// líneas.
+  Future<Resultado> actualizarCabecera({
+    required int id,
+    int? proveedorId,
+    DateTime? fecha,
+    String? numeroFactura,
+    String? notas,
+  });
+
+  // Líneas, una a una
+  //
+  // Mismo modelo que órdenes, reservas y deudas: el editor escribe por línea y
+  // no reemplazando la remisión entera, porque cada línea **mete mercancía al
+  // inventario** y reescribirlas todas en cada tecleo serían dos movimientos
+  // por línea y por tecla.
+
+  /// Anota un producto más y **lo mete al inventario**, con su movimiento.
+  ///
+  /// Si el producto ya está en la remisión se le suma a su línea en vez de
+  /// abrir otra, y el costo pasa a ser el último tecleado: para quien recibe
+  /// es el mismo pedido, no un error.
+  ///
+  /// Deja además el costo en `productos.precio_compra`, para que el margen que
+  /// muestra la app se calcule contra lo que de verdad se pagó la última vez y
+  /// no contra un número que alguien tecleó una vez.
+  Future<Resultado> agregarLinea({
+    required int compraId,
+    required int productoId,
+    required double cantidad,
+    required int costoUnitario,
+  });
+
+  /// Cambia la cantidad o el costo de una línea, moviendo **solo la
+  /// diferencia** de stock.
+  ///
+  /// Bajar la cantidad falla si esa mercancía ya salió del taller: no se puede
+  /// «des-recibir» lo que ya se vendió.
+  Future<Resultado> actualizarLinea(
+    int lineaId, {
+    double? cantidad,
+    int? costoUnitario,
+  });
+
+  /// Quita la línea y saca del inventario lo que había metido.
+  Future<Resultado> eliminarLinea(int lineaId);
 
   /// Anula la remisión y **saca del inventario lo que había entrado**.
   ///

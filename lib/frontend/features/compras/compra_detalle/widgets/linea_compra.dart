@@ -1,11 +1,11 @@
 import 'package:flutter/material.dart';
 
-import '../../../../core/formato.dart';
-import '../../../share/share.dart';
-import '../../productos/widgets/miniatura_linea.dart';
+import '../../../../../core/formato.dart';
+import '../../../../share/share.dart';
+import '../../../productos/widgets/miniatura_linea.dart';
 
-/// Una línea de la remisión mientras se teclea: producto, cuánto llegó y a
-/// cuánto salió cada unidad.
+/// Una línea de la remisión: producto, cuánto llegó y a cuánto salió cada
+/// unidad.
 ///
 /// Es la hermana de `LineaOrden` con el signo cambiado: allí se teclea el
 /// precio de venta y aquí el **costo**, que es el dato que el módulo existe
@@ -21,7 +21,7 @@ import '../../productos/widgets/miniatura_linea.dart';
 ///
 /// Ejemplo:
 /// ```dart
-/// LineaCompraEditable(
+/// LineaCompra(
 ///   descripcion: producto.nombre,
 ///   sku: producto.sku,
 ///   cantidad: 12,
@@ -31,8 +31,8 @@ import '../../productos/widgets/miniatura_linea.dart';
 ///   alEliminar: () => _quitar(i),
 /// )
 /// ```
-class LineaCompraEditable extends StatefulWidget {
-  const LineaCompraEditable({
+class LineaCompra extends StatefulWidget {
+  const LineaCompra({
     super.key,
     required this.descripcion,
     required this.sku,
@@ -42,6 +42,7 @@ class LineaCompraEditable extends StatefulWidget {
     required this.alCambiarCosto,
     required this.alEliminar,
     this.imagen,
+    this.editable = true,
   });
 
   final String descripcion;
@@ -54,11 +55,14 @@ class LineaCompraEditable extends StatefulWidget {
   final ValueChanged<int> alCambiarCosto;
   final VoidCallback alEliminar;
 
+  /// En `false` la fila se ve pero no se toca: la remisión está anulada.
+  final bool editable;
+
   @override
-  State<LineaCompraEditable> createState() => _LineaCompraEditableState();
+  State<LineaCompra> createState() => _LineaCompraState();
 }
 
-class _LineaCompraEditableState extends State<LineaCompraEditable> {
+class _LineaCompraState extends State<LineaCompra> {
   late final TextEditingController _costo = TextEditingController(
     text: widget.costoUnitario == 0 ? '' : '${widget.costoUnitario}',
   );
@@ -83,11 +87,16 @@ class _LineaCompraEditableState extends State<LineaCompraEditable> {
       // uno por uno, ver el parcial evita tener que sumar de cabeza.
       subtitulo: '${widget.sku ?? ''} · '
           '${formatearPrecio((widget.cantidad * widget.costoUnitario).round())}',
-      precio: CampoPrecioLinea(
-        controlador: _costo,
-        foco: _focoCosto,
-        alCambiar: widget.alCambiarCosto,
-      ),
+      precio: widget.editable
+          ? CampoPrecioLinea(
+              controlador: _costo,
+              foco: _focoCosto,
+              alCambiar: widget.alCambiarCosto,
+            )
+          : Text(
+              formatearPrecio(widget.costoUnitario),
+              style: CampoPrecioLinea.estilo,
+            ),
       acciones: [
         ControlCantidad(
           cantidad: widget.cantidad,
@@ -95,8 +104,11 @@ class _LineaCompraEditableState extends State<LineaCompraEditable> {
           // porque hay mercancía que llega por litro y por metro.
           minimo: 0,
           permitirDecimales: true,
-          alCambiar: (valor) =>
-              valor <= 0 ? widget.alEliminar() : widget.alCambiarCantidad(valor),
+          alCambiar: widget.editable
+              ? (valor) => valor <= 0
+                  ? widget.alEliminar()
+                  : widget.alCambiarCantidad(valor)
+              : null,
         ),
       ],
     );

@@ -330,9 +330,8 @@ class RepositorioComprasImpl with FirmaDeSesion implements RepositorioCompras {
   // ── Escrituras ─────────────────────────────────────────────────────────────
 
   @override
-  Future<ResultadoCompra> registrar({
+  Future<ResultadoCompra> crear({
     required int proveedorId,
-    required List<LineaCompraNueva> lineas,
     DateTime? fecha,
     String? numeroFactura,
     String? notas,
@@ -345,29 +344,20 @@ class RepositorioComprasImpl with FirmaDeSesion implements RepositorioCompras {
       );
     }
 
-    // El mismo producto en dos renglones se funde antes de escribir: la
-    // `UNIQUE (compra_id, producto_id)` lo rechazaría, y para el que teclea es
-    // el mismo pedido, no un error.
-    final fundidas = _fundirPorProducto(lineas);
-    if (fundidas.isEmpty) {
-      return const CompraRechazada(
-        MotivoFallo.validacion,
-        'La compra no tiene ni una línea.',
-      );
-    }
-
     final factura = _limpio(numeroFactura);
 
     try {
       return await _db.transaction(() async {
-        if (factura != null &&
-            await _facturaRepetida(proveedorId, factura)) {
+        if (factura != null && await _facturaRepetida(proveedorId, factura)) {
           return CompraRechazada(
             MotivoFallo.remisionDuplicada,
             'Ese proveedor ya tiene registrada la factura $factura.',
           );
         }
 
+        // El número se pide **dentro** de la transacción que inserta la
+        // compra: si el `INSERT` falla, el consecutivo se devuelve y la serie
+        // sigue sin huecos (§7.1).
         final numero = await _consecutivos.siguiente(
           DocumentoConsecutivo.compra,
         );
@@ -384,28 +374,11 @@ class RepositorioComprasImpl with FirmaDeSesion implements RepositorioCompras {
               ),
             );
 
-        for (final linea in fundidas) {
-          await _agregarLinea(compraId, linea);
-        }
-
-        // El total se lee de lo que quedó guardado, no de lo que mandó la
-        // vista: si los dos no coincidieran, la que manda es la base.
-        final total = await _sumaLineas(compraId);
-        await (_db.update(
-          _db.tablaCompra,
-        )..where((t) => t.id.equals(compraId))).write(
-          TablaCompraCompanion(
-            total: Value(total),
-            actualizadoEn: Value(DateTime.now()),
-          ),
-        );
-
         await _anotar(
           AccionAuditada.creo,
           compraId,
           'Compra $numero',
-          detalle: '${fundidas.length} líneas por $total pesos'
-              '${factura == null ? '' : ', factura $factura'}',
+          detalle: factura == null ? null : 'Factura $factura',
         );
 
         return CompraRegistrada(compraId: compraId, numero: numero);
@@ -415,50 +388,196 @@ class RepositorioComprasImpl with FirmaDeSesion implements RepositorioCompras {
     }
   }
 
-  /// La línea, su entrada de inventario y el costo del producto, que tienen
-  /// que pasar juntos: sin la segunda, la remisión diría que llegó mercancía
-  /// que el stock no tiene.
-  Future<void> _agregarLinea(int compraId, LineaCompraNueva linea) async {
-    final producto = await (_db.select(
-      _db.tablaProducto,
-    )..where((t) => t.id.equals(linea.productoId))).getSingleOrNull();
-    if (producto == null) {
-      throw Exception('Uno de los productos ya no está en el catálogo.');
+  @override
+  Future<Resultado> actualizarCabecera({
+    required int id,
+    int? proveedorId,
+    DateTime? fecha,
+    String? numeroFactura,
+    String? notas,
+  }) async {
+    final compra = await _fila(id);
+    if (compra == null) {
+      return const Fallo(MotivoFallo.persistencia, 'La compra ya no existe.');
     }
 
-    await _db
-        .into(_db.tablaCompraDetalle)
-        .insert(
-          CompraMapper.itemACompanion(
-            compraId: compraId,
-            productoId: linea.productoId,
-            descripcion: producto.nombre,
-            cantidad: linea.cantidad,
-            costoUnitario: linea.costoUnitario,
+    final proveedor = proveedorId ?? compra.proveedorId;
+    final factura = _limpio(numeroFactura);
+
+    // El `UNIQUE` lo impediría igual; esto es para poder señalar el campo.
+    if (factura != null &&
+        (factura != compra.numeroFactura || proveedor != compra.proveedorId) &&
+        await _facturaRepetida(proveedor, factura)) {
+      return Fallo(
+        MotivoFallo.remisionDuplicada,
+        'Ese proveedor ya tiene registrada la factura $factura.',
+      );
+    }
+
+    return _envolver(
+      () => (_db.update(_db.tablaCompra)..where((t) => t.id.equals(id))).write(
+        TablaCompraCompanion(
+          proveedorId: Value(proveedor),
+          fecha: Value(fecha ?? compra.fecha),
+          numeroFactura: Value(factura),
+          notas: Value(_limpio(notas)),
+          actualizadoEn: Value(DateTime.now()),
+        ),
+      ),
+    );
+  }
+
+  // ── Líneas ─────────────────────────────────────────────────────────────────
+
+  @override
+  Future<Resultado> agregarLinea({
+    required int compraId,
+    required int productoId,
+    required double cantidad,
+    required int costoUnitario,
+  }) async {
+    if (!puede(Permiso.comprasCrear)) {
+      return const Fallo(
+        MotivoFallo.validacion,
+        'Tu cuenta no tiene permiso para registrar compras. Pídeselo a un '
+        'administrador del taller.',
+      );
+    }
+    if (cantidad <= 0) {
+      return const Fallo(
+        MotivoFallo.validacion,
+        'La cantidad tiene que ser mayor que cero.',
+      );
+    }
+
+    try {
+      await _db.transaction(() async {
+        await _exigirAbierta(compraId);
+        final producto = await _producto(productoId);
+
+        // Si el producto ya está en la remisión se le suma a su línea, como
+        // hace el carrito: dos filas del mismo producto solo complican la
+        // lectura. La `UNIQUE` de la tabla es la garantía; esto es lo que
+        // evita el choque.
+        final existente =
+            await (_db.select(_db.tablaCompraDetalle)
+                  ..where(
+                    (t) =>
+                        t.compraId.equals(compraId) &
+                        t.productoId.equals(productoId),
+                  )
+                  ..limit(1))
+                .getSingleOrNull();
+
+        if (existente == null) {
+          await _db
+              .into(_db.tablaCompraDetalle)
+              .insert(
+                CompraMapper.itemACompanion(
+                  compraId: compraId,
+                  productoId: productoId,
+                  // El nombre se congela aquí y no lo manda la vista: es el
+                  // snapshot de §1.2.
+                  descripcion: producto.nombre,
+                  cantidad: cantidad,
+                  costoUnitario: costoUnitario,
+                ),
+              );
+        } else {
+          await (_db.update(
+            _db.tablaCompraDetalle,
+          )..where((t) => t.id.equals(existente.id))).write(
+            TablaCompraDetalleCompanion(
+              cantidad: Value(existente.cantidad + cantidad),
+              costoUnitario: Value(costoUnitario),
+            ),
+          );
+        }
+
+        await _meterAlInventario(compraId, productoId, cantidad);
+        await _fijarCosto(productoId, costoUnitario);
+        await _recalcularTotal(compraId);
+      });
+      return const Exito();
+    } catch (e) {
+      return Fallo(MotivoFallo.persistencia, _mensaje(e));
+    }
+  }
+
+  @override
+  Future<Resultado> actualizarLinea(
+    int lineaId, {
+    double? cantidad,
+    int? costoUnitario,
+  }) async {
+    try {
+      await _db.transaction(() async {
+        final actual = await _filaLinea(lineaId);
+        if (actual == null) throw Exception('La línea ya no existe.');
+        await _exigirAbierta(actual.compraId);
+
+        final cantidadNueva = cantidad ?? actual.cantidad;
+        if (cantidadNueva <= 0) {
+          throw Exception('La cantidad tiene que ser mayor que cero.');
+        }
+        final delta = cantidadNueva - actual.cantidad;
+
+        // Solo se mueve la diferencia: subir de 2 a 5 mete tres más, bajar de
+        // 5 a 2 saca tres. Registrar la cantidad entera duplicaría la entrada.
+        if (delta > 0) {
+          await _meterAlInventario(actual.compraId, actual.productoId, delta);
+        } else if (delta < 0) {
+          await _sacarDelInventario(
+            actual.compraId,
+            actual.productoId,
+            -delta,
+          );
+        }
+
+        await (_db.update(
+          _db.tablaCompraDetalle,
+        )..where((t) => t.id.equals(lineaId))).write(
+          TablaCompraDetalleCompanion(
+            cantidad: Value(cantidadNueva),
+            costoUnitario: Value(costoUnitario ?? actual.costoUnitario),
           ),
         );
 
-    await _inventario.registrar(
-      SolicitudMovimiento.entrada(
-        productoId: linea.productoId,
-        cantidad: linea.cantidad,
-        tipo: TipoMovimiento.entradaCompra,
-        compraId: compraId,
-      ),
-    );
+        if (costoUnitario != null) {
+          await _fijarCosto(actual.productoId, costoUnitario);
+        }
+        await _recalcularTotal(actual.compraId);
+      });
+      return const Exito();
+    } catch (e) {
+      return Fallo(MotivoFallo.persistencia, _mensaje(e));
+    }
+  }
 
-    // **El costo de referencia pasa a ser el que se acaba de pagar.** Antes
-    // `precio_compra` era un número que alguien tecleó una vez, así que el
-    // margen que muestra la app no era el real. El histórico no se pierde:
-    // sigue línea por línea en `compra_detalles`.
-    await (_db.update(
-      _db.tablaProducto,
-    )..where((t) => t.id.equals(linea.productoId))).write(
-      TablaProductoCompanion(
-        precioCompra: Value(linea.costoUnitario),
-        actualizadoEn: Value(DateTime.now()),
-      ),
-    );
+  @override
+  Future<Resultado> eliminarLinea(int lineaId) async {
+    try {
+      await _db.transaction(() async {
+        final actual = await _filaLinea(lineaId);
+        if (actual == null) return;
+        await _exigirAbierta(actual.compraId);
+
+        await _sacarDelInventario(
+          actual.compraId,
+          actual.productoId,
+          actual.cantidad,
+        );
+
+        await (_db.delete(
+          _db.tablaCompraDetalle,
+        )..where((t) => t.id.equals(lineaId))).go();
+
+        await _recalcularTotal(actual.compraId);
+      });
+      return const Exito();
+    } catch (e) {
+      return Fallo(MotivoFallo.persistencia, _mensaje(e));
+    }
   }
 
   @override
@@ -485,15 +604,11 @@ class RepositorioComprasImpl with FirmaDeSesion implements RepositorioCompras {
         // lanza y la compra se queda como estaba en vez de quedar anulada con
         // el stock sin devolver.
         for (final item in await _cargarItems(id)) {
-          await _verificarStock(item);
-          await _inventario.registrar(
-            SolicitudMovimiento.salida(
-              productoId: item.productoId,
-              cantidad: item.cantidad,
-              tipo: TipoMovimiento.ajusteNegativo,
-              compraId: id,
-              notas: 'Anulación de la compra ${compra.numero}',
-            ),
+          await _sacarDelInventario(
+            id,
+            item.productoId,
+            item.cantidad,
+            notas: 'Anulación de la compra ${compra.numero}',
           );
         }
 
@@ -545,24 +660,108 @@ class RepositorioComprasImpl with FirmaDeSesion implements RepositorioCompras {
 
   // ── Helpers privados ───────────────────────────────────────────────────────
 
-  /// Suma las líneas repetidas del mismo producto en una sola, conservando el
-  /// último costo tecleado: es lo que haría quien las está viendo en pantalla.
-  static List<LineaCompraNueva> _fundirPorProducto(
-    List<LineaCompraNueva> lineas,
-  ) {
-    final porProducto = <int, LineaCompraNueva>{};
-    for (final linea in lineas) {
-      if (linea.cantidad <= 0) continue;
-      final previa = porProducto[linea.productoId];
-      porProducto[linea.productoId] = previa == null
-          ? linea
-          : LineaCompraNueva(
-              productoId: linea.productoId,
-              cantidad: previa.cantidad + linea.cantidad,
-              costoUnitario: linea.costoUnitario,
-            );
+  Future<TablaCompraData?> _fila(int id) => (_db.select(
+        _db.tablaCompra,
+      )..where((t) => t.id.equals(id))).getSingleOrNull();
+
+  Future<TablaCompraDetalleData?> _filaLinea(int id) => (_db.select(
+        _db.tablaCompraDetalle,
+      )..where((t) => t.id.equals(id))).getSingleOrNull();
+
+  /// Una compra anulada no se toca. La guarda de la base lo impide igual;
+  /// esto existe para poder decir por qué.
+  Future<void> _exigirAbierta(int compraId) async {
+    final compra = await _fila(compraId);
+    if (compra == null) throw Exception('La compra ya no existe.');
+    if (compra.estado == EstadoCompra.anulada.codigo) {
+      throw Exception(
+        'La compra ${compra.numero} está anulada y ya no admite cambios.',
+      );
     }
-    return porProducto.values.toList(growable: false);
+  }
+
+  Future<TablaProductoData> _producto(int productoId) async {
+    final producto = await (_db.select(
+      _db.tablaProducto,
+    )..where((t) => t.id.equals(productoId))).getSingleOrNull();
+    if (producto == null) {
+      throw Exception('El producto ya no está en el catálogo.');
+    }
+    return producto;
+  }
+
+  Future<void> _meterAlInventario(
+    int compraId,
+    int productoId,
+    double cantidad,
+  ) => _inventario.registrar(
+    SolicitudMovimiento.entrada(
+      productoId: productoId,
+      cantidad: cantidad,
+      tipo: TipoMovimiento.entradaCompra,
+      compraId: compraId,
+    ),
+  );
+
+  /// La salida que corrige una entrada: bajar una línea, quitarla o anular la
+  /// remisión entera. Falla si esa mercancía ya salió del taller.
+  Future<void> _sacarDelInventario(
+    int compraId,
+    int productoId,
+    double cantidad, {
+    String? notas,
+  }) async {
+    await _verificarStock(productoId, cantidad);
+    await _inventario.registrar(
+      SolicitudMovimiento.salida(
+        productoId: productoId,
+        cantidad: cantidad,
+        tipo: TipoMovimiento.ajusteNegativo,
+        compraId: compraId,
+        notas: notas,
+      ),
+    );
+  }
+
+  /// **El costo de referencia pasa a ser el que se acaba de pagar.** Antes
+  /// `precio_compra` era un número que alguien tecleó una vez, así que el
+  /// margen que muestra la app no era el real. El histórico no se pierde:
+  /// sigue línea por línea en `compra_detalles`.
+  Future<void> _fijarCosto(int productoId, int costo) =>
+      (_db.update(_db.tablaProducto)..where((t) => t.id.equals(productoId)))
+          .write(
+        TablaProductoCompanion(
+          precioCompra: Value(costo),
+          actualizadoEn: Value(DateTime.now()),
+        ),
+      );
+
+  /// Recalcula el caché **entero** desde las líneas, nunca sumándole el delta
+  /// al valor anterior: así no puede desviarse aunque una escritura falle a
+  /// mitad, y `descuadres()` puede afirmar que siempre coincide.
+  Future<void> _recalcularTotal(int compraId) async {
+    final total = await _sumaLineas(compraId);
+    await (_db.update(_db.tablaCompra)..where((t) => t.id.equals(compraId)))
+        .write(
+      TablaCompraCompanion(
+        total: Value(total),
+        actualizadoEn: Value(DateTime.now()),
+      ),
+    );
+  }
+
+  /// Traduce lo que SQLite rechace a un [Fallo] tipado. Las reglas que tienen
+  /// mensaje propio ya se comprobaron antes: aquí solo queda lo imprevisto.
+  Future<Resultado> _envolver(Future<void> Function() operacion) async {
+    try {
+      await operacion();
+      return const Exito();
+    } catch (e) {
+      return Fallo(
+        MotivoFallo.persistencia,
+        'No se pudo guardar: ${_mensaje(e)}',
+      );
+    }
   }
 
   /// El `UNIQUE (proveedor_id, numero_factura)` lo impediría igual; esto es
@@ -592,25 +791,26 @@ class RepositorioComprasImpl with FirmaDeSesion implements RepositorioCompras {
     return fila.read<int>('s');
   }
 
-  /// Lanza si anular dejaría el stock en negativo, con el mensaje que ve el
-  /// usuario. La mercancía que ya se vendió no se puede «des-recibir».
-  Future<void> _verificarStock(CompraItem item) async {
+  /// Lanza si deshacer una entrada dejaría el stock en negativo, con el
+  /// mensaje que ve el usuario. La mercancía que ya se vendió no se puede
+  /// «des-recibir».
+  Future<void> _verificarStock(int productoId, double cantidad) async {
     final fila = await _db
         .customSelect(
           'SELECT stock_actual, nombre FROM productos WHERE id = ?',
-          variables: [Variable.withInt(item.productoId)],
+          variables: [Variable.withInt(productoId)],
           readsFrom: {_db.tablaProducto},
         )
         .getSingleOrNull();
 
     final disponible = (fila?.data['stock_actual'] as num?)?.toDouble() ?? 0;
-    if (disponible >= item.cantidad) return;
+    if (disponible >= cantidad) return;
 
     final nombre = fila?.data['nombre'] as String? ?? 'un producto';
     throw Exception(
-      'No se puede anular: de "$nombre" entraron ${_cantidad(item.cantidad)} '
-      'y solo quedan ${_cantidad(disponible)}. Lo demás ya salió del taller, '
-      'así que la corrección es un ajuste de inventario.',
+      'De "$nombre" entraron ${_cantidad(cantidad)} y solo quedan '
+      '${_cantidad(disponible)}: lo demás ya salió del taller, así que la '
+      'corrección es un ajuste de inventario.',
     );
   }
 
