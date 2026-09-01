@@ -26,7 +26,19 @@ class FiltroProductos {
     this.compatibleConModeloId,
   });
 
-  /// Coincide contra nombre, SKU o nombre de categoría.
+  /// Coincide contra nombre, SKU o nombre de categoría, **palabra por
+  /// palabra**: «freno yamaha» encuentra «Frenos Yamaha FZ» aunque nadie las
+  /// haya escrito en ese orden. Todas las palabras tienen que aparecer, cada
+  /// una donde sea.
+  ///
+  /// Los resultados llegan **por relevancia**: primero lo que coincide en el
+  /// nombre, después en el SKU y al final lo que solo coincide por su
+  /// categoría. Sin ese orden, buscar «freno» en un catálogo con una
+  /// categoría «Frenos» sepultaba las pastillas debajo de todo lo demás de esa
+  /// categoría.
+  ///
+  /// Un código de barras completo se compara aparte, exacto y normalizado: lo
+  /// escribe un lector, no una persona.
   final String busqueda;
   final int? categoriaId;
   final bool soloStockBajo;
