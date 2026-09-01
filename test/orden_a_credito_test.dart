@@ -309,6 +309,24 @@ void main() {
       );
     });
 
+    test('la orden fiada no se puede borrar, y el mensaje dice por qué',
+        () async {
+      final ordenId = await _ordenCompleta();
+      final r = await deudores.cerrarOrdenACredito(ordenId: ordenId)
+          as DeudaAbierta;
+
+      expect(
+        () => ordenes.eliminar(ordenId),
+        throwsA(
+          isA<Exception>().having(
+            (e) => e.toString(),
+            'mensaje',
+            contains(r.numero),
+          ),
+        ),
+      );
+    });
+
     test('borrarla no devuelve al estante lo que sigue en la moto', () async {
       // Borrar una deuda de mostrador sí devuelve: significa que nunca debió
       // anotarse. Esta es otra cosa —los repuestos los sigue debiendo la
