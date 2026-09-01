@@ -45,9 +45,13 @@ class LineaDeuda extends StatelessWidget {
     return FilaDocumento(
       principal: MiniaturaLinea(
         rutaImagen: linea.imagenUrl,
-        iconoAlterno: Icons.inventory_2_outlined,
+        // La mano de obra y los cargos de una orden fiada no son piezas: el
+        // ícono lo dice sin que haya que leer el subtítulo, que ahí va vacío.
+        iconoAlterno: linea.esProducto
+            ? Icons.inventory_2_outlined
+            : Icons.build_outlined,
       ),
-      titulo: linea.nombreProducto,
+      titulo: linea.descripcion,
       subtitulo: linea.sku,
       precio: Text(
         formatearPrecio(linea.precioUnitario),

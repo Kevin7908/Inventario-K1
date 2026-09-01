@@ -1003,8 +1003,9 @@ class Sembrador {
           );
 
       var total = 0;
-      // El UNIQUE (deudor_id, producto_id) no deja repetir producto en la
-      // misma deuda; `_conStock` ya devuelve un conjunto.
+      // `_conStock` ya devuelve un conjunto, así que ningún producto se
+      // repite: en una deuda de mostrador el repositorio le sumaría cantidad
+      // a la línea que ya está, en vez de abrir otra.
       for (final productoId in elegidos) {
         final cantidad = _tomar(productoId, 2);
         if (cantidad == null) continue;
@@ -1015,7 +1016,8 @@ class Sembrador {
               TablaDeudorItemCompanion.insert(
                 usuarioId: autor,
                 deudorId: deudorId,
-                productoId: productoId,
+                productoId: Value(productoId),
+                descripcion: precio.nombre,
                 cantidad: cantidad,
                 precioUnitario: precio.venta,
               ),

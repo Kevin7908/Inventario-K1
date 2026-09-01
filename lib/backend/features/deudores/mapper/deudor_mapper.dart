@@ -15,6 +15,7 @@ class DeudorMapper {
     required String nombreCliente,
     String? nombreMoto,
     String? placaMoto,
+    String? numeroOrden,
   }) {
     return DeudorResumen(
       id: row.id,
@@ -24,7 +25,10 @@ class DeudorMapper {
       motoId: row.motoId,
       nombreMoto: nombreMoto,
       placaMoto: placaMoto,
+      ordenId: row.ordenId,
+      numeroOrden: numeroOrden,
       concepto: row.concepto,
+      descuento: row.descuento,
       montoTotal: row.montoTotal,
       montoPagado: row.montoPagado,
       estado: EstadoDeudor.desdeValor(row.estado),
@@ -45,17 +49,19 @@ class DeudorMapper {
     );
   }
 
+  /// La descripción sale de la **fila**, no del catálogo: es el snapshot del
+  /// día en que se fió (§1.2). El SKU y la foto sí vienen del producto, y
+  /// faltan cuando la línea es mano de obra o un cargo suelto.
   static DeudorItem itemAModelo(
     TablaDeudorItemData row, {
-    required String nombreProducto,
-    required String sku,
+    String? sku,
     String? imagenUrl,
   }) {
     return DeudorItem(
       id: row.id,
       deudorId: row.deudorId,
       productoId: row.productoId,
-      nombreProducto: nombreProducto,
+      descripcion: row.descripcion,
       sku: sku,
       imagenUrl: imagenUrl,
       cantidad: row.cantidad,
@@ -83,17 +89,22 @@ class DeudorMapper {
     );
   }
 
+  /// [productoId] va en nulo cuando lo fiado no es una pieza: la mano de obra
+  /// y los cargos de una orden cerrada a crédito se cobran igual y solo
+  /// tienen [descripcion].
   static TablaDeudorItemCompanion itemACompanion({
     required int usuarioId,
     required int deudorId,
-    required int productoId,
+    int? productoId,
+    required String descripcion,
     required double cantidad,
     required int precioUnitario,
   }) {
     return TablaDeudorItemCompanion.insert(
       usuarioId: usuarioId,
       deudorId: deudorId,
-      productoId: productoId,
+      productoId: Value(productoId),
+      descripcion: descripcion,
       cantidad: cantidad,
       precioUnitario: precioUnitario,
     );

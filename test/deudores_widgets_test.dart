@@ -47,7 +47,7 @@ DeudorItem _linea({double cantidad = 2}) => DeudorItem(
       id: 1,
       deudorId: 7,
       productoId: 3,
-      nombreProducto: 'Pastilla de freno',
+      descripcion: 'Pastilla de freno',
       sku: 'FRE-1123',
       cantidad: cantidad,
       precioUnitario: 30000,

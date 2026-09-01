@@ -4,7 +4,7 @@
 // módulo: apartar deja el repuesto en la bodega —cancelar lo devuelve—, fiar
 // lo saca montado en una moto. Si dar una deuda por perdida devolviera stock,
 // el taller creería tener piezas que ya no están.
-import 'package:drift/drift.dart' show Variable;
+import 'package:drift/drift.dart' show Value, Variable;
 import 'package:flutter_test/flutter_test.dart';
 import 'package:inventario_k1/backend/features/deudores/enum/enum_deudor.dart';
 import 'package:inventario_k1/backend/features/deudores/repositorio/repositorio_deudores.dart';
@@ -361,7 +361,8 @@ void main() {
               TablaDeudorItemCompanion.insert(
                 usuarioId: sesion.usuarioId,
                 deudorId: id,
-                productoId: taller.productoId,
+                productoId: Value(taller.productoId),
+                descripcion: 'Pastilla de freno',
                 cantidad: 0,
                 precioUnitario: 30000,
               ),
@@ -370,21 +371,42 @@ void main() {
       );
     });
 
-    test('el mismo producto no entra dos veces en la misma deuda', () async {
-      final id = await _deudaCon(cantidad: 1);
+    test('una línea sin descripción se rechaza', () async {
+      // La descripción es lo único que siempre está: el producto falta en la
+      // mano de obra de una orden fiada.
+      final id = await _deuda();
 
       expect(
         () => db.into(db.tablaDeudorItem).insert(
               TablaDeudorItemCompanion.insert(
                 usuarioId: sesion.usuarioId,
                 deudorId: id,
-                productoId: taller.productoId,
+                descripcion: '   ',
                 cantidad: 1,
                 precioUnitario: 30000,
               ),
             ),
         throwsA(isA<Exception>()),
       );
+    });
+
+    test('el mismo producto se suma a su línea, no abre otra', () async {
+      // La regla ya no la sostiene un UNIQUE —una orden fiada puede traer el
+      // mismo repuesto dos veces a precios distintos—, así que la sostiene el
+      // repositorio y por eso se prueba aquí.
+      final id = await _deudaCon(cantidad: 1, precio: 30000);
+
+      await deudores.agregarItem(
+        deudorId: id,
+        productoId: taller.productoId,
+        cantidad: 2,
+        precioUnitario: 30000,
+      );
+
+      final detalle = await deudores.obtenerDetalle(id);
+      expect(detalle.items, hasLength(1));
+      expect(detalle.items.single.cantidad, 3);
+      expect(detalle.resumen.montoTotal, 90000);
     });
 
     test('un pago con método fuera del enum se rechaza', () async {

@@ -239,7 +239,7 @@ class DeudaEditorNotifier extends AsyncNotifier<DeudaEditorState> {
         id: linea.id,
         deudorId: linea.deudorId,
         productoId: linea.productoId,
-        nombreProducto: linea.nombreProducto,
+        descripcion: linea.descripcion,
         sku: linea.sku,
         imagenUrl: linea.imagenUrl,
         cantidad: cantidad,

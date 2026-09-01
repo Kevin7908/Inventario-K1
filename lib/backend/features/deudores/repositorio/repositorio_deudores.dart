@@ -3,6 +3,7 @@ import '../../../share/dominio/metodo_pago.dart';
 import '../enum/enum_deudor.dart';
 import '../modelo/deudor_detalle.dart';
 import '../modelo/deudor_resumen.dart';
+import '../resultado/resultado_cierre_credito.dart';
 
 /// En qué tramo de la cartera se está mirando.
 ///
@@ -110,6 +111,32 @@ abstract class RepositorioDeudores {
     String? notas,
   });
 
+  /// Cierra una orden de servicio **a crédito**: abre la deuda con lo que la
+  /// orden cobra ya dentro y deja las dos enlazadas.
+  ///
+  /// Es la operación que cierra el descuento doble de inventario. Antes había
+  /// que anotar el repuesto en la orden —que lo saca del estante— y otra vez
+  /// en la deuda para que constara qué se fió, y el inventario descontaba las
+  /// dos veces. Aquí las líneas se **copian**: repuestos, mano de obra y
+  /// cargos, con su descripción congelada, y **no se registra ni un
+  /// movimiento**, porque la mercancía ya salió.
+  ///
+  /// En la misma transacción la orden pasa a `ENTREGADA` con su fecha de
+  /// salida: la moto se va con el cliente, que es lo que significa fiar.
+  ///
+  /// Una orden se fía **una sola vez** —lo garantiza el `UNIQUE` de
+  /// `deudores.orden_id`—, y las líneas de la deuda que resulta no se editan
+  /// a mano: hay una guarda en la base que lo impide, porque editarlas movería
+  /// stock por una salida que ya ocurrió.
+  ///
+  /// Exige `DEUDORES_CREAR` y `ORDENES_EDITAR`: abre una deuda y cierra una
+  /// orden.
+  Future<ResultadoCierreCredito> cerrarOrdenACredito({
+    required int ordenId,
+    DateTime? fechaVencimiento,
+    String? notas,
+  });
+
   /// Cambia los datos de la cabecera. **El monto no está aquí**: sale de las
   /// líneas.
   Future<Resultado> actualizar({
@@ -131,6 +158,13 @@ abstract class RepositorioDeudores {
   ///
   /// Si el producto ya está en la deuda se le suma a su línea en vez de abrir
   /// otra. Falla si no hay stock: no se puede fiar lo que no está.
+  ///
+  /// La descripción no se recibe: se copia del catálogo al insertar, que es
+  /// lo que la vuelve un snapshot y no un dato que la vista pueda inventar.
+  ///
+  /// Falla también si la deuda vino de una orden ([cerrarOrdenACredito]):
+  /// esas líneas ya salieron del estante y anotarlas otra vez es el descuento
+  /// doble que todo esto vino a cerrar.
   Future<Resultado> agregarItem({
     required int deudorId,
     required int productoId,

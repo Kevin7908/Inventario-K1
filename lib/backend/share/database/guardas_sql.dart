@@ -220,6 +220,77 @@ const List<String> guardasSql = [
   END;
   ''',
 
+  // ── La deuda que copia una orden no se retoca a mano ─────────────────────
+  //
+  // Es la guarda que cierra el descuento doble de inventario. El caso era
+  // este: se anotaba el repuesto en la orden —y salía del estante—, el
+  // cliente pedía fiado, y en Cuentas por cobrar se anotaba otra vez el mismo
+  // repuesto para que constara. Salía uno del taller y el inventario decía
+  // dos.
+  //
+  // Cerrar la orden a crédito copia sus líneas a la deuda **sin volver a
+  // tocar el stock**, y estas tres guardas impiden que después alguien le
+  // agregue, cambie o quite una línea a mano: esas sí moverían inventario, y
+  // sobre una salida que ya ocurrió. Lo que haya que corregir se corrige en
+  // la orden, que es donde de verdad está.
+  //
+  // Un aviso no habría servido: mientras se pueda anotar en los dos sitios,
+  // alguien lo va a hacer.
+  //
+  // **Por qué el `INSERT` también:** el cierre a crédito inserta sus líneas
+  // *antes* de escribir `deudores.orden_id`, todo dentro de la misma
+  // transacción. Cuando el enlace queda puesto, la deuda ya está completa y
+  // esta guarda la sella.
+  '''
+  CREATE TRIGGER IF NOT EXISTS guarda_deuda_de_orden_sin_alta
+  BEFORE INSERT ON deudor_items
+  FOR EACH ROW
+  WHEN (SELECT orden_id FROM deudores WHERE id = NEW.deudor_id) IS NOT NULL
+  BEGIN
+    SELECT RAISE(ABORT,
+      'Esta deuda es la orden cerrada a crédito: sus líneas se corrigen en la orden.');
+  END;
+  ''',
+
+  '''
+  CREATE TRIGGER IF NOT EXISTS guarda_deuda_de_orden_sin_edicion
+  BEFORE UPDATE ON deudor_items
+  FOR EACH ROW
+  WHEN (SELECT orden_id FROM deudores WHERE id = OLD.deudor_id) IS NOT NULL
+  BEGIN
+    SELECT RAISE(ABORT,
+      'Esta deuda es la orden cerrada a crédito: sus líneas se corrigen en la orden.');
+  END;
+  ''',
+
+  '''
+  CREATE TRIGGER IF NOT EXISTS guarda_deuda_de_orden_sin_borrado
+  BEFORE DELETE ON deudor_items
+  FOR EACH ROW
+  WHEN (SELECT orden_id FROM deudores WHERE id = OLD.deudor_id) IS NOT NULL
+  BEGIN
+    SELECT RAISE(ABORT,
+      'Esta deuda es la orden cerrada a crédito: sus líneas se corrigen en la orden.');
+  END;
+  ''',
+
+  // ── El enlace con la orden se pone una vez y no se mueve ─────────────────
+  //
+  // Sin esto, la guarda de arriba se saltaría en dos pasos: bastaría con
+  // poner `orden_id` en NULL, retocar las líneas y volver a enlazarla. Y
+  // desenlazar una deuda de su orden dejaría además los repuestos de la orden
+  // cobrados dos veces si alguien la cierra a crédito otra vez.
+  '''
+  CREATE TRIGGER IF NOT EXISTS guarda_deuda_orden_inmutable
+  BEFORE UPDATE ON deudores
+  FOR EACH ROW
+  WHEN OLD.orden_id IS NOT NULL AND NEW.orden_id IS NOT OLD.orden_id
+  BEGIN
+    SELECT RAISE(ABORT,
+      'La deuda nació de una orden: ese enlace no se cambia.');
+  END;
+  ''',
+
   // ── La bitácora es de solo escritura ────────────────────────────────────
   //
   // Mismo argumento que el libro mayor del inventario, y más fuerte: una
