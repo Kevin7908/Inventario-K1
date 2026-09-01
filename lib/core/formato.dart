@@ -59,3 +59,40 @@ String formatearFechaHora(DateTime fecha) => _fechaHora.format(fecha);
 /// Solo la hora: `15:30`. Para cuando la fecha ya está a la vista y repetirla
 /// en cada renglón estorba, como en la bitácora.
 String formatearHora(DateTime fecha) => _hora.format(fecha);
+
+/// Hace cuánto pasó algo, en palabras: `hace 2 días`, `ayer`, `hace un rato`.
+///
+/// Existe para los renglones de historial de una ficha —«modificado por Ana,
+/// hace dos días»—, donde la fecha exacta estorba: lo que se quiere saber de
+/// un vistazo es si fue hoy o el mes pasado.
+///
+/// Pasada una semana devuelve la fecha de [formatearFecha]: «hace 23 días» ya
+/// no le dice nada a nadie, y el día concreto sí.
+///
+/// [ahora] existe para los tests, que necesitan un presente fijo.
+String formatearHaceCuanto(DateTime cuando, {DateTime? ahora}) {
+  final referencia = ahora ?? DateTime.now();
+  final transcurrido = referencia.difference(cuando);
+
+  // Una fecha futura es un reloj mal puesto, no un caso de negocio: se dice
+  // la fecha y se deja que quien mira saque sus conclusiones.
+  if (transcurrido.isNegative) return formatearFecha(cuando);
+
+  // Los días se cuentan **de calendario** y se miran primero: a las ocho de
+  // la mañana, algo de anoche pasó «ayer», no «hace diez horas». Con la resta
+  // de duraciones el mismo hecho cambiaría de nombre según la hora en que se
+  // mire la ficha.
+  final dias = DateTime(referencia.year, referencia.month, referencia.day)
+      .difference(DateTime(cuando.year, cuando.month, cuando.day))
+      .inDays;
+
+  if (dias == 1) return 'ayer';
+  if (dias > 7) return formatearFecha(cuando);
+  if (dias > 1) return 'hace $dias días';
+
+  // Mismo día: se cuenta en horas, que es lo que distingue «hace un rato» de
+  // «esta mañana».
+  if (transcurrido.inMinutes < 60) return 'hace un rato';
+  final horas = transcurrido.inHours;
+  return horas == 1 ? 'hace una hora' : 'hace $horas horas';
+}

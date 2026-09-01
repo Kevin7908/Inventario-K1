@@ -32,12 +32,12 @@ class PanelMovimientosProducto extends ConsumerWidget {
     return PanelSeccion(
       titulo: 'Movimientos recientes',
       child: switch (movimientos) {
-        AsyncData(value: final lista) when lista.isEmpty => const _SinNada(),
+        AsyncData(value: final lista) when lista.isEmpty => const _Hueco(),
         AsyncData(value: final lista) => _Lista(movimientos: lista),
-        AsyncError() => const _SinNada(
+        AsyncError() => const _Hueco(
             texto: 'No se pudo leer el historial de este producto',
           ),
-        _ => const _Cargando(),
+        _ => const PanelSinDatos.cargando(),
       },
     );
   }
@@ -85,68 +85,16 @@ class _Fila extends StatelessWidget {
   }
 }
 
-/// El hueco cuando no hay nada que contar, con el mismo cajón que traía el
-/// marcador del diseño.
-class _SinNada extends StatelessWidget {
-  const _SinNada({this.texto = 'Aún no se registran movimientos'});
+/// El hueco cuando no hay nada que contar. Es [PanelSinDatos] con el ícono
+/// del módulo puesto: lo único que esta pantalla decide.
+class _Hueco extends StatelessWidget {
+  const _Hueco({this.texto = 'Aún no se registran movimientos'});
 
   final String texto;
 
   @override
-  Widget build(BuildContext context) {
-    return _Caja(
-      child: Column(
-        children: [
-          const Icon(
-            Icons.swap_vert_rounded,
-            size: 26,
-            color: ColoresApp.textDisabled,
-          ),
-          const SizedBox(height: 8),
-          Text(
-            texto,
-            style: TipografiaApp.caption.copyWith(
-              color: ColoresApp.textDisabled,
-            ),
-            textAlign: TextAlign.center,
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-class _Cargando extends StatelessWidget {
-  const _Cargando();
-
-  @override
-  Widget build(BuildContext context) {
-    return const _Caja(
-      child: SizedBox(
-        height: 22,
-        width: 22,
-        child: CircularProgressIndicator(strokeWidth: 2),
-      ),
-    );
-  }
-}
-
-class _Caja extends StatelessWidget {
-  const _Caja({required this.child});
-
-  final Widget child;
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      width: double.infinity,
-      padding: const EdgeInsets.symmetric(vertical: 26, horizontal: 16),
-      decoration: BoxDecoration(
-        color: ColoresApp.bgInput,
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: ColoresApp.borderFila),
-      ),
-      child: Center(child: child),
-    );
-  }
+  Widget build(BuildContext context) => PanelSinDatos(
+        icono: Icons.swap_vert_rounded,
+        texto: texto,
+      );
 }

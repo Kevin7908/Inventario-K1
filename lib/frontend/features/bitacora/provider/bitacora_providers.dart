@@ -242,3 +242,26 @@ final bitacoraPaginaProvider = Provider<List<EntradaBitacora>>(
   name: 'bitacoraPaginaProvider',
   (ref) => ref.watch(bitacoraListaProvider).value?.items ?? const [],
 );
+
+/// De qué fila se quiere el historial: la entidad y su id.
+///
+/// Es un `record` y no dos parámetros sueltos porque una `family` de Riverpod
+/// acepta un solo argumento, y los records tienen igualdad estructural: dos
+/// fichas abiertas sobre el mismo producto comparten el provider.
+typedef FilaAuditada = ({EntidadAuditada entidad, int id});
+
+/// Lo último que se le hizo a una fila concreta, para su ficha.
+///
+/// Es un `FutureProvider` y no un stream porque la bitácora no se edita: lo
+/// que hay cuando se abre la ficha es lo que hay. Se relee al invalidarlo,
+/// que es lo que hace la ficha después de guardar.
+///
+/// Exige `bitacoraVer` —la compuerta está en el repositorio—, así que quien
+/// no lo tenga recibe el error y la vista no pinta el panel.
+final historialDeFilaProvider =
+    FutureProvider.family<List<EntradaBitacora>, FilaAuditada>(
+  name: 'historialDeFilaProvider',
+  (ref, fila) => ref
+      .watch(repositorioBitacoraProvider)
+      .historialDe(fila.entidad, fila.id, limite: 5),
+);

@@ -6,3 +6,4 @@ export 'estado_vacio.dart';
 export 'icono_notificaciones.dart';
 export 'indicador_estado.dart';
 export 'mensaje_app.dart';
+export 'panel_sin_datos.dart';

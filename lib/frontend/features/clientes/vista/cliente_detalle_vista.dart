@@ -1,10 +1,12 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../../../backend/features/bitacora/modelo/entrada_bitacora.dart';
 import '../../../../backend/features/clientes/modelo/cliente.dart';
 import '../../../../backend/features/motos/modelo/moto.dart';
 import '../../../../core/formato.dart';
 import '../../../share/share.dart';
+import '../../bitacora/widgets/panel_historial_fila.dart';
 import '../provider/cliente_provider.dart';
 
 /// Ficha de un cliente: identidad, contacto, sus motos y su estado de cuenta.
@@ -72,6 +74,14 @@ class ClienteDetalleVista extends StatelessWidget {
                 child: Text(cliente.notas!.trim(), style: TipografiaApp.cuerpo),
               ),
             ],
+            const SizedBox(height: 20),
+            // Quién tocó esta ficha. En un cliente importa más que en un
+            // producto: el teléfono y la dirección son lo que se corrige a
+            // mano, y son lo que después nadie recuerda haber cambiado.
+            PanelHistorialFila(
+              entidad: EntidadAuditada.cliente,
+              entidadId: cliente.id,
+            ),
           ],
         ),
       ),

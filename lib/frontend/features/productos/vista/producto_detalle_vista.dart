@@ -12,6 +12,8 @@ import '../widgets/panel_compatibilidad.dart';
 import '../../../../backend/share/dominio/permiso.dart';
 import '../../autenticacion/widgets/si_puede.dart';
 import '../../inventario/widgets/dialogo_entrada_compra.dart';
+import '../../bitacora/widgets/panel_historial_fila.dart';
+import '../../../../backend/features/bitacora/modelo/entrada_bitacora.dart';
 import '../../inventario/widgets/panel_movimientos_producto.dart';
 
 /// Ficha de un producto: imagen, datos de inventario y acciones.
@@ -335,8 +337,15 @@ class _PanelesSecundarios extends StatelessWidget {
       builder: (context, constraints) {
         final proveedor = _PanelProveedor(producto: producto);
         final movimientos = PanelMovimientosProducto(productoId: producto.id!);
+        // Los movimientos cuentan qué le pasó al stock; esto, quién tocó la
+        // ficha. Son preguntas distintas y por eso van en dos paneles: el
+        // precio de venta no deja movimiento, pero sí renglón de bitácora.
+        final historial = PanelHistorialFila(
+          entidad: EntidadAuditada.producto,
+          entidadId: producto.id!,
+        );
 
-        // En ventanas angostas los dos paneles se apilan.
+        // En ventanas angostas los paneles se apilan.
         if (constraints.maxWidth < 900) {
           return Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -344,16 +353,25 @@ class _PanelesSecundarios extends StatelessWidget {
               proveedor,
               const SizedBox(height: 22),
               movimientos,
+              const SizedBox(height: 22),
+              historial,
             ],
           );
         }
 
-        return Row(
-          crossAxisAlignment: CrossAxisAlignment.start,
+        return Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            Expanded(child: proveedor),
-            const SizedBox(width: 22),
-            Expanded(child: movimientos),
+            Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Expanded(child: proveedor),
+                const SizedBox(width: 22),
+                Expanded(child: movimientos),
+              ],
+            ),
+            const SizedBox(height: 22),
+            historial,
           ],
         );
       },
