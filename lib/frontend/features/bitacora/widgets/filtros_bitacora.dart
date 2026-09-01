@@ -1,11 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
-import '../../../../backend/features/autenticacion/modelo/usuario.dart';
 import '../../../../backend/features/bitacora/modelo/entrada_bitacora.dart';
 import '../../../../core/formato.dart';
 import '../../../share/share.dart';
-import '../../autenticacion/provider/usuarios_provider.dart';
+import '../../autenticacion/widgets/selector_cuenta.dart';
 import '../provider/bitacora_providers.dart';
 import 'estilo_accion.dart';
 
@@ -59,22 +58,14 @@ class FiltrosBitacora extends ConsumerWidget {
     if (estado == null) return const SizedBox.shrink();
 
     final notifier = ref.read(bitacoraListaProvider.notifier);
-    final cuentas = ref.watch(usuariosProvider).value ?? const <Usuario>[];
 
     return FilaCampos(
       // Quién y Módulo llevan nombres largos; las fechas caben en la mitad.
       pesos: const [3, 3, 2, 2],
       hijos: [
-        SelectorWidget<String>(
-          etiqueta: 'Quién',
-          valor: estado.usuarioId?.toString() ?? _todos,
-          opciones: [_todos, for (final c in cuentas) c.id.toString()],
-          constructorEtiqueta: (valor) => valor == _todos
-              ? 'Cualquiera'
-              : _nombreDe(cuentas, int.parse(valor)),
-          alCambiar: (valor) => notifier.filtrarPorUsuario(
-            valor == _todos ? null : int.parse(valor),
-          ),
+        SelectorCuenta(
+          usuarioId: estado.usuarioId,
+          alCambiar: notifier.filtrarPorUsuario,
         ),
         SelectorWidget<String>(
           etiqueta: 'Módulo',
@@ -114,14 +105,5 @@ class FiltrosBitacora extends ConsumerWidget {
         ),
       ],
     );
-  }
-
-  /// Una cuenta que se dio de baja puede seguir teniendo renglones suyos, así
-  /// que el nombre puede no estar en la lista.
-  static String _nombreDe(List<Usuario> cuentas, int id) {
-    for (final cuenta in cuentas) {
-      if (cuenta.id == id) return cuenta.nombre;
-    }
-    return 'Cuenta #$id';
   }
 }

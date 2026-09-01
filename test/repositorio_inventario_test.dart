@@ -224,6 +224,38 @@ void main() {
       expect(pagina.items.single.numeroDocumento, isNull);
     });
 
+    test('filtrar por quién movió deja fuera lo de los demás', () async {
+      // `FiltroMovimientos.usuarioId` estaba resuelto en SQL y con su índice
+      // desde la tanda de auditoría, y ninguna pantalla lo pedía: el kardex
+      // no tenía el selector de cuentas. Ahora lo tiene, así que esto es la
+      // consulta que ese desplegable dispara.
+      final creado = await productos.crear(_producto(stock: 10));
+
+      final otra = await sesionDePrueba(db, usuario: 'otro');
+      await RepositorioProductosImpl(db, otra).ajustarStock(creado.id!, 3);
+
+      final suyos = await inventario
+          .observarPagina(
+            filtro: FiltroMovimientos(usuarioId: otra.usuarioId),
+            pagina: 0,
+            tamano: 20,
+          )
+          .first;
+
+      expect(suyos.total, 1, reason: 'el alta la firmó la otra sesión');
+      expect(suyos.items.single.cantidad, 3);
+      expect(suyos.items.single.usuario, 'Usuario de prueba');
+
+      final todos = await inventario
+          .observarPagina(
+            filtro: const FiltroMovimientos(),
+            pagina: 0,
+            tamano: 20,
+          )
+          .first;
+      expect(todos.total, 2);
+    });
+
     test('el total es el real, no el recortado por el LIMIT', () async {
       final creado = await productos.crear(_producto(stock: 1));
       for (var i = 0; i < 6; i++) {

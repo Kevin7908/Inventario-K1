@@ -50,6 +50,7 @@ final class MovimientosState {
     this.desde,
     this.hasta,
     this.productoId,
+    this.usuarioId,
   });
 
   final List<MovimientoDetalle> items;
@@ -64,6 +65,10 @@ final class MovimientosState {
   final DateTime? hasta;
   final int? productoId;
 
+  /// Quién movió el stock. Ya estaba resuelto en SQL y con su índice; lo que
+  /// faltaba era el desplegable que lo eligiera.
+  final int? usuarioId;
+
   int get totalPaginas =>
       total <= 0 ? 1 : (total + tamanoPagina - 1) ~/ tamanoPagina;
 
@@ -76,6 +81,7 @@ final class MovimientosState {
         desde: desde,
         hasta: hasta,
         busqueda: busqueda,
+        usuarioId: usuarioId,
       );
 
   /// Los campos que se pueden **quitar** llevan un `bool` aparte: con solo el
@@ -95,6 +101,8 @@ final class MovimientosState {
     bool limpiarHasta = false,
     int? productoId,
     bool limpiarProducto = false,
+    int? usuarioId,
+    bool limpiarUsuario = false,
   }) =>
       MovimientosState(
         items: items ?? this.items,
@@ -108,6 +116,7 @@ final class MovimientosState {
         desde: limpiarDesde ? null : (desde ?? this.desde),
         hasta: limpiarHasta ? null : (hasta ?? this.hasta),
         productoId: limpiarProducto ? null : (productoId ?? this.productoId),
+        usuarioId: limpiarUsuario ? null : (usuarioId ?? this.usuarioId),
       );
 }
 
@@ -180,6 +189,17 @@ class MovimientosNotifier extends AsyncNotifier<MovimientosState> {
     _aplicar(actual.copyWith(
       tipo: quitar ? null : tipo,
       limpiarTipo: quitar,
+      pagina: 0,
+    ));
+  }
+
+  /// Quién movió el stock. `null` vuelve a «cualquiera».
+  void filtrarPorUsuario(int? usuarioId) {
+    final actual = state.value;
+    if (actual == null || actual.usuarioId == usuarioId) return;
+    _aplicar(actual.copyWith(
+      usuarioId: usuarioId,
+      limpiarUsuario: usuarioId == null,
       pagina: 0,
     ));
   }
