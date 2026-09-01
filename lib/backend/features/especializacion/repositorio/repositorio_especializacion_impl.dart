@@ -1,5 +1,6 @@
 import 'package:drift/drift.dart';
 
+import '../../../../core/resultado.dart';
 import '../../../share/database/app_db.dart';
 import '../mapper/especializacion_mapper.dart';
 import '../modelo/especializacion.dart';
@@ -80,58 +81,95 @@ class RepositorioEspecializacionImpl with FirmaDeSesion implements RepositorioEs
 
   // CRUD 
   @override
-  Future<Especializacion> agregar({
+  Future<Resultado> agregar({
     required String nombre,
     String? descripcion,
-  }) async {
-    final companion = EspecializacionMapper.aCompanionNuevo(
-      nombre: nombre.trim(),
-      descripcion: descripcion?.trim(),
-    );
-    return _db.transaction(() async {
-      final id = await _db.into(_tabla).insert(companion);
-      await _anotar(AccionAuditada.creo, id, nombre.trim());
-      final fila = await (_db.select(_tabla)..where((t) => t.id.equals(id)))
-          .getSingle();
-      return EspecializacionMapper.desdeFila(fila);
-    });
-  }
+  }) =>
+      intentar(() async {
+        exigir(Permiso.configuracionEditar);
+        final limpio = nombre.trim();
+        if (limpio.isEmpty) {
+          return const Fallo(
+            MotivoFallo.validacion,
+            'El nombre de la especialización no puede estar vacío.',
+          );
+        }
+        if (await existeNombre(limpio)) {
+          return const Fallo(
+            MotivoFallo.nombreDuplicado,
+            'Ya existe una especialización con ese nombre.',
+          );
+        }
+        await _db.transaction(() async {
+          final id = await _db.into(_tabla).insert(
+                EspecializacionMapper.aCompanionNuevo(
+                  nombre: limpio,
+                  descripcion: descripcion?.trim(),
+                ),
+              );
+          await _anotar(AccionAuditada.creo, id, limpio);
+        });
+        return const Exito();
+      });
 
   @override
-  Future<Especializacion> actualizar({
+  Future<Resultado> actualizar({
     required int id,
     required String nombre,
     String? descripcion,
-  }) async {
-    final companion = EspecializacionMapper.aCompanionActualizar(
-      id: id,
-      nombre: nombre.trim(),
-      descripcion: descripcion?.trim(),
-    );
-    return _db.transaction(() async {
-      await (_db.update(_tabla)..where((t) => t.id.equals(id)))
-          .write(companion);
-      await _anotar(AccionAuditada.modifico, id, nombre.trim());
-      final fila = await (_db.select(_tabla)..where((t) => t.id.equals(id)))
-          .getSingle();
-      return EspecializacionMapper.desdeFila(fila);
-    });
-  }
+  }) =>
+      intentar(() async {
+        exigir(Permiso.configuracionEditar);
+        final limpio = nombre.trim();
+        if (limpio.isEmpty) {
+          return const Fallo(
+            MotivoFallo.validacion,
+            'El nombre de la especialización no puede estar vacío.',
+          );
+        }
+        if (await existeNombre(limpio, ignorarId: id)) {
+          return const Fallo(
+            MotivoFallo.nombreDuplicado,
+            'Ya existe una especialización con ese nombre.',
+          );
+        }
+        await _db.transaction(() async {
+          final tocadas =
+              await (_db.update(_tabla)..where((t) => t.id.equals(id))).write(
+            EspecializacionMapper.aCompanionActualizar(
+              id: id,
+              nombre: limpio,
+              descripcion: descripcion?.trim(),
+            ),
+          );
+          if (tocadas == 0) {
+            throw Exception('La especialización ya no existe.');
+          }
+          await _anotar(AccionAuditada.modifico, id, limpio);
+        });
+        return const Exito();
+      });
 
   @override
-  Future<void> eliminar(int id) {
-    exigir(Permiso.configuracionEditar);
-    return _db.transaction(() async {
-      final antes = await (_db.select(_tabla)..where((t) => t.id.equals(id)))
-          .getSingleOrNull();
+  Future<Resultado> eliminar(int id) => intentar(() async {
+        exigir(Permiso.configuracionEditar);
+        await _db.transaction(() async {
+          final antes =
+              await (_db.select(_tabla)..where((t) => t.id.equals(id)))
+                  .getSingleOrNull();
 
-      await (_db.delete(_tabla)..where((t) => t.id.equals(id))).go();
+          final eliminadas =
+              await (_db.delete(_tabla)..where((t) => t.id.equals(id))).go();
+          if (eliminadas == 0) {
+            throw Exception('La especialización ya no existe.');
+          }
 
-      await _anotar(
-        AccionAuditada.elimino,
-        id,
-        antes?.nombre ?? 'Especialización #$id',
-      );
-    });
-  }
+          await _anotar(
+            AccionAuditada.elimino,
+            id,
+            antes?.nombre ?? 'Especialización #$id',
+          );
+        });
+        return const Exito();
+      });
 }

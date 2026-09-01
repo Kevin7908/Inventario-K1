@@ -1,5 +1,6 @@
 import 'package:drift/drift.dart';
 import 'package:inventario_k1/backend/share/database/app_db.dart';
+import '../../../../core/resultado.dart';
 import '../modelo/unidad_medida.dart';
 import 'repositorio_unidades_medida.dart';
 import '../../../share/dominio/sesion_actual.dart';
@@ -52,13 +53,16 @@ class RepositorioUnidadesMedidaImpl with FirmaDeSesion implements RepositorioUni
     );
   }
 
+  /// El recorte va aquí y no en el diálogo: normalizar es del repositorio
+  /// (`REGLAS_BD.md` §2). Si lo hiciera la vista, la unidad creada desde otra
+  /// pantalla entraría con espacios y el `UNIQUE` dejaría pasar « lt».
   TablaUnidadesMedidaCompanion _modeloACompanion(UnidadMedida unidad) {
     return TablaUnidadesMedidaCompanion(
       id: unidad.id != null ? Value(unidad.id!) : const Value.absent(),
-      nombre: Value(unidad.nombre),
-      abreviatura: Value(unidad.abreviatura),
+      nombre: Value(unidad.nombre.trim()),
+      abreviatura: Value(unidad.abreviatura.trim()),
       tipo: Value(unidad.tipo),
-      descripcion: Value(unidad.descripcion),
+      descripcion: Value(unidad.descripcion?.trim()),
       actualizadoEn: Value(DateTime.now()),
     );
   }
@@ -93,45 +97,99 @@ class RepositorioUnidadesMedidaImpl with FirmaDeSesion implements RepositorioUni
     return filas.map(_filaAModelo).toList();
   }
 
-  @override
-  Future<UnidadMedida> crear(UnidadMedida unidad) {
-    exigir(Permiso.configuracionEditar);
-    return _db.transaction(() async {
-      final companion = _modeloACompanion(unidad);
-      final id = await _db.into(_db.tablaUnidadesMedida).insert(companion);
-      await _anotar(AccionAuditada.creo, id, unidad.nombre);
-      return (await obtenerPorId(id))!;
-    });
-  }
-
-  @override
-  Future<UnidadMedida> actualizar(UnidadMedida unidad) {
-    exigir(Permiso.configuracionEditar);
-    return _db.transaction(() async {
-      final companion = _modeloACompanion(unidad);
-      await (_db.update(
-        _db.tablaUnidadesMedida,
-      )..where((t) => t.id.equals(unidad.id!))).write(companion);
-      await _anotar(AccionAuditada.modifico, unidad.id, unidad.nombre);
-      return (await obtenerPorId(unidad.id!))!;
-    });
-  }
-
-  @override
-  Future<void> eliminar(int id) {
-    exigir(Permiso.configuracionEditar);
-    return _db.transaction(() async {
-      final antes = await obtenerPorId(id);
-      await (_db.delete(
-        _db.tablaUnidadesMedida,
-      )..where((t) => t.id.equals(id))).go();
-      await _anotar(
-        AccionAuditada.elimino,
-        id,
-        antes?.nombre ?? 'Unidad #$id',
+  /// Las dos unicidades de la tabla, comprobadas antes de escribir para poder
+  /// decir **cuál** de las dos estorba. La garantía sigue siendo el `UNIQUE`;
+  /// esto solo existe para que el diálogo señale el campo correcto.
+  Future<Fallo?> _choque(UnidadMedida unidad, {int? excluir}) async {
+    if (await existeNombre(unidad.nombre, excludirId: excluir)) {
+      return const Fallo(
+        MotivoFallo.nombreDuplicado,
+        'Ya existe una unidad con ese nombre.',
       );
-    });
+    }
+    if (await existeAbreviatura(unidad.abreviatura, excludirId: excluir)) {
+      return const Fallo(
+        MotivoFallo.abreviaturaDuplicada,
+        'Ya existe una unidad con esa abreviatura.',
+      );
+    }
+    return null;
   }
+
+  /// Lo que ni el `CHECK` ni el `UNIQUE` cubren: que los dos campos
+  /// obligatorios traigan algo.
+  static Fallo? _vacios(UnidadMedida unidad) {
+    if (unidad.nombre.trim().isEmpty) {
+      return const Fallo(
+        MotivoFallo.validacion,
+        'El nombre no puede estar vacío.',
+      );
+    }
+    if (unidad.abreviatura.trim().isEmpty) {
+      return const Fallo(
+        MotivoFallo.validacion,
+        'La abreviatura no puede estar vacía.',
+      );
+    }
+    return null;
+  }
+
+  @override
+  Future<Resultado> crear(UnidadMedida unidad) => intentar(() async {
+        exigir(Permiso.configuracionEditar);
+        final invalido = _vacios(unidad) ?? await _choque(unidad);
+        if (invalido != null) return invalido;
+
+        await _db.transaction(() async {
+          final id = await _db
+              .into(_db.tablaUnidadesMedida)
+              .insert(_modeloACompanion(unidad));
+          await _anotar(AccionAuditada.creo, id, unidad.nombre.trim());
+        });
+        return const Exito();
+      });
+
+  @override
+  Future<Resultado> actualizar(UnidadMedida unidad) => intentar(() async {
+        exigir(Permiso.configuracionEditar);
+        final id = unidad.id;
+        if (id == null) {
+          return const Fallo(
+            MotivoFallo.validacion,
+            'La unidad todavía no existe: no se puede actualizar.',
+          );
+        }
+        final invalido =
+            _vacios(unidad) ?? await _choque(unidad, excluir: id);
+        if (invalido != null) return invalido;
+
+        await _db.transaction(() async {
+          final tocadas = await (_db.update(_db.tablaUnidadesMedida)
+                ..where((t) => t.id.equals(id)))
+              .write(_modeloACompanion(unidad));
+          if (tocadas == 0) throw Exception('La unidad ya no existe.');
+          await _anotar(AccionAuditada.modifico, id, unidad.nombre.trim());
+        });
+        return const Exito();
+      });
+
+  @override
+  Future<Resultado> eliminar(int id) => intentar(() async {
+        exigir(Permiso.configuracionEditar);
+        await _db.transaction(() async {
+          final antes = await obtenerPorId(id);
+          final eliminadas = await (_db.delete(_db.tablaUnidadesMedida)
+                ..where((t) => t.id.equals(id)))
+              .go();
+          if (eliminadas == 0) throw Exception('La unidad ya no existe.');
+          await _anotar(
+            AccionAuditada.elimino,
+            id,
+            antes?.nombre ?? 'Unidad #$id',
+          );
+        });
+        return const Exito();
+      });
 
   @override
   Future<bool> existeNombre(String nombre, {int? excludirId}) async {
