@@ -70,9 +70,16 @@ class _VentasFalsas implements RepositorioVentas {
   @override
   Stream<List<VentaResumen>> observarTodas() => Stream.value(ventas);
 
+  /// Los ids cuyo detalle se pidió. El diálogo tiene su propio test
+  /// (`detalle_venta_devoluciones_test.dart`); aquí solo importa que la fila
+  /// sepa abrirlo.
+  final List<int> detallesPedidos = [];
+
   @override
-  Future<VentaDetalle> obtenerDetalle(int id) =>
-      throw UnimplementedError('la pantalla no abre el detalle');
+  Future<VentaDetalle> obtenerDetalle(int id) {
+    detallesPedidos.add(id);
+    throw UnimplementedError('el contenido del diálogo se prueba aparte');
+  }
 
   @override
   Future<VentaResumen> registrarVentaMostrador({
@@ -203,7 +210,7 @@ void main() {
       expect(find.byTooltip('Anular la venta entera'), findsOneWidget);
     });
 
-    testWidgets('una factura anulada ya no ofrece nada', (tester) async {
+    testWidgets('una factura anulada ya no ofrece deshacerse', (tester) async {
       await _montar(
         tester,
         _VentasFalsas(ventas: [_venta(estado: EstadoPago.anulada)]),
@@ -212,6 +219,10 @@ void main() {
 
       expect(find.byTooltip('Recibir una devolución'), findsNothing);
       expect(find.byTooltip('Anular la venta entera'), findsNothing);
+      // Pero mirarla y reimprimirla sí: el documento anulado es justo el que
+      // a veces hay que enseñar.
+      expect(find.byTooltip('Ver qué se vendió y qué volvió'), findsOneWidget);
+      expect(find.byTooltip('Imprimir la factura'), findsOneWidget);
     });
 
     testWidgets('anular pide confirmación antes de tocar la base',
@@ -230,6 +241,21 @@ void main() {
       await tester.pumpAndSettle();
 
       expect(ventas.anuladas, [1]);
+    });
+
+    testWidgets('ver el detalle no pide POS_ANULAR', (tester) async {
+      // Mirar qué se cobró y qué volvió no deshace nada, así que lo puede
+      // hacer cualquiera que entre al historial.
+      final ventas = _VentasFalsas(ventas: [_venta()]);
+      await _montar(tester, ventas);
+
+      final boton = find.byTooltip('Ver qué se vendió y qué volvió');
+      expect(boton, findsOneWidget);
+
+      await tester.tap(boton);
+      await tester.pump();
+
+      expect(ventas.detallesPedidos, [1]);
     });
 
     testWidgets('lo devuelto se ve bajo el total, sin cambiarlo',

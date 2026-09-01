@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../../backend/features/pos/enum/enum_ventas.dart';
+import '../../../../backend/features/pos/modelo/venta_detalle.dart';
 import '../../../../backend/features/pos/modelo/venta_resumen.dart';
 import '../../../../backend/features/pos/repositorio/repositorio_ventas.dart';
 import '../../pos/provider/pos_providers.dart';
@@ -222,4 +223,16 @@ final historialVentasProvider =
 final ventasPaginaProvider = Provider<List<VentaResumen>>(
   name: 'ventasPaginaProvider',
   (ref) => ref.watch(historialVentasProvider).value?.items ?? const [],
+);
+
+/// El detalle de una venta: cabecera y líneas, tal como quedaron guardadas.
+///
+/// `obtenerDetalle` ya lo usaba la reimpresión; esto es lo mismo para verlo en
+/// pantalla. `autoDispose` y `family`: solo lo mira el diálogo de la factura
+/// que se abrió.
+final ventaDetalleProvider =
+    FutureProvider.autoDispose.family<VentaDetalle, int>(
+  name: 'ventaDetalleProvider',
+  (ref, ventaId) =>
+      ref.watch(repositorioVentasProvider).obtenerDetalle(ventaId),
 );

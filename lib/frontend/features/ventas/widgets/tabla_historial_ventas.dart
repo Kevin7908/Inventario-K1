@@ -13,6 +13,7 @@ import '../../documentos/traductores/venta_a_documento.dart';
 import '../../documentos/widgets/dialogo_vista_previa.dart';
 import '../../pos/provider/pos_providers.dart';
 import '../provider/historial_ventas_providers.dart';
+import 'dialogo_detalle_venta.dart';
 import 'dialogo_devolucion.dart';
 
 /// Color de cada estado de pago, en un solo sitio.
@@ -95,7 +96,9 @@ class TablaHistorialVentas extends ConsumerWidget {
         ),
         ColumnaTabla<VentaResumen>(
           titulo: '',
-          ancho: 92,
+          // Cuatro botones: ver, imprimir, devolver y anular. Con 92 px —el
+          // ancho de cuando eran tres— el último se salía de la celda.
+          ancho: 124,
           alineacion: Alignment.centerRight,
           constructor: (v) => _Acciones(venta: v),
         ),
@@ -262,9 +265,16 @@ class _Acciones extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    // Reimprimir no está detrás de `POS_ANULAR` ni se esconde en una factura
-    // anulada: dar una copia del papel no cambia nada, y el documento anulado
-    // es justo el que a veces hay que enseñar.
+    // Ver el detalle y reimprimir no están detrás de `POS_ANULAR` ni se
+    // esconden en una factura anulada: mirar lo que se cobró no cambia nada, y
+    // el documento anulado es justo el que a veces hay que enseñar.
+    final ver = BotonIcono(
+      icono: Icons.receipt_long_outlined,
+      tooltip: 'Ver qué se vendió y qué volvió',
+      alPresionar: () =>
+          DialogoDetalleVenta.mostrar(context, ventaId: venta.id),
+    );
+
     final imprimir = BotonIcono(
       icono: Icons.print_outlined,
       tooltip: 'Imprimir la factura',
@@ -273,12 +283,13 @@ class _Acciones extends ConsumerWidget {
 
     // Una factura anulada está cerrada: ni se devuelve ni se vuelve a anular.
     if (venta.estadoPago == EstadoPago.anulada) {
-      return imprimir;
+      return Row(mainAxisSize: MainAxisSize.min, children: [ver, imprimir]);
     }
 
     return Row(
       mainAxisSize: MainAxisSize.min,
       children: [
+        ver,
         imprimir,
         SiPuede(
           permiso: Permiso.posAnular,
