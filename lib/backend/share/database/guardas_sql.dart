@@ -123,6 +123,74 @@ const List<String> guardasSql = [
   END;
   ''',
 
+  // ── Una compra no se borra ──────────────────────────────────────────────
+  //
+  // Mismo argumento que la factura, del otro lado del mostrador: la remisión
+  // explica entradas de inventario y quemó un consecutivo. Borrarla dejaría
+  // mercancía en el stock sin documento que diga de dónde salió. Se anula, y
+  // anular saca lo que había entrado.
+  '''
+  CREATE TRIGGER IF NOT EXISTS guarda_compras_sin_borrado
+  BEFORE DELETE ON compras
+  FOR EACH ROW
+  BEGIN
+    SELECT RAISE(ABORT,
+      'Una compra no se borra: anúlala.');
+  END;
+  ''',
+
+  // ── Una compra anulada está cerrada ─────────────────────────────────────
+  //
+  // Se permite llegar a `ANULADA`; salir de ahí o retocar el total, no. Sin
+  // esto, desanular una remisión metería su mercancía dos veces.
+  '''
+  CREATE TRIGGER IF NOT EXISTS guarda_compras_anuladas_inmutables
+  BEFORE UPDATE ON compras
+  FOR EACH ROW
+  WHEN OLD.estado = 'ANULADA'
+  BEGIN
+    SELECT RAISE(ABORT,
+      'Una compra anulada no se modifica.');
+  END;
+  ''',
+
+  // ── Ni sus líneas ───────────────────────────────────────────────────────
+  //
+  // Tres triggers y no uno porque SQLite no admite `FOR EACH ROW` sobre
+  // varias operaciones a la vez, igual que en `venta_detalles`.
+  '''
+  CREATE TRIGGER IF NOT EXISTS guarda_compra_detalles_sin_alta
+  BEFORE INSERT ON compra_detalles
+  FOR EACH ROW
+  WHEN (SELECT estado FROM compras WHERE id = NEW.compra_id) = 'ANULADA'
+  BEGIN
+    SELECT RAISE(ABORT,
+      'No se le agregan líneas a una compra anulada.');
+  END;
+  ''',
+
+  '''
+  CREATE TRIGGER IF NOT EXISTS guarda_compra_detalles_sin_edicion
+  BEFORE UPDATE ON compra_detalles
+  FOR EACH ROW
+  WHEN (SELECT estado FROM compras WHERE id = OLD.compra_id) = 'ANULADA'
+  BEGIN
+    SELECT RAISE(ABORT,
+      'No se editan las líneas de una compra anulada.');
+  END;
+  ''',
+
+  '''
+  CREATE TRIGGER IF NOT EXISTS guarda_compra_detalles_sin_borrado
+  BEFORE DELETE ON compra_detalles
+  FOR EACH ROW
+  WHEN (SELECT estado FROM compras WHERE id = OLD.compra_id) = 'ANULADA'
+  BEGIN
+    SELECT RAISE(ABORT,
+      'No se borran las líneas de una compra anulada.');
+  END;
+  ''',
+
   // ── Una orden cerrada ya no recibe trabajo ──────────────────────────────
   //
   // Entregada la moto o anulada la orden, agregarle un repuesto descontaría

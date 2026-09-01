@@ -53,6 +53,12 @@ enum MotivoFallo {
   /// Ya existe otro producto con ese SKU.
   skuDuplicado,
 
+  /// Ese proveedor ya tiene registrada una remisión con ese número. Es el
+  /// error de captura más caro de las compras —teclearla dos veces mete el
+  /// doble de mercancía al inventario— y por eso el diálogo tiene que poder
+  /// señalar el campo en vez de decir «no se pudo guardar».
+  remisionDuplicada,
+
   /// Ya existe otro registro con ese documento (NIT, cédula…).
   documentoDuplicado,
 

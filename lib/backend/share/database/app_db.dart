@@ -12,6 +12,8 @@ import '../../features/autenticacion/esquema_datos/tabla_usuario_permiso.dart';
 import '../../features/bitacora/esquema_datos/tabla_bitacora.dart';
 import '../../features/categorias/esquema_datos/tabla_categoria.dart';
 import '../../features/clientes/esquema_datos/tabla_cliente.dart';
+import '../../features/compras/esquema_datos/tabla_compra.dart';
+import '../../features/compras/esquema_datos/tabla_compra_detalle.dart';
 import '../../features/configuracion/esquema_datos/configuracion_tabla.dart';
 import '../../features/cotizaciones/esquema_datos/tabla_cotizacion.dart';
 import '../../features/cotizaciones/esquema_datos/tabla_cotizacion_item.dart';
@@ -54,6 +56,8 @@ part 'app_db.g.dart';
     TablaProveedor,
     TablaProducto,
     TablaProductoCompatibilidad,
+    TablaCompra,
+    TablaCompraDetalle,
     TablaMovimientoInventario,
     TablaUsuario,
     TablaUsuarioPermiso,

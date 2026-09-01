@@ -16,6 +16,7 @@ enum EntidadAuditada {
   especializacion('ESPECIALIZACION', 'Especialización'),
   usuario('USUARIO', 'Cuenta de usuario'),
   venta('VENTA', 'Venta'),
+  compra('COMPRA', 'Compra a proveedor'),
   orden('ORDEN', 'Orden de servicio'),
   cotizacion('COTIZACION', 'Cotización'),
   reserva('RESERVA', 'Reserva'),
