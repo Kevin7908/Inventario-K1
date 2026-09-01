@@ -1,5 +1,6 @@
 import 'package:drift/drift.dart';
 
+import '../../autenticacion/esquema_datos/tabla_usuario.dart';
 import 'tabla_ordenes_servicio.dart';
 
 /// Un cargo suelto de la orden: descripción y precio escritos a mano, sin
@@ -17,6 +18,8 @@ import 'tabla_ordenes_servicio.dart';
 /// No descuenta inventario a propósito: si el repuesto estuviera en el
 /// catálogo, sería un repuesto.
 @TableIndex(name: 'idx_ordenes_cargos_orden', columns: {#ordenId})
+// Cubre el WHERE usuarioId = ? de «qué anotó esta cuenta».
+@TableIndex(name: 'idx_ordenes_cargos_usuario', columns: {#usuarioId})
 class TablaOrdenesCargo extends Table {
   @override
   String get tableName => 'ordenes_cargos';
@@ -26,6 +29,19 @@ class TablaOrdenesCargo extends Table {
   /// `cascade`: un cargo no existe sin su orden.
   IntColumn get ordenId => integer()
       .references(TablaOrdenesServicio, #id, onDelete: KeyAction.cascade)();
+
+  /// Quién anotó **esta línea**, que no siempre es quien abrió el documento:
+  /// el editor guarda solo y el trabajo del taller puede pasar de un turno a otro
+  /// (`REGLAS_BD.md` §7.0).
+  ///
+  /// `NOT NULL` y sin valor por defecto **a propósito**: así el
+  /// `Companion.insert` que genera Drift lo exige como parámetro, y un método
+  /// de escritura nuevo que se olvide del autor no compila. La garantía la da
+  /// el compilador, no la disciplina.
+  ///
+  /// `restrict`: la cuenta que anotó algo no se borra mientras eso exista.
+  IntColumn get usuarioId => integer()
+      .references(TablaUsuario, #id, onDelete: KeyAction.restrict)();
 
   TextColumn get descripcion => text()();
 

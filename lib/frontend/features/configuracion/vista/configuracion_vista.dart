@@ -10,6 +10,7 @@ import '../../especializacion/vista/especializacion_vista.dart';
 import '../../motos/vista/motos_vista.dart';
 import '../../unidades_medida/vista/unidad_medida_vista.dart';
 import '../widgets/tab_general.dart';
+import '../widgets/tab_marcas.dart';
 import '../widgets/tab_servicios.dart';
 
 /// Pantalla de Configuración: ajustes generales del negocio y catálogos base.
@@ -41,7 +42,7 @@ class _ConfiguracionVistaState extends ConsumerState<ConfiguracionVista> {
 
     // Al perder el rol con la pestaña de Usuarios abierta, el índice apuntaría
     // a una pestaña que ya no existe.
-    final tabActivo = _tabActivo.clamp(0, esAdmin ? 5 : 4);
+    final tabActivo = _tabActivo.clamp(0, esAdmin ? 6 : 5);
 
     return Padding(
       padding: const EdgeInsets.fromLTRB(32, 28, 32, 28),
@@ -76,10 +77,14 @@ class _ConfiguracionVistaState extends ConsumerState<ConfiguracionVista> {
                 etiqueta: 'Motos',
                 alPresionar: () => _cambiarTab(4),
               ),
+              TabSecundariaDato(
+                etiqueta: 'Marcas y modelos',
+                alPresionar: () => _cambiarTab(5),
+              ),
               if (esAdmin)
                 TabSecundariaDato(
                   etiqueta: 'Usuarios',
-                  alPresionar: () => _cambiarTab(5),
+                  alPresionar: () => _cambiarTab(6),
                 ),
             ],
           ),
@@ -93,6 +98,7 @@ class _ConfiguracionVistaState extends ConsumerState<ConfiguracionVista> {
                 const EspecializacionesVista(),
                 const TabServicios(),
                 const MotosVista(),
+                const TabMarcas(),
                 if (esAdmin) const UsuariosVista(),
               ],
             ),

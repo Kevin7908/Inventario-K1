@@ -44,6 +44,8 @@ final class OrdenEditorState {
     required this.motoId,
     required this.motoDescripcion,
     required this.motoPlaca,
+    required this.motoMarcaId,
+    this.motoModeloId,
     required this.kilometrajeEntrada,
     required this.estado,
     this.diagnostico = '',
@@ -56,6 +58,7 @@ final class OrdenEditorState {
     this.busquedaCatalogo = '',
     this.categoriaId,
     this.paginaCatalogo = 0,
+    this.soloCompatibles = false,
   });
 
   /// Cuántas tarjetas trae cada página de la rejilla de productos.
@@ -72,6 +75,11 @@ final class OrdenEditorState {
   final int motoId;
   final String motoDescripcion;
   final String motoPlaca;
+
+  /// La marca y el modelo de la moto, para poder acotar el catálogo a lo que
+  /// le sirve. El modelo puede faltar: hay motos registradas sin él.
+  final int motoMarcaId;
+  final int? motoModeloId;
 
   final int kilometrajeEntrada;
   final EstadoOrden estado;
@@ -102,6 +110,13 @@ final class OrdenEditorState {
   /// Página de la rejilla de productos, de base cero.
   final int paginaCatalogo;
 
+  /// Acota la rejilla a los repuestos declarados compatibles con esta moto.
+  ///
+  /// Apagado por defecto **a propósito**: la compatibilidad se declara a mano
+  /// producto por producto, así que un catálogo sin declarar se vería vacío y
+  /// parecería que la app está rota. Quien lo enciende ya sabe que la tiene.
+  final bool soloCompatibles;
+
   /// Traduce los filtros del panel a los que entiende el repositorio.
   ///
   /// `soloActivos` va fijo: un producto dado de baja no se monta en una moto.
@@ -109,6 +124,8 @@ final class OrdenEditorState {
         busqueda: busquedaCatalogo,
         categoriaId: categoriaId,
         soloActivos: true,
+        compatibleConMarcaId: soloCompatibles ? motoMarcaId : null,
+        compatibleConModeloId: soloCompatibles ? motoModeloId : null,
       );
 
   /// Si todavía se le pueden agregar líneas.
@@ -204,6 +221,8 @@ final class OrdenEditorState {
     int? clienteId,
     String? clienteNombre,
     int? motoId,
+    int? motoMarcaId,
+    int? motoModeloId,
     String? motoDescripcion,
     String? motoPlaca,
     int? kilometrajeEntrada,
@@ -218,6 +237,7 @@ final class OrdenEditorState {
     String? busquedaCatalogo,
     Object? categoriaId = _sinCambio,
     int? paginaCatalogo,
+    bool? soloCompatibles,
   }) =>
       OrdenEditorState(
         ordenId: ordenId,
@@ -225,6 +245,8 @@ final class OrdenEditorState {
         clienteId: clienteId ?? this.clienteId,
         clienteNombre: clienteNombre ?? this.clienteNombre,
         motoId: motoId ?? this.motoId,
+        motoMarcaId: motoMarcaId ?? this.motoMarcaId,
+        motoModeloId: motoModeloId ?? this.motoModeloId,
         motoDescripcion: motoDescripcion ?? this.motoDescripcion,
         motoPlaca: motoPlaca ?? this.motoPlaca,
         kilometrajeEntrada: kilometrajeEntrada ?? this.kilometrajeEntrada,
@@ -243,6 +265,7 @@ final class OrdenEditorState {
             ? this.categoriaId
             : categoriaId as int?,
         paginaCatalogo: paginaCatalogo ?? this.paginaCatalogo,
+        soloCompatibles: soloCompatibles ?? this.soloCompatibles,
       );
 }
 

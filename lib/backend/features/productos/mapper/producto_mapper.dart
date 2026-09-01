@@ -10,6 +10,7 @@ class ProductoMapper {
     return Producto(
       id: fila.id,
       sku: fila.sku,
+      codigoBarras: fila.codigoBarras,
       nombre: fila.nombre,
       descripcion: fila.descripcion,
       categoriaId: fila.categoriaId,
@@ -50,6 +51,7 @@ class ProductoMapper {
     return Producto(
       id: fila.id,
       sku: fila.sku,
+      codigoBarras: fila.codigoBarras,
       nombre: fila.nombre,
       descripcion: fila.descripcion,
       categoriaId: fila.categoriaId,
@@ -82,6 +84,10 @@ class ProductoMapper {
   static TablaProductoCompanion modeloACompanion(Producto p) {
     return TablaProductoCompanion(
       sku: Value(p.sku),
+      // Normalizado aquí y no en el formulario: un lector que mande
+      // «7 702001 234567» y otro que mande «7702001234567» tienen que
+      // encontrar el mismo producto (`REGLAS_BD.md` §2).
+      codigoBarras: Value(normalizarCodigoBarras(p.codigoBarras)),
       nombre: Value(p.nombre),
       descripcion: Value(p.descripcion),
       categoriaId: Value(p.categoriaId),
@@ -104,4 +110,13 @@ class ProductoMapper {
       actualizadoEn: Value(DateTime.now()),
     );
   }
+}
+/// Deja un código de barras como se guarda: sin espacios ni guiones, o `null`
+/// si no queda nada.
+///
+/// Vive fuera de la clase para que lo comparta quien **busque** por código: si
+/// se guarda normalizado y se busca en crudo, el lector nunca encuentra nada.
+String? normalizarCodigoBarras(String? valor) {
+  final limpio = (valor ?? '').replaceAll(RegExp(r'[\s-]'), '');
+  return limpio.isEmpty ? null : limpio;
 }

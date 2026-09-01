@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../../backend/features/especializacion/modelo/especializacion.dart';
+import '../../../../core/resultado.dart';
 import '../../../share/share.dart';
 import '../../tecnicos/provider/tecnico_provider.dart';
 import '../provider/especializacion_provider.dart';
@@ -42,18 +43,6 @@ class _EspecializacionesVistaState
     });
   }
 
-  void _mostrarError(String error) {
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text(
-          error,
-          style: TipografiaApp.sobrePrimario(TipografiaApp.cuerpo),
-        ),
-        backgroundColor: ColoresApp.statusDanger,
-      ),
-    );
-  }
-
   Future<void> _eliminar(Especializacion especializacion) async {
     final confirmado = await DialogoConfirmacion.mostrar(
       context,
@@ -62,11 +51,16 @@ class _EspecializacionesVistaState
     );
     if (confirmado != true || !mounted) return;
 
-    final error = await ref
+    final resultado = await ref
         .read(especializacionesProvider.notifier)
         .eliminar(especializacion.id);
-    if (!mounted || error == null) return;
-    _mostrarError(error);
+    if (!mounted) return;
+    switch (resultado) {
+      case Exito():
+        MensajeApp.exito(context, 'Especialización eliminada.');
+      case Fallo(:final mensaje):
+        MensajeApp.error(context, mensaje);
+    }
   }
 
   /// Cuenta cuántos técnicos tienen asignada cada especialización.

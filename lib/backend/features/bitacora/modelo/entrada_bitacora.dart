@@ -8,6 +8,8 @@ enum EntidadAuditada {
   proveedor('PROVEEDOR', 'Proveedor'),
   cliente('CLIENTE', 'Cliente'),
   moto('MOTO', 'Moto'),
+  marcaMoto('MARCA_MOTO', 'Marca de moto'),
+  modeloMoto('MODELO_MOTO', 'Modelo de moto'),
   tecnico('TECNICO', 'Técnico'),
   servicio('SERVICIO', 'Servicio'),
   unidadMedida('UNIDAD_MEDIDA', 'Unidad de medida'),

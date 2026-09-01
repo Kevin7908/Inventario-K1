@@ -22,6 +22,8 @@ class FiltroProductos {
     this.soloSinStock = false,
     this.soloEnStock = false,
     this.soloActivos = false,
+    this.compatibleConMarcaId,
+    this.compatibleConModeloId,
   });
 
   /// Coincide contra nombre, SKU o nombre de categoría.
@@ -35,6 +37,23 @@ class FiltroProductos {
   /// de venta y cotizaciones—, no el catálogo: en Productos, un producto
   /// inactivo tiene que verse para poder reactivarlo.
   final bool soloActivos;
+
+  /// Deja solo lo que le sirve a una moto concreta.
+  ///
+  /// Cuentan **las dos cosas a la vez**: lo declarado para ese modelo exacto y
+  /// lo declarado para toda su marca. Quien busca repuestos para una FZ 2.0
+  /// también quiere ver el aceite que sirve para cualquier Yamaha.
+  ///
+  /// [compatibleConModeloId] puede ir en nulo con la marca puesta —hay motos
+  /// registradas sin modelo—, y entonces solo cuenta la marca. Con la marca en
+  /// nulo el filtro no se aplica: sin marca no hay moto contra la que cruzar.
+  ///
+  /// **Se resuelve en SQL**, con un `EXISTS` correlacionado. Traer el conjunto
+  /// de ids compatibles a Dart para descartar filas después rompería la
+  /// paginación: el `COUNT` contaría lo que la página ya no muestra
+  /// (`REGLAS_BD.md` §5).
+  final int? compatibleConMarcaId;
+  final int? compatibleConModeloId;
 }
 
 /// Contrato abstracto del repositorio de productos.

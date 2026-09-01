@@ -407,9 +407,18 @@ class RepositorioProductosImpl with FirmaDeSesion implements RepositorioProducto
     final texto = filtro.busqueda.trim();
     if (texto.isNotEmpty) {
       final patron = '%${texto.toLowerCase()}%';
+      // El código de barras se compara **exacto y normalizado**, no con
+      // `LIKE`: lo que llega ahí lo escribió un lector, no una persona, y
+      // tiene que dar en el producto de una sola vez aunque el patrón traiga
+      // los espacios que el lector inserta. Va en `OR` con lo demás para que
+      // el mismo cuadro siga sirviendo para teclear un nombre.
+      final codigo = normalizarCodigoBarras(texto);
       acumulado = acumulado &
           (p.nombre.lower().like(patron) |
               p.sku.lower().like(patron) |
+              (codigo == null
+                  ? const Constant(false)
+                  : p.codigoBarras.equals(codigo)) |
               _db.tablaCategoria.nombre.lower().like(patron));
     }
 
@@ -422,7 +431,38 @@ class RepositorioProductosImpl with FirmaDeSesion implements RepositorioProducto
       acumulado = acumulado & p.activo.equals(true);
     }
 
+    final marcaMoto = filtro.compatibleConMarcaId;
+    if (marcaMoto != null) {
+      acumulado = acumulado & _compatibleCon(marcaMoto, filtro.compatibleConModeloId);
+    }
+
     return acumulado;
+  }
+
+  /// «Este producto le sirve a esta moto», como condición de la misma consulta.
+  ///
+  /// Es un `EXISTS` correlacionado y no un `WHERE id IN (…)` con los ids
+  /// traídos desde Dart: el `IN` obligaría a resolver antes el conjunto entero
+  /// de productos compatibles y a meterlo en la consulta, que es traer filas
+  /// para descartarlas (`REGLAS_BD.md` §5) y además rompe con un catálogo
+  /// grande.
+  ///
+  /// Las dos condiciones van en `OR` porque la compatibilidad tiene dos
+  /// niveles: la línea de marca vale para toda la marca —el aceite de
+  /// cualquier Yamaha— y la de modelo solo para ese —la pastilla de la FZ—.
+  Expression<bool> _compatibleCon(int marcaId, int? modeloId) {
+    final compat = _db.tablaProductoCompatibilidad;
+    return existsQuery(
+      _db.selectOnly(compat)
+        ..addColumns([compat.id])
+        ..where(
+          compat.productoId.equalsExp(_db.tablaProducto.id) &
+              (compat.marcaId.equals(marcaId) |
+                  (modeloId == null
+                      ? const Constant(false)
+                      : compat.modeloId.equals(modeloId))),
+        ),
+    );
   }
 
   /// Traduce [FiltroProductos] a una expresión SQL reutilizable por la

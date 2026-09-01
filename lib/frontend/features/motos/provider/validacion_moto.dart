@@ -24,10 +24,13 @@ Future<Resultado?> validarMoto({
   required RepositorioMotos repo,
   bool exigirDueno = false,
 }) async {
-  if (moto.marca.trim().isEmpty || moto.modelo.trim().isEmpty) {
+  // El modelo dejó de ser obligatorio al pasar al catálogo: en el mostrador la
+  // marca siempre se sabe y el modelo exacto a veces no, y parar la atención al
+  // cliente por eso sería peor que registrar la moto con lo que se sabe.
+  if (moto.marca.trim().isEmpty) {
     return const Fallo(
       MotivoFallo.validacion,
-      'Cada moto necesita al menos marca y modelo.',
+      'Cada moto necesita al menos su marca.',
     );
   }
 

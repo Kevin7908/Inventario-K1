@@ -15,6 +15,8 @@ class DatosTaller {
     required this.tecnicoId,
     required this.servicioId,
     required this.productoId,
+    required this.marcaId,
+    required this.modeloId,
   });
 
   final int personaId;
@@ -23,6 +25,10 @@ class DatosTaller {
   final int tecnicoId;
   final int servicioId;
   final int productoId;
+
+  /// El catálogo detrás de [motoId]: «Bajaj» y «Bajaj Pulsar».
+  final int marcaId;
+  final int modeloId;
 }
 
 /// Siembra el taller y devuelve los ids.
@@ -50,11 +56,20 @@ Future<DatosTaller> sembrarTaller(
       .into(db.tablaCliente)
       .insert(TablaClienteCompanion.insert(personaId: personaCliente));
 
+  // La marca y el modelo son catálogo, no texto: hay que darlos de alta antes
+  // de que exista la moto (`REGLAS_BD.md` §1.3).
+  final marcaId = await db
+      .into(db.tablaMarcaMoto)
+      .insert(TablaMarcaMotoCompanion.insert(nombre: 'Bajaj'));
+  final modeloId = await db.into(db.tablaModeloMoto).insert(
+        TablaModeloMotoCompanion.insert(marcaId: marcaId, nombre: 'Pulsar'),
+      );
+
   final motoId = await db.into(db.tablaMoto).insert(
         TablaMotoCompanion.insert(
           clienteId: clienteId,
-          marca: 'Bajaj',
-          modelo: 'Pulsar',
+          marcaId: marcaId,
+          modeloId: Value(modeloId),
           placa: const Value('KMN12C'),
         ),
       );
@@ -105,6 +120,8 @@ Future<DatosTaller> sembrarTaller(
     tecnicoId: tecnicoId,
     servicioId: servicioId,
     productoId: productoId,
+    marcaId: marcaId,
+    modeloId: modeloId,
   );
 }
 

@@ -56,6 +56,7 @@ class _FormularioProductoState extends ConsumerState<FormularioProducto> {
   bool _guardando = false;
 
   late final TextEditingController _skuCtrl;
+  late final TextEditingController _codigoBarrasCtrl;
   late final TextEditingController _nombreCtrl;
   late final TextEditingController _descripcionCtrl;
   late final TextEditingController _precioCompraCtrl;
@@ -80,6 +81,7 @@ class _FormularioProductoState extends ConsumerState<FormularioProducto> {
     String texto(num? v) => v == null ? '' : v.toStringAsFixed(0);
 
     _skuCtrl = TextEditingController(text: p?.sku ?? '');
+    _codigoBarrasCtrl = TextEditingController(text: p?.codigoBarras ?? '');
     _nombreCtrl = TextEditingController(text: p?.nombre ?? '');
     _descripcionCtrl = TextEditingController(text: p?.descripcion ?? '');
     _precioCompraCtrl = TextEditingController(text: texto(p?.precioCompra));
@@ -142,6 +144,7 @@ class _FormularioProductoState extends ConsumerState<FormularioProducto> {
   @override
   void dispose() {
     _skuCtrl.dispose();
+    _codigoBarrasCtrl.dispose();
     _nombreCtrl.dispose();
     _descripcionCtrl.dispose();
     _precioCompraCtrl.dispose();
@@ -210,6 +213,11 @@ class _FormularioProductoState extends ConsumerState<FormularioProducto> {
       // serie, dentro de su transacción. Mandar el previsualizado haría que
       // dos altas seguidas de la misma categoría compartieran SKU.
       sku: widget.esEdicion ? _skuCtrl.text.trim() : '',
+      // Vacío es «sin código», no la cadena vacía: el `UNIQUE` de la columna
+      // admite varios NULL, pero solo un ''. El repositorio lo normaliza.
+      codigoBarras: _codigoBarrasCtrl.text.trim().isEmpty
+          ? null
+          : _codigoBarrasCtrl.text.trim(),
       nombre: _nombreCtrl.text.trim(),
       descripcion: descripcion.isEmpty ? null : descripcion,
       categoriaId: _categoria?.id,
@@ -318,6 +326,15 @@ class _FormularioProductoState extends ConsumerState<FormularioProducto> {
                 soloLectura: true,
               ),
             ],
+          ),
+          const SizedBox(height: 16),
+          // El del empaque, aparte del SKU: aquel lo arma la app, este viene
+          // impreso y sirve para buscar pasando el lector en el mostrador.
+          CampoTexto(
+            etiqueta: 'Código de barras (opcional)',
+            controlador: _codigoBarrasCtrl,
+            placeholder: 'Pasa el lector o tecléalo',
+            monoespaciado: true,
           ),
           const SizedBox(height: 16),
           FilaCampos(

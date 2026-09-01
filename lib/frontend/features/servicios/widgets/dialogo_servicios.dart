@@ -5,6 +5,7 @@ import '../../../../backend/features/servicios/modelo/servicio.dart';
 import '../../../share/share.dart';
 import '../provider/servicios_provider.dart';
 import '../../../../core/formato.dart';
+import '../../../../core/resultado.dart';
 import '../../../../core/validaciones.dart';
 
 /// Diálogo de creación y edición de un servicio del taller.
@@ -42,6 +43,11 @@ class _DialogoServicioState extends ConsumerState<DialogoServicio> {
 
   bool _guardando = false;
 
+  /// El «ya existe» que devolvió la última escritura. Se limpia en cuanto
+  /// el usuario toca el campo: un error pegado a un texto que ya cambió
+  /// dice algo que dejó de ser cierto.
+  String? _errorNombre;
+
   @override
   void initState() {
     super.initState();
@@ -66,82 +72,57 @@ class _DialogoServicioState extends ConsumerState<DialogoServicio> {
     super.dispose();
   }
 
-  void _mostrarMensaje(String texto, {required bool esError}) {
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text(
-          texto,
-          style: TipografiaApp.sobrePrimario(TipografiaApp.cuerpo),
-        ),
-        backgroundColor:
-            esError ? ColoresApp.statusDanger : ColoresApp.statusSuccess,
-      ),
-    );
-  }
-
-  /// Validación de nombre único contra el repositorio, antes de persistir.
-  Future<String?> _validarNombreUnico(String nombre) async {
-    if (nombre.trim().length < 2) return null;
-
-    final repo = ref.read(repositorioServiciosProvider);
-    final existe = await repo.existeNombre(
-      nombre.trim(),
-      ignorarId: widget.servicioAEditar?.id,
-    );
-    if (existe) return 'Ya existe un servicio con ese nombre.';
-    return null;
-  }
-
   Future<void> _guardar() async {
     if (!_formKey.currentState!.validate()) return;
 
     setState(() => _guardando = true);
 
-    final errorUnicidad = await _validarNombreUnico(_nombreCtrl.text);
-    if (errorUnicidad != null) {
-      if (!mounted) return;
-      _mostrarMensaje(errorUnicidad, esError: true);
-      setState(() => _guardando = false);
-      return;
-    }
-
     final notifier = ref.read(serviciosProvider.notifier);
     final descripcion = _descripcionCtrl.text.trim();
     final precioSugerido = int.tryParse(normalizarDigitos(_precioCtrl.text)) ?? 0;
-    final String? error;
 
-    if (widget.esEdicion) {
-      error = await notifier.actualizar(
-        id: widget.servicioAEditar!.id,
-        nombre: _nombreCtrl.text.trim(),
-        descripcion: descripcion.isEmpty ? null : descripcion,
-        precioSugerido: precioSugerido,
-        activo: _activo,
-      );
-    } else {
-      error = await notifier.agregar(
-        nombre: _nombreCtrl.text.trim(),
-        descripcion: descripcion.isEmpty ? null : descripcion,
-        precioSugerido: precioSugerido,
-        activo: _activo,
-      );
-    }
+    // El nombre repetido ya no se pregunta antes de escribir: lo decide el
+    // repositorio dentro de la misma llamada, y vuelve como
+    // `MotivoFallo.nombreDuplicado`. Preguntar primero dejaba un hueco entre
+    // el `SELECT` y el `INSERT`, que es justo lo que el `UNIQUE` cierra.
+    final resultado = widget.esEdicion
+        ? await notifier.actualizar(
+            id: widget.servicioAEditar!.id,
+            nombre: _nombreCtrl.text.trim(),
+            descripcion: descripcion.isEmpty ? null : descripcion,
+            precioSugerido: precioSugerido,
+            activo: _activo,
+          )
+        : await notifier.agregar(
+            nombre: _nombreCtrl.text.trim(),
+            descripcion: descripcion.isEmpty ? null : descripcion,
+            precioSugerido: precioSugerido,
+            activo: _activo,
+          );
 
     if (!mounted) return;
 
-    if (error != null) {
-      _mostrarMensaje(error, esError: true);
-      setState(() => _guardando = false);
-      return;
+    switch (resultado) {
+      case Fallo(motivo: MotivoFallo.nombreDuplicado, :final mensaje):
+        // El conflicto es del campo, así que se señala en el campo y el
+        // diálogo se queda abierto con lo que el usuario ya tecleó.
+        setState(() {
+          _errorNombre = mensaje;
+          _guardando = false;
+        });
+        _formKey.currentState!.validate();
+      case Fallo(:final mensaje):
+        MensajeApp.error(context, mensaje);
+        setState(() => _guardando = false);
+      case Exito():
+        Navigator.of(context).pop();
+        MensajeApp.exito(
+          context,
+          widget.esEdicion
+              ? 'Servicio actualizado correctamente.'
+              : 'Servicio creado correctamente.',
+        );
     }
-
-    Navigator.of(context).pop();
-    _mostrarMensaje(
-      widget.esEdicion
-          ? 'Servicio actualizado correctamente.'
-          : 'Servicio creado correctamente.',
-      esError: false,
-    );
   }
 
   @override
@@ -214,6 +195,9 @@ class _DialogoServicioState extends ConsumerState<DialogoServicio> {
                         controlador: _nombreCtrl,
                         placeholder: 'Ej: Cambio de aceite, Sincronización...',
                         autofocus: true,
+                        alCambiar: _errorNombre == null
+                            ? null
+                            : (_) => setState(() => _errorNombre = null),
                         validador: (v) {
                           final texto = v?.trim() ?? '';
                           if (texto.isEmpty) {
@@ -223,7 +207,7 @@ class _DialogoServicioState extends ConsumerState<DialogoServicio> {
                           if (texto.length > 120) {
                             return 'Máximo 120 caracteres.';
                           }
-                          return null;
+                          return _errorNombre;
                         },
                       ),
                       const SizedBox(height: 18),

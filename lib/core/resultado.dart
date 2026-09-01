@@ -44,6 +44,12 @@ enum MotivoFallo {
   /// Ya existe otro registro con ese nombre.
   nombreDuplicado,
 
+  /// Ya existe otra unidad de medida con esa abreviatura. Es aparte de
+  /// [nombreDuplicado] porque son dos `UNIQUE` distintos sobre la misma fila:
+  /// «Litro / lt» choca con «Litros / lt» por la abreviatura y no por el
+  /// nombre, y el diálogo tiene que señalar el campo que de verdad estorba.
+  abreviaturaDuplicada,
+
   /// Ya existe otro producto con ese SKU.
   skuDuplicado,
 

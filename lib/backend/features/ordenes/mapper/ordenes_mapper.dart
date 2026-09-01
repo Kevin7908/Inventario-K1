@@ -59,6 +59,8 @@ abstract final class OrdenMapper {
           '${ordenRow['marca'] ?? ''} ${ordenRow['modelo'] ?? ''} ${ordenRow['anio'] ?? ''}'
               .trim(),
       motoPlaca: ordenRow['placa'] as String? ?? 'SIN PLACA',
+      motoMarcaId: ordenRow['marca_id'] as int? ?? 0,
+      motoModeloId: ordenRow['modelo_id'] as int?,
       clienteId: ordenRow['cliente_id'] as int? ?? 0,
       clienteNombre: ordenRow['cliente_nombre'] as String? ?? 'Sin Cliente',
       kilometrajeEntrada: ordenRow['kilometraje_entrada'] as int? ?? 0,
@@ -124,13 +126,18 @@ abstract final class OrdenMapper {
     actualizadoEn: Value(DateTime.now()),
   );
 
+  /// [usuarioId] es quién anotó **esta** línea. No se hereda de la orden
+  /// porque una orden pasa de un turno a otro: la abre el de la mañana y el
+  /// de la tarde le agrega tareas (`REGLAS_BD.md` §7.0).
   static TablaOrdenesTareaCompanion tareaCompanionNuevo({
+    required int usuarioId,
     required int ordenId,
     required int servicioId,
     required int tecnicoId,
     required int precioPactado,
     String? notas,
   }) => TablaOrdenesTareaCompanion.insert(
+    usuarioId: usuarioId,
     ordenId: ordenId,
     servicioId: servicioId,
     tecnicoId: tecnicoId,
@@ -141,11 +148,13 @@ abstract final class OrdenMapper {
   );
 
   static TablaOrdenesRepuestoCompanion repuestoCompanionNuevo({
+    required int usuarioId,
     required int ordenId,
     required int productoId,
     required double cantidad,
     required int precioUnitario,
   }) => TablaOrdenesRepuestoCompanion.insert(
+    usuarioId: usuarioId,
     ordenId: ordenId,
     productoId: productoId,
     cantidad: Value(cantidad),
@@ -209,11 +218,13 @@ abstract final class OrdenMapper {
       );
 
   static TablaOrdenesCargoCompanion cargoCompanionNuevo({
+    required int usuarioId,
     required int ordenId,
     required String descripcion,
     required int precio,
   }) =>
       TablaOrdenesCargoCompanion.insert(
+        usuarioId: usuarioId,
         ordenId: ordenId,
         descripcion: descripcion,
         precio: Value(precio),

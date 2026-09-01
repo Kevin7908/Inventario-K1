@@ -72,8 +72,25 @@ señor registrado dos veces tenía dos teléfonos que se desincronizaban solos."
    'usuario_permisos', 'especializaciones']),
 
  ('2. CATÁLOGO', """Lo que el taller vende y con qué lo mide. Los catálogos no se borran: llevan
-`activo` porque los documentos emitidos los referencian.""",
-  ['categorias', 'unidades_medida', 'productos', 'servicios']),
+`activo` porque los documentos emitidos los referencian.
+
+`productos.codigo_barras` es APARTE del sku: el sku lo inventa el taller con el
+prefijo de la categoría y siempre está; el código de barras viene impreso de
+fábrica y falta en todo lo que llega a granel. Por eso es nullable, y UNIQUE
+acepta varios NULL sin estorbar. Se guarda normalizado —sin espacios ni
+guiones— porque un lector puede mandar «7 702001 234567» y otro
+«7702001234567», y los dos tienen que dar en el mismo producto.
+
+producto_compatibilidades responde «¿esta pastilla le sirve a una Pulsar?»,
+que antes caía dentro de `descripcion` como texto libre. Una línea vale por una
+MARCA ENTERA o por un MODELO, nunca por las dos —el aceite sirve para cualquier
+Yamaha, la pastilla solo para la FZ—, y eso lo cierra un CHECK: obligar a
+listar los modelos uno por uno para el primer caso llenaría la tabla de filas
+que dicen lo mismo. Son dos columnas nulables y no el par
+referencia_tipo/referencia_id, por lo mismo que en movimientos_inventario: una
+FK polimórfica no la puede verificar la base.""",
+  ['categorias', 'unidades_medida', 'productos', 'producto_compatibilidades',
+   'servicios']),
 
  ('3. INVENTARIO', """El libro mayor del stock. `productos.stock_actual` es un CACHÉ de
 SUM(movimientos_inventario.cantidad): se guarda porque la app lo consulta cien
@@ -86,9 +103,24 @@ nulables con FK real en vez del típico par referencia_tipo/referencia_id: una
 FK polimórfica no la puede verificar la base.""",
   ['movimientos_inventario']),
 
- ('4. TALLER', """La moto del cliente y su paso por el taller.""",
-  ['motos', 'ordenes_servicio', 'ordenes_tareas', 'ordenes_repuestos',
-   'ordenes_cargos']),
+ ('4. TALLER', """La moto del cliente y su paso por el taller.
+
+La marca y el modelo son CATÁLOGO, no texto libre en `motos`: con texto entran
+«Yamaha», «yamaha» y «YAMAHA» como tres marcas y ningún informe puede
+cruzarlas. El cilindraje vive en `modelos_moto` y no en cada moto porque es del
+modelo, no del ejemplar: todas las Boxer CT100 son de 100 cc, y repetirlo por
+moto era el mismo dato una vez por cliente.
+
+`motos.modelo_id` es nullable y `marca_id` no: en el mostrador la marca siempre
+se sabe y el modelo exacto a veces no está catalogado todavía. Parar la
+atención al cliente para dar de alta un modelo sería peor que registrar la moto
+con lo que se sabe.
+
+Las líneas de las tres tablas hijas llevan su propio usuario_id: una orden pasa
+de un turno a otro, así que quien anota un repuesto no siempre es quien la
+abrió.""",
+  ['marcas_moto', 'modelos_moto', 'motos', 'ordenes_servicio',
+   'ordenes_tareas', 'ordenes_repuestos', 'ordenes_cargos']),
 
  ('5. DOCUMENTOS DE VENTA', """La factura es un documento contable: no se borra, se anula (ver las guardas
 del final). Sus líneas congelan descripción, precio y costo a propósito: si

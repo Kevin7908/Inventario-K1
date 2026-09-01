@@ -7,6 +7,7 @@ import '../../../../backend/features/especializacion/modelo/especializacion.dart
 import '../../../../backend/features/especializacion/repositorio/repositorio_especializacion.dart';
 import '../../../../backend/features/especializacion/repositorio/repositorio_especializacion_impl.dart';
 import '../../../../backend/share/database/app_db_provider.dart';
+import '../../../../core/resultado.dart';
 import '../../autenticacion/provider/auth_providers.dart';
 
 // Repositorio concreto. Cambiar la impl aquí no toca ninguna otra capa.
@@ -41,60 +42,28 @@ class EspecializacionesNotifier
     return repo.obtenerTodas();
   }
 
-  /// Retorna null si tuvo éxito, o el mensaje de error si falló.
-  Future<String?> agregar({
+  /// El repositorio ya valida, decide el motivo y redacta el texto: aquí no
+  /// queda nada que traducir. Antes este notifier buscaba `UNIQUE` dentro del
+  /// `toString()` de la excepción para adivinar que el nombre estaba repetido,
+  /// que es justo lo que `Resultado` vino a evitar.
+  ///
+  /// Tampoco toca `state`: el stream de Drift que suscribe `build()` re-emite
+  /// solo en cuanto la tabla cambia. El `AsyncLoading` + recarga manual que
+  /// había aquí hacía el mismo trabajo dos veces y parpadeaba la lista.
+  Future<Resultado> agregar({
     required String nombre,
     String? descripcion,
-  }) async {
-    state = const AsyncLoading();
-    final result = await AsyncValue.guard(
-      () => _repo.agregar(nombre: nombre, descripcion: descripcion),
-    );
-    if (result is AsyncError) {
-      // Restaura lista actual antes de retornar error
-      state = await AsyncValue.guard(_repo.obtenerTodas);
-      return _mensajeDeError(result.error);
-    }
-    return null; // éxito
-  }
+  }) =>
+      _repo.agregar(nombre: nombre, descripcion: descripcion);
 
-  // Actualizar 
-  Future<String?> actualizar({
+  Future<Resultado> actualizar({
     required int id,
     required String nombre,
     String? descripcion,
-  }) async {
-    state = const AsyncLoading();
-    final result = await AsyncValue.guard(
-      () => _repo.actualizar(id: id, nombre: nombre, descripcion: descripcion),
-    );
-    if (result is AsyncError) {
-      state = await AsyncValue.guard(_repo.obtenerTodas);
-      return _mensajeDeError(result.error);
-    }
-    return null;
-  }
+  }) =>
+      _repo.actualizar(id: id, nombre: nombre, descripcion: descripcion);
 
-  // Eliminar
-  Future<String?> eliminar(int id) async {
-    state = const AsyncLoading();
-    final result = await AsyncValue.guard(() => _repo.eliminar(id));
-    if (result is AsyncError) {
-      state = await AsyncValue.guard(_repo.obtenerTodas);
-      return _mensajeDeError(result.error);
-    }
-    return null;
-  }
-
-  //  Helper 
-  String _mensajeDeError(Object? error) {
-    if (error == null) return 'Error desconocido';
-    final msg = error.toString();
-    if (msg.contains('UNIQUE')) {
-      return 'Ya existe una especialización con ese nombre.';
-    }
-    return msg;
-  }
+  Future<Resultado> eliminar(int id) => _repo.eliminar(id);
 }
 
 final especializacionesProvider =

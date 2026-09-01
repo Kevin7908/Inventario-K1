@@ -47,6 +47,8 @@ Moto _moto({
     Moto(
       id: id,
       clienteId: 0,
+      // `marcaId: 0` = todavía sin resolver: el repositorio traduce el nombre.
+      marcaId: 0,
       marca: marca,
       modelo: modelo,
       placa: placa,
@@ -157,14 +159,18 @@ void main() {
       expect((fallo as Fallo).mensaje, contains('Repetiste'));
     });
 
-    test('una moto sin marca o sin modelo no pasa', () async {
+    test('una moto sin marca no pasa; sin modelo sí', () async {
       expect(
         await _validar(_cliente(), [_moto(marca: '  ', modelo: 'Pulsar')]),
         isA<Fallo>(),
       );
+      // El modelo dejó de ser obligatorio al pasar al catálogo: en el
+      // mostrador la marca siempre se sabe y el modelo exacto a veces no, y
+      // parar la atención al cliente por eso sería peor que registrar la moto
+      // con lo que se sabe. `motos.modelo_id` es nullable justamente por esto.
       expect(
         await _validar(_cliente(), [_moto(marca: 'Bajaj', modelo: '')]),
-        isA<Fallo>(),
+        isNull,
       );
     });
   });

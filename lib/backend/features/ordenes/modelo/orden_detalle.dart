@@ -13,6 +13,8 @@ class OrdenDetalle extends Equatable {
     required this.motoId,
     required this.motoDescripcion,
     required this.motoPlaca,
+    required this.motoMarcaId,
+    this.motoModeloId,
     required this.clienteId,
     required this.clienteNombre,
     required this.kilometrajeEntrada,
@@ -32,6 +34,11 @@ class OrdenDetalle extends Equatable {
   final int motoId;
   final String motoDescripcion;
   final String motoPlaca;
+
+  /// El catálogo detrás de la moto, para poder acotar la rejilla de repuestos
+  /// a lo que le sirve. El modelo puede faltar: hay motos sin él.
+  final int motoMarcaId;
+  final int? motoModeloId;
   final int clienteId;
   final String clienteNombre;
   final int kilometrajeEntrada;
@@ -73,6 +80,8 @@ class OrdenDetalle extends Equatable {
         motoId,
         motoDescripcion,
         motoPlaca,
+        motoMarcaId,
+        motoModeloId,
         clienteId,
         clienteNombre,
         kilometrajeEntrada,

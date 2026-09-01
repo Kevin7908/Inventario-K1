@@ -4,6 +4,7 @@ import '../../../../backend/features/unidades_medida/modelo/unidad_medida.dart';
 import '../../../../backend/features/unidades_medida/repositorio/repositorio_unidades_medida.dart';
 import '../../../../backend/features/unidades_medida/repositorio/repositorio_unidades_medida_impl.dart';
 import '../../../../backend/share/database/app_db_provider.dart';
+import '../../../../core/resultado.dart';
 import '../../autenticacion/provider/auth_providers.dart';
 
 final repositorioUnidadesMedidaProvider = Provider<RepositorioUnidadesMedida>(
@@ -90,76 +91,64 @@ class UnidadesMedidaNotifier extends AsyncNotifier<UnidadesMedidaState> {
     state = AsyncData(s.copyWith(filtroTipo: tipo));
   }
 
-  Future<String?> crear({
+  /// El repositorio valida, decide el motivo y redacta el texto (`REGLAS_BD.md`
+  /// §8). Antes esas comprobaciones vivían aquí y devolvían un `String?`: el
+  /// «ya existe» del nombre y el de la abreviatura llegaban indistinguibles a
+  /// la vista, que solo podía volcarlos en un aviso genérico.
+  Future<Resultado> crear({
     required String nombre,
     required String abreviatura,
     String tipo = 'unidad',
     String? descripcion,
   }) async {
-    try {
-      final repo = ref.read(repositorioUnidadesMedidaProvider);
-      if (nombre.trim().isEmpty) return 'El nombre no puede estar vacío';
-      if (abreviatura.trim().isEmpty) return 'La abreviatura no puede estar vacía';
-      if (await repo.existeNombre(nombre.trim())) {
-        return 'Ya existe una unidad con ese nombre';
-      }
-      if (await repo.existeAbreviatura(abreviatura.trim())) {
-        return 'Ya existe una unidad con esa abreviatura';
-      }
-      await repo.crear(UnidadMedida(
-        nombre: nombre.trim(),
-        abreviatura: abreviatura.trim(),
-        tipo: tipo,
-        descripcion: descripcion?.trim(),
-        creadoEn: DateTime.now(),
-        actualizadoEn: DateTime.now(),
-      ));
-      await _recargar();
-      return null;
-    } catch (e) {
-      return e.toString();
-    }
+    final ahora = DateTime.now();
+    final resultado = await ref.read(repositorioUnidadesMedidaProvider).crear(
+          UnidadMedida(
+            nombre: nombre,
+            abreviatura: abreviatura,
+            tipo: tipo,
+            descripcion: descripcion,
+            creadoEn: ahora,
+            actualizadoEn: ahora,
+          ),
+        );
+    if (resultado.exitoso) await _recargar();
+    return resultado;
   }
 
-  Future<String?> actualizar({
+  Future<Resultado> actualizar({
     required int id,
     required String nombre,
     required String abreviatura,
     String? tipo,
     String? descripcion,
   }) async {
-    try {
-      final repo = ref.read(repositorioUnidadesMedidaProvider);
-      if (await repo.existeNombre(nombre.trim(), excludirId: id)) {
-        return 'Ya existe una unidad con ese nombre';
-      }
-      if (await repo.existeAbreviatura(abreviatura.trim(), excludirId: id)) {
-        return 'Ya existe una unidad con esa abreviatura';
-      }
-      final actual =
-          state.value!.unidades.firstWhere((u) => u.id == id);
-      await repo.actualizar(actual.copyWith(
-        nombre: nombre.trim(),
-        abreviatura: abreviatura.trim(),
-        tipo: tipo,
-        descripcion: descripcion?.trim(),
-        actualizadoEn: DateTime.now(),
-      ));
-      await _recargar();
-      return null;
-    } catch (e) {
-      return e.toString();
+    final actual = state.value?.unidades.where((u) => u.id == id).firstOrNull;
+    if (actual == null) {
+      return const Fallo(
+        MotivoFallo.validacion,
+        'La unidad ya no está en la lista.',
+      );
     }
+    final resultado =
+        await ref.read(repositorioUnidadesMedidaProvider).actualizar(
+              actual.copyWith(
+                nombre: nombre,
+                abreviatura: abreviatura,
+                tipo: tipo,
+                descripcion: descripcion,
+                actualizadoEn: DateTime.now(),
+              ),
+            );
+    if (resultado.exitoso) await _recargar();
+    return resultado;
   }
 
-  Future<String?> eliminar(int id) async {
-    try {
-      await ref.read(repositorioUnidadesMedidaProvider).eliminar(id);
-      await _recargar();
-      return null;
-    } catch (e) {
-      return e.toString();
-    }
+  Future<Resultado> eliminar(int id) async {
+    final resultado =
+        await ref.read(repositorioUnidadesMedidaProvider).eliminar(id);
+    if (resultado.exitoso) await _recargar();
+    return resultado;
   }
 }
 

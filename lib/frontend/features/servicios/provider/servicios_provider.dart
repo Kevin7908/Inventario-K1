@@ -5,6 +5,7 @@ import '../../../../backend/features/servicios/modelo/servicio.dart';
 import '../../../../backend/features/servicios/repositorio/repositorio_servicios.dart';
 import '../../../../backend/features/servicios/repositorio/repositorio_servicios_impl.dart';
 import '../../../../backend/share/database/app_db_provider.dart';
+import '../../../../core/resultado.dart';
 import '../../autenticacion/provider/auth_providers.dart';
 
 final repositorioServiciosProvider = Provider<RepositorioServicios>(
@@ -34,80 +35,41 @@ class ServiciosNotifier extends AsyncNotifier<List<Servicio>> {
     return repo.obtenerTodos();
   }
 
-  Future<String?> agregar({
+  /// El repositorio ya valida, decide el motivo y redacta el texto: aquí no
+  /// queda nada que traducir. Antes este notifier leía `UNIQUE` dentro del
+  /// `toString()` de la excepción para adivinar que el nombre estaba repetido.
+  Future<Resultado> agregar({
     required String nombre,
     String? descripcion,
     int precioSugerido = 0,
     bool activo = true,
-  }) async {
-    state = const AsyncLoading();
-    final result = await AsyncValue.guard(
-      () => _repo.agregar(
+  }) =>
+      _repo.agregar(
         nombre: nombre,
         descripcion: descripcion,
         precioSugerido: precioSugerido,
         activo: activo,
-      ),
-    );
-    if (result is AsyncError) {
-      state = await AsyncValue.guard(_repo.obtenerTodos);
-      return _mensajeDeError(result.error);
-    }
-    return null;
-  }
+      );
 
-  Future<String?> actualizar({
+  Future<Resultado> actualizar({
     required int id,
     required String nombre,
     String? descripcion,
     int precioSugerido = 0,
     required bool activo,
-  }) async {
-    state = const AsyncLoading();
-    final result = await AsyncValue.guard(
-      () => _repo.actualizar(
+  }) =>
+      _repo.actualizar(
         id: id,
         nombre: nombre,
         descripcion: descripcion,
         precioSugerido: precioSugerido,
         activo: activo,
-      ),
-    );
-    if (result is AsyncError) {
-      state = await AsyncValue.guard(_repo.obtenerTodos);
-      return _mensajeDeError(result.error);
-    }
-    return null;
-  }
+      );
 
-  Future<String?> eliminar(int id) async {
-    state = const AsyncLoading();
-    final result = await AsyncValue.guard(() => _repo.eliminar(id));
-    if (result is AsyncError) {
-      state = await AsyncValue.guard(_repo.obtenerTodos);
-      return _mensajeDeError(result.error);
-    }
-    return null;
-  }
+  Future<Resultado> eliminar(int id) => _repo.eliminar(id);
 
-  Future<void> alternarActivo(int id, {required bool activo}) async {
-    // Operacion local silenciosa 
-    try {
-      await _repo.alternarActivo(id, activo: activo);
-    } catch (e) {
-      // El stream reactivo ya restaura el estado; no es necesario hacer nada mas
-    }
-  }
-
-  // Helper 
-  String _mensajeDeError(Object? error) {
-    if (error == null) return 'Error desconocido.';
-    final msg = error.toString();
-    if (msg.contains('UNIQUE')) {
-      return 'Ya existe un servicio con ese nombre.';
-    }
-    return msg;
-  }
+  Future<Resultado> alternarActivo(int id, {required bool activo}) =>
+      _repo.alternarActivo(id, activo: activo);
 }
 
 final serviciosProvider =

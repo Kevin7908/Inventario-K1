@@ -83,12 +83,14 @@ class ReservaMapper {
   }
 
   static TablaReservaItemCompanion itemACompanion({
+    required int usuarioId,
     required int reservaId,
     required int productoId,
     required double cantidad,
     required int precioUnitario,
   }) {
     return TablaReservaItemCompanion.insert(
+      usuarioId: usuarioId,
       reservaId: reservaId,
       productoId: productoId,
       cantidad: cantidad,

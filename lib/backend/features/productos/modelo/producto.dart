@@ -9,6 +9,12 @@ class Producto extends Equatable {
 
   final int? id;
   final String sku;
+
+  /// El código de barras del empaque, si lo trae. Es aparte del [sku]: aquel
+  /// lo inventa el taller y siempre está, este viene impreso de fábrica y
+  /// falta en todo lo que llega a granel.
+  final String? codigoBarras;
+
   final String nombre;
   final String? descripcion;
 
@@ -43,6 +49,7 @@ class Producto extends Equatable {
     const Producto({
     this.id,
     required this.sku,
+    this.codigoBarras,
     required this.nombre,
     this.descripcion,
     // FKs (IDs) — se persisten en la tabla
@@ -103,6 +110,7 @@ class Producto extends Equatable {
   Producto copyWith({
     int? id,
     String? sku,
+    String? codigoBarras,
     String? nombre,
     String? descripcion,
     int? categoriaId,
@@ -126,6 +134,7 @@ class Producto extends Equatable {
     return Producto(
       id: id ?? this.id,
       sku: sku ?? this.sku,
+      codigoBarras: codigoBarras ?? this.codigoBarras,
       nombre: nombre ?? this.nombre,
       descripcion: descripcion ?? this.descripcion,
       categoriaId: categoriaId ?? this.categoriaId,

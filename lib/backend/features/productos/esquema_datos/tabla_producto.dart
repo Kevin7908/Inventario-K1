@@ -14,6 +14,8 @@ import '../../unidades_medida/esquema_datos/tabla_unidades_medida.dart';
 @TableIndex(name: 'idx_productos_categoria', columns: {#categoriaId})
 @TableIndex(name: 'idx_productos_proveedor', columns: {#proveedorId})
 @TableIndex(name: 'idx_productos_activo', columns: {#activo})
+// Cubre el WHERE codigoBarras = ? del lector del POS.
+@TableIndex(name: 'idx_productos_codigo_barras', columns: {#codigoBarras})
 class TablaProducto extends Table {
   @override
   String get tableName => 'productos';
@@ -23,6 +25,19 @@ class TablaProducto extends Table {
   /// Código interno del repuesto. `UNIQUE` en el esquema y no solo en Dart:
   /// entre el `existeSku()` de validación y el `INSERT` cabe otra escritura.
   TextColumn get sku => text().unique()();
+
+  /// El código de barras del empaque (EAN-13, UPC-A…), para buscar pasando el
+  /// lector en el mostrador.
+  ///
+  /// Es **aparte del SKU** y no un segundo uso de la misma columna: el SKU lo
+  /// inventa el taller y siempre está; este viene impreso de fábrica y falta
+  /// en todo lo que llega a granel. Por eso es nullable, y `UNIQUE` acepta
+  /// varios NULL sin estorbar.
+  ///
+  /// Se guarda normalizado —sin espacios ni guiones— desde el repositorio: un
+  /// lector que mande «7 702001 234567» y otro que mande «7702001234567» tienen
+  /// que encontrar el mismo producto.
+  TextColumn get codigoBarras => text().nullable().unique()();
 
   TextColumn get nombre => text()();
 
@@ -77,6 +92,10 @@ class TablaProducto extends Table {
   @override
   List<String> get customConstraints => [
         'CHECK (length(trim(sku)) > 0)',
+        // Un código de barras vacío es un NULL mal escrito: sin esto, dos
+        // productos «sin código» chocarían contra el `UNIQUE` con la cadena
+        // vacía en vez de convivir como NULL.
+        'CHECK (codigo_barras IS NULL OR length(trim(codigo_barras)) > 0)',
         'CHECK (length(trim(nombre)) > 0)',
         'CHECK (precio_compra >= 0)',
         'CHECK (precio_venta >= 0)',

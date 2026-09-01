@@ -1,3 +1,4 @@
+import '../../motos/repositorio/join_moto.dart';
 import '../../../share/consecutivos/documento_consecutivo.dart';
 import '../../../share/consecutivos/repositorio_consecutivos.dart';
 import 'package:drift/drift.dart';
@@ -15,7 +16,9 @@ import '../../bitacora/repositorio/repositorio_bitacora.dart';
 import '../../bitacora/repositorio/repositorio_bitacora_impl.dart';
 import '../../../share/dominio/permiso.dart';
 
-class RepositorioCotizacionesImpl with FirmaDeSesion implements RepositorioCotizaciones {
+class RepositorioCotizacionesImpl
+    with FirmaDeSesion
+    implements RepositorioCotizaciones {
   RepositorioCotizacionesImpl(this._db, this.sesion);
 
   /// Quién firma lo que este repositorio escribe. La inyecta Riverpod
@@ -24,8 +27,10 @@ class RepositorioCotizacionesImpl with FirmaDeSesion implements RepositorioCotiz
   @override
   final SesionActual? sesion;
 
-  late final RepositorioBitacora _bitacora =
-      RepositorioBitacoraImpl(_db, sesion);
+  late final RepositorioBitacora _bitacora = RepositorioBitacoraImpl(
+    _db,
+    sesion,
+  );
 
   /// Deja el renglón de la bitácora, **dentro** de la transacción del cambio.
   Future<void> _anotar(
@@ -33,24 +38,23 @@ class RepositorioCotizacionesImpl with FirmaDeSesion implements RepositorioCotiz
     int? id,
     String descripcion, {
     String? detalle,
-  }) =>
-      _bitacora.anotar(
-        Anotacion(
-          entidad: EntidadAuditada.cotizacion,
-          accion: accion,
-          entidadId: id,
-          descripcion: descripcion,
-          detalle: detalle,
-        ),
-      );
-
+  }) => _bitacora.anotar(
+    Anotacion(
+      entidad: EntidadAuditada.cotizacion,
+      accion: accion,
+      entidadId: id,
+      descripcion: descripcion,
+      detalle: detalle,
+    ),
+  );
 
   final AppDb _db;
 
   /// Los números de documento salen de la tabla `consecutivos`, no de `MAX+1`
   /// ni del `id`: ver `RepositorioConsecutivos`.
-  late final RepositorioConsecutivos _consecutivos =
-      RepositorioConsecutivos(_db);
+  late final RepositorioConsecutivos _consecutivos = RepositorioConsecutivos(
+    _db,
+  );
 
   // ── JOIN base ─────────────────────────────────────────────────────────────
 
@@ -69,8 +73,8 @@ class RepositorioCotizacionesImpl with FirmaDeSesion implements RepositorioCotiz
         _db.tablaMoto,
         _db.tablaMoto.id.equalsExp(_db.tablaCotizacion.motoId),
       ),
-    ])
-      ..addColumns([_cantidadItems]);
+      ..._db.joinsCatalogoMoto,
+    ])..addColumns([_cantidadItems]);
   }
 
   /// Cuántas líneas tiene cada cotización, sin traerlas.
@@ -88,14 +92,11 @@ class RepositorioCotizacionesImpl with FirmaDeSesion implements RepositorioCotiz
   CotizacionResumen _rowToResumen(TypedResult row) {
     final cot = row.readTable(_db.tablaCotizacion);
     final cli = row.readTableOrNull(_db.tablaPersona);
-    final moto = row.readTableOrNull(_db.tablaMoto);
 
     final nombreCliente = cli != null
         ? '${cli.nombres} ${cli.apellidos ?? ''}'.trim()
         : 'Sin cliente';
-    final nombreMoto = moto != null
-        ? '${moto.marca} ${moto.modelo}${moto.anio != null ? ' ${moto.anio}' : ''}'
-        : 'Sin moto';
+    final nombreMoto = _db.nombreMotoDe(row) ?? 'Sin moto';
 
     return CotizacionMapper.filaAResumen(
       cot,
@@ -110,9 +111,9 @@ class RepositorioCotizacionesImpl with FirmaDeSesion implements RepositorioCotiz
 
   @override
   Stream<List<CotizacionResumen>> observarTodas() {
-    return (_baseQuery..orderBy(_orden))
-        .watch()
-        .map((rows) => rows.map(_rowToResumen).toList());
+    return (_baseQuery..orderBy(_orden)).watch().map(
+      (rows) => rows.map(_rowToResumen).toList(),
+    );
   }
 
   // ── Paginación — WHERE, COUNT y LIMIT los resuelve SQLite ─────────────────
@@ -144,9 +145,9 @@ class RepositorioCotizacionesImpl with FirmaDeSesion implements RepositorioCotiz
   /// mismo instante tendrían un orden arbitrario, y con `LIMIT`/`OFFSET` eso
   /// hace que una fila salga en dos páginas o en ninguna.
   List<OrderingTerm> get _orden => [
-        OrderingTerm.desc(_db.tablaCotizacion.creadoEn),
-        OrderingTerm.desc(_db.tablaCotizacion.id),
-      ];
+    OrderingTerm.desc(_db.tablaCotizacion.creadoEn),
+    OrderingTerm.desc(_db.tablaCotizacion.id),
+  ];
 
   Expression<bool> _condicion(FiltroCotizaciones filtro) {
     Expression<bool> acumulado = const Constant(true);
@@ -154,7 +155,8 @@ class RepositorioCotizacionesImpl with FirmaDeSesion implements RepositorioCotiz
     final busqueda = filtro.busqueda.trim();
     if (busqueda.isNotEmpty) {
       final patron = '%${busqueda.toLowerCase()}%';
-      acumulado = acumulado &
+      acumulado =
+          acumulado &
           (_db.tablaCotizacion.numero.lower().like(patron) |
               _db.tablaPersona.nombres.lower().like(patron) |
               _db.tablaPersona.apellidos.lower().like(patron));
@@ -184,18 +186,19 @@ class RepositorioCotizacionesImpl with FirmaDeSesion implements RepositorioCotiz
     // El total va en su propia consulta: el `limit` no debe afectarlo. Repite
     // el JOIN porque la búsqueda mira el nombre del cliente.
     final total = _db.tablaCotizacion.id.count();
-    final consultaTotal = _db.selectOnly(_db.tablaCotizacion).join([
-      leftOuterJoin(
-        _db.tablaCliente,
-        _db.tablaCliente.id.equalsExp(_db.tablaCotizacion.clienteId),
-      ),
-      leftOuterJoin(
-        _db.tablaPersona,
-        _db.tablaPersona.id.equalsExp(_db.tablaCliente.personaId),
-      ),
-    ])
-      ..addColumns([total])
-      ..where(condicion);
+    final consultaTotal =
+        _db.selectOnly(_db.tablaCotizacion).join([
+            leftOuterJoin(
+              _db.tablaCliente,
+              _db.tablaCliente.id.equalsExp(_db.tablaCotizacion.clienteId),
+            ),
+            leftOuterJoin(
+              _db.tablaPersona,
+              _db.tablaPersona.id.equalsExp(_db.tablaCliente.personaId),
+            ),
+          ])
+          ..addColumns([total])
+          ..where(condicion);
 
     return consultaPagina.watch().asyncMap((filas) async {
       final fila = await consultaTotal.getSingleOrNull();
@@ -213,52 +216,57 @@ class RepositorioCotizacionesImpl with FirmaDeSesion implements RepositorioCotiz
     // revisar y que se rompía en silencio si cambiaba una columna.
     final t = _db.tablaCotizacion;
     final total = t.id.count();
-    final vigentes =
-        t.id.count(filter: _condicionEstado(EstadoCotizacion.vigente));
-    final porVencer =
-        t.id.count(filter: _condicionEstado(EstadoCotizacion.porVencer));
-    final vencidas =
-        t.id.count(filter: _condicionEstado(EstadoCotizacion.vencida));
+    final vigentes = t.id.count(
+      filter: _condicionEstado(EstadoCotizacion.vigente),
+    );
+    final porVencer = t.id.count(
+      filter: _condicionEstado(EstadoCotizacion.porVencer),
+    );
+    final vencidas = t.id.count(
+      filter: _condicionEstado(EstadoCotizacion.vencida),
+    );
     // El total de cada cotización es `subtotal - descuento`: no hay columna
     // `total` porque se deduce de esas dos, y el IVA ya va dentro del precio.
-    final montoVigente = (t.subtotal - t.descuento)
-        .sum(filter: _diasParaVencer.isBiggerOrEqualValue(0));
+    final montoVigente = (t.subtotal - t.descuento).sum(
+      filter: _diasParaVencer.isBiggerOrEqualValue(0),
+    );
 
     final consulta = _db.selectOnly(t)
       ..addColumns([total, vigentes, porVencer, vencidas, montoVigente]);
 
     return consulta.watchSingleOrNull().map(
-          (fila) => (
-            total: fila?.read(total) ?? 0,
-            vigentes: fila?.read(vigentes) ?? 0,
-            porVencer: fila?.read(porVencer) ?? 0,
-            vencidas: fila?.read(vencidas) ?? 0,
-            montoVigente: fila?.read(montoVigente) ?? 0,
-          ),
-        );
+      (fila) => (
+        total: fila?.read(total) ?? 0,
+        vigentes: fila?.read(vigentes) ?? 0,
+        porVencer: fila?.read(porVencer) ?? 0,
+        vencidas: fila?.read(vencidas) ?? 0,
+        montoVigente: fila?.read(montoVigente) ?? 0,
+      ),
+    );
   }
 
   @override
   Future<List<CotizacionResumen>> obtenerTodas() async {
-    final rows = await (_baseQuery
-          ..orderBy([OrderingTerm.desc(_db.tablaCotizacion.creadoEn)]))
-        .get();
+    final rows =
+        await (_baseQuery
+              ..orderBy([OrderingTerm.desc(_db.tablaCotizacion.creadoEn)]))
+            .get();
     return rows.map(_rowToResumen).toList();
   }
 
   @override
   Future<CotizacionDetalle> obtenerDetalle(int id) async {
-    final rows = await (_baseQuery
-          ..where(_db.tablaCotizacion.id.equals(id)))
+    final rows = await (_baseQuery..where(_db.tablaCotizacion.id.equals(id)))
         .get();
     if (rows.isEmpty) throw Exception('Cotización $id no encontrada');
 
     final resumen = _rowToResumen(rows.first);
 
-    final itemsRows = await (_db.select(_db.tablaCotizacionItem)
-          ..where((t) => t.cotizacionId.equals(id))
-          ..orderBy([(t) => OrderingTerm.asc(t.id)]))
-        .get();
+    final itemsRows =
+        await (_db.select(_db.tablaCotizacionItem)
+              ..where((t) => t.cotizacionId.equals(id))
+              ..orderBy([(t) => OrderingTerm.asc(t.id)]))
+            .get();
 
     return CotizacionDetalle(
       resumen: resumen,
@@ -286,13 +294,17 @@ class RepositorioCotizacionesImpl with FirmaDeSesion implements RepositorioCotiz
     exigir(Permiso.cotizacionesCrear);
 
     return _db.transaction(() async {
-      final numero = await _consecutivos.siguiente(DocumentoConsecutivo.cotizacion);
+      final numero = await _consecutivos.siguiente(
+        DocumentoConsecutivo.cotizacion,
+      );
       final subtotal = items.fold(0, (s, d) => s + d.subtotal);
       final rebaja = _recortarDescuento(descuento, subtotal);
       // Los precios ya traen el IVA dentro: se extrae del total, no se suma.
       final iva = ivaIncluidoEn(subtotal - rebaja);
 
-      final id = await _db.into(_db.tablaCotizacion).insert(
+      final id = await _db
+          .into(_db.tablaCotizacion)
+          .insert(
             CotizacionMapper.nuevaACompanion(
               usuarioId: autorId,
               numero: numero,
@@ -307,8 +319,11 @@ class RepositorioCotizacionesImpl with FirmaDeSesion implements RepositorioCotiz
           );
 
       for (final draft in items) {
-        await _db.into(_db.tablaCotizacionItem).insert(
+        await _db
+            .into(_db.tablaCotizacionItem)
+            .insert(
               CotizacionMapper.itemACompanion(
+                usuarioId: autorId,
                 cotizacionId: id,
                 tipo: draft.tipo,
                 referenciaId: draft.referenciaId,
@@ -338,26 +353,32 @@ class RepositorioCotizacionesImpl with FirmaDeSesion implements RepositorioCotiz
       final rebaja = _recortarDescuento(descuento, subtotal);
       // Los precios ya traen el IVA dentro: se extrae del total, no se suma.
       final iva = ivaIncluidoEn(subtotal - rebaja);
-      await (_db.update(_db.tablaCotizacion)..where((t) => t.id.equals(id)))
-          .write(TablaCotizacionCompanion(
-        clienteId: Value(clienteId),
-        motoId: Value(motoId),
-        subtotal: Value(subtotal),
-        descuento: Value(rebaja),
-        iva: Value(iva),
-        vigenciaHasta: Value(vigenciaHasta),
-        actualizadoEn: Value(DateTime.now()),
-        notas: Value(notas),
-      ));
+      await (_db.update(
+        _db.tablaCotizacion,
+      )..where((t) => t.id.equals(id))).write(
+        TablaCotizacionCompanion(
+          clienteId: Value(clienteId),
+          motoId: Value(motoId),
+          subtotal: Value(subtotal),
+          descuento: Value(rebaja),
+          iva: Value(iva),
+          vigenciaHasta: Value(vigenciaHasta),
+          actualizadoEn: Value(DateTime.now()),
+          notas: Value(notas),
+        ),
+      );
 
       // Los ítems se reemplazan enteros: es más simple que diferenciar altas,
       // bajas y cambios de cantidad, y no hay stock que conciliar.
-      await (_db.delete(_db.tablaCotizacionItem)
-            ..where((t) => t.cotizacionId.equals(id)))
-          .go();
+      await (_db.delete(
+        _db.tablaCotizacionItem,
+      )..where((t) => t.cotizacionId.equals(id))).go();
       for (final draft in items) {
-        await _db.into(_db.tablaCotizacionItem).insert(
+        await _db
+            .into(_db.tablaCotizacionItem)
+            .insert(
               CotizacionMapper.itemACompanion(
+                usuarioId: autorId,
                 cotizacionId: id,
                 tipo: draft.tipo,
                 referenciaId: draft.referenciaId,
@@ -376,12 +397,13 @@ class RepositorioCotizacionesImpl with FirmaDeSesion implements RepositorioCotiz
     exigir(Permiso.cotizacionesEliminar);
 
     return _db.transaction(() async {
-      final antes = await (_db.select(_db.tablaCotizacion)
-            ..where((t) => t.id.equals(id)))
-          .getSingleOrNull();
+      final antes = await (_db.select(
+        _db.tablaCotizacion,
+      )..where((t) => t.id.equals(id))).getSingleOrNull();
 
-      await (_db.delete(_db.tablaCotizacion)..where((t) => t.id.equals(id)))
-          .go();
+      await (_db.delete(
+        _db.tablaCotizacion,
+      )..where((t) => t.id.equals(id))).go();
 
       await _anotar(
         AccionAuditada.elimino,
@@ -404,8 +426,11 @@ class RepositorioCotizacionesImpl with FirmaDeSesion implements RepositorioCotiz
 
     final subtotal = (cantidad * precioUnitario).round();
     return _db.transaction(() async {
-      await _db.into(_db.tablaCotizacionItem).insert(
+      await _db
+          .into(_db.tablaCotizacionItem)
+          .insert(
             CotizacionMapper.itemACompanion(
+              usuarioId: autorId,
               cotizacionId: cotizacionId,
               tipo: tipo,
               referenciaId: referenciaId,
@@ -422,9 +447,9 @@ class RepositorioCotizacionesImpl with FirmaDeSesion implements RepositorioCotiz
   @override
   Future<void> eliminarItem(int itemId, int cotizacionId) {
     return _db.transaction(() async {
-      await (_db.delete(_db.tablaCotizacionItem)
-            ..where((t) => t.id.equals(itemId)))
-          .go();
+      await (_db.delete(
+        _db.tablaCotizacionItem,
+      )..where((t) => t.id.equals(itemId))).go();
       await _recalcularTotales(cotizacionId);
     });
   }
@@ -434,27 +459,29 @@ class RepositorioCotizacionesImpl with FirmaDeSesion implements RepositorioCotiz
   /// O(1): una sola consulta MAX() en lugar de cargar todas las filas.
 
   Future<void> _recalcularTotales(int cotizacionId) async {
-    final filas = await (_db.select(_db.tablaCotizacionItem)
-          ..where((t) => t.cotizacionId.equals(cotizacionId)))
-        .get();
+    final filas = await (_db.select(
+      _db.tablaCotizacionItem,
+    )..where((t) => t.cotizacionId.equals(cotizacionId))).get();
     final subtotal = filas.fold(0, (s, i) => s + i.subtotal);
 
     // Al quitar una línea el subtotal baja, y el descuento que ya estaba
     // guardado puede quedar por encima. Sin recortarlo aquí, el `CHECK`
     // rechazaría el `UPDATE` y quitar una línea fallaría sin explicación.
-    final cotizacion = await (_db.select(_db.tablaCotizacion)
-          ..where((t) => t.id.equals(cotizacionId)))
-        .getSingleOrNull();
+    final cotizacion = await (_db.select(
+      _db.tablaCotizacion,
+    )..where((t) => t.id.equals(cotizacionId))).getSingleOrNull();
     final rebaja = _recortarDescuento(cotizacion?.descuento ?? 0, subtotal);
 
-    await (_db.update(_db.tablaCotizacion)
-          ..where((t) => t.id.equals(cotizacionId)))
-        .write(TablaCotizacionCompanion(
-      subtotal: Value(subtotal),
-      descuento: Value(rebaja),
-      iva: Value(ivaIncluidoEn(subtotal - rebaja)),
-      actualizadoEn: Value(DateTime.now()),
-    ));
+    await (_db.update(
+      _db.tablaCotizacion,
+    )..where((t) => t.id.equals(cotizacionId))).write(
+      TablaCotizacionCompanion(
+        subtotal: Value(subtotal),
+        descuento: Value(rebaja),
+        iva: Value(ivaIncluidoEn(subtotal - rebaja)),
+        actualizadoEn: Value(DateTime.now()),
+      ),
+    );
   }
 
   /// Deja el descuento entre 0 y el subtotal.
