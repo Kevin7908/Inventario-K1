@@ -18,6 +18,7 @@ final class HistorialVentasState {
   const HistorialVentasState({
     this.items = const [],
     this.total = 0,
+    this.sumaNeta = 0,
     this.pagina = 0,
     this.tamanoPagina = 15,
     this.busqueda = '',
@@ -29,6 +30,12 @@ final class HistorialVentasState {
 
   final List<VentaResumen> items;
   final int total;
+
+  /// Lo que suman **todas** las ventas del filtro, no las de esta página. Lo
+  /// calcula SQLite con un `SUM`: sumar quince filas para hablar de un mes es
+  /// decir un número equivocado con toda seguridad.
+  final int sumaNeta;
+
   final int pagina;
   final int tamanoPagina;
 
@@ -56,6 +63,7 @@ final class HistorialVentasState {
   HistorialVentasState copyWith({
     List<VentaResumen>? items,
     int? total,
+    int? sumaNeta,
     int? pagina,
     String? busqueda,
     TipoVenta? tipo,
@@ -70,6 +78,7 @@ final class HistorialVentasState {
       HistorialVentasState(
         items: items ?? this.items,
         total: total ?? this.total,
+        sumaNeta: sumaNeta ?? this.sumaNeta,
         pagina: pagina ?? this.pagina,
         tamanoPagina: tamanoPagina,
         busqueda: busqueda ?? this.busqueda,
@@ -101,7 +110,11 @@ class HistorialVentasNotifier extends AsyncNotifier<HistorialVentasState> {
         .first;
 
     _suscribir(inicial);
-    return inicial.copyWith(items: primera.items, total: primera.total);
+    return inicial.copyWith(
+      items: primera.items,
+      total: primera.total,
+      sumaNeta: primera.sumaNeta,
+    );
   }
 
   /// Reabre el stream con los filtros y la página vigentes. Cada cambio de
@@ -119,7 +132,11 @@ class HistorialVentasNotifier extends AsyncNotifier<HistorialVentasState> {
         final actual = state.value;
         if (actual == null) return;
         state = AsyncData(
-          actual.copyWith(items: pagina.items, total: pagina.total),
+          actual.copyWith(
+            items: pagina.items,
+            total: pagina.total,
+            sumaNeta: pagina.sumaNeta,
+          ),
         );
       },
       onError: (Object e, StackTrace st) => state = AsyncError(e, st),

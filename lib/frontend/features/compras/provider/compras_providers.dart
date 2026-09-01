@@ -26,6 +26,7 @@ final class ComprasState {
   const ComprasState({
     this.items = const [],
     this.total = 0,
+    this.suma = 0,
     this.pagina = 0,
     this.tamanoPagina = 15,
     this.busqueda = '',
@@ -37,6 +38,11 @@ final class ComprasState {
 
   final List<CompraResumen> items;
   final int total;
+
+  /// Lo que costó **todo** lo que cumple el filtro, no lo de esta página. Lo
+  /// suma SQLite con el mismo `WHERE` del listado.
+  final int suma;
+
   final int pagina;
   final int tamanoPagina;
 
@@ -64,6 +70,7 @@ final class ComprasState {
   ComprasState copyWith({
     List<CompraResumen>? items,
     int? total,
+    int? suma,
     int? pagina,
     String? busqueda,
     int? proveedorId,
@@ -78,6 +85,7 @@ final class ComprasState {
       ComprasState(
         items: items ?? this.items,
         total: total ?? this.total,
+        suma: suma ?? this.suma,
         pagina: pagina ?? this.pagina,
         tamanoPagina: tamanoPagina,
         busqueda: busqueda ?? this.busqueda,
@@ -110,7 +118,11 @@ class ComprasNotifier extends AsyncNotifier<ComprasState> {
         .first;
 
     _suscribir(inicial);
-    return inicial.copyWith(items: primera.items, total: primera.total);
+    return inicial.copyWith(
+      items: primera.items,
+      total: primera.total,
+      suma: primera.suma,
+    );
   }
 
   /// Reabre el stream con los filtros y la página vigentes. Cada cambio de
@@ -128,7 +140,11 @@ class ComprasNotifier extends AsyncNotifier<ComprasState> {
         final actual = state.value;
         if (actual == null) return;
         state = AsyncData(
-          actual.copyWith(items: pagina.items, total: pagina.total),
+          actual.copyWith(
+            items: pagina.items,
+            total: pagina.total,
+            suma: pagina.suma,
+          ),
         );
       },
       onError: (Object e, StackTrace st) => state = AsyncError(e, st),

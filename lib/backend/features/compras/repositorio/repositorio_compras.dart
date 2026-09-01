@@ -54,10 +54,25 @@ final class FiltroCompras {
 /// [total] cuenta **todas** las compras que cumplen el filtro, no las de la
 /// página: es lo que necesita el paginador para saber cuántas hay.
 final class PaginaCompras {
-  const PaginaCompras({required this.items, required this.total});
+  const PaginaCompras({
+    required this.items,
+    required this.total,
+    this.suma = 0,
+  });
 
   final List<CompraResumen> items;
   final int total;
+
+  /// Cuánto costó **todo** lo que cumple el filtro, no solo lo visible.
+  ///
+  /// Sale de un `SUM` en la misma pasada que el `COUNT`, con el mismo
+  /// `WHERE`: sumar quince filas para hablar de un mes es decir un número
+  /// equivocado con toda seguridad.
+  ///
+  /// Las anuladas no cuentan —su mercancía volvió al proveedor— ni los
+  /// borradores: un borrador todavía se está tecleando y meterlo en el gasto
+  /// del mes lo haría subir y bajar mientras alguien cuenta una caja.
+  final int suma;
 
   static const vacia = PaginaCompras(items: [], total: 0);
 }

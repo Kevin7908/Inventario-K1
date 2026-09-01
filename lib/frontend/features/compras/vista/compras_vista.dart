@@ -271,33 +271,36 @@ class _Filtros extends ConsumerWidget {
   }
 }
 
-/// Cuántas compras hay y cuánto suman las de la página.
+/// Cuántas compras hay y cuánto costó **todo** lo que cumple el filtro.
 class _Resumen extends ConsumerWidget {
   const _Resumen();
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final estado = ref.watch(comprasProvider).value;
-    if (estado == null) return const SizedBox.shrink();
-
-    // Solo lo visible, y la etiqueta lo dice: el total del periodo filtrado
-    // pide su propia consulta con `SUM`, no recorrer una lista paginada.
-    final sumaPagina = estado.items
-        .where((c) => !c.anulada)
-        .fold<int>(0, (acumulado, c) => acumulado + c.total);
+    final resumen = ref.watch(
+      comprasProvider.select((s) => (
+            total: s.value?.total ?? 0,
+            suma: s.value?.suma ?? 0,
+            hayFiltro: s.value?.hayFiltro ?? false,
+            cargado: s.value != null,
+          )),
+    );
+    if (!resumen.cargado) return const SizedBox.shrink();
 
     return Row(
       children: [
         Text(
-          estado.total == 1 ? '1 compra' : '${estado.total} compras',
+          resumen.total == 1 ? '1 compra' : '${resumen.total} compras',
           style: TipografiaApp.caption.copyWith(color: ColoresApp.textMuted),
         ),
         const SizedBox(width: 12),
+        // El periodo entero, no la página: lo suma SQLite con el mismo
+        // `WHERE` del listado, descartando anuladas y borradores.
         Text(
-          'En esta página: ${formatearPrecio(sumaPagina)}',
+          'En total: ${formatearPrecio(resumen.suma)}',
           style: TipografiaApp.caption.copyWith(color: ColoresApp.textMuted),
         ),
-        if (estado.hayFiltro) ...[
+        if (resumen.hayFiltro) ...[
           const SizedBox(width: 12),
           TextButton(
             onPressed: () => ref.read(comprasProvider.notifier).limpiarFiltros(),

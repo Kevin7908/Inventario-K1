@@ -18,12 +18,26 @@ import '../enum/enum_ventas.dart';
 /// de `consecutivos`.
 /// Una página del historial: las ventas visibles y el total real.
 final class PaginaVentas {
-  const PaginaVentas({required this.items, required this.total});
+  const PaginaVentas({
+    required this.items,
+    required this.total,
+    this.sumaNeta = 0,
+  });
 
   final List<VentaResumen> items;
 
   /// Cuántas ventas cumplen el filtro en total, no solo en esta página.
   final int total;
+
+  /// Cuánto suman **todas** las que cumplen el filtro, no solo las visibles.
+  ///
+  /// Sale de un `SUM` en la misma consulta que el `COUNT`, no de recorrer
+  /// [items]: la lista está paginada, y sumar quince filas para hablar de un
+  /// mes es decir un número equivocado con toda seguridad.
+  ///
+  /// Va el **neto** y sin las anuladas: lo que se devolvió salió de la caja,
+  /// y una anulada nunca entró. Es la cifra con la que se cuadra el cajón.
+  final int sumaNeta;
 
   static const vacia = PaginaVentas(items: [], total: 0);
 }

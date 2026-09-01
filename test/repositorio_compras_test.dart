@@ -639,6 +639,52 @@ void main() {
       expect(pagina.items.single.lineas, 1);
     });
 
+    test('la suma es la del periodo filtrado, no la de la página', () async {
+      // El pie decía «En esta página: $X». Con tres remisiones y una página de
+      // una, sumar lo visible habría reportado un tercio del gasto del mes.
+      await _compra(cantidad: 10, costo: 5000, factura: 'FV-1');
+      await _compra(cantidad: 10, costo: 5000, factura: 'FV-2');
+      await _compra(cantidad: 10, costo: 5000, factura: 'FV-3');
+
+      final pagina = await compras
+          .observarPagina(
+            filtro: const FiltroCompras(),
+            pagina: 0,
+            tamano: 1,
+          )
+          .first;
+
+      expect(pagina.items, hasLength(1));
+      expect(pagina.suma, 150000);
+    });
+
+    test('la suma deja fuera la anulada y el borrador', () async {
+      // La anulada devolvió su mercancía; el borrador todavía se está
+      // tecleando y meterlo en el gasto lo haría subir y bajar mientras
+      // alguien cuenta una caja.
+      await _compra(cantidad: 10, costo: 5000, factura: 'FV-1');
+      final anulada = await _compra(cantidad: 10, costo: 5000, factura: 'FV-2')
+          as CompraAbierta;
+      await compras.anular(anulada.compraId);
+      await _compra(
+        cantidad: 10,
+        costo: 5000,
+        factura: 'FV-3',
+        terminada: false,
+      );
+
+      final pagina = await compras
+          .observarPagina(
+            filtro: const FiltroCompras(),
+            pagina: 0,
+            tamano: 10,
+          )
+          .first;
+
+      expect(pagina.total, 3, reason: 'las tres siguen en el listado');
+      expect(pagina.suma, 50000);
+    });
+
     test('la búsqueda mira el número del taller y el del proveedor', () async {
       await _compra(factura: 'FV-2291');
 

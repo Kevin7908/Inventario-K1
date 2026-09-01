@@ -120,7 +120,8 @@ class RepositorioComprasImpl with FirmaDeSesion implements RepositorioCompras {
       final items = filas
           .map((f) => _filaAResumen(f, lineas: f.read(_conteoLineas) ?? 0))
           .toList(growable: false);
-      return PaginaCompras(items: items, total: await _total(filtro));
+      final (total, suma) = await _agregados(filtro);
+      return PaginaCompras(items: items, total: total, suma: suma);
     });
   }
 
@@ -137,14 +138,26 @@ class RepositorioComprasImpl with FirmaDeSesion implements RepositorioCompras {
           ),
       );
 
-  /// El total real, sin el `LIMIT`: es lo que necesita el paginador para saber
-  /// cuántas páginas hay.
-  Future<int> _total(FiltroCompras filtro) async {
+  /// Cuántas hay y cuánto costaron, sin el `LIMIT`.
+  ///
+  /// Los dos en la misma pasada y con el mismo `_aplicarFiltro`: hablan del
+  /// mismo conjunto, y separarlos en dos consultas abriría la puerta a que un
+  /// día filtren distinto. El conteo es lo que necesita el paginador; la suma,
+  /// lo que el pie dice del periodo.
+  ///
+  /// La suma descarta la anulada y el borrador: la primera devolvió su
+  /// mercancía y el segundo todavía se está tecleando (§`PaginaCompras.suma`).
+  Future<(int, int)> _agregados(FiltroCompras filtro) async {
     final conteo = _db.tablaCompra.id.count();
-    final consulta = _baseQuery..addColumns([conteo]);
+    final suma = _db.tablaCompra.total.sum(
+      filter: _db.tablaCompra.estado.equals(EstadoCompra.registrada.codigo),
+    );
+
+    final consulta = _baseQuery..addColumns([conteo, suma]);
     _aplicarFiltro(consulta, filtro);
+
     final fila = await consulta.getSingleOrNull();
-    return fila?.read(conteo) ?? 0;
+    return (fila?.read(conteo) ?? 0, fila?.read(suma) ?? 0);
   }
 
   /// El `WHERE`, compartido por la página y por el `COUNT`: si divergieran, el

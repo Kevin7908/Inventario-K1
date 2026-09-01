@@ -118,8 +118,17 @@ class RepositorioVentasImpl with FirmaDeSesion implements RepositorioVentas {
 
     // Dos consultas: el total no lo puede recortar el `LIMIT`, o el paginador
     // diría que hay una página cuando hay veinte.
+    //
+    // El `SUM` viaja con el `COUNT` y no en una tercera consulta: los dos
+    // hablan del mismo conjunto filtrado y separarlos abriría la puerta a que
+    // un día filtren distinto. Se resta lo devuelto y se descartan las
+    // anuladas: lo que interesa es la plata que quedó en el cajón.
     final consultaTotal = _db.customSelect(
-      'SELECT COUNT(*) AS total FROM ventas v '
+      'SELECT COUNT(*) AS total, '
+      "COALESCE(SUM(CASE WHEN v.estado_pago = 'ANULADA' THEN 0 ELSE "
+      'v.total - COALESCE((SELECT SUM(d.total) FROM devoluciones d '
+      'WHERE d.venta_id = v.id), 0) END), 0) AS suma_neta '
+      'FROM ventas v '
       'LEFT JOIN clientes c ON c.id = v.cliente_id '
       'LEFT JOIN personas pe ON pe.id = c.persona_id '
       'INNER JOIN usuarios u ON u.id = v.usuario_id '
@@ -141,11 +150,14 @@ class RepositorioVentasImpl with FirmaDeSesion implements RepositorioVentas {
         )
         .watch()
         .asyncMap((filas) async {
-      final total = await consultaTotal.getSingleOrNull();
+      final agregados = await consultaTotal.getSingleOrNull();
       return PaginaVentas(
         items:
             VentasMapper.resumenesDesdeMapas(filas.map((f) => f.data).toList()),
-        total: total?.data['total'] as int? ?? 0,
+        total: agregados?.data['total'] as int? ?? 0,
+        // `SUM` sobre columnas enteras devuelve entero, pero SQLite no lo
+        // promete si algún día alguna fuera REAL: se lee como `num`.
+        sumaNeta: (agregados?.data['suma_neta'] as num?)?.round() ?? 0,
       );
     });
   }

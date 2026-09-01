@@ -446,6 +446,67 @@ void main() {
       expect(pagina.total, 3);
     });
 
+    test('la suma tampoco: es la del periodo, no la de la página', () async {
+      // El pie decía «En esta página: $X» porque eso era lo único que tenía a
+      // mano. Con tres ventas de 30.000 y una página de dos, sumar lo visible
+      // habría dado 60.000 y el mes se habría reportado corto.
+      await _ventaConProducto(cantidad: 1);
+      await _ventaConProducto(cantidad: 1);
+      await _ventaConProducto(cantidad: 1);
+
+      final pagina = await ventas
+          .observarPagina(
+            filtro: const FiltroVentas(),
+            pagina: 0,
+            tamano: 2,
+          )
+          .first;
+
+      expect(pagina.items, hasLength(2));
+      expect(pagina.sumaNeta, 90000);
+    });
+
+    test('la suma va neta y sin las anuladas', () async {
+      // Lo devuelto salió de la caja y lo anulado nunca entró: es la cifra
+      // con la que se cuadra el cajón, no la de lo que se facturó.
+      final vivaId = await _ventaConProducto(cantidad: 1);
+      final anuladaId = await _ventaConProducto(cantidad: 1);
+      await ventas.anular(anuladaId);
+
+      final pagina = await ventas
+          .observarPagina(
+            filtro: const FiltroVentas(),
+            pagina: 0,
+            tamano: 10,
+          )
+          .first;
+
+      expect(pagina.total, 2, reason: 'la anulada sigue en el listado');
+      expect(pagina.sumaNeta, 30000);
+      expect(
+        pagina.items.firstWhere((v) => v.id == vivaId).totalNeto,
+        30000,
+      );
+    });
+
+    test('el filtro recorta la suma, no solo las filas', () async {
+      await _ventaConProducto(cantidad: 1);
+      await _ventaConProducto(cantidad: 1);
+
+      final futuras = await ventas
+          .observarPagina(
+            filtro: FiltroVentas(
+              desde: DateTime.now().add(const Duration(days: 1)),
+            ),
+            pagina: 0,
+            tamano: 10,
+          )
+          .first;
+
+      expect(futuras.total, 0);
+      expect(futuras.sumaNeta, 0);
+    });
+
     test('cada venta trae el nombre de quien la hizo', () async {
       await _ventaConProducto(cantidad: 1);
 
