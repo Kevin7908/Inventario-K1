@@ -10,6 +10,7 @@ import '../../../../../core/formato.dart';
 import '../../../../../core/resultado.dart';
 import '../../../../share/share.dart';
 import '../../../autenticacion/widgets/si_puede.dart';
+import '../../widgets/estado_compra_ui.dart';
 import '../provider/compra_editor_provider.dart';
 import 'dialogo_datos_compra.dart';
 import 'linea_compra.dart';
@@ -96,12 +97,9 @@ class _Cabecera extends ConsumerWidget {
                   overflow: TextOverflow.ellipsis,
                 ),
               ),
-              if (datos.estado == EstadoCompra.anulada)
-                const IndicadorEstado(
-                  etiqueta: 'Anulada',
-                  color: ColoresApp.statusDanger,
-                  colorFondo: ColoresApp.statusDangerBg,
-                ),
+              // El estado siempre a la vista: mientras sea borrador, lo que
+              // el usuario tiene que ver es que **falta darla por terminada**.
+              if (datos.estado != null) BadgeEstadoCompra(estado: datos.estado!),
             ],
           ),
           const SizedBox(height: 12),
@@ -169,11 +167,28 @@ class _Lineas extends ConsumerWidget {
   }
 }
 
-/// El total de la remisión y lo único que se le puede hacer después: anularla.
+/// El total de la remisión y los dos gestos que la cierran: darla por
+/// terminada —que es lo normal— o anularla.
 class _Pie extends ConsumerWidget {
   const _Pie({required this.compraId});
 
   final int compraId;
+
+  /// Dar por terminada es archivar: a partir de ahí no admite más líneas y
+  /// cuenta como gasto del mes. Se avisa con el total porque es la cifra que
+  /// queda escrita.
+  Future<void> _terminar(BuildContext context, WidgetRef ref) async {
+    final resultado =
+        await ref.read(compraEditorProvider(compraId).notifier).terminar();
+    if (!context.mounted) return;
+
+    switch (resultado) {
+      case Exito():
+        MensajeApp.exito(context, 'Compra terminada');
+      case Fallo(:final mensaje):
+        MensajeApp.error(context, mensaje);
+    }
+  }
 
   Future<void> _anular(BuildContext context, WidgetRef ref, int total) async {
     final confirmado = await DialogoConfirmacion.mostrar(
@@ -205,7 +220,8 @@ class _Pie extends ConsumerWidget {
       compraEditorProvider(compraId).select((s) => (
             total: s.value?.total ?? 0,
             unidades: s.value?.unidades ?? 0,
-            editable: s.value?.editable ?? false,
+            puedeTerminar: s.value?.puedeTerminar ?? false,
+            estado: s.value?.estado,
             lineas: s.value?.lineas.length ?? 0,
           )),
     );
@@ -229,8 +245,21 @@ class _Pie extends ConsumerWidget {
             valor: formatearPrecio(datos.total),
             color: ColoresApp.castletonGreen,
           ),
-          if (datos.editable && datos.lineas > 0) ...[
+          // Terminar va arriba y en primario porque es lo que se hace nueve
+          // de cada diez veces; anular es el camino de vuelta.
+          if (datos.puedeTerminar) ...[
             const SizedBox(height: 16),
+            SiPuede(
+              permiso: Permiso.comprasCrear,
+              child: BotonPrimario(
+                etiqueta: 'Marcar como terminada',
+                icono: Icons.check_rounded,
+                alPresionar: () => unawaited(_terminar(context, ref)),
+              ),
+            ),
+          ],
+          if (datos.lineas > 0 && datos.estado != EstadoCompra.anulada) ...[
+            const SizedBox(height: 10),
             SiPuede(
               permiso: Permiso.comprasAnular,
               child: BotonDestructivo(

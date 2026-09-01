@@ -1,26 +1,11 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
-import '../../../../backend/features/compras/enum/enum_compras.dart';
 import '../../../../backend/features/compras/modelo/compra_resumen.dart';
 import '../../../../core/formato.dart';
 import '../../../share/share.dart';
 import '../provider/compras_providers.dart';
-
-/// Color de cada estado de una compra, en un solo sitio.
-///
-/// Conoce `EstadoCompra`, que es dominio, así que no cabe en share.
-({Color color, Color fondo}) colorDeEstadoCompra(EstadoCompra estado) =>
-    switch (estado) {
-      EstadoCompra.registrada => (
-          color: ColoresApp.statusSuccess,
-          fondo: ColoresApp.statusSuccessBg,
-        ),
-      EstadoCompra.anulada => (
-          color: ColoresApp.statusDanger,
-          fondo: ColoresApp.statusDangerBg,
-        ),
-    };
+import 'estado_compra_ui.dart';
 
 /// La tabla de compras: cuándo llegó, de quién, con qué factura y cuánto
 /// costó.
@@ -88,11 +73,7 @@ class TablaCompras extends ConsumerWidget {
         ColumnaTabla<CompraResumen>(
           titulo: 'Estado',
           flex: 2,
-          constructor: (c) => IndicadorEstado(
-            etiqueta: c.estado.etiqueta,
-            color: colorDeEstadoCompra(c.estado).color,
-            colorFondo: colorDeEstadoCompra(c.estado).fondo,
-          ),
+          constructor: (c) => BadgeEstadoCompra(estado: c.estado),
         ),
         ColumnaTabla<CompraResumen>(
           titulo: 'Costó',

@@ -15,6 +15,7 @@ import '../../proveedores/provider/proveedores_provider.dart';
 import '../compra_detalle/vista/compra_detalle_vista.dart';
 import '../compra_detalle/widgets/dialogo_nueva_compra.dart';
 import '../provider/compras_providers.dart';
+import '../widgets/estado_compra_ui.dart';
 import '../widgets/tabla_compras.dart';
 
 /// Compras: las remisiones del proveedor, con lo que de verdad costó cada una.
@@ -212,7 +213,7 @@ class _ChipsEstado extends ConsumerWidget {
           ChipFiltro(
             etiqueta: estado.etiqueta,
             seleccionado: activo == estado,
-            colorActivo: colorDeEstadoCompra(estado).color,
+            colorActivo: coloresDeEstadoCompra(estado).color,
             alPresionar: () => notifier.filtrarPorEstado(estado),
           ),
       ],

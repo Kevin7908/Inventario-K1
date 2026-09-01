@@ -259,9 +259,22 @@ class CompraEditorNotifier extends AsyncNotifier<CompraEditorState> {
         ),
       );
 
+  /// Da la remisión por terminada: deja de admitir líneas y pasa a contar
+  /// como gasto del mes. Se guarda antes lo que esté esperando su retardo, o
+  /// el último costo tecleado no entraría en el total que se archiva.
+  Future<Resultado> terminar() async {
+    final pendiente = await guardarAhora();
+    if (pendiente case Fallo()) return pendiente;
+    return _escribir(() => _repo.terminar(compraId));
+  }
+
   /// Anular saca del inventario lo que había entrado. La compra no se borra:
   /// queda con su número, como una factura anulada.
   Future<Resultado> anular() => _escribir(() => _repo.anular(compraId));
+
+  /// Descarta el borrador en el que no se anotó nada. Lo llama la ficha al
+  /// salir, y por eso **no relee**: la compra ya no existe.
+  Future<Resultado> descartarVacia() => _repo.descartarVacia(compraId);
 }
 
 final compraEditorProvider = AsyncNotifierProvider.autoDispose

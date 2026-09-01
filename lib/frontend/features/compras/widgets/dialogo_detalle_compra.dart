@@ -7,6 +7,7 @@ import '../../../../core/formato.dart';
 import '../../../share/share.dart';
 import '../../productos/widgets/miniatura_linea.dart';
 import '../provider/compras_providers.dart';
+import 'estado_compra_ui.dart';
 
 /// Un vistazo a la remisión desde fuera del módulo: qué llegó, a cuánto y de
 /// quién.
@@ -86,15 +87,7 @@ class _Contenido extends StatelessWidget {
                 ],
               ),
             ),
-            IndicadorEstado(
-              etiqueta: compra.estado.etiqueta,
-              color: compra.anulada
-                  ? ColoresApp.statusDanger
-                  : ColoresApp.statusSuccess,
-              colorFondo: compra.anulada
-                  ? ColoresApp.statusDangerBg
-                  : ColoresApp.statusSuccessBg,
-            ),
+            BadgeEstadoCompra(estado: compra.estado),
           ],
         ),
         const SizedBox(height: 18),

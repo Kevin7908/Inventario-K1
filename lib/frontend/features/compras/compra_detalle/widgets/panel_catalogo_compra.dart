@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../../share/share.dart';
 import '../../../categorias/widgets/panel_categorias_catalogo.dart';
+import '../modelo/compra_editor_state.dart';
 import '../provider/catalogo_compra_providers.dart';
 import '../provider/compra_editor_provider.dart';
 import 'grilla_productos_compra.dart';
@@ -23,8 +24,11 @@ class PanelCatalogoCompra extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final editable = ref.watch(
-      compraEditorProvider(compraId).select((s) => s.value?.editable ?? false),
+    final vista = ref.watch(
+      compraEditorProvider(compraId).select((s) => (
+            editable: s.value?.editable ?? false,
+            motivo: s.value?.motivoNoEditable,
+          )),
     );
 
     return Row(
@@ -37,15 +41,22 @@ class PanelCatalogoCompra extends ConsumerWidget {
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
                 _Buscador(compraId: compraId, foco: focoBusqueda),
-                if (!editable) ...[
+                // Por qué el panel está apagado. Son dos razones distintas
+                // —terminada o anulada— y decir cuál evita que el usuario
+                // busque el botón que le falta.
+                if (!vista.editable) ...[
                   const SizedBox(height: 12),
-                  const _AvisoAnulada(),
+                  AvisoEnLinea(
+                    mensaje: vista.motivo ??
+                        'La compra ya no admite más líneas.',
+                    tono: TonoAviso.alerta,
+                  ),
                 ],
                 const SizedBox(height: 16),
                 Expanded(
                   child: GrillaProductosCompra(
                     compraId: compraId,
-                    habilitado: editable,
+                    habilitado: vista.editable,
                   ),
                 ),
                 _Paginador(compraId: compraId),
@@ -124,46 +135,23 @@ class _Paginador extends ConsumerWidget {
     final pagina = ref.watch(
       compraEditorProvider(compraId).select((s) => s.value?.paginaCatalogo ?? 0),
     );
-    final total = ref.watch(totalPaginasCompraProvider(compraId));
-    if (total <= 1) return const SizedBox.shrink();
+    final totalPaginas = ref.watch(totalPaginasCompraProvider(compraId));
+    final totalItems = ref.watch(
+      paginaProductosCompraProvider(compraId).select((p) => p.value?.total ?? 0),
+    );
+
+    // Con una sola página el paginador no dice nada que no se vea.
+    if (totalPaginas <= 1) return const SizedBox.shrink();
 
     return Padding(
       padding: const EdgeInsets.only(top: 12),
       child: PaginacionWidget(
         paginaActual: pagina,
-        totalPaginas: total,
-        alCambiarPagina: (p) => ref
-            .read(compraEditorProvider(compraId).notifier)
-            .irAPaginaCatalogo(p),
-      ),
-    );
-  }
-}
-
-/// Por qué el panel está apagado.
-class _AvisoAnulada extends StatelessWidget {
-  const _AvisoAnulada();
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
-      decoration: BoxDecoration(
-        color: ColoresApp.statusWarningBg,
-        borderRadius: BorderRadius.circular(10),
-      ),
-      child: const Row(
-        children: [
-          Icon(Icons.lock_outline_rounded,
-              size: 15, color: ColoresApp.statusWarning),
-          SizedBox(width: 8),
-          Expanded(
-            child: Text(
-              'La compra está anulada: su mercancía ya salió del inventario.',
-              style: TipografiaApp.caption,
-            ),
-          ),
-        ],
+        totalPaginas: totalPaginas,
+        totalItems: totalItems,
+        itemsPorPagina: CompraEditorState.tamanoPaginaCatalogo,
+        alCambiarPagina:
+            ref.read(compraEditorProvider(compraId).notifier).irAPaginaCatalogo,
       ),
     );
   }

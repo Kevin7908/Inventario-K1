@@ -120,8 +120,18 @@ histórico queda aquí.
 `compras.total` es caché de SUM(cantidad * costo_unitario), como el stock. El
 UNIQUE (proveedor_id, numero_factura) cierra el error de captura más caro del
 módulo —teclear dos veces la misma remisión mete el doble de mercancía—, y
-admite varios NULL para lo que llega sin papel. Una compra NO SE BORRA: se
-anula, y anular saca del inventario lo que había entrado.
+admite varios NULL para lo que llega sin papel.
+
+La remisión NACE EN BORRADOR y se teclea línea por línea, como una orden: cada
+línea mete su mercancía al inventario en el momento, porque anotarla ES
+recibirla. Lo que falta mientras tanto es que quien recibe diga «ya está
+todo», y eso es REGISTRADA: a partir de ahí se cierra a cambios —lo garantizan
+tres guardas— y cuenta como gasto del mes. Un borrador no cuenta como gasto ni
+como la última compra de sus productos, aunque su stock ya esté dentro.
+
+Una compra con algo dentro NO SE BORRA: se anula, y anular saca del inventario
+lo que había entrado. La única que se borra es la que no llegó a nada —borrador
+y sin una sola línea—, que es el cuadro que alguien abrió por error.
 
 `compra_detalles` no lleva usuario_id, por lo mismo que `venta_detalles`: la
 remisión se escribe entera en una transacción, así que el autor de cada línea

@@ -381,7 +381,7 @@ class RepositorioComprasImpl with FirmaDeSesion implements RepositorioCompras {
           detalle: factura == null ? null : 'Factura $factura',
         );
 
-        return CompraRegistrada(compraId: compraId, numero: numero);
+        return CompraAbierta(compraId: compraId, numero: numero);
       });
     } catch (e) {
       return CompraRechazada(MotivoFallo.persistencia, _mensaje(e));
@@ -580,6 +580,85 @@ class RepositorioComprasImpl with FirmaDeSesion implements RepositorioCompras {
     }
   }
 
+  // ── Cierre ─────────────────────────────────────────────────────────────────
+
+  @override
+  Future<Resultado> terminar(int id) async {
+    if (!puede(Permiso.comprasCrear)) {
+      return const Fallo(
+        MotivoFallo.validacion,
+        'Tu cuenta no tiene permiso para registrar compras. Pídeselo a un '
+        'administrador del taller.',
+      );
+    }
+
+    final compra = await _fila(id);
+    if (compra == null) {
+      return const Fallo(MotivoFallo.persistencia, 'La compra ya no existe.');
+    }
+    if (compra.estado != EstadoCompra.borrador.codigo) {
+      return Fallo(
+        MotivoFallo.validacion,
+        'La compra ${compra.numero} ya está '
+        '${EstadoCompra.desdeCodigo(compra.estado).etiqueta.toLowerCase()}.',
+      );
+    }
+    // Una remisión que no trajo nada no es un documento.
+    if (await _cuantasLineas(id) == 0) {
+      return const Fallo(
+        MotivoFallo.validacion,
+        'La remisión no tiene ni una línea: anota lo que llegó antes de darla '
+        'por terminada.',
+      );
+    }
+
+    return _envolver(
+      () => _db.transaction(() async {
+        await (_db.update(_db.tablaCompra)..where((t) => t.id.equals(id)))
+            .write(
+          TablaCompraCompanion(
+            estado: Value(EstadoCompra.registrada.codigo),
+            actualizadoEn: Value(DateTime.now()),
+          ),
+        );
+        await _anotar(
+          AccionAuditada.modifico,
+          id,
+          'Compra ${compra.numero}',
+          detalle: 'La dio por terminada por ${compra.total} pesos',
+        );
+      }),
+    );
+  }
+
+  @override
+  Future<Resultado> descartarVacia(int id) async {
+    final compra = await _fila(id);
+    // Ya no está: descartar dos veces no es un error que valga la pena contar.
+    if (compra == null) return const Exito();
+
+    if (compra.estado != EstadoCompra.borrador.codigo) {
+      return Fallo(
+        MotivoFallo.validacion,
+        'La compra ${compra.numero} ya no es un borrador.',
+      );
+    }
+    if (await _cuantasLineas(id) > 0) {
+      return Fallo(
+        MotivoFallo.validacion,
+        'La compra ${compra.numero} ya tiene mercancía dentro: para deshacerla '
+        'hay que anularla.',
+      );
+    }
+
+    // Sin bitácora: no llegó a existir para nadie más que para quien abrió el
+    // cuadro y se arrepintió. Lo único que deja es el hueco en la serie `COM-`,
+    // que es el precio de numerar al abrir y no al cerrar.
+    return _envolver(
+      () => (_db.delete(_db.tablaCompra)..where((t) => t.id.equals(id))).go(),
+    );
+  }
+
   @override
   Future<Resultado> anular(int id) async {
     if (!puede(Permiso.comprasAnular)) {
@@ -598,6 +677,14 @@ class RepositorioComprasImpl with FirmaDeSesion implements RepositorioCompras {
         if (compra == null) throw Exception('La compra #$id no existe.');
         if (compra.estado == EstadoCompra.anulada.codigo) {
           throw Exception('La compra ${compra.numero} ya está anulada.');
+        }
+        // El borrador con líneas también se anula: metió mercancía igual que
+        // una terminada. El que no tiene ni una línea se descarta y ya.
+        if (await _cuantasLineas(id) == 0) {
+          throw Exception(
+            'La compra ${compra.numero} no tiene nada dentro: descártala en '
+            'vez de anularla.',
+          );
         }
 
         // Sacar primero y marcar después: si la mercancía ya se vendió, esto
@@ -668,16 +755,27 @@ class RepositorioComprasImpl with FirmaDeSesion implements RepositorioCompras {
         _db.tablaCompraDetalle,
       )..where((t) => t.id.equals(id))).getSingleOrNull();
 
-  /// Una compra anulada no se toca. La guarda de la base lo impide igual;
+  /// Solo un borrador admite líneas. La guarda de la base lo impide igual;
   /// esto existe para poder decir por qué.
   Future<void> _exigirAbierta(int compraId) async {
     final compra = await _fila(compraId);
     if (compra == null) throw Exception('La compra ya no existe.');
-    if (compra.estado == EstadoCompra.anulada.codigo) {
+    final estado = EstadoCompra.desdeCodigo(compra.estado);
+    if (!estado.admiteCambios) {
       throw Exception(
-        'La compra ${compra.numero} está anulada y ya no admite cambios.',
+        'La compra ${compra.numero} está ${estado.etiqueta.toLowerCase()} y ya '
+        'no admite cambios.',
       );
     }
+  }
+
+  Future<int> _cuantasLineas(int compraId) async {
+    final conteo = _db.tablaCompraDetalle.id.count();
+    final fila = await (_db.selectOnly(_db.tablaCompraDetalle)
+          ..addColumns([conteo])
+          ..where(_db.tablaCompraDetalle.compraId.equals(compraId)))
+        .getSingle();
+    return fila.read(conteo) ?? 0;
   }
 
   Future<TablaProductoData> _producto(int productoId) async {

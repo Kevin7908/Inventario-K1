@@ -57,13 +57,31 @@ final class CompraEditorState {
   final EstadoGuardadoCompra guardado;
   final String? motivoBloqueo;
 
-  /// Si todavía se le pueden mover líneas.
+  /// Si todavía se le pueden mover líneas: **solo mientras sea borrador**.
   ///
-  /// Una remisión anulada se lee pero no se toca: cambiarle una línea movería
-  /// stock por una entrada que ya se deshizo. Es la misma condición que aplica
-  /// el repositorio para rechazarlo —y la guarda de la base para impedirlo—,
-  /// así que la interfaz y la garantía no pueden decir cosas distintas.
-  bool get editable => estado == EstadoCompra.registrada;
+  /// Darla por terminada es lo que la cierra, y una anulada además ya devolvió
+  /// su mercancía. Es la misma condición que aplica el repositorio para
+  /// rechazarlo —y la guarda de la base para impedirlo—, así que la interfaz y
+  /// la garantía no pueden decir cosas distintas.
+  bool get editable => estado.admiteCambios;
+
+  /// Si se puede dar por terminada: es borrador y trajo algo. Una remisión sin
+  /// una sola línea no es un documento.
+  bool get puedeTerminar => editable && lineas.isNotEmpty;
+
+  /// El cuadro que se abrió y en el que no se anotó nada. Al salir se
+  /// descarta: si no, el listado se llenaría de remisiones vacías.
+  bool get vacia => lineas.isEmpty;
+
+  /// Por qué no se puede tocar, para poder decirlo en pantalla. `null` cuando
+  /// sí se puede.
+  String? get motivoNoEditable => switch (estado) {
+        EstadoCompra.borrador => null,
+        EstadoCompra.registrada =>
+          'La compra está terminada: para cambiarla hay que anularla.',
+        EstadoCompra.anulada =>
+          'La compra está anulada: su mercancía ya salió del inventario.',
+      };
 
   /// Cuántas unidades trae en total, para el contador de la cabecera.
   double get unidades => lineas.fold(0, (t, l) => t + l.cantidad);
