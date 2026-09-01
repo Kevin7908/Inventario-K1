@@ -159,7 +159,12 @@ class _PanelMarcas extends StatelessWidget {
             itemCount: marcas.length,
             // Todas las filas miden igual: con `itemExtent` Flutter se salta
             // el cálculo de layout de cada una (`CLAUDE.md` §2).
-            itemExtent: 60,
+            //
+            // 64 y no 60: la fila lleva dos líneas de texto —20,25 px de
+            // `cuerpoMedium` y 17,5 de `caption`— más 8 de separación abajo y
+            // 16 de relleno arriba y abajo. Con 60 quedaban 36 para 37,75 y
+            // Flutter pintaba la franja amarilla del desborde en cada marca.
+            itemExtent: 64,
             itemBuilder: (context, i) {
               final marca = marcas[i];
               return _FilaMarca(

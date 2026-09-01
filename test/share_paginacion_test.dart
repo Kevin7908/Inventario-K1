@@ -4,68 +4,91 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:inventario_k1/frontend/share/share.dart';
 
 /// Representación legible de la barra, para comparar de un vistazo.
-/// Las páginas se escriben en base 1.
-String _barra(int actual, int total, {int maximo = 5}) =>
+/// Las páginas se escriben en base 1 y un `null` —el salto— como «…».
+String _barra(int actual, int total, {int maximo = 7}) =>
     PaginacionWidget.paginasVisibles(
       paginaActual: actual,
       totalPaginas: total,
       maximo: maximo,
-    ).map((p) => '${p + 1}').join(' ');
+    ).map((p) => p == null ? '…' : '${p + 1}').join(' ');
 
 Widget _envolver(Widget child) =>
     MaterialApp(home: Scaffold(body: child));
 
 void main() {
   group('páginas visibles', () {
-    test('con pocas páginas se muestran todas', () {
+    test('con pocas páginas se muestran todas, sin saltos', () {
       expect(_barra(0, 1), '1');
       expect(_barra(2, 5), '1 2 3 4 5');
+      expect(_barra(4, 7), '1 2 3 4 5 6 7');
       expect(_barra(4, 9, maximo: 9), '1 2 3 4 5 6 7 8 9');
     });
 
-    test('la ventana es contigua: ni elipsis ni huecos', () {
-      final paginas = PaginacionWidget.paginasVisibles(
-        paginaActual: 10,
-        totalPaginas: 20,
-      );
-      for (var i = 1; i < paginas.length; i++) {
-        expect(paginas[i], paginas[i - 1] + 1,
-            reason: 'la ventana no puede saltarse números');
+    test('la primera y la última se ven siempre', () {
+      // Es lo que la versión de la ventana contigua no daba: desde la mitad de
+      // una lista larga no había forma de saber cuántas páginas hay.
+      for (var actual = 0; actual < 40; actual++) {
+        final barra = _barra(actual, 40);
+        expect(barra, startsWith('1 '), reason: 'falta la primera en «$barra»');
+        expect(barra, endsWith(' 40'), reason: 'falta la última en «$barra»');
       }
     });
 
-    test('al principio se apoya en el borde izquierdo', () {
-      expect(_barra(0, 20), '1 2 3 4 5');
+    test('al principio, el salto va a la derecha', () {
+      expect(_barra(0, 20), '1 2 3 4 5 … 20');
+      expect(_barra(2, 20), '1 2 3 4 5 … 20');
     });
 
-    test('en la mitad se centra en la actual', () {
-      expect(_barra(10, 20), '9 10 11 12 13');
+    test('en la mitad, salto a los dos lados', () {
+      expect(_barra(10, 20), '1 … 10 11 12 … 20');
     });
 
-    test('al final se desplaza en vez de encogerse', () {
-      expect(_barra(19, 20), '16 17 18 19 20');
+    test('al final, el salto va a la izquierda', () {
+      expect(_barra(19, 20), '1 … 16 17 18 19 20');
+      expect(_barra(17, 20), '1 … 16 17 18 19 20');
+    });
+
+    test('la barra mide siempre lo mismo: el «…» gasta una casilla', () {
+      // Sin esto la barra cambiaría de ancho al pasar de página, que es un
+      // salto visual en una pantalla que se usa con el mouse.
+      for (var actual = 0; actual < 40; actual++) {
+        expect(
+          PaginacionWidget.paginasVisibles(paginaActual: actual, totalPaginas: 40),
+          hasLength(7),
+          reason: 'la página $actual cambia el ancho de la barra',
+        );
+      }
     });
 
     test('la página actual siempre se ve, esté donde esté', () {
       for (var actual = 0; actual < 40; actual++) {
-        final paginas = PaginacionWidget.paginasVisibles(
-          paginaActual: actual,
-          totalPaginas: 40,
+        expect(
+          PaginacionWidget.paginasVisibles(
+            paginaActual: actual,
+            totalPaginas: 40,
+          ),
+          contains(actual),
+          reason: 'la página actual $actual debe verse',
         );
-        expect(paginas.contains(actual), isTrue,
-            reason: 'la página actual $actual debe verse');
-        expect(paginas, hasLength(5));
       }
     });
 
-    test('el máximo controla el ancho de la ventana', () {
+    test('con menos de cinco casillas se cae a la ventana contigua', () {
+      // Los dos extremos y sus dos elipsis no caben junto a la actual, así que
+      // se prefiere poder navegar a poder contar. Es el panel angosto del POS.
       expect(_barra(10, 20, maximo: 1), '11');
       expect(_barra(10, 20, maximo: 3), '10 11 12');
-      expect(_barra(10, 20, maximo: 7), '8 9 10 11 12 13 14');
+      expect(_barra(10, 20, maximo: 4), '10 11 12 13');
+    });
+
+    test('con cinco casillas justas se aprietan los dos extremos', () {
+      expect(_barra(10, 20, maximo: 5), '1 … 11 … 20');
+      expect(_barra(0, 20, maximo: 5), '1 2 3 … 20');
+      expect(_barra(19, 20, maximo: 5), '1 … 18 19 20');
     });
 
     test('sin sitio para ningún número, no devuelve ninguno', () {
-      // Es lo que deja a la barra con solo las flechas y el «4 / 12».
+      // Es lo que deja a la barra con solo las flechas y el «4/12».
       expect(
         PaginacionWidget.paginasVisibles(
             paginaActual: 3, totalPaginas: 12, maximo: 0),
@@ -103,9 +126,10 @@ void main() {
         ),
       ));
 
-      // "9" en pantalla es el índice 8: tres páginas hacia atrás.
-      await tester.tap(find.text('9'));
-      expect(saltos, [8]);
+      // En la 11 de 20 la barra dice «1 … 10 11 12 … 20»: el «10» de
+      // pantalla es el índice 9, una página hacia atrás.
+      await tester.tap(find.text('10'));
+      expect(saltos, [9]);
     });
 
     testWidgets('en la primera página no se puede retroceder', (tester) async {

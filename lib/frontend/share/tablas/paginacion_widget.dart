@@ -17,10 +17,13 @@ import '../temas/tipografia_app.dart';
 /// tramo se queda con dos flechas y un «4 / 12». Nunca desborda, que es lo que
 /// pasaba antes cuando la ventana se hacía angosta.
 ///
-/// **Sin elipsis.** La ventana de páginas es contigua: se corre alrededor de
-/// la actual en vez de fijar la primera y la última con «…» en medio. Un «…»
-/// ocupa lo mismo que el número que esconde y no se puede pulsar, y las
-/// flechas dobles ya llevan a los extremos.
+/// **La primera y la última siempre se ven**, con «…» donde haya salto:
+/// `1 … 9 10 11 … 20`. Hubo una versión con la ventana contigua y sin elipsis
+/// —`9 10 11 12 13`— con el argumento de que un «…» ocupa lo mismo que el
+/// número que esconde; el problema es que desde la mitad de una lista larga no
+/// había forma de saber **cuántas páginas hay**, y las flechas dobles llevan
+/// al final sin decir cuál es. Saber que son veinte es la mitad de para lo que
+/// se mira un paginador.
 ///
 /// Se combina con [TablaGenerica] pasándole solo los ítems de la página
 /// actual, de forma que la tabla nunca construye más filas de las que caben en
@@ -33,9 +36,11 @@ import '../temas/tipografia_app.dart';
 /// - [totalItems]: total de ítems sin paginar. Si se define junto con
 ///   [itemsPorPagina], se muestra el rango cuando hay ancho para él.
 /// - [itemsPorPagina]: tamaño de página usado para calcular el rango mostrado.
-/// - [radio]: cuántas páginas se ven a cada lado de la actual **cuando hay
-///   sitio**. Por defecto 2, o sea una ventana de cinco; con menos ancho se
-///   muestran menos.
+/// - [maximoNumeros]: cuántas casillas de página se pintan **cuando hay
+///   sitio**, contando los «…» —cada uno ocupa una—. Por defecto 7: los dos
+///   extremos, dos elipsis y tres números alrededor de la actual. Con menos
+///   ancho se pintan menos, y por debajo de cinco se cae a una ventana
+///   contigua, porque los extremos y sus elipsis ya no caben.
 ///
 /// Ejemplo:
 /// ```dart
@@ -60,7 +65,7 @@ class PaginacionWidget extends StatelessWidget {
     required this.alCambiarPagina,
     this.totalItems,
     this.itemsPorPagina,
-    this.radio = 2,
+    this.maximoNumeros = 7,
   });
 
   final int paginaActual;
@@ -68,7 +73,7 @@ class PaginacionWidget extends StatelessWidget {
   final ValueChanged<int> alCambiarPagina;
   final int? totalItems;
   final int? itemsPorPagina;
-  final int radio;
+  final int maximoNumeros;
 
   // Medidas reales de las piezas, para poder decidir qué cabe sin adivinar.
   static const _anchoNumero = 36.0; // 32 del botón + 2 de padding a cada lado
@@ -76,28 +81,84 @@ class PaginacionWidget extends StatelessWidget {
   static const _anchoRango = 150.0;
   static const _paddingH = 20.0;
 
-  /// Qué páginas se dibujan: una ventana **contigua** de a lo sumo [maximo]
-  /// números alrededor de [paginaActual].
+  /// Qué casillas se dibujan, en orden. Un `null` es un «…».
   ///
-  /// Cerca de los bordes la ventana se desplaza en vez de encogerse, para que
-  /// la barra no cambie de ancho al navegar. Nunca devuelve huecos: si no
-  /// caben todas las páginas, las que faltan se alcanzan con las flechas.
-  static List<int> paginasVisibles({
+  /// [maximo] son **casillas**, no números: cada elipsis gasta una, así que la
+  /// barra mide siempre lo mismo y no baila al navegar.
+  ///
+  /// La forma es la de siempre en una lista larga: la primera, la última, y
+  /// una ventana contigua alrededor de la actual con «…» donde hay salto. Los
+  /// tres casos —principio, medio y final— gastan exactamente [maximo]
+  /// casillas:
+  ///
+  /// ```text
+  /// 1 2 3 4 5 … 20      cerca del principio
+  /// 1 … 9 10 11 … 20    en medio
+  /// 1 … 16 17 18 19 20  cerca del final
+  /// ```
+  ///
+  /// Por debajo de cinco casillas los dos extremos y sus dos elipsis no caben
+  /// junto a la actual, así que se cae a la ventana contigua de antes: es lo
+  /// que pasa en el panel angosto del punto de venta.
+  static List<int?> paginasVisibles({
     required int paginaActual,
     required int totalPaginas,
-    int maximo = 5,
+    int maximo = 7,
   }) {
     if (totalPaginas <= 1) return const [0];
     if (maximo <= 0) return const [];
+    if (totalPaginas <= maximo) {
+      return List<int?>.generate(totalPaginas, (i) => i);
+    }
 
-    final cuantas = maximo < totalPaginas ? maximo : totalPaginas;
-    var inicio = paginaActual - (cuantas - 1) ~/ 2;
+    if (maximo < 5) return _ventanaContigua(paginaActual, totalPaginas, maximo);
 
-    // Apoyar la ventana en el borde que toque, sin salirse por ninguno.
+    final ultima = totalPaginas - 1;
+    // Las casillas que quedan entre la primera y la última.
+    final interior = maximo - 2;
+
+    // Cerca del principio: los primeros seguidos, un «…» y la última.
+    if (paginaActual <= interior - 2) {
+      return [
+        for (var i = 0; i < interior; i++) i,
+        null,
+        ultima,
+      ];
+    }
+
+    // Cerca del final: la primera, un «…» y los últimos seguidos.
+    if (paginaActual >= ultima - (interior - 2)) {
+      return [
+        0,
+        null,
+        for (var i = ultima - interior + 1; i <= ultima; i++) i,
+      ];
+    }
+
+    // En medio: los dos extremos, sus dos elipsis y la ventana entre ellas.
+    final centro = interior - 2;
+    final inicio = paginaActual - (centro - 1) ~/ 2;
+    return [
+      0,
+      null,
+      for (var i = 0; i < centro; i++) inicio + i,
+      null,
+      ultima,
+    ];
+  }
+
+  /// La ventana de siempre, sin extremos fijos: para cuando no caben.
+  ///
+  /// Cerca de los bordes se desplaza en vez de encogerse, para que la barra no
+  /// cambie de ancho al navegar.
+  static List<int?> _ventanaContigua(int actual, int total, int maximo) {
+    final cuantas = maximo < total ? maximo : total;
+    var inicio = actual - (cuantas - 1) ~/ 2;
+
     if (inicio < 0) inicio = 0;
-    if (inicio + cuantas > totalPaginas) inicio = totalPaginas - cuantas;
+    if (inicio + cuantas > total) inicio = total - cuantas;
 
-    return List<int>.generate(cuantas, (i) => inicio + i);
+    return List<int?>.generate(cuantas, (i) => inicio + i);
   }
 
   @override
@@ -127,36 +188,47 @@ class PaginacionWidget extends StatelessWidget {
           if (mostrarExtremos) libre -= _anchoFlecha * 2;
           libre -= 16; // los dos separadores de 4 y un respiro
 
+
           final caben = (libre / _anchoNumero).floor();
-          var maximo = caben.clamp(0, radio * 2 + 1);
+          var maximo = caben.clamp(0, maximoNumeros);
 
           // Con uno o dos números la ventana no sirve para navegar —no se
           // puede saltar a ninguna parte— y un «4» suelto no dice de cuántas
           // es. Por debajo de tres se cambia por el contador.
           if (maximo < 3) maximo = 0;
 
+          // El rango se acota a lo que el presupuesto le reservó y los
+          // controles se quedan con el resto. Los dos como `Flexible` repartían
+          // el ancho en mitades y las flechas no cabían en la suya aunque
+          // sobrara sitio al otro lado; los controles sueltos, sin envolver,
+          // reciben ancho infinito —un `Row` se lo da a los hijos que no son
+          // flexibles— y desbordan por su cuenta. El `Expanded` con `Align` es
+          // lo que les da un máximo real.
           return Row(
-            mainAxisAlignment: mostrarRango
-                ? MainAxisAlignment.spaceBetween
-                : MainAxisAlignment.center,
             children: [
               if (mostrarRango)
-                Flexible(
+                ConstrainedBox(
+                  constraints: const BoxConstraints(maxWidth: _anchoRango),
                   child: Text(
                     _textoRango(),
                     style: TipografiaApp.caption,
                     overflow: TextOverflow.ellipsis,
                   ),
                 ),
-              Flexible(
-                child: _Controles(
-                  paginaActual: paginaActual,
-                  totalPaginas: paginas,
-                  maximoNumeros: maximo,
-                  mostrarExtremos: mostrarExtremos,
-                  hayAnterior: hayAnterior,
-                  haySiguiente: haySiguiente,
-                  alCambiarPagina: alCambiarPagina,
+              Expanded(
+                child: Align(
+                  alignment: mostrarRango
+                      ? Alignment.centerRight
+                      : Alignment.center,
+                  child: _Controles(
+                    paginaActual: paginaActual,
+                    totalPaginas: paginas,
+                    maximoNumeros: maximo,
+                    mostrarExtremos: mostrarExtremos,
+                    hayAnterior: hayAnterior,
+                    haySiguiente: haySiguiente,
+                    alCambiarPagina: alCambiarPagina,
+                  ),
                 ),
               ),
             ],
@@ -245,11 +317,14 @@ class _Controles extends StatelessWidget {
           )
         else
           for (final pagina in numeros)
-            _NumeroPagina(
-              numero: pagina,
-              activa: pagina == paginaActual,
-              alPresionar: () => alCambiarPagina(pagina),
-            ),
+            if (pagina == null)
+              const _Elipsis()
+            else
+              _NumeroPagina(
+                numero: pagina,
+                activa: pagina == paginaActual,
+                alPresionar: () => alCambiarPagina(pagina),
+              ),
         const SizedBox(width: 4),
         _BotonFlecha(
           icono: Icons.chevron_right_rounded,
@@ -265,6 +340,37 @@ class _Controles extends StatelessWidget {
                 haySiguiente ? () => alCambiarPagina(totalPaginas - 1) : null,
           ),
       ],
+    );
+  }
+}
+
+/// El salto entre dos tramos de páginas.
+///
+/// Mide **lo mismo que un número** a propósito: así el presupuesto de ancho
+/// que reparte `PaginacionWidget` cuadra casilla por casilla y la barra no
+/// cambia de largo al pasar de página. Sin borde ni tinta fuerte, porque no se
+/// puede pulsar: lo que hay ahí son las páginas que las flechas alcanzan.
+class _Elipsis extends StatelessWidget {
+  const _Elipsis();
+
+  @override
+  Widget build(BuildContext context) {
+    return const Padding(
+      padding: EdgeInsets.symmetric(horizontal: 2),
+      child: SizedBox(
+        width: 32,
+        height: 32,
+        child: Center(
+          child: Text(
+            '…',
+            style: TextStyle(
+              fontSize: 15,
+              height: 1,
+              color: ColoresApp.textDisabled,
+            ),
+          ),
+        ),
+      ),
     );
   }
 }

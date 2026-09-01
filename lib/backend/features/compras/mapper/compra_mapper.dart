@@ -51,6 +51,13 @@ abstract final class CompraMapper {
 
   /// El total nace en cero: lo escribe el repositorio recalculándolo desde las
   /// líneas, nunca sumándole el delta a lo que hubiera.
+  ///
+  /// **El estado se escribe, no se hereda del `DEFAULT` de la columna.** El
+  /// valor por defecto es la red para las filas que ya estaban; para las que
+  /// escribe la app, el estado es una decisión de negocio y tiene que verse en
+  /// el `INSERT`. Confiar en el `DEFAULT` costó una tarde: una base creada
+  /// antes de que existiera el borrador seguía dando de alta las remisiones
+  /// como `REGISTRADA`, y desde el código no había forma de verlo.
   static TablaCompraCompanion nuevaACompanion({
     required int usuarioId,
     required String numero,
@@ -63,6 +70,7 @@ abstract final class CompraMapper {
       usuarioId: usuarioId,
       numero: numero,
       proveedorId: proveedorId,
+      estado: Value(EstadoCompra.borrador.codigo),
       fecha: Value(fecha),
       numeroFactura: Value(numeroFactura),
       notas: Value(notas),

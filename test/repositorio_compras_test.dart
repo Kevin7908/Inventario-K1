@@ -12,6 +12,7 @@
 import 'package:drift/drift.dart' show Variable;
 import 'package:flutter_test/flutter_test.dart';
 import 'package:inventario_k1/backend/features/compras/enum/enum_compras.dart';
+import 'package:inventario_k1/backend/features/compras/mapper/compra_mapper.dart';
 import 'package:inventario_k1/backend/features/compras/modelo/compra_item.dart';
 import 'package:inventario_k1/backend/features/compras/repositorio/repositorio_compras.dart';
 import 'package:inventario_k1/backend/features/compras/repositorio/repositorio_compras_impl.dart';
@@ -284,6 +285,34 @@ void main() {
   });
 
   group('el borrador se termina o se descarta', () {
+    test('el INSERT lleva el estado escrito, no heredado del DEFAULT',
+        () async {
+      // Se mira el `Companion` y no la fila guardada a propósito: contra una
+      // base recién creada el `DEFAULT` ya es BORRADOR, así que leerla de
+      // vuelta daría verde con o sin el arreglo. Lo que falló en la práctica
+      // fue una base **vieja**, hecha cuando el `DEFAULT` era REGISTRADA: ahí
+      // la app daba de alta remisiones ya terminadas y desde el código no
+      // había forma de verlo.
+      final companion = CompraMapper.nuevaACompanion(
+        usuarioId: sesion.usuarioId,
+        numero: 'COM-0001',
+        proveedorId: proveedorId,
+        fecha: DateTime(2026, 9, 1),
+      );
+
+      expect(companion.estado.present, isTrue,
+          reason: 'sin esto el estado lo pone la columna, no el código');
+      expect(companion.estado.value, EstadoCompra.borrador.codigo);
+    });
+
+    test('y la remisión recién abierta está en BORRADOR', () async {
+      final abierta = await compras.crear(proveedorId: proveedorId);
+      final detalle =
+          await compras.obtenerDetalle((abierta as CompraAbierta).compraId);
+
+      expect(detalle.resumen.estado, EstadoCompra.borrador);
+    });
+
     test('nace en borrador y no cuenta como gasto del mes', () async {
       // Su mercancía ya está en el inventario, pero falta que quien recibe
       // diga que está todo: hasta entonces no es un gasto ni es la última
