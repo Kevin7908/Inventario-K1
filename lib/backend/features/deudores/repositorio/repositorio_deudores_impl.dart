@@ -1,3 +1,4 @@
+import '../../motos/repositorio/join_moto.dart';
 import 'package:drift/drift.dart';
 import 'package:inventario_k1/backend/share/database/app_db.dart';
 
@@ -21,7 +22,9 @@ import '../../bitacora/repositorio/repositorio_bitacora.dart';
 import '../../bitacora/repositorio/repositorio_bitacora_impl.dart';
 import '../../../share/dominio/permiso.dart';
 
-class RepositorioDeudoresImpl with FirmaDeSesion implements RepositorioDeudores {
+class RepositorioDeudoresImpl
+    with FirmaDeSesion
+    implements RepositorioDeudores {
   RepositorioDeudoresImpl(this._db, this.sesion);
 
   /// Quién firma lo que este repositorio escribe. La inyecta Riverpod
@@ -30,8 +33,10 @@ class RepositorioDeudoresImpl with FirmaDeSesion implements RepositorioDeudores 
   @override
   final SesionActual? sesion;
 
-  late final RepositorioBitacora _bitacora =
-      RepositorioBitacoraImpl(_db, sesion);
+  late final RepositorioBitacora _bitacora = RepositorioBitacoraImpl(
+    _db,
+    sesion,
+  );
 
   /// Deja el renglón de la bitácora, **dentro** de la transacción del cambio.
   Future<void> _anotar(
@@ -39,27 +44,29 @@ class RepositorioDeudoresImpl with FirmaDeSesion implements RepositorioDeudores 
     int? id,
     String descripcion, {
     String? detalle,
-  }) =>
-      _bitacora.anotar(
-        Anotacion(
-          entidad: EntidadAuditada.deuda,
-          accion: accion,
-          entidadId: id,
-          descripcion: descripcion,
-          detalle: detalle,
-        ),
-      );
-
+  }) => _bitacora.anotar(
+    Anotacion(
+      entidad: EntidadAuditada.deuda,
+      accion: accion,
+      entidadId: id,
+      descripcion: descripcion,
+      detalle: detalle,
+    ),
+  );
 
   final AppDb _db;
 
   /// Los números de documento salen de la tabla `consecutivos`, no de `MAX+1`
   /// ni del `id`: ver `RepositorioConsecutivos`.
-  late final RepositorioConsecutivos _consecutivos =
-      RepositorioConsecutivos(_db);
+  late final RepositorioConsecutivos _consecutivos = RepositorioConsecutivos(
+    _db,
+  );
 
   /// El **único** camino por el que cambia el stock (§7 de `REGLAS_BD.md`).
-  late final RepositorioInventario _inventario = RepositorioInventarioImpl(_db, sesion);
+  late final RepositorioInventario _inventario = RepositorioInventarioImpl(
+    _db,
+    sesion,
+  );
 
   // ── Join base ──────────────────────────────────────────────────────────────
 
@@ -80,6 +87,7 @@ class RepositorioDeudoresImpl with FirmaDeSesion implements RepositorioDeudores 
         _db.tablaMoto,
         _db.tablaMoto.id.equalsExp(_db.tablaDeudor.motoId),
       ),
+      ..._db.joinsCatalogoMoto,
     ]);
   }
 
@@ -92,7 +100,7 @@ class RepositorioDeudoresImpl with FirmaDeSesion implements RepositorioDeudores 
     return DeudorMapper.filaAResumen(
       d,
       nombreCliente: nombreCliente,
-      nombreMoto: moto == null ? null : '${moto.marca} ${moto.modelo}'.trim(),
+      nombreMoto: _db.nombreMotoDe(row, conAnio: false),
       placaMoto: moto?.placa,
     );
   }
@@ -113,12 +121,15 @@ class RepositorioDeudoresImpl with FirmaDeSesion implements RepositorioDeudores 
     // El total va aparte y sin `LIMIT`: es cuántas cumplen el filtro, no
     // cuántas caben en la página.
     final conteo = _db.selectOnly(_db.tablaDeudor).join([
-      innerJoin(_db.tablaCliente,
-          _db.tablaCliente.id.equalsExp(_db.tablaDeudor.clienteId)),
-      innerJoin(_db.tablaPersona,
-          _db.tablaPersona.id.equalsExp(_db.tablaCliente.personaId)),
-    ])
-      ..addColumns([_db.tablaDeudor.id.count()]);
+      innerJoin(
+        _db.tablaCliente,
+        _db.tablaCliente.id.equalsExp(_db.tablaDeudor.clienteId),
+      ),
+      innerJoin(
+        _db.tablaPersona,
+        _db.tablaPersona.id.equalsExp(_db.tablaCliente.personaId),
+      ),
+    ])..addColumns([_db.tablaDeudor.id.count()]);
     _aplicarFiltro(conteo, filtro);
 
     return consulta.watch().asyncMap((rows) async {
@@ -166,9 +177,9 @@ class RepositorioDeudoresImpl with FirmaDeSesion implements RepositorioDeudores 
 
   /// Sigue esperando plata: ni cobrada ni dada por perdida.
   Expression<bool> get _viva => _db.tablaDeudor.estado.isIn([
-        EstadoDeudor.activa.valor,
-        EstadoDeudor.vencida.valor,
-      ]);
+    EstadoDeudor.activa.valor,
+    EstadoDeudor.vencida.valor,
+  ]);
 
   /// Se le pasó el plazo, o alguien la dio por vencida antes de tiempo.
   ///
@@ -192,20 +203,21 @@ class RepositorioDeudoresImpl with FirmaDeSesion implements RepositorioDeudores 
     final porCobrar = (t.montoTotal - t.montoPagado).sum(filter: _viva);
     final alDia = t.id.count(filter: _viva & _vencida.not());
     final vencidas = t.id.count(filter: _viva & _vencida);
-    final pagadas =
-        t.id.count(filter: t.estado.equals(EstadoDeudor.pagada.valor));
+    final pagadas = t.id.count(
+      filter: t.estado.equals(EstadoDeudor.pagada.valor),
+    );
 
     final consulta = _db.selectOnly(t)
       ..addColumns([porCobrar, alDia, vencidas, pagadas]);
 
     return consulta.watchSingleOrNull().map(
-          (fila) => (
-            porCobrar: fila?.read(porCobrar) ?? 0,
-            alDia: fila?.read(alDia) ?? 0,
-            vencidas: fila?.read(vencidas) ?? 0,
-            pagadas: fila?.read(pagadas) ?? 0,
-          ),
-        );
+      (fila) => (
+        porCobrar: fila?.read(porCobrar) ?? 0,
+        alDia: fila?.read(alDia) ?? 0,
+        vencidas: fila?.read(vencidas) ?? 0,
+        pagadas: fila?.read(pagadas) ?? 0,
+      ),
+    );
   }
 
   @override
@@ -223,15 +235,18 @@ class RepositorioDeudoresImpl with FirmaDeSesion implements RepositorioDeudores 
   /// Las líneas con el nombre y la foto de su producto, en un solo `JOIN`: una
   /// consulta por línea sería el N+1 que prohíbe §5.
   Future<List<DeudorItem>> _cargarItems(int deudorId) async {
-    final filas = await (_db.select(_db.tablaDeudorItem).join([
-      innerJoin(
-        _db.tablaProducto,
-        _db.tablaProducto.id.equalsExp(_db.tablaDeudorItem.productoId),
-      ),
-    ])
-          ..where(_db.tablaDeudorItem.deudorId.equals(deudorId))
-          ..orderBy([OrderingTerm.asc(_db.tablaDeudorItem.id)]))
-        .get();
+    final filas =
+        await (_db.select(_db.tablaDeudorItem).join([
+                innerJoin(
+                  _db.tablaProducto,
+                  _db.tablaProducto.id.equalsExp(
+                    _db.tablaDeudorItem.productoId,
+                  ),
+                ),
+              ])
+              ..where(_db.tablaDeudorItem.deudorId.equals(deudorId))
+              ..orderBy([OrderingTerm.asc(_db.tablaDeudorItem.id)]))
+            .get();
 
     return filas.map((row) {
       final item = row.readTable(_db.tablaDeudorItem);
@@ -246,10 +261,11 @@ class RepositorioDeudoresImpl with FirmaDeSesion implements RepositorioDeudores 
   }
 
   Future<List<DeudorPago>> _cargarPagos(int deudorId) async {
-    final filas = await (_db.select(_db.tablaDeudorPago)
-          ..where((t) => t.deudorId.equals(deudorId))
-          ..orderBy([(t) => OrderingTerm.asc(t.fechaPago)]))
-        .get();
+    final filas =
+        await (_db.select(_db.tablaDeudorPago)
+              ..where((t) => t.deudorId.equals(deudorId))
+              ..orderBy([(t) => OrderingTerm.asc(t.fechaPago)]))
+            .get();
     return filas.map(DeudorMapper.pagoAModelo).toList();
   }
 
@@ -267,7 +283,9 @@ class RepositorioDeudoresImpl with FirmaDeSesion implements RepositorioDeudores 
 
     return _db.transaction(() async {
       final numero = await _consecutivos.siguiente(DocumentoConsecutivo.deuda);
-      return _db.into(_db.tablaDeudor).insert(
+      return _db
+          .into(_db.tablaDeudor)
+          .insert(
             DeudorMapper.nuevaACompanion(
               usuarioId: autorId,
               numero: numero,
@@ -294,16 +312,17 @@ class RepositorioDeudoresImpl with FirmaDeSesion implements RepositorioDeudores 
       return const Fallo(MotivoFallo.persistencia, 'La deuda ya no existe.');
     }
 
-    return _envolver(() =>
-        (_db.update(_db.tablaDeudor)..where((t) => t.id.equals(id))).write(
-          TablaDeudorCompanion(
-            motoId: Value(motoId),
-            concepto: Value(_limpio(concepto)),
-            fechaVencimiento: Value(fechaVencimiento),
-            notas: Value(_limpio(notas)),
-            actualizadoEn: Value(DateTime.now()),
-          ),
-        ));
+    return _envolver(
+      () => (_db.update(_db.tablaDeudor)..where((t) => t.id.equals(id))).write(
+        TablaDeudorCompanion(
+          motoId: Value(motoId),
+          concepto: Value(_limpio(concepto)),
+          fechaVencimiento: Value(fechaVencimiento),
+          notas: Value(_limpio(notas)),
+          actualizadoEn: Value(DateTime.now()),
+        ),
+      ),
+    );
   }
 
   // ── Líneas ─────────────────────────────────────────────────────────────────
@@ -324,15 +343,22 @@ class RepositorioDeudoresImpl with FirmaDeSesion implements RepositorioDeudores 
         // hace el carrito: dos filas del mismo producto solo complican la
         // lectura y no dicen nada que la cantidad no diga. La `UNIQUE` de la
         // tabla es la garantía; esto es lo que evita el choque.
-        final existente = await (_db.select(_db.tablaDeudorItem)
-              ..where((t) =>
-                  t.deudorId.equals(deudorId) & t.productoId.equals(productoId))
-              ..limit(1))
-            .getSingleOrNull();
+        final existente =
+            await (_db.select(_db.tablaDeudorItem)
+                  ..where(
+                    (t) =>
+                        t.deudorId.equals(deudorId) &
+                        t.productoId.equals(productoId),
+                  )
+                  ..limit(1))
+                .getSingleOrNull();
 
         if (existente == null) {
-          await _db.into(_db.tablaDeudorItem).insert(
+          await _db
+              .into(_db.tablaDeudorItem)
+              .insert(
                 DeudorMapper.itemACompanion(
+                  usuarioId: autorId,
                   deudorId: deudorId,
                   productoId: productoId,
                   cantidad: cantidad,
@@ -340,12 +366,14 @@ class RepositorioDeudoresImpl with FirmaDeSesion implements RepositorioDeudores 
                 ),
               );
         } else {
-          await (_db.update(_db.tablaDeudorItem)
-                ..where((t) => t.id.equals(existente.id)))
-              .write(TablaDeudorItemCompanion(
-            cantidad: Value(existente.cantidad + cantidad),
-            precioUnitario: Value(precioUnitario),
-          ));
+          await (_db.update(
+            _db.tablaDeudorItem,
+          )..where((t) => t.id.equals(existente.id))).write(
+            TablaDeudorItemCompanion(
+              cantidad: Value(existente.cantidad + cantidad),
+              precioUnitario: Value(precioUnitario),
+            ),
+          );
         }
 
         await _sacarDelInventario(deudorId, productoId, cantidad);
@@ -380,15 +408,20 @@ class RepositorioDeudoresImpl with FirmaDeSesion implements RepositorioDeudores 
           await _sacarDelInventario(actual.deudorId, actual.productoId, delta);
         } else if (delta < 0) {
           await _devolverAlInventario(
-              actual.deudorId, actual.productoId, -delta);
+            actual.deudorId,
+            actual.productoId,
+            -delta,
+          );
         }
 
-        await (_db.update(_db.tablaDeudorItem)
-              ..where((t) => t.id.equals(itemId)))
-            .write(TablaDeudorItemCompanion(
-          cantidad: Value(cantidadNueva),
-          precioUnitario: Value(precioUnitario ?? actual.precioUnitario),
-        ));
+        await (_db.update(
+          _db.tablaDeudorItem,
+        )..where((t) => t.id.equals(itemId))).write(
+          TablaDeudorItemCompanion(
+            cantidad: Value(cantidadNueva),
+            precioUnitario: Value(precioUnitario ?? actual.precioUnitario),
+          ),
+        );
 
         await _recalcularTotales(actual.deudorId);
       });
@@ -407,11 +440,14 @@ class RepositorioDeudoresImpl with FirmaDeSesion implements RepositorioDeudores 
         await _exigirViva(actual.deudorId);
 
         await _devolverAlInventario(
-            actual.deudorId, actual.productoId, actual.cantidad);
+          actual.deudorId,
+          actual.productoId,
+          actual.cantidad,
+        );
 
-        await (_db.delete(_db.tablaDeudorItem)
-              ..where((t) => t.id.equals(itemId)))
-            .go();
+        await (_db.delete(
+          _db.tablaDeudorItem,
+        )..where((t) => t.id.equals(itemId))).go();
 
         await _recalcularTotales(actual.deudorId);
       });
@@ -462,28 +498,34 @@ class RepositorioDeudoresImpl with FirmaDeSesion implements RepositorioDeudores 
       );
     }
 
-    return _envolver(() => _db.transaction(() async {
-          await _db.into(_db.tablaDeudorPago).insert(
-                DeudorMapper.pagoACompanion(
-                  usuarioId: autorId,
-                  deudorId: deudorId,
-                  monto: monto,
-                  metodoPago: metodoPago,
-                  notas: notas,
-                ),
-              );
-          await _recalcularPagado(deudorId);
-        }));
+    return _envolver(
+      () => _db.transaction(() async {
+        await _db
+            .into(_db.tablaDeudorPago)
+            .insert(
+              DeudorMapper.pagoACompanion(
+                usuarioId: autorId,
+                deudorId: deudorId,
+                monto: monto,
+                metodoPago: metodoPago,
+                notas: notas,
+              ),
+            );
+        await _recalcularPagado(deudorId);
+      }),
+    );
   }
 
   @override
   Future<Resultado> eliminarPago(int pagoId, int deudorId) {
-    return _envolver(() => _db.transaction(() async {
-          await (_db.delete(_db.tablaDeudorPago)
-                ..where((t) => t.id.equals(pagoId)))
-              .go();
-          await _recalcularPagado(deudorId, restaurarActiva: true);
-        }));
+    return _envolver(
+      () => _db.transaction(() async {
+        await (_db.delete(
+          _db.tablaDeudorPago,
+        )..where((t) => t.id.equals(pagoId))).go();
+        await _recalcularPagado(deudorId, restaurarActiva: true);
+      }),
+    );
   }
 
   @override
@@ -526,27 +568,28 @@ class RepositorioDeudoresImpl with FirmaDeSesion implements RepositorioDeudores 
       );
     }
 
-    return _envolver(() => _db.transaction(() async {
-          final deudor = await _fila(id);
-          if (deudor != null &&
-              (deudor.estado == EstadoDeudor.activa.valor ||
-                  deudor.estado == EstadoDeudor.vencida.valor)) {
-            for (final item in await _itemsCrudos(id)) {
-              await _devolverAlInventario(id, item.productoId, item.cantidad);
-            }
+    return _envolver(
+      () => _db.transaction(() async {
+        final deudor = await _fila(id);
+        if (deudor != null &&
+            (deudor.estado == EstadoDeudor.activa.valor ||
+                deudor.estado == EstadoDeudor.vencida.valor)) {
+          for (final item in await _itemsCrudos(id)) {
+            await _devolverAlInventario(id, item.productoId, item.cantidad);
           }
-          await (_db.delete(_db.tablaDeudor)..where((t) => t.id.equals(id)))
-              .go();
+        }
+        await (_db.delete(_db.tablaDeudor)..where((t) => t.id.equals(id))).go();
 
-          await _anotar(
-            AccionAuditada.elimino,
-            id,
-            deudor == null ? 'Deuda #$id' : 'Deuda ${deudor.numero}',
-            detalle: deudor == null
-                ? null
-                : 'Saldo al borrarla: ${deudor.montoTotal - deudor.montoPagado}',
-          );
-        }));
+        await _anotar(
+          AccionAuditada.elimino,
+          id,
+          deudor == null ? 'Deuda #$id' : 'Deuda ${deudor.numero}',
+          detalle: deudor == null
+              ? null
+              : 'Saldo al borrarla: ${deudor.montoTotal - deudor.montoPagado}',
+        );
+      }),
+    );
   }
 
   // ── Descuadres ─────────────────────────────────────────────────────────────
@@ -556,8 +599,9 @@ class RepositorioDeudoresImpl with FirmaDeSesion implements RepositorioDeudores 
     // Un solo `GROUP BY` contra todas las deudas. El `LEFT JOIN` incluye a las
     // que no tienen ningún pago: si una de esas figura como pagada, también
     // está descuadrada.
-    final filas = await _db.customSelect(
-      '''
+    final filas = await _db
+        .customSelect(
+          '''
       SELECT d.id AS id,
              d.monto_pagado - COALESCE(SUM(p.monto), 0) AS diferencia
       FROM deudores d
@@ -565,8 +609,9 @@ class RepositorioDeudoresImpl with FirmaDeSesion implements RepositorioDeudores 
       GROUP BY d.id
       HAVING diferencia <> 0
       ''',
-      readsFrom: {_db.tablaDeudor, _db.tablaDeudorPago},
-    ).get();
+          readsFrom: {_db.tablaDeudor, _db.tablaDeudorPago},
+        )
+        .get();
 
     return {
       for (final fila in filas)
@@ -576,8 +621,9 @@ class RepositorioDeudoresImpl with FirmaDeSesion implements RepositorioDeudores 
 
   @override
   Future<Map<int, int>> descuadresTotal() async {
-    final filas = await _db.customSelect(
-      '''
+    final filas = await _db
+        .customSelect(
+          '''
       SELECT d.id AS id,
              d.monto_total - COALESCE(
                SUM(CAST(ROUND(i.cantidad * i.precio_unitario) AS INTEGER)), 0
@@ -587,8 +633,9 @@ class RepositorioDeudoresImpl with FirmaDeSesion implements RepositorioDeudores 
       GROUP BY d.id
       HAVING diferencia <> 0
       ''',
-      readsFrom: {_db.tablaDeudor, _db.tablaDeudorItem},
-    ).get();
+          readsFrom: {_db.tablaDeudor, _db.tablaDeudorItem},
+        )
+        .get();
 
     return {
       for (final fila in filas)
@@ -603,18 +650,17 @@ class RepositorioDeudoresImpl with FirmaDeSesion implements RepositorioDeudores 
     return t == null || t.isEmpty ? null : t;
   }
 
-  Future<TablaDeudorData?> _fila(int id) =>
-      (_db.select(_db.tablaDeudor)..where((t) => t.id.equals(id)))
-          .getSingleOrNull();
+  Future<TablaDeudorData?> _fila(int id) => (_db.select(
+    _db.tablaDeudor,
+  )..where((t) => t.id.equals(id))).getSingleOrNull();
 
-  Future<TablaDeudorItemData?> _filaItem(int id) =>
-      (_db.select(_db.tablaDeudorItem)..where((t) => t.id.equals(id)))
-          .getSingleOrNull();
+  Future<TablaDeudorItemData?> _filaItem(int id) => (_db.select(
+    _db.tablaDeudorItem,
+  )..where((t) => t.id.equals(id))).getSingleOrNull();
 
-  Future<List<TablaDeudorItemData>> _itemsCrudos(int deudorId) =>
-      (_db.select(_db.tablaDeudorItem)
-            ..where((t) => t.deudorId.equals(deudorId)))
-          .get();
+  Future<List<TablaDeudorItemData>> _itemsCrudos(int deudorId) => (_db.select(
+    _db.tablaDeudorItem,
+  )..where((t) => t.deudorId.equals(deudorId))).get();
 
   /// Una deuda cobrada o dada por perdida no se edita.
   ///
@@ -659,15 +705,14 @@ class RepositorioDeudoresImpl with FirmaDeSesion implements RepositorioDeudores 
     int deudorId,
     int productoId,
     double cantidad,
-  ) =>
-      _inventario.registrar(
-        SolicitudMovimiento.salida(
-          productoId: productoId,
-          cantidad: cantidad,
-          tipo: TipoMovimiento.salidaFiado,
-          deudorId: deudorId,
-        ),
-      );
+  ) => _inventario.registrar(
+    SolicitudMovimiento.salida(
+      productoId: productoId,
+      cantidad: cantidad,
+      tipo: TipoMovimiento.salidaFiado,
+      deudorId: deudorId,
+    ),
+  );
 
   /// La única entrada legítima: **corregir lo que se anotó mal**. Nada de lo
   /// que el cliente se llevó vuelve solo, así que esto no lo dispara ningún
@@ -676,15 +721,14 @@ class RepositorioDeudoresImpl with FirmaDeSesion implements RepositorioDeudores 
     int deudorId,
     int productoId,
     double cantidad,
-  ) =>
-      _inventario.registrar(
-        SolicitudMovimiento.entrada(
-          productoId: productoId,
-          cantidad: cantidad,
-          tipo: TipoMovimiento.devolucionFiado,
-          deudorId: deudorId,
-        ),
-      );
+  ) => _inventario.registrar(
+    SolicitudMovimiento.entrada(
+      productoId: productoId,
+      cantidad: cantidad,
+      tipo: TipoMovimiento.devolucionFiado,
+      deudorId: deudorId,
+    ),
+  );
 
   static String _cantidad(double valor) =>
       valor % 1 == 0 ? valor.toInt().toString() : valor.toStringAsFixed(2);
@@ -709,7 +753,9 @@ class RepositorioDeudoresImpl with FirmaDeSesion implements RepositorioDeudores 
     var pagado = await _sumaPagos(deudorId);
 
     if (pagado > total) {
-      await _db.into(_db.tablaDeudorPago).insert(
+      await _db
+          .into(_db.tablaDeudorPago)
+          .insert(
             DeudorMapper.pagoACompanion(
               usuarioId: autorId,
               deudorId: deudorId,
@@ -725,13 +771,16 @@ class RepositorioDeudoresImpl with FirmaDeSesion implements RepositorioDeudores 
         ? EstadoDeudor.pagada
         : await _estadoConSaldo(deudorId);
 
-    await (_db.update(_db.tablaDeudor)..where((t) => t.id.equals(deudorId)))
-        .write(TablaDeudorCompanion(
-      montoTotal: Value(total),
-      montoPagado: Value(pagado),
-      estado: Value(estado.valor),
-      actualizadoEn: Value(DateTime.now()),
-    ));
+    await (_db.update(
+      _db.tablaDeudor,
+    )..where((t) => t.id.equals(deudorId))).write(
+      TablaDeudorCompanion(
+        montoTotal: Value(total),
+        montoPagado: Value(pagado),
+        estado: Value(estado.valor),
+        actualizadoEn: Value(DateTime.now()),
+      ),
+    );
   }
 
   /// Qué estado le toca a una deuda que todavía tiene saldo.
@@ -769,30 +818,36 @@ class RepositorioDeudoresImpl with FirmaDeSesion implements RepositorioDeudores 
       nuevoEstado = EstadoDeudor.desdeValor(deudor.estado);
     }
 
-    await (_db.update(_db.tablaDeudor)..where((t) => t.id.equals(deudorId)))
-        .write(TablaDeudorCompanion(
-      montoPagado: Value(pagado),
-      estado: Value(nuevoEstado.valor),
-      actualizadoEn: Value(DateTime.now()),
-    ));
+    await (_db.update(
+      _db.tablaDeudor,
+    )..where((t) => t.id.equals(deudorId))).write(
+      TablaDeudorCompanion(
+        montoPagado: Value(pagado),
+        estado: Value(nuevoEstado.valor),
+        actualizadoEn: Value(DateTime.now()),
+      ),
+    );
   }
 
   Future<int> _sumaItems(int deudorId) async {
-    final fila = await _db.customSelect(
-      'SELECT COALESCE(SUM(CAST(ROUND(cantidad * precio_unitario) AS INTEGER)), 0) AS s '
-      'FROM deudor_items WHERE deudor_id = ?',
-      variables: [Variable.withInt(deudorId)],
-      readsFrom: {_db.tablaDeudorItem},
-    ).getSingle();
+    final fila = await _db
+        .customSelect(
+          'SELECT COALESCE(SUM(CAST(ROUND(cantidad * precio_unitario) AS INTEGER)), 0) AS s '
+          'FROM deudor_items WHERE deudor_id = ?',
+          variables: [Variable.withInt(deudorId)],
+          readsFrom: {_db.tablaDeudorItem},
+        )
+        .getSingle();
     return fila.read<int>('s');
   }
 
   Future<int> _sumaPagos(int deudorId) async {
     final suma = _db.tablaDeudorPago.monto.sum();
-    final fila = await (_db.selectOnly(_db.tablaDeudorPago)
-          ..addColumns([suma])
-          ..where(_db.tablaDeudorPago.deudorId.equals(deudorId)))
-        .getSingleOrNull();
+    final fila =
+        await (_db.selectOnly(_db.tablaDeudorPago)
+              ..addColumns([suma])
+              ..where(_db.tablaDeudorPago.deudorId.equals(deudorId)))
+            .getSingleOrNull();
     return fila?.read(suma) ?? 0;
   }
 
@@ -811,7 +866,10 @@ class RepositorioDeudoresImpl with FirmaDeSesion implements RepositorioDeudores 
       await operacion();
       return const Exito();
     } catch (e) {
-      return Fallo(MotivoFallo.persistencia, 'No se pudo guardar: ${_mensaje(e)}');
+      return Fallo(
+        MotivoFallo.persistencia,
+        'No se pudo guardar: ${_mensaje(e)}',
+      );
     }
   }
 }

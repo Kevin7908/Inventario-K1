@@ -359,6 +359,7 @@ void main() {
       expect(
         () => db.into(db.tablaDeudorItem).insert(
               TablaDeudorItemCompanion.insert(
+                usuarioId: sesion.usuarioId,
                 deudorId: id,
                 productoId: taller.productoId,
                 cantidad: 0,
@@ -375,6 +376,7 @@ void main() {
       expect(
         () => db.into(db.tablaDeudorItem).insert(
               TablaDeudorItemCompanion.insert(
+                usuarioId: sesion.usuarioId,
                 deudorId: id,
                 productoId: taller.productoId,
                 cantidad: 1,

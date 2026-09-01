@@ -84,12 +84,14 @@ class DeudorMapper {
   }
 
   static TablaDeudorItemCompanion itemACompanion({
+    required int usuarioId,
     required int deudorId,
     required int productoId,
     required double cantidad,
     required int precioUnitario,
   }) {
     return TablaDeudorItemCompanion.insert(
+      usuarioId: usuarioId,
       deudorId: deudorId,
       productoId: productoId,
       cantidad: cantidad,
