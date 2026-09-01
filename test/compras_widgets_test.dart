@@ -28,7 +28,7 @@ CompraItem _item({
     );
 
 CompraEditorState _estado({
-  EstadoCompra estado = EstadoCompra.registrada,
+  EstadoCompra estado = EstadoCompra.borrador,
   List<CompraItem> lineas = const [],
 }) =>
     CompraEditorState(
@@ -55,14 +55,50 @@ Future<void> _pump(WidgetTester tester, Widget child) => tester.pumpWidget(
 
 void main() {
   group('CompraEditorState', () {
-    test('una remisión registrada se puede seguir anotando', () {
+    test('el borrador es lo único que admite líneas', () {
       expect(_estado().editable, isTrue);
+      expect(_estado().motivoNoEditable, isNull);
+    });
+
+    test('una terminada se cierra, y lo dice', () {
+      // Marcarla como terminada es lo que la archiva: a partir de ahí sus
+      // líneas explican entradas de inventario ya contadas.
+      final terminada = _estado(estado: EstadoCompra.registrada);
+
+      expect(terminada.editable, isFalse);
+      expect(terminada.motivoNoEditable, contains('anularla'));
     });
 
     test('una anulada se lee pero no se toca', () {
       // Su mercancía ya salió del inventario: cambiarle una línea movería
       // stock por una entrada que se deshizo.
-      expect(_estado(estado: EstadoCompra.anulada).editable, isFalse);
+      final anulada = _estado(estado: EstadoCompra.anulada);
+
+      expect(anulada.editable, isFalse);
+      expect(anulada.motivoNoEditable, contains('anulada'));
+    });
+
+    test('sin una sola línea no se puede dar por terminada', () {
+      // Una remisión que no trajo nada no es un documento, es un cuadro que
+      // alguien abrió sin querer. Al salir se descarta.
+      final vacia = _estado();
+
+      expect(vacia.vacia, isTrue);
+      expect(vacia.puedeTerminar, isFalse);
+    });
+
+    test('con líneas ya se puede terminar', () {
+      final conLineas = _estado(lineas: [_item()]);
+
+      expect(conLineas.vacia, isFalse);
+      expect(conLineas.puedeTerminar, isTrue);
+    });
+
+    test('una terminada ya no se vuelve a terminar', () {
+      final terminada =
+          _estado(estado: EstadoCompra.registrada, lineas: [_item()]);
+
+      expect(terminada.puedeTerminar, isFalse);
     });
 
     test('cuenta las unidades recibidas, no las líneas', () {

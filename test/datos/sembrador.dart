@@ -754,8 +754,14 @@ class Sembrador {
         );
       }
 
+      // Las sembradas son historia: ya se contaron y se archivaron. Un
+      // borrador es lo que está a medio teclear ahora mismo, y de eso no hay
+      // en un histórico.
       await (db.update(db.tablaCompra)..where((t) => t.id.equals(compraId)))
-          .write(TablaCompraCompanion(total: Value(total)));
+          .write(TablaCompraCompanion(
+        total: Value(total),
+        estado: const Value('REGISTRADA'),
+      ));
 
       // El costo de referencia queda en el último pagado, como hace el
       // repositorio.

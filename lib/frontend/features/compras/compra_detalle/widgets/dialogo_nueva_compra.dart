@@ -74,7 +74,7 @@ class _DialogoNuevaCompraState extends ConsumerState<DialogoNuevaCompra> {
     if (!mounted) return;
 
     switch (resultado) {
-      case CompraRegistrada(:final compraId, :final numero):
+      case CompraAbierta(:final compraId, :final numero):
         Navigator.of(context).pop(compraId);
         MensajeApp.exito(context, 'Compra $numero abierta');
       case CompraRechazada(:final motivo, :final mensaje):

@@ -123,19 +123,25 @@ const List<String> guardasSql = [
   END;
   ''',
 
-  // ── Una compra no se borra ──────────────────────────────────────────────
+  // ── Una compra con algo dentro no se borra ──────────────────────────────
   //
   // Mismo argumento que la factura, del otro lado del mostrador: la remisión
-  // explica entradas de inventario y quemó un consecutivo. Borrarla dejaría
-  // mercancía en el stock sin documento que diga de dónde salió. Se anula, y
-  // anular saca lo que había entrado.
+  // explica entradas de inventario. Borrarla dejaría mercancía en el stock sin
+  // documento que diga de dónde salió. Se anula, y anular saca lo que había
+  // entrado.
+  //
+  // El `WHEN` deja pasar un solo caso: el **borrador sin una sola línea**. Ese
+  // no explica ningún movimiento —no llegó a recibir nada— y es el que se abre
+  // por error; obligar a anularlo llenaría el listado de remisiones vacías.
   '''
   CREATE TRIGGER IF NOT EXISTS guarda_compras_sin_borrado
   BEFORE DELETE ON compras
   FOR EACH ROW
+  WHEN OLD.estado <> 'BORRADOR'
+    OR EXISTS (SELECT 1 FROM compra_detalles WHERE compra_id = OLD.id)
   BEGIN
     SELECT RAISE(ABORT,
-      'Una compra no se borra: anúlala.');
+      'Una compra con mercancía dentro no se borra: anúlala.');
   END;
   ''',
 
@@ -154,18 +160,23 @@ const List<String> guardasSql = [
   END;
   ''',
 
-  // ── Ni sus líneas ───────────────────────────────────────────────────────
+  // ── Solo un borrador admite líneas ──────────────────────────────────────
   //
-  // Tres triggers y no uno porque SQLite no admite `FOR EACH ROW` sobre
-  // varias operaciones a la vez, igual que en `venta_detalles`.
+  // Marcar la remisión como terminada es lo que la cierra: a partir de ahí sus
+  // líneas explican entradas de inventario ya archivadas, y una anulada además
+  // ya devolvió su mercancía. Tocarlas movería stock por algo que no está
+  // pasando.
+  //
+  // Tres triggers y no uno porque SQLite no admite `FOR EACH ROW` sobre varias
+  // operaciones a la vez, igual que en `venta_detalles`.
   '''
   CREATE TRIGGER IF NOT EXISTS guarda_compra_detalles_sin_alta
   BEFORE INSERT ON compra_detalles
   FOR EACH ROW
-  WHEN (SELECT estado FROM compras WHERE id = NEW.compra_id) = 'ANULADA'
+  WHEN (SELECT estado FROM compras WHERE id = NEW.compra_id) <> 'BORRADOR'
   BEGIN
     SELECT RAISE(ABORT,
-      'No se le agregan líneas a una compra anulada.');
+      'La compra ya está cerrada: no admite más líneas.');
   END;
   ''',
 
@@ -173,10 +184,10 @@ const List<String> guardasSql = [
   CREATE TRIGGER IF NOT EXISTS guarda_compra_detalles_sin_edicion
   BEFORE UPDATE ON compra_detalles
   FOR EACH ROW
-  WHEN (SELECT estado FROM compras WHERE id = OLD.compra_id) = 'ANULADA'
+  WHEN (SELECT estado FROM compras WHERE id = OLD.compra_id) <> 'BORRADOR'
   BEGIN
     SELECT RAISE(ABORT,
-      'No se editan las líneas de una compra anulada.');
+      'La compra ya está cerrada: sus líneas no se editan.');
   END;
   ''',
 
@@ -184,10 +195,10 @@ const List<String> guardasSql = [
   CREATE TRIGGER IF NOT EXISTS guarda_compra_detalles_sin_borrado
   BEFORE DELETE ON compra_detalles
   FOR EACH ROW
-  WHEN (SELECT estado FROM compras WHERE id = OLD.compra_id) = 'ANULADA'
+  WHEN (SELECT estado FROM compras WHERE id = OLD.compra_id) <> 'BORRADOR'
   BEGIN
     SELECT RAISE(ABORT,
-      'No se borran las líneas de una compra anulada.');
+      'La compra ya está cerrada: sus líneas no se borran.');
   END;
   ''',
 

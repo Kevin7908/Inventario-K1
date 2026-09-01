@@ -69,9 +69,16 @@ class PanelCatalogoDeuda extends ConsumerWidget {
                         panel: vista.panel,
                         conPadding: false,
                       ),
+                      // Por qué el panel está apagado: cerrada, o copia de
+                      // una orden. Decir cuál evita que el usuario busque el
+                      // botón que le falta.
                       if (!vista.editable) ...[
                         const SizedBox(height: 12),
-                        _AvisoCerrada(motivo: vista.motivo),
+                        AvisoEnLinea(
+                          mensaje: vista.motivo ??
+                              'La deuda está cerrada: no admite más repuestos.',
+                          tono: TonoAviso.alerta,
+                        ),
                       ],
                       const SizedBox(height: 16),
                       Expanded(
@@ -163,40 +170,6 @@ class _BarraState extends ConsumerState<_Barra> {
               alCambiar: _notifier.buscarEnCatalogo,
             ),
           ],
-        ],
-      ),
-    );
-  }
-}
-
-/// Por qué el panel está apagado.
-class _AvisoCerrada extends StatelessWidget {
-  const _AvisoCerrada({this.motivo});
-
-  /// Por qué no se le puede anotar nada. Son dos razones distintas —cerrada,
-  /// o copia de una orden— y decir cuál evita que el usuario busque el botón
-  /// que le falta.
-  final String? motivo;
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
-      decoration: BoxDecoration(
-        color: ColoresApp.statusWarningBg,
-        borderRadius: BorderRadius.circular(10),
-      ),
-      child: Row(
-        children: [
-          const Icon(Icons.lock_outline_rounded,
-              size: 15, color: ColoresApp.statusWarning),
-          const SizedBox(width: 8),
-          Expanded(
-            child: Text(
-              motivo ?? 'La deuda está cerrada: no admite más repuestos.',
-              style: TipografiaApp.caption,
-            ),
-          ),
         ],
       ),
     );

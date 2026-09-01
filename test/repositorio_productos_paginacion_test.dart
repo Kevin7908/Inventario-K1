@@ -138,6 +138,84 @@ void main() {
     expect(await buscar('nada'), isEmpty);
   });
 
+  test('la búsqueda encuentra las palabras en cualquier orden', () async {
+    // Nadie las escribe en el orden exacto del catálogo. Con un solo `LIKE`
+    // de la frase entera, esto no encontraba nada.
+    await repo.crear(_producto(nombre: 'Pastillas de freno Yamaha', sku: 'FRE-9'));
+    await repo.crear(_producto(nombre: 'Aceite Yamalube', sku: 'ACE-9'));
+
+    Future<List<String>> buscar(String q) async {
+      final pagina = await repo
+          .observarPagina(
+            filtro: FiltroProductos(busqueda: q),
+            pagina: 0,
+            tamano: 50,
+          )
+          .first;
+      return pagina.items.map((p) => p.nombre).toList();
+    }
+
+    expect(await buscar('freno yamaha'), ['Pastillas de freno Yamaha']);
+    expect(await buscar('yamaha   freno'), ['Pastillas de freno Yamaha'],
+        reason: 'los espacios de más no cuentan');
+    expect(await buscar('yamaha'), hasLength(1),
+        reason: 'el aceite se llama Yamalube, no Yamaha');
+    expect(await buscar('freno aceite'), isEmpty,
+        reason: 'todas las palabras tienen que aparecer');
+  });
+
+  test('las tildes no estorban: «bateria» encuentra «Baterías»', () async {
+    // Nadie teclea la tilde en el mostrador, y `LIKE` de SQLite solo ignora
+    // las mayúsculas del ASCII.
+    await repo.crear(_producto(nombre: 'Baterías Yamaha', sku: 'BAT-1'));
+    await repo.crear(_producto(nombre: 'Piñones', sku: 'PIN-1'));
+
+    Future<List<String>> buscar(String q) async {
+      final pagina = await repo
+          .observarPagina(
+            filtro: FiltroProductos(busqueda: q),
+            pagina: 0,
+            tamano: 50,
+          )
+          .first;
+      return pagina.items.map((p) => p.nombre).toList();
+    }
+
+    expect(await buscar('bateria'), ['Baterías Yamaha']);
+    expect(await buscar('BATERÍAS'), ['Baterías Yamaha']);
+    expect(await buscar('pinones'), ['Piñones']);
+  });
+
+  test('lo que coincide en el nombre va antes que lo de su categoría',
+      () async {
+    // El defecto que hacía parecer roto el buscador: con una categoría
+    // «Frenos», escribir «freno» devolvía primero todo lo que colgaba de esa
+    // categoría —ordenado por nombre—, y el repuesto buscado caía páginas
+    // más abajo.
+    final frenos = await _crearCategoria('Frenos');
+    await repo.crear(
+      _producto(nombre: 'Aceite 20W50', sku: 'ACE-1', categoriaId: frenos),
+    );
+    await repo.crear(
+      _producto(nombre: 'Zapata de freno', sku: 'ZAP-1', categoriaId: frenos),
+    );
+    await repo.crear(_producto(nombre: 'Bujía', sku: 'FRENO-X'));
+
+    final pagina = await repo
+        .observarPagina(
+          filtro: const FiltroProductos(busqueda: 'freno'),
+          pagina: 0,
+          tamano: 50,
+        )
+        .first;
+
+    expect(
+      pagina.items.map((p) => p.nombre),
+      ['Zapata de freno', 'Bujía', 'Aceite 20W50'],
+      reason: 'primero el nombre, después el SKU y al final la categoría',
+    );
+  });
+
   test('soloActivos deja fuera lo dado de baja, y el total lo refleja',
       () async {
     await repo.crear(_producto(nombre: 'Vigente', sku: 'ACT-1'));

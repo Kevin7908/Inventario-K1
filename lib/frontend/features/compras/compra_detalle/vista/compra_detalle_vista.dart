@@ -57,14 +57,26 @@ class _CompraDetalleVistaState extends ConsumerState<CompraDetalleVista> {
     }
   }
 
+  /// Sale al listado, y **descarta la remisión en la que no se anotó nada**.
+  ///
+  /// Abrir el cuadro y arrepentirse no puede dejar un borrador vacío en el
+  /// listado: no explica ningún movimiento y no llegó a ser un documento. El
+  /// que sí tiene líneas se queda como borrador, igual que una orden abierta.
   Future<void> _cerrar() async {
-    final resultado = await ref
-        .read(compraEditorProvider(widget.compraId).notifier)
-        .guardarAhora();
+    final notifier = ref.read(compraEditorProvider(widget.compraId).notifier);
+
+    final resultado = await notifier.guardarAhora();
     if (!mounted) return;
     if (resultado case Fallo(:final mensaje)) {
       MensajeApp.error(context, 'No se guardó el último cambio: $mensaje');
     }
+
+    final estado = ref.read(compraEditorProvider(widget.compraId)).value;
+    if (estado != null && estado.editable && estado.vacia) {
+      await notifier.descartarVacia();
+    }
+    if (!mounted) return;
+
     widget.alCerrar();
   }
 

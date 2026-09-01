@@ -43,19 +43,23 @@ Future<int> _proveedor({String nombre = 'Repuestos JR'}) async {
       .insert(TablaProveedorCompanion.insert(personaId: personaId));
 }
 
-/// Una remisión con una línea ya anotada, que es como queda al salir del
-/// editor. [cantidad] a [costo] es el total.
+/// Una remisión con una línea anotada y **dada por terminada**, que es como
+/// queda al salir del editor. [cantidad] a [costo] es el total.
+///
+/// Con [terminada] en `false` se queda en borrador, que es el único estado que
+/// admite más cambios.
 Future<ResultadoCompra> _compra({
   double cantidad = 12,
   int costo = 6500,
   String? factura = 'FV-2291',
   int? deProveedor,
+  bool terminada = true,
 }) async {
   final abierta = await compras.crear(
     proveedorId: deProveedor ?? proveedorId,
     numeroFactura: factura,
   );
-  if (abierta is! CompraRegistrada) return abierta;
+  if (abierta is! CompraAbierta) return abierta;
 
   final linea = await compras.agregarLinea(
     compraId: abierta.compraId,
@@ -64,6 +68,10 @@ Future<ResultadoCompra> _compra({
     costoUnitario: costo,
   );
   expect(linea, isA<Exito>(), reason: 'la línea de partida tiene que entrar');
+
+  if (terminada) {
+    expect(await compras.terminar(abierta.compraId), isA<Exito>());
+  }
   return abierta;
 }
 
@@ -101,7 +109,7 @@ void main() {
 
   group('registrar una compra mete la mercancía con su documento', () {
     test('el stock sube y el movimiento apunta a la remisión', () async {
-      final r = await _compra(cantidad: 12) as CompraRegistrada;
+      final r = await _compra(cantidad: 12) as CompraAbierta;
 
       expect(await _stock(), 22);
 
@@ -117,8 +125,8 @@ void main() {
     });
 
     test('el número sale del consecutivo, no del id', () async {
-      final primera = await _compra(factura: 'FV-1') as CompraRegistrada;
-      final segunda = await _compra(factura: 'FV-2') as CompraRegistrada;
+      final primera = await _compra(factura: 'FV-1') as CompraAbierta;
+      final segunda = await _compra(factura: 'FV-2') as CompraAbierta;
 
       expect(primera.numero, endsWith('-0001'));
       expect(segunda.numero, endsWith('-0002'));
@@ -127,7 +135,7 @@ void main() {
 
     test('el total es la suma de las líneas, no lo que diga la vista',
         () async {
-      final r = await _compra(cantidad: 12, costo: 6500) as CompraRegistrada;
+      final r = await _compra(cantidad: 12, costo: 6500) as CompraAbierta;
 
       final detalle = await compras.obtenerDetalle(r.compraId);
       expect(detalle.resumen.total, 78000);
@@ -137,7 +145,7 @@ void main() {
 
     test('la descripción de la línea se congela con el nombre del día',
         () async {
-      final r = await _compra() as CompraRegistrada;
+      final r = await _compra() as CompraAbierta;
       await db.customStatement(
         "UPDATE productos SET nombre = 'Pastilla ECO' WHERE id = "
         '${taller.productoId}',
@@ -151,7 +159,8 @@ void main() {
 
     test('el mismo producto dos veces se suma a su línea, no abre otra',
         () async {
-      final r = await _compra(cantidad: 5, costo: 6000) as CompraRegistrada;
+      final r = await _compra(cantidad: 5, costo: 6000, terminada: false)
+          as CompraAbierta;
 
       await compras.agregarLinea(
         compraId: r.compraId,
@@ -170,8 +179,11 @@ void main() {
   });
 
   group('la remisión se corrige línea a línea', () {
+    // Todo este grupo trabaja sobre **borradores**: una remisión terminada se
+    // cierra a cambios, y eso lo prueba el grupo siguiente.
     test('subir la cantidad mete solo la diferencia', () async {
-      final r = await _compra(cantidad: 5, costo: 6000) as CompraRegistrada;
+      final r = await _compra(cantidad: 5, costo: 6000, terminada: false)
+          as CompraAbierta;
       expect(await _stock(), 15);
 
       await compras.actualizarLinea((await _linea(r.compraId)).id,
@@ -183,7 +195,8 @@ void main() {
     });
 
     test('bajar la cantidad saca solo la diferencia', () async {
-      final r = await _compra(cantidad: 5, costo: 6000) as CompraRegistrada;
+      final r = await _compra(cantidad: 5, costo: 6000, terminada: false)
+          as CompraAbierta;
 
       await compras.actualizarLinea((await _linea(r.compraId)).id,
           cantidad: 2);
@@ -195,7 +208,7 @@ void main() {
     test('bajar más de lo que queda en bodega se rechaza', () async {
       // La mercancía ya se vendió: deshacer la entrada dejaría el inventario
       // en negativo.
-      final r = await _compra(cantidad: 12) as CompraRegistrada;
+      final r = await _compra(cantidad: 12, terminada: false) as CompraAbierta;
       await db.customStatement(
         'UPDATE productos SET stock_actual = 3 WHERE id = ${taller.productoId}',
       );
@@ -211,7 +224,8 @@ void main() {
 
     test('cambiar el costo no mueve stock y actualiza el del producto',
         () async {
-      final r = await _compra(cantidad: 5, costo: 6000) as CompraRegistrada;
+      final r = await _compra(cantidad: 5, costo: 6000, terminada: false)
+          as CompraAbierta;
 
       await compras.actualizarLinea((await _linea(r.compraId)).id,
           costoUnitario: 7000);
@@ -223,7 +237,7 @@ void main() {
     });
 
     test('quitar la línea saca lo que había metido', () async {
-      final r = await _compra(cantidad: 12) as CompraRegistrada;
+      final r = await _compra(cantidad: 12, terminada: false) as CompraAbierta;
 
       await compras.eliminarLinea((await _linea(r.compraId)).id);
 
@@ -235,7 +249,8 @@ void main() {
     });
 
     test('la cabecera se puede corregir sin tocar las líneas', () async {
-      final r = await _compra(factura: 'FV-1') as CompraRegistrada;
+      final r = await _compra(factura: 'FV-1', terminada: false)
+          as CompraAbierta;
       final otro = await _proveedor(nombre: 'Motopartes del Sur');
 
       final resultado = await compras.actualizarCabecera(
@@ -255,7 +270,7 @@ void main() {
 
     test('la cabecera no puede quedar con una factura ya usada', () async {
       await _compra(factura: 'FV-1');
-      final segunda = await _compra(factura: 'FV-2') as CompraRegistrada;
+      final segunda = await _compra(factura: 'FV-2') as CompraAbierta;
 
       final resultado = await compras.actualizarCabecera(
         id: segunda.compraId,
@@ -266,9 +281,28 @@ void main() {
       expect((resultado as Fallo).motivo, MotivoFallo.remisionDuplicada);
     });
 
-    test('una compra anulada ya no admite líneas', () async {
-      final r = await _compra() as CompraRegistrada;
-      await compras.anular(r.compraId);
+  });
+
+  group('el borrador se termina o se descarta', () {
+    test('nace en borrador y no cuenta como gasto del mes', () async {
+      // Su mercancía ya está en el inventario, pero falta que quien recibe
+      // diga que está todo: hasta entonces no es un gasto ni es la última
+      // compra de nada.
+      final r = await _compra(terminada: false) as CompraAbierta;
+
+      final detalle = await compras.obtenerDetalle(r.compraId);
+      expect(detalle.resumen.estado, EstadoCompra.borrador);
+      expect(await _stock(), 22, reason: 'la mercancía sí entró');
+
+      final resumen = await compras.observarResumen().first;
+      expect(resumen.comprasMes, 0);
+      expect(resumen.invertidoMes, 0);
+      expect(await compras.observarUltimaCompra(taller.productoId).first,
+          isNull);
+    });
+
+    test('terminarla la cierra a cambios', () async {
+      final r = await _compra() as CompraAbierta;
 
       final resultado = await compras.agregarLinea(
         compraId: r.compraId,
@@ -278,8 +312,91 @@ void main() {
       );
 
       expect(resultado, isA<Fallo>());
-      expect((resultado as Fallo).mensaje, contains('anulada'));
-      expect(await _stock(), 10, reason: 'y no entró nada');
+      expect((resultado as Fallo).mensaje, contains('registrada'));
+      expect(await _stock(), 22, reason: 'y no entró nada');
+    });
+
+    test('la guarda de la base lo impide aunque se escriba a mano', () async {
+      // El repositorio da el mensaje; la base cierra la puerta (§3.4).
+      final r = await _compra() as CompraAbierta;
+
+      expect(
+        () => db.into(db.tablaCompraDetalle).insert(
+              TablaCompraDetalleCompanion.insert(
+                compraId: r.compraId,
+                productoId: taller.productoId,
+                descripcion: 'Colada por la puerta de atrás',
+                cantidad: 1,
+                costoUnitario: 100,
+              ),
+            ),
+        throwsA(isA<Exception>()),
+      );
+      expect(
+        () => db.customStatement(
+          'DELETE FROM compra_detalles WHERE compra_id = ${r.compraId}',
+        ),
+        throwsA(isA<Exception>()),
+      );
+    });
+
+    test('una remisión sin líneas no se puede dar por terminada', () async {
+      final abierta =
+          await compras.crear(proveedorId: proveedorId) as CompraAbierta;
+
+      final resultado = await compras.terminar(abierta.compraId);
+
+      expect(resultado, isA<Fallo>());
+      expect((resultado as Fallo).mensaje, contains('ni una línea'));
+    });
+
+    test('el borrador vacío se descarta y no deja rastro', () async {
+      // Es lo que hace la ficha al salir sin haber anotado nada: si no, el
+      // listado se llenaría de cuadros abiertos por error.
+      final abierta =
+          await compras.crear(proveedorId: proveedorId) as CompraAbierta;
+
+      expect(await compras.descartarVacia(abierta.compraId), isA<Exito>());
+
+      final filas = await db
+          .customSelect('SELECT COUNT(*) AS n FROM compras')
+          .getSingle();
+      expect(filas.read<int>('n'), 0);
+    });
+
+    test('el borrador con mercancía dentro no se descarta', () async {
+      final r = await _compra(terminada: false) as CompraAbierta;
+
+      final resultado = await compras.descartarVacia(r.compraId);
+
+      expect(resultado, isA<Fallo>());
+      expect((resultado as Fallo).mensaje, contains('anularla'));
+      // Y la base lo impide igual, aunque se intente a mano.
+      expect(
+        () => db.customStatement('DELETE FROM compras WHERE id = ${r.compraId}'),
+        throwsA(isA<Exception>()),
+      );
+    });
+
+    test('un borrador con líneas sí se anula, y devuelve la mercancía',
+        () async {
+      final r = await _compra(cantidad: 12, terminada: false) as CompraAbierta;
+
+      expect(await compras.anular(r.compraId), isA<Exito>());
+
+      expect(await _stock(), 10);
+      expect((await compras.obtenerDetalle(r.compraId)).resumen.estado,
+          EstadoCompra.anulada);
+      expect(await inventario.descuadres(), isEmpty);
+    });
+
+    test('terminar dos veces se rechaza', () async {
+      final r = await _compra() as CompraAbierta;
+
+      final segunda = await compras.terminar(r.compraId);
+
+      expect(segunda, isA<Fallo>());
+      expect((segunda as Fallo).mensaje, contains('ya está registrada'));
     });
   });
 
@@ -308,9 +425,9 @@ void main() {
     test('una compra anulada no cuenta como la última', () async {
       final vieja = await _compra(costo: 6000, factura: 'FV-1');
       final nueva = await _compra(costo: 7200, factura: 'FV-2');
-      expect(vieja, isA<CompraRegistrada>());
+      expect(vieja, isA<CompraAbierta>());
 
-      await compras.anular((nueva as CompraRegistrada).compraId);
+      await compras.anular((nueva as CompraAbierta).compraId);
 
       final ultima =
           await compras.observarUltimaCompra(taller.productoId).first;
@@ -333,7 +450,7 @@ void main() {
 
   group('anular saca lo que había entrado', () {
     test('el stock vuelve a donde estaba y la compra queda anulada', () async {
-      final r = await _compra(cantidad: 12) as CompraRegistrada;
+      final r = await _compra(cantidad: 12) as CompraAbierta;
       expect(await _stock(), 22);
 
       final resultado = await compras.anular(r.compraId);
@@ -348,7 +465,7 @@ void main() {
     test('no se anula lo que ya se vendió', () async {
       // Deshacer la entrada dejaría el inventario en negativo. Ahí el camino
       // es un ajuste, no una anulación.
-      final r = await _compra(cantidad: 12) as CompraRegistrada;
+      final r = await _compra(cantidad: 12) as CompraAbierta;
       await db.customStatement(
         'UPDATE productos SET stock_actual = 3 WHERE id = ${taller.productoId}',
       );
@@ -363,7 +480,7 @@ void main() {
     });
 
     test('anular dos veces no saca la mercancía dos veces', () async {
-      final r = await _compra(cantidad: 12) as CompraRegistrada;
+      final r = await _compra(cantidad: 12) as CompraAbierta;
       await compras.anular(r.compraId);
 
       final segunda = await compras.anular(r.compraId);
@@ -390,14 +507,14 @@ void main() {
 
       final segunda = await _compra(factura: 'FV-2291', deProveedor: otro);
 
-      expect(segunda, isA<CompraRegistrada>());
+      expect(segunda, isA<CompraAbierta>());
     });
 
     test('varias compras sin número de factura conviven', () async {
       // El UNIQUE compuesto admite tantos NULL como haga falta: lo que llega
       // sin papel es lo más común del mostrador.
-      expect(await _compra(factura: null), isA<CompraRegistrada>());
-      expect(await _compra(factura: null), isA<CompraRegistrada>());
+      expect(await _compra(factura: null), isA<CompraAbierta>());
+      expect(await _compra(factura: null), isA<CompraAbierta>());
     });
 
     test('una remisión repetida no quema consecutivo', () async {
@@ -424,7 +541,7 @@ void main() {
 
       // Y tampoco por la puerta de atrás: con la compra abierta por otra
       // cuenta, anotarle una línea sigue pidiendo el permiso.
-      final mia = await _compra() as CompraRegistrada;
+      final mia = await _compra() as CompraAbierta;
       final linea = await soloLectura.agregarLinea(
         compraId: mia.compraId,
         productoId: taller.productoId,
@@ -437,7 +554,7 @@ void main() {
     });
 
     test('una compra no se borra: se anula', () async {
-      final r = await _compra() as CompraRegistrada;
+      final r = await _compra() as CompraAbierta;
 
       expect(
         () => db.customStatement('DELETE FROM compras WHERE id = ${r.compraId}'),
@@ -446,7 +563,7 @@ void main() {
     });
 
     test('una compra anulada ya no se toca', () async {
-      final r = await _compra() as CompraRegistrada;
+      final r = await _compra() as CompraAbierta;
       await compras.anular(r.compraId);
 
       expect(
@@ -470,7 +587,7 @@ void main() {
     });
 
     test('un estado inventado se rechaza', () async {
-      final r = await _compra() as CompraRegistrada;
+      final r = await _compra() as CompraAbierta;
 
       expect(
         () => db.customStatement(
@@ -484,7 +601,7 @@ void main() {
       // El CHECK polimórfico ahora cuenta cinco columnas: si al agregar
       // `compra_id` se hubiera quedado en cuatro, esto pasaría. La factura se
       // inserta de verdad para que lo que rechace sea el CHECK y no la FK.
-      final r = await _compra() as CompraRegistrada;
+      final r = await _compra() as CompraAbierta;
       final ventaId = await db.into(db.tablaVentas).insert(
             TablaVentasCompanion.insert(
               numeroFactura: 'FAC-9999',
@@ -547,7 +664,7 @@ void main() {
     test('los contadores del mes salen de un COUNT/SUM', () async {
       await _compra(cantidad: 10, costo: 5000, factura: 'FV-1');
       final anulada = await _compra(cantidad: 2, costo: 7000, factura: 'FV-2')
-          as CompraRegistrada;
+          as CompraAbierta;
       await compras.anular(anulada.compraId);
 
       final resumen = await compras.observarResumen().first;
@@ -587,7 +704,7 @@ void main() {
 
   group('la compra deja rastro de quién la hizo', () {
     test('la cabecera firma y la bitácora anota', () async {
-      final r = await _compra() as CompraRegistrada;
+      final r = await _compra() as CompraAbierta;
 
       final compra = await db.customSelect(
         'SELECT usuario_id FROM compras WHERE id = ?',
@@ -596,22 +713,24 @@ void main() {
       expect(compra.read<int>('usuario_id'), sesion.usuarioId);
 
       final renglon = await db.customSelect(
-        "SELECT accion, descripcion FROM bitacora WHERE entidad = 'COMPRA'",
+        "SELECT accion, descripcion FROM bitacora WHERE entidad = 'COMPRA' "
+        'ORDER BY id LIMIT 1',
       ).getSingle();
       expect(renglon.read<String>('accion'), 'CREO');
       expect(renglon.read<String>('descripcion'), contains(r.numero));
     });
 
     test('anular también deja su renglón', () async {
-      final r = await _compra() as CompraRegistrada;
+      final r = await _compra() as CompraAbierta;
       await compras.anular(r.compraId);
 
       final renglones = await db.customSelect(
         "SELECT accion FROM bitacora WHERE entidad = 'COMPRA' ORDER BY id",
       ).get();
 
+      // Abrirla, darla por terminada y anularla: los tres gestos quedan.
       expect(renglones.map((f) => f.read<String>('accion')),
-          ['CREO', 'ANULO']);
+          ['CREO', 'MODIFICO', 'ANULO']);
     });
   });
 }

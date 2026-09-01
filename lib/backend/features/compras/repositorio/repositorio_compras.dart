@@ -111,13 +111,17 @@ abstract class RepositorioCompras {
   /// La remisión con sus líneas.
   Future<CompraDetalle> obtenerDetalle(int id);
 
-  /// Abre la remisión **vacía** y devuelve su número.
+  /// Abre la remisión **vacía y en borrador**, y devuelve su número.
   ///
   /// Nace con proveedor, fecha y —si lo trae— el número de factura del
   /// proveedor; las líneas se le van anotando con [agregarLinea], igual que
   /// los repuestos de una orden. Se escribe así y no de un golpe porque es
   /// como se recibe la mercancía en el mostrador: la caja se va vaciando y
   /// cada producto se cuenta y se teclea cuando sale de ella.
+  ///
+  /// Mientras sea borrador **no cuenta como gasto del mes ni como la última
+  /// compra del producto**, aunque su mercancía ya esté en el inventario:
+  /// falta que quien recibe diga que está todo, y eso es [terminar].
   ///
   /// Rechaza la remisión repetida —mismo proveedor y mismo número de
   /// factura—, que es el error de captura que duplicaría el inventario.
@@ -175,11 +179,32 @@ abstract class RepositorioCompras {
   /// Quita la línea y saca del inventario lo que había metido.
   Future<Resultado> eliminarLinea(int lineaId);
 
+  // Cierre
+
+  /// Da la remisión por terminada: pasa de borrador a `REGISTRADA`.
+  ///
+  /// Es el gesto de quien recibe cuando ya contó todo lo que traía la caja. A
+  /// partir de ahí la remisión **se cierra a cambios** —lo garantizan las
+  /// guardas—, cuenta como gasto del mes y pasa a ser la última compra de sus
+  /// productos.
+  ///
+  /// Rechaza la remisión **sin una sola línea**: una compra que no trajo nada
+  /// no es un documento, es un cuadro que alguien abrió sin querer.
+  Future<Resultado> terminar(int id);
+
+  /// Borra el borrador **que no llegó a nada**: sin una sola línea.
+  ///
+  /// Es lo que hace la ficha al salir de una remisión en la que no se anotó
+  /// nada, para no dejar el listado lleno de cuadros abiertos por error. Con
+  /// líneas dentro rechaza: eso ya explica entradas de inventario y el camino
+  /// es [anular].
+  Future<Resultado> descartarVacia(int id);
+
   /// Anula la remisión y **saca del inventario lo que había entrado**.
   ///
-  /// No la borra: es un documento que explica movimientos y quemó un
-  /// consecutivo. Queda en `ANULADA`, con su número, y una guarda de la base
-  /// rechaza cualquier `DELETE` sobre `compras`.
+  /// Vale tanto para la terminada como para el borrador que ya tiene líneas:
+  /// las dos metieron mercancía. No la borra —es un documento que explica
+  /// movimientos—: queda en `ANULADA`, con su número.
   ///
   /// Falla si a algún producto ya no le queda stock suficiente: si la
   /// mercancía mal recibida ya se vendió, deshacer la compra dejaría el

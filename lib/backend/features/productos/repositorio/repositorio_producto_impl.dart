@@ -10,6 +10,7 @@ import '../../inventario/repositorio/repositorio_inventario.dart';
 import '../../inventario/repositorio/repositorio_inventario_impl.dart';
 import '../../../share/consecutivos/repositorio_consecutivos.dart';
 import '../../../share/utils/sku_utils.dart';
+import '../../../share/utils/texto_utils.dart';
 import '../mapper/producto_mapper.dart';
 import '../modelo/producto.dart';
 import 'repositorio_producto.dart';
@@ -406,20 +407,31 @@ class RepositorioProductosImpl with FirmaDeSesion implements RepositorioProducto
 
     final texto = filtro.busqueda.trim();
     if (texto.isNotEmpty) {
-      final patron = '%${texto.toLowerCase()}%';
       // El código de barras se compara **exacto y normalizado**, no con
       // `LIKE`: lo que llega ahí lo escribió un lector, no una persona, y
       // tiene que dar en el producto de una sola vez aunque el patrón traiga
       // los espacios que el lector inserta. Va en `OR` con lo demás para que
       // el mismo cuadro siga sirviendo para teclear un nombre.
       final codigo = normalizarCodigoBarras(texto);
+
+      // **Todas las palabras tienen que aparecer, cada una donde sea.** Antes
+      // se buscaba la frase entera con un solo `LIKE`, así que «freno yamaha»
+      // no encontraba «Frenos Yamaha FZ»: nadie escribe las palabras en el
+      // orden exacto del catálogo.
+      Expression<bool> porPalabras = const Constant(true);
+      for (final palabra in _palabras(texto)) {
+        final patron = '%$palabra%';
+        porPalabras = porPalabras &
+            (_plano(p.nombre).like(patron) |
+                _plano(p.sku).like(patron) |
+                _plano(_db.tablaCategoria.nombre).like(patron));
+      }
+
       acumulado = acumulado &
-          (p.nombre.lower().like(patron) |
-              p.sku.lower().like(patron) |
+          (porPalabras |
               (codigo == null
                   ? const Constant(false)
-                  : p.codigoBarras.equals(codigo)) |
-              _db.tablaCategoria.nombre.lower().like(patron));
+                  : p.codigoBarras.equals(codigo)));
     }
 
     final categoria = filtro.categoriaId;
@@ -437,6 +449,63 @@ class RepositorioProductosImpl with FirmaDeSesion implements RepositorioProducto
     }
 
     return acumulado;
+  }
+
+  /// Las palabras de la búsqueda, en minúsculas, sin tildes y sin huecos.
+  ///
+  /// Partirla es lo que la vuelve utilizable: quien teclea «freno yamaha»
+  /// quiere lo que sea las dos cosas, y la frase literal solo acierta si la
+  /// escribió en el mismo orden en que está el catálogo.
+  static List<String> _palabras(String texto) => aplanarTexto(texto)
+      .split(RegExp(r'\s+'))
+      .where((palabra) => palabra.isNotEmpty)
+      .toList(growable: false);
+
+  /// La columna en minúsculas **y sin tildes**, para comparar contra el patrón
+  /// ya aplanado.
+  ///
+  /// Nadie teclea «Baterías» con la tilde, y sin esto «bateria» no encontraba
+  /// nada: `LIKE` de SQLite ignora las mayúsculas del ASCII y nada más. Se
+  /// resuelve con `replace` anidados en la propia consulta y no con una
+  /// columna normalizada aparte, que sería el mismo dato guardado dos veces
+  /// (`REGLAS_BD.md` §1.1). Sobre el catálogo de un taller —miles de filas—
+  /// cuesta lo mismo que el `LIKE`, que tampoco usa índice (§5).
+  static Expression<String> _plano(Expression<String> columna) {
+    var expresion = columna.lower();
+    tildes.forEach((conTilde, sinTilde) {
+      expresion = FunctionCallExpression('replace', [
+        expresion,
+        Constant(conTilde),
+        Constant(sinTilde),
+      ]);
+    });
+    return expresion;
+  }
+
+  /// Qué tan bien responde una fila a lo que se tecleó: 0 el nombre, 1 el
+  /// SKU, 2 lo demás —hoy, el nombre de su categoría—.
+  ///
+  /// Sin esto la búsqueda **parecía rota**: como el nombre de la categoría
+  /// también cuenta, escribir «freno» devolvía cientos de aceites cuya
+  /// categoría era «Frenos», y al ordenar por nombre las pastillas de freno
+  /// caían en la página nueve. Ordenar por relevancia se hace en SQL, con un
+  /// `CASE`, y no recortando en Dart (§5).
+  Expression<int> _relevancia(String texto) {
+    final palabras = _palabras(texto);
+    if (palabras.isEmpty) return const Constant(2);
+
+    Expression<bool> todasEn(Expression<String> columna) => palabras.fold(
+          const Constant(true),
+          (acumulado, palabra) => acumulado & _plano(columna).like('%$palabra%'),
+        );
+
+    return CaseWhenExpression<int>(
+      cases: [
+        CaseWhen(todasEn(_db.tablaProducto.nombre), then: const Constant(0)),
+        CaseWhen(todasEn(_db.tablaProducto.sku), then: const Constant(1)),
+      ],
+      orElse: const Constant(2),
+    );
   }
 
   /// «Este producto le sirve a esta moto», como condición de la misma consulta.
@@ -491,10 +560,16 @@ class RepositorioProductosImpl with FirmaDeSesion implements RepositorioProducto
     required int tamano,
   }) {
     final condicion = _condicion(filtro);
+    final texto = filtro.busqueda.trim();
 
     final consultaPagina = _queryConJoin()
       ..where(condicion)
-      ..orderBy([OrderingTerm.asc(_db.tablaProducto.nombre)])
+      // Con búsqueda manda la relevancia y el nombre desempata; sin ella, el
+      // catálogo se lee en orden alfabético.
+      ..orderBy([
+        if (texto.isNotEmpty) OrderingTerm.asc(_relevancia(texto)),
+        OrderingTerm.asc(_db.tablaProducto.nombre),
+      ])
       ..limit(tamano, offset: pagina * tamano);
 
     // El total va en su propia consulta: `limit` no debe afectarlo.

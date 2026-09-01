@@ -23,9 +23,11 @@ import '../enum/enum_compras.dart';
 /// detalle, y `RepositorioCompras.descuadres()` es la consulta que afirma que
 /// coincide (§7).
 ///
-/// Una compra **no se borra: se anula**, igual que una factura. Borrarla
-/// dejaría entradas de inventario sin documento que las explique y huecos en
-/// el consecutivo. Lo impide una guarda de `guardas_sql.dart`.
+/// Una compra registrada **no se borra: se anula**, igual que una factura.
+/// Borrarla dejaría entradas de inventario sin documento que las explique. Lo
+/// impide una guarda de `guardas_sql.dart`, que deja pasar un solo caso: el
+/// borrador **sin una sola línea**, que es el que se abre por error y no llegó
+/// a ser nada.
 @TableIndex(name: 'idx_compras_proveedor', columns: {#proveedorId})
 @TableIndex(name: 'idx_compras_fecha', columns: {#fecha})
 @TableIndex(name: 'idx_compras_estado', columns: {#estado})
@@ -66,7 +68,12 @@ class TablaCompra extends Table {
   /// Uno de [EstadoCompra]. El `CHECK` sale del propio enum; el valor por
   /// defecto va literal porque el código que genera Drift no importa el enum
   /// —una constante suya ahí no compila—.
-  TextColumn get estado => text().withDefault(const Constant('REGISTRADA'))();
+  ///
+  /// **Nace como borrador**: la remisión se abre y se va tecleando, y solo
+  /// cuando quien recibe dice «ya está todo» pasa a `REGISTRADA`. Mientras
+  /// tanto no cuenta como gasto del mes ni como última compra del producto,
+  /// aunque su mercancía sí esté ya en el inventario.
+  TextColumn get estado => text().withDefault(const Constant('BORRADOR'))();
 
   TextColumn get notas => text().nullable()();
 
