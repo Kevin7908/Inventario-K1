@@ -15,6 +15,14 @@ import 'tabla_ventas.dart';
 ///
 /// Las FK a producto, servicio y técnico se conservan **además** del texto,
 /// para poder cruzar el histórico con el catálogo; no lo sustituyen.
+///
+/// **No lleva `usuario_id`, y es una decisión.** Una venta se escribe entera
+/// en una transacción, así que el autor de cada línea es siempre el de
+/// `ventas.usuario_id`: repetirlo aquí sería el dato duplicado que prohíbe
+/// `REGLAS_BD.md` §1.1, y no cumple las tres condiciones del snapshot de §1.2.
+/// Las tablas de líneas que **sí** lo llevan son las que se agregan de a una
+/// desde un editor que autoguarda, donde cada renglón lo puede poner una
+/// persona distinta.
 @TableIndex(name: 'idx_venta_detalles_venta', columns: {#ventaId})
 @TableIndex(name: 'idx_venta_detalles_producto', columns: {#productoId})
 class TablaVentaDetalles extends Table {
