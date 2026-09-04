@@ -1,6 +1,8 @@
 import 'package:pdf/pdf.dart';
 import 'package:pdf/widgets.dart' as pw;
 
+import 'formato_impreso.dart';
+
 /// Los tokens de diseño del impreso: colores y estilos de texto.
 ///
 /// Existe por lo mismo que `ColoresApp` y `TipografiaApp`: para que el papel no
@@ -10,7 +12,30 @@ import 'package:pdf/widgets.dart' as pw;
 ///
 /// Si cambia un color de marca, cambia en los dos sitios. No hay forma de
 /// evitarlo sin meter el paquete de PDF dentro de `share/`, que es peor.
-abstract final class EstiloPdf {
+///
+/// **Los colores son estáticos y los textos no.** Un verde de marca es el
+/// mismo en cualquier papel; un cuerpo de 9 pt que se lee bien en carta no
+/// cabe en una tirilla de 58 mm, así que cada tamaño se corrige con
+/// [FormatoImpreso.ajusteTexto]. Por eso se construye una instancia por
+/// impresión —`EstiloPdf.de(formato)`— en vez de tener dos juegos de
+/// constantes que habría que mantener a la par.
+///
+/// Ejemplo:
+/// ```dart
+/// final estilo = EstiloPdf.de(FormatoImpreso.tirilla80);
+/// pw.Text('Total', style: estilo.granTotalEtiqueta);
+/// ```
+class EstiloPdf {
+  const EstiloPdf._(this._ajuste);
+
+  /// Los estilos del formato pedido.
+  factory EstiloPdf.de(FormatoImpreso formato) => EstiloPdf._(
+        formato.ajusteTexto,
+      );
+
+  /// Cuánto se le suma a cada tamaño. Negativo en las tirillas.
+  final double _ajuste;
+
   // Marca
   static const verde = PdfColor.fromInt(0xFF01B763);
   static const verdeOscuro = PdfColor.fromInt(0xFF005B31);
@@ -28,75 +53,52 @@ abstract final class EstiloPdf {
   // Semánticos: se conservan aunque no sean del verde de marca.
   static const alerta = PdfColor.fromInt(0xFFB45309);
 
-  static pw.TextStyle get nombreNegocio => const pw.TextStyle(
-        fontSize: 17,
-        fontWeight: pw.FontWeight.bold,
-        color: textoPrincipal,
+  pw.TextStyle _texto(
+    double tamano, {
+    PdfColor color = textoPrincipal,
+    bool negrita = false,
+  }) =>
+      pw.TextStyle(
+        fontSize: tamano + _ajuste,
+        fontWeight: negrita ? pw.FontWeight.bold : pw.FontWeight.normal,
+        color: color,
       );
 
-  static pw.TextStyle get datosNegocio =>
-      const pw.TextStyle(fontSize: 8.5, color: textoSecundario);
+  pw.TextStyle get nombreNegocio => _texto(17, negrita: true);
 
-  static pw.TextStyle get tituloDocumento => const pw.TextStyle(
-        fontSize: 15,
-        fontWeight: pw.FontWeight.bold,
-        color: verdeOscuro,
-      );
+  pw.TextStyle get datosNegocio => _texto(8.5, color: textoSecundario);
 
-  static pw.TextStyle get numeroDocumento => const pw.TextStyle(
-        fontSize: 11,
-        fontWeight: pw.FontWeight.bold,
-        color: textoPrincipal,
-      );
+  pw.TextStyle get tituloDocumento =>
+      _texto(15, color: verdeOscuro, negrita: true);
 
-  static pw.TextStyle get etiqueta =>
-      const pw.TextStyle(fontSize: 8, color: textoTenue);
+  pw.TextStyle get numeroDocumento => _texto(11, negrita: true);
 
-  static pw.TextStyle get valor =>
-      const pw.TextStyle(fontSize: 9.5, color: textoPrincipal);
+  pw.TextStyle get etiqueta => _texto(8, color: textoTenue);
 
-  static pw.TextStyle get encabezadoTabla => const pw.TextStyle(
-        fontSize: 8,
-        fontWeight: pw.FontWeight.bold,
-        color: textoSecundario,
-      );
+  pw.TextStyle get valor => _texto(9.5);
 
-  static pw.TextStyle get celda =>
-      const pw.TextStyle(fontSize: 9, color: textoPrincipal);
+  pw.TextStyle get encabezadoTabla =>
+      _texto(8, color: textoSecundario, negrita: true);
 
-  static pw.TextStyle get celdaTenue =>
-      const pw.TextStyle(fontSize: 7.5, color: textoTenue);
+  pw.TextStyle get celda => _texto(9);
 
-  static pw.TextStyle get tituloGrupo => const pw.TextStyle(
-        fontSize: 9,
-        fontWeight: pw.FontWeight.bold,
-        color: verdeOscuro,
-      );
+  pw.TextStyle get celdaTenue => _texto(7.5, color: textoTenue);
 
-  static pw.TextStyle get totalEtiqueta =>
-      const pw.TextStyle(fontSize: 9.5, color: textoSecundario);
+  pw.TextStyle get tituloGrupo => _texto(9, color: verdeOscuro, negrita: true);
 
-  static pw.TextStyle get totalValor =>
-      const pw.TextStyle(fontSize: 9.5, color: textoPrincipal);
+  pw.TextStyle get totalEtiqueta => _texto(9.5, color: textoSecundario);
 
-  static pw.TextStyle get granTotalEtiqueta => const pw.TextStyle(
-        fontSize: 11,
-        fontWeight: pw.FontWeight.bold,
-        color: textoPrincipal,
-      );
+  pw.TextStyle get totalValor => _texto(9.5);
 
-  static pw.TextStyle get granTotalValor => const pw.TextStyle(
-        fontSize: 13,
-        fontWeight: pw.FontWeight.bold,
-        color: verde,
-      );
+  pw.TextStyle get granTotalEtiqueta => _texto(11, negrita: true);
 
-  static pw.TextStyle get saldoValor => const pw.TextStyle(
-        fontSize: 11,
-        fontWeight: pw.FontWeight.bold,
-        color: alerta,
-      );
+  pw.TextStyle get granTotalValor => _texto(13, color: verde, negrita: true);
 
-  static pw.TextStyle get pie =>
-      const pw.TextStyle(fontSize: 7.5, color: textoTenue);
+  pw.TextStyle get saldoValor => _texto(11, color: alerta, negrita: true);
+
+  pw.TextStyle get pie => _texto(7.5, color: textoTenue);
+
+  /// El encabezado reducido de la segunda página en adelante. Solo lo usa la
+  /// carta: una tirilla no tiene páginas que numerar.
+  pw.TextStyle get encabezadoContinuacion => _texto(8, color: textoTenue);
 }

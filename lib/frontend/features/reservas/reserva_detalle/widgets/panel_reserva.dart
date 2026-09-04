@@ -240,13 +240,18 @@ class _Pie extends ConsumerWidget {
   Future<void> _imprimir(BuildContext context, WidgetRef ref) async {
     try {
       final reserva = await ref.read(detalleReservaProvider(reservaId).future);
-      final negocio =
-          await leerNegocioImpreso(ref.read(repositorioConfiguracionProvider));
+      final ajustes = await leerAjustesImpresion(
+        ref.read(repositorioConfiguracionProvider),
+      );
       if (!context.mounted) return;
 
       await DialogoVistaPrevia.mostrar(
         context,
-        documento: documentoDeReserva(reserva: reserva, negocio: negocio),
+        documento: documentoDeReserva(
+          reserva: reserva,
+          negocio: ajustes.negocio,
+        ),
+        formato: ajustes.formato,
       );
     } catch (e) {
       if (!context.mounted) return;

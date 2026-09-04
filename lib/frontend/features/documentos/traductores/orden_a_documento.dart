@@ -28,7 +28,7 @@ import '../modelo/negocio_impreso.dart';
 ///
 /// Parámetros:
 /// - [orden]: la orden con sus tareas, repuestos y cargos.
-/// - [negocio]: el encabezado, de `leerNegocioImpreso`.
+/// - [negocio]: el encabezado, de `leerAjustesImpresion`.
 /// - [atendidoPor]: quién la entrega.
 ///
 /// Ejemplo:

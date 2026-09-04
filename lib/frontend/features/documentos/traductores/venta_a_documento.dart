@@ -25,7 +25,7 @@ import '../modelo/negocio_impreso.dart';
 ///
 /// Parámetros:
 /// - [venta]: la venta ya cerrada, con sus líneas.
-/// - [negocio]: el encabezado, de `negocioImpresoProvider`.
+/// - [negocio]: el encabezado, de `leerAjustesImpresion`.
 /// - [atendidoPor]: nombre de quien la cobró.
 ///
 /// Ejemplo:

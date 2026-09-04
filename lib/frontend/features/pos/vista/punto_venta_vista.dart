@@ -66,13 +66,15 @@ class _PuntoVentaVistaState extends ConsumerState<PuntoVentaVista> {
     try {
       final venta =
           await ref.read(repositorioVentasProvider).obtenerDetalle(ventaId);
-      final negocio =
-          await leerNegocioImpreso(ref.read(repositorioConfiguracionProvider));
+      final ajustes = await leerAjustesImpresion(
+        ref.read(repositorioConfiguracionProvider),
+      );
       if (!mounted) return;
 
       await DialogoVistaPrevia.mostrar(
         context,
-        documento: documentoDeVenta(venta: venta, negocio: negocio),
+        documento: documentoDeVenta(venta: venta, negocio: ajustes.negocio),
+        formato: ajustes.formato,
       );
     } catch (e) {
       if (!mounted) return;

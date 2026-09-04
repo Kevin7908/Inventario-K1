@@ -85,13 +85,15 @@ class _OrdenDetalleVistaState extends ConsumerState<OrdenDetalleVista> {
     try {
       final orden =
           await ref.read(ordenDetalleProvider(widget.ordenId).future);
-      final negocio =
-          await leerNegocioImpreso(ref.read(repositorioConfiguracionProvider));
+      final ajustes = await leerAjustesImpresion(
+        ref.read(repositorioConfiguracionProvider),
+      );
       if (!mounted) return;
 
       await DialogoVistaPrevia.mostrar(
         context,
-        documento: documentoDeOrden(orden: orden, negocio: negocio),
+        documento: documentoDeOrden(orden: orden, negocio: ajustes.negocio),
+        formato: ajustes.formato,
       );
     } catch (e) {
       if (!mounted) return;

@@ -1,4 +1,5 @@
-// El encabezado impreso tiene que decir lo que dice Configuración **hoy**.
+// El encabezado impreso —y el papel en que sale— tienen que decir lo que dice
+// Configuración **hoy**.
 //
 // Esto existe por un bug real: `negocioImpresoProvider` era un `FutureProvider`
 // cuya única dependencia era el provider del repositorio, que nunca cambia.
@@ -36,25 +37,25 @@ void main() {
       await sesionDePrueba(db, permisos: {Permiso.posVender}, usuario: 'caja'),
     );
 
-    expect((await leerNegocioImpreso(cajero)).nombre,
+    expect((await leerAjustesImpresion(cajero)).negocio.nombre,
         ClaveConfiguracion.nombreNegocio.porDefecto);
   });
 
   test('sin configurar nada usa los valores por defecto', () async {
-    final negocio = await leerNegocioImpreso(repositorio);
+    final negocio = (await leerAjustesImpresion(repositorio)).negocio;
     expect(negocio.nombre, ClaveConfiguracion.nombreNegocio.porDefecto);
   });
 
   test('cambiar el nombre se ve en la impresión siguiente', () async {
     await repositorio.guardar(
         ClaveConfiguracion.nombreNegocio, 'Taller K1 Motos');
-    expect((await leerNegocioImpreso(repositorio)).nombre, 'Taller K1 Motos');
+    expect((await leerAjustesImpresion(repositorio)).negocio.nombre, 'Taller K1 Motos');
 
     // El segundo cambio es el que importa: con la caché, este devolvía el
     // primero.
     await repositorio.guardar(
         ClaveConfiguracion.nombreNegocio, 'Motorepuestos del Valle');
-    expect((await leerNegocioImpreso(repositorio)).nombre,
+    expect((await leerAjustesImpresion(repositorio)).negocio.nombre,
         'Motorepuestos del Valle');
   });
 
@@ -64,12 +65,12 @@ void main() {
     await repositorio.guardar(ClaveConfiguracion.ciudad, 'Cali');
     await repositorio.guardar(ClaveConfiguracion.telefono, '602 555 7788');
 
-    final negocio = await leerNegocioImpreso(repositorio);
+    final negocio = (await leerAjustesImpresion(repositorio)).negocio;
     expect(negocio.lineaUbicacion, 'Cra. 8 #23-45 · Cali');
     expect(negocio.lineaContacto, 'NIT 901.555.222-8 · Tel. 602 555 7788');
 
     await repositorio.guardar(ClaveConfiguracion.ciudad, 'Palmira');
-    expect((await leerNegocioImpreso(repositorio)).lineaUbicacion,
+    expect((await leerAjustesImpresion(repositorio)).negocio.lineaUbicacion,
         'Cra. 8 #23-45 · Palmira');
   });
 }

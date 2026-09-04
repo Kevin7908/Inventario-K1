@@ -34,7 +34,7 @@ import '../modelo/negocio_impreso.dart';
 ///
 /// Parámetros:
 /// - [reserva]: la reserva con sus líneas y sus abonos.
-/// - [negocio]: el encabezado, de `negocioImpresoProvider`.
+/// - [negocio]: el encabezado, de `leerAjustesImpresion`.
 /// - [atendidoPor]: quién la atiende.
 ///
 /// Ejemplo:

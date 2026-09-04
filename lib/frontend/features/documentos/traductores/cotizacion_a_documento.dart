@@ -23,7 +23,7 @@ import '../modelo/negocio_impreso.dart';
 ///
 /// Parámetros:
 /// - [cotizacion]: la cotización con sus líneas.
-/// - [negocio]: el encabezado, de `leerNegocioImpreso`.
+/// - [negocio]: el encabezado, de `leerAjustesImpresion`.
 /// - [atendidoPor]: quién la elaboró.
 ///
 /// Ejemplo:

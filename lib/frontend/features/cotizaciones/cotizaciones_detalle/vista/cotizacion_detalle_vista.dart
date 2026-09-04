@@ -125,14 +125,18 @@ class _CotizacionDetalleVistaState
 
     try {
       final cotizacion = await ref.read(cotizacionDetalleProvider(id).future);
-      final negocio =
-          await leerNegocioImpreso(ref.read(repositorioConfiguracionProvider));
+      final ajustes = await leerAjustesImpresion(
+        ref.read(repositorioConfiguracionProvider),
+      );
       if (!mounted) return;
 
       await DialogoVistaPrevia.mostrar(
         context,
-        documento:
-            documentoDeCotizacion(cotizacion: cotizacion, negocio: negocio),
+        documento: documentoDeCotizacion(
+          cotizacion: cotizacion,
+          negocio: ajustes.negocio,
+        ),
+        formato: ajustes.formato,
       );
     } catch (e) {
       if (!mounted) return;

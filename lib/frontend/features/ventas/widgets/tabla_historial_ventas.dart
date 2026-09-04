@@ -249,13 +249,15 @@ class _Acciones extends ConsumerWidget {
     try {
       final detalle =
           await ref.read(repositorioVentasProvider).obtenerDetalle(venta.id);
-      final negocio =
-          await leerNegocioImpreso(ref.read(repositorioConfiguracionProvider));
+      final ajustes = await leerAjustesImpresion(
+        ref.read(repositorioConfiguracionProvider),
+      );
       if (!context.mounted) return;
 
       await DialogoVistaPrevia.mostrar(
         context,
-        documento: documentoDeVenta(venta: detalle, negocio: negocio),
+        documento: documentoDeVenta(venta: detalle, negocio: ajustes.negocio),
+        formato: ajustes.formato,
       );
     } catch (e) {
       if (!context.mounted) return;
