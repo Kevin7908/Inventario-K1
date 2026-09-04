@@ -10,6 +10,10 @@ import '../../../../../core/formato.dart';
 import '../../../../../core/resultado.dart';
 import '../../../../share/share.dart';
 import '../../../autenticacion/widgets/si_puede.dart';
+import '../../../documentos/provider/documentos_providers.dart';
+import '../../../documentos/traductores/compra_a_documento.dart';
+import '../../../documentos/widgets/dialogo_vista_previa.dart';
+import '../../provider/compras_providers.dart';
 import '../../widgets/estado_compra_ui.dart';
 import '../provider/compra_editor_provider.dart';
 import 'dialogo_datos_compra.dart';
@@ -190,6 +194,32 @@ class _Pie extends ConsumerWidget {
     }
   }
 
+  /// Abre la remisión impresa: el acta de lo que llegó, para archivarla con
+  /// la factura del proveedor.
+  ///
+  /// Relee el detalle en vez de armarlo con lo que tiene el editor a la vista:
+  /// el papel tiene que salir de lo que está guardado. Un borrador también se
+  /// imprime —su mercancía ya entró al inventario—, y el título lo dice.
+  Future<void> _imprimir(BuildContext context, WidgetRef ref) async {
+    try {
+      ref.invalidate(compraDetalleProvider(compraId));
+      final compra = await ref.read(compraDetalleProvider(compraId).future);
+      final ajustes = await leerAjustesImpresion(
+        ref.read(repositorioConfiguracionProvider),
+      );
+      if (!context.mounted) return;
+
+      await DialogoVistaPrevia.mostrar(
+        context,
+        documento: documentoDeCompra(compra: compra, negocio: ajustes.negocio),
+        formato: ajustes.formato,
+      );
+    } catch (e) {
+      if (!context.mounted) return;
+      MensajeApp.error(context, 'No se pudo abrir la remisión: $e');
+    }
+  }
+
   Future<void> _anular(BuildContext context, WidgetRef ref, int total) async {
     final confirmado = await DialogoConfirmacion.mostrar(
       context,
@@ -256,6 +286,17 @@ class _Pie extends ConsumerWidget {
                 icono: Icons.check_rounded,
                 alPresionar: () => unawaited(_terminar(context, ref)),
               ),
+            ),
+          ],
+          // Imprimir no mira el estado: una remisión anulada también se
+          // archiva, y el título del papel dice que lo está.
+          if (datos.lineas > 0) ...[
+            const SizedBox(height: 10),
+            BotonSecundario(
+              etiqueta: 'Imprimir remisión',
+              icono: Icons.print_outlined,
+              expandido: true,
+              alPresionar: () => unawaited(_imprimir(context, ref)),
             ),
           ],
           if (datos.lineas > 0 && datos.estado != EstadoCompra.anulada) ...[

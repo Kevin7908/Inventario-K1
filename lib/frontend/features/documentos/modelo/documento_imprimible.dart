@@ -22,8 +22,14 @@ import 'negocio_impreso.dart';
 /// - [fecha]: cuándo se emitió.
 /// - [cliente], [documentoCliente]: a quién. Opcionales: el mostrador vende sin
 ///   pedir cédula.
+/// - [etiquetaDestinatario]: cómo se rotula ese bloque. «Cliente» en los cinco
+///   documentos que salen del taller, «Proveedor» en la remisión de compra,
+///   que es el único que entra. Es un parámetro y no un documento aparte
+///   porque la franja es la misma —un nombre y un dato que lo identifica— y
+///   solo cambia el rótulo, igual que [tituloMovimientos].
 /// - [atendidoPor]: quién lo hizo, para que el papel diga lo mismo que la
 ///   bitácora.
+/// - [etiquetaAtendidoPor]: su rótulo. Una compra no se «atiende», se recibe.
 /// - [bloques]: las líneas, agrupadas. Un solo bloque sin título es lo normal;
 ///   una venta con repuestos y mano de obra usa dos.
 /// - [subtotal], [descuento], [total]: en pesos enteros, como toda la app.
@@ -51,7 +57,9 @@ class DocumentoImprimible extends Equatable {
     required this.fecha,
     this.cliente,
     this.documentoCliente,
+    this.etiquetaDestinatario = 'Cliente',
     this.atendidoPor,
+    this.etiquetaAtendidoPor = 'Atendido por',
     required this.bloques,
     required this.subtotal,
     this.descuento = 0,
@@ -69,7 +77,9 @@ class DocumentoImprimible extends Equatable {
   final DateTime fecha;
   final String? cliente;
   final String? documentoCliente;
+  final String etiquetaDestinatario;
   final String? atendidoPor;
+  final String etiquetaAtendidoPor;
   final List<BloqueLineas> bloques;
   final int subtotal;
   final int descuento;
@@ -95,7 +105,9 @@ class DocumentoImprimible extends Equatable {
         fecha,
         cliente,
         documentoCliente,
+        etiquetaDestinatario,
         atendidoPor,
+        etiquetaAtendidoPor,
         bloques,
         subtotal,
         descuento,

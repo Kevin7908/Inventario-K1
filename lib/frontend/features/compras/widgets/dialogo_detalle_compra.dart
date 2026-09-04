@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
@@ -5,6 +7,9 @@ import '../../../../backend/features/compras/modelo/compra_item.dart';
 import '../../../../backend/features/compras/modelo/compra_resumen.dart';
 import '../../../../core/formato.dart';
 import '../../../share/share.dart';
+import '../../documentos/provider/documentos_providers.dart';
+import '../../documentos/traductores/compra_a_documento.dart';
+import '../../documentos/widgets/dialogo_vista_previa.dart';
 import '../../productos/widgets/miniatura_linea.dart';
 import '../provider/compras_providers.dart';
 import 'estado_compra_ui.dart';
@@ -12,9 +17,11 @@ import 'estado_compra_ui.dart';
 /// Un vistazo a la remisión desde fuera del módulo: qué llegó, a cuánto y de
 /// quién.
 ///
-/// **Solo lee.** Existe para el «ver la remisión COM-0007» de la ficha del
-/// producto: corregirla o anularla se hace en su ficha, que es una pantalla
-/// entera dentro de Compras y a la que desde aquí no hay cómo navegar.
+/// **Solo lee, pero sí imprime.** Existe para el «ver la remisión COM-0007» de
+/// la ficha del producto: corregirla o anularla se hace en su ficha, que es una
+/// pantalla entera dentro de Compras y a la que desde aquí no hay cómo navegar.
+/// Sacar el papel no cambia nada, así que no hay razón para obligar a dar ese
+/// rodeo: es el mismo `documentoDeCompra` que abre el pie de la ficha.
 ///
 /// Ejemplo:
 /// ```dart
@@ -56,13 +63,37 @@ class DialogoDetalleCompra extends ConsumerWidget {
   }
 }
 
-class _Contenido extends StatelessWidget {
+class _Contenido extends ConsumerWidget {
   const _Contenido({required this.detalle});
 
   final CompraDetalle detalle;
 
+  /// El mismo impreso que la ficha de la remisión. El detalle ya está en la
+  /// mano —es lo que esta pantalla acaba de pintar—, así que aquí solo falta
+  /// el encabezado del taller.
+  Future<void> _imprimir(BuildContext context, WidgetRef ref) async {
+    try {
+      final ajustes = await leerAjustesImpresion(
+        ref.read(repositorioConfiguracionProvider),
+      );
+      if (!context.mounted) return;
+
+      await DialogoVistaPrevia.mostrar(
+        context,
+        documento: documentoDeCompra(
+          compra: detalle,
+          negocio: ajustes.negocio,
+        ),
+        formato: ajustes.formato,
+      );
+    } catch (e) {
+      if (!context.mounted) return;
+      MensajeApp.error(context, 'No se pudo abrir la remisión: $e');
+    }
+  }
+
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
     final compra = detalle.resumen;
 
     return Column(
@@ -135,6 +166,12 @@ class _Contenido extends StatelessWidget {
               )
             else
               const Spacer(),
+            BotonSecundario(
+              etiqueta: 'Imprimir',
+              icono: Icons.print_outlined,
+              alPresionar: () => unawaited(_imprimir(context, ref)),
+            ),
+            const SizedBox(width: 10),
             BotonSecundario(
               etiqueta: 'Cerrar',
               alPresionar: () => Navigator.of(context).pop(),

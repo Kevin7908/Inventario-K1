@@ -25,6 +25,11 @@ import '../../../../share/share.dart';
 /// - [colorAvance]: el de la barra, decidido por la situación de la deuda.
 /// - [alDarPorPerdida]: `null` si la deuda ya está cerrada.
 /// - [alReabrir]: `null` salvo que esté dada por perdida. Deshace lo anterior.
+/// - [alImprimir]: abre el comprobante de la cuenta. Va como acción secundaria
+///   y **sin condición de estado**, igual que en una reserva: una deuda
+///   saldada o dada por perdida también se imprime, porque el cliente puede
+///   venir a pedir el papel después —y en el caso de la saldada, ese papel es
+///   justamente el que le sirve—.
 ///
 /// Ejemplo:
 /// ```dart
@@ -43,6 +48,7 @@ class PieDeuda extends StatelessWidget {
     required this.colorAvance,
     this.alDarPorPerdida,
     this.alReabrir,
+    this.alImprimir,
   });
 
   final int total;
@@ -50,6 +56,7 @@ class PieDeuda extends StatelessWidget {
   final Color colorAvance;
   final VoidCallback? alDarPorPerdida;
   final VoidCallback? alReabrir;
+  final VoidCallback? alImprimir;
 
   int get _saldo => (total - pagado).clamp(0, total);
 
@@ -89,8 +96,17 @@ class PieDeuda extends StatelessWidget {
               : '${(_progreso * 100).round()} % cobrado',
           style: TipografiaApp.caption.copyWith(fontSize: 11.5),
         ),
-        if (alDarPorPerdida != null) ...[
+        if (alImprimir != null) ...[
           const SizedBox(height: 16),
+          BotonSecundario(
+            etiqueta: 'Imprimir comprobante',
+            icono: Icons.print_outlined,
+            expandido: true,
+            alPresionar: alImprimir,
+          ),
+        ],
+        if (alDarPorPerdida != null) ...[
+          SizedBox(height: alImprimir != null ? 10 : 16),
           BotonDestructivo(
             etiqueta: 'Dar por perdida',
             icono: Icons.money_off_rounded,

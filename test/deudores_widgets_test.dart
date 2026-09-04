@@ -188,6 +188,29 @@ void main() {
       expect(find.text('Volver a cobrarla'), findsNothing);
     });
 
+    testWidgets('imprimir se ofrece incluso en una deuda ya cerrada',
+        (tester) async {
+      // **Sin condición de estado**, igual que en una reserva: quien viene a
+      // pedir el papel de una cuenta saldada viene justamente a que diga que
+      // no debe nada.
+      var impresa = false;
+      await _pump(
+        tester,
+        PieDeuda(
+          total: 50000,
+          pagado: 50000,
+          colorAvance: ColoresApp.statusSuccess,
+          alImprimir: () => impresa = true,
+        ),
+      );
+
+      await tester.tap(find.text('Imprimir comprobante'));
+      await tester.pump();
+
+      expect(impresa, isTrue);
+      expect(find.text('Dar por perdida'), findsNothing);
+    });
+
     testWidgets('dar por perdida avisa por su callback', (tester) async {
       var perdida = false;
       await _pump(
