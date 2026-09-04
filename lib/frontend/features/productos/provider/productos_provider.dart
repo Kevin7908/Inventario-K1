@@ -264,10 +264,22 @@ final productosProvider =
 
 /// Catálogo completo, en vivo.
 ///
-/// Para lo que necesita buscar sobre **todo** el inventario: el punto de
-/// venta y los buscadores de factura y de orden. La tabla de Productos no lo
-/// usa — esa va paginada contra la base de datos.
-final catalogoCompletoProvider = StreamProvider<List<Producto>>(
+/// Para lo que necesita buscar sobre **todo** el inventario: los buscadores de
+/// los editores de orden, cotización, reserva y deuda. La tabla de Productos
+/// no lo usa — esa va paginada contra la base de datos.
+///
+/// **`autoDispose` y no global**, aunque lo miren cinco pantallas. Sin esto,
+/// abrir **una vez** cualquier editor dejaba el catálogo entero en memoria
+/// hasta cerrar sesión, y —lo que cuesta de verdad— dejaba viva una consulta
+/// con cinco tablas unidas que Drift vuelve a correr completa ante cualquier
+/// cambio en productos, categorías o proveedores: cada venta del mostrador
+/// mueve `stock_actual` y rearmaba los miles de objetos del catálogo para
+/// nadie.
+///
+/// El precio es que cerrar y reabrir un editor rehace la consulta. Se paga
+/// con gusto: es una vez por editor, contra una vez por cada movimiento de
+/// stock del día.
+final catalogoCompletoProvider = StreamProvider.autoDispose<List<Producto>>(
   name: 'catalogoCompletoProvider',
   (ref) => ref.watch(repositorioProductosProvider).observarTodos(),
 );

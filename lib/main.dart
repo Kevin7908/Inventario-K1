@@ -9,6 +9,7 @@ import 'frontend/share/temas/colores_app.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
+  _acotarCacheDeImagenes();
 
   // Ya no hay `setupLocator()`: la única base de datos y todos los
   // repositorios los construye Riverpod. `get_it` salió del proyecto con la
@@ -27,6 +28,24 @@ Future<void> main() async {
       child: const MainApp(),
     ),
   );
+}
+
+/// Le pone techo al caché de imágenes de Flutter.
+///
+/// El valor por defecto es **100 MB**, pensado para un teléfono que enseña
+/// fotos a pantalla completa. Aquí las imágenes son miniaturas de repuesto de
+/// 44 px en tablas de cientos de filas: con el techo de fábrica, recorrer el
+/// catálogo llenaba 100 MB de decodificaciones que ya nadie mira, y esa
+/// memoria no vuelve sola.
+///
+/// 32 MB dan de sobra para lo que cabe en pantalla y varias pantallas de
+/// scroll hacia atrás. Las miniaturas ya se decodifican al tamaño en que se
+/// pintan (`cacheWidth`/`cacheHeight` en `producto_vista.dart`), así que cada
+/// entrada del caché es pequeña y en 32 MB caben muchas.
+void _acotarCacheDeImagenes() {
+  PaintingBinding.instance.imageCache
+    ..maximumSizeBytes = 32 << 20
+    ..maximumSize = 300;
 }
 
 /// Pasa a memoria lo que la app necesita saber antes de pintar nada.
