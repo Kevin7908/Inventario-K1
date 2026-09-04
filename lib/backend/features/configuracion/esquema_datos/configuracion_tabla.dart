@@ -3,7 +3,8 @@ import 'package:drift/drift.dart';
 /// Los datos del negocio, en pares clave-valor.
 ///
 /// El archivo estaba **vacío**: el NIT, la dirección y el IVA del taller no se
-/// guardaban en ninguna parte, y `kIva` vivía como constante en el código.
+/// guardaban en ninguna parte, y la tasa de IVA vivía como constante en el
+/// código.
 ///
 /// Clave-valor y no una tabla de una sola fila con una columna por dato porque
 /// esto crece de a poco —hoy el NIT, mañana el pie de página de la factura— y

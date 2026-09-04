@@ -152,19 +152,33 @@ void main() {
   });
 
   group('totales', () {
-    // `kIva` es una constante de compilación, así que un test no puede
-    // moverla: lo que se comprueba es que **hoy**, con la tasa en 0, el pie no
-    // pinta ni subtotal ni IVA. Si algún día `kIva` deja de ser 0, este test
-    // avisa cambiando de resultado y hay que actualizarlo.
+    // La tasa se configura, así que este grupo puede probar las dos caras. La
+    // global se devuelve a 0 después de cada test: sin eso, el orden en que
+    // corran cambiaría el resultado del siguiente.
+    tearDown(() => configurarIva(0));
+
     testWidgets('sin IVA el pie va directo al total', (tester) async {
+      configurarIva(0);
       await _pump(tester, const TotalesCotizacion(cotizacionId: null));
       await tester.pumpAndSettle();
 
       expect(find.text('Total'), findsOneWidget);
-      expect(hayIva, isFalse, reason: 'el taller no factura IVA hoy');
+      expect(hayIva, isFalse);
       expect(find.text(etiquetaIva), findsNothing);
       // Sin descuento, subtotal y total son el mismo número.
       expect(find.text('Subtotal'), findsNothing);
+    });
+
+    testWidgets('con la tasa puesta el pie discrimina el IVA', (tester) async {
+      configurarIva(19);
+      await _pump(tester, const TotalesCotizacion(cotizacionId: null));
+      await tester.pumpAndSettle();
+
+      // El renglón dice el porcentaje vigente, no uno quemado: es lo que
+      // dejaba de poder probarse cuando la tasa era una constante de
+      // compilación.
+      expect(find.text('IVA (19%) incluido'), findsOneWidget);
+      expect(find.text(etiquetaIva), findsOneWidget);
     });
   });
 

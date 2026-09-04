@@ -1,9 +1,14 @@
 // El IVA va **dentro** del precio, no encima: `ivaIncluidoEn` lo extrae.
 //
-// Es la aritmética más delicada del sistema y `kIva` vale 0 hoy, así que con
-// la constante real ningún test probaría nada. Por eso se prueba contra
-// `ivaIncluidoEnConTasa`, que recibe la tasa, y aparte se comprueba que la
-// función que usa la app delega en ella.
+// Es la aritmética más delicada del sistema y la tasa vale 0 en un taller
+// recién instalado, así que la aritmética se prueba contra
+// `ivaIncluidoEnConTasa`, que recibe la tasa. Aparte se comprueba lo que la
+// tasa configurada sí decide: que `ivaIncluidoEn` delegue en ella, que
+// `hayIva` y `etiquetaIva` la sigan, y que valores absurdos se recorten.
+//
+// La tasa es una global —ver el porqué en `core/iva_app.dart`—, así que cada
+// test que la mueva la devuelve a 0 en su `tearDown`. Sin eso, el orden de los
+// tests cambiaría los resultados.
 import 'package:flutter_test/flutter_test.dart';
 import 'package:inventario_k1/core/iva_app.dart';
 
@@ -45,16 +50,54 @@ void main() {
   });
 
   group('la función que usa la app', () {
-    test('delega en la de tasa explícita con kIva', () {
+    tearDown(() => configurarIva(0));
+
+    test('delega en la de tasa explícita con la tasa configurada', () {
+      configurarIva(19);
       for (final monto in [0, 1000, 87654]) {
-        expect(ivaIncluidoEn(monto), ivaIncluidoEnConTasa(monto, kIva));
+        expect(ivaIncluidoEn(monto), ivaIncluidoEnConTasa(monto, tasaIva));
       }
     });
 
-    test('hoy kIva es 0, así que no hay IVA en ninguna parte', () {
+    test('sin tasa configurada no hay IVA en ninguna parte', () {
       expect(hayIva, isFalse);
       expect(ivaIncluidoEn(100000), 0);
       expect(baseSinIva(100000), 100000);
+    });
+  });
+
+  group('la tasa se configura, no se compila', () {
+    tearDown(() => configurarIva(0));
+
+    test('el porcentaje que se teclea es el que se aplica', () {
+      configurarIva(19);
+      expect(tasaIva, 0.19);
+      expect(porcentajeIva, 19);
+      expect(hayIva, isTrue);
+      expect(ivaIncluidoEn(119000), 19000);
+    });
+
+    test('la etiqueta del renglón sale de la tasa, no de una constante', () {
+      configurarIva(19);
+      expect(etiquetaIva, 'IVA (19%) incluido');
+      configurarIva(5);
+      expect(etiquetaIva, 'IVA (5%) incluido');
+    });
+
+    test('volver a 0 apaga el IVA en todas partes', () {
+      configurarIva(19);
+      configurarIva(0);
+      expect(hayIva, isFalse);
+      expect(ivaIncluidoEn(119000), 0);
+    });
+
+    test('un valor absurdo se recorta en vez de romper el cálculo', () {
+      // Una tasa negativa no significa nada y una por encima de 100 dejaría la
+      // base imponible en negativo. El campo de Configuración ya lo evita,
+      // pero la garantía tiene que estar donde vive la tasa.
+      expect(configurarIva(-30), 0);
+      expect(configurarIva(250), 1.0);
+      expect(porcentajeIva, 100);
     });
   });
 }

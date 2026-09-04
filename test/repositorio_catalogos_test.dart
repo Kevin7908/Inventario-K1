@@ -164,7 +164,8 @@ void main() {
 
   group('configuración', () {
     test('una clave sin configurar devuelve su valor por defecto', () async {
-      expect(await configuracion.leer(ClaveConfiguracion.moneda), 'COP');
+      expect(await configuracion.leer(ClaveConfiguracion.formatoImpresion),
+          'CARTA');
       expect(await configuracion.leer(ClaveConfiguracion.nit), '');
     });
 
@@ -189,7 +190,7 @@ void main() {
 
       expect(valores.keys.toSet(), ClaveConfiguracion.values.toSet());
       expect(valores[ClaveConfiguracion.ciudad], 'Medellín');
-      expect(valores[ClaveConfiguracion.moneda], 'COP');
+      expect(valores[ClaveConfiguracion.formatoImpresion], 'CARTA');
     });
   });
 }

@@ -173,7 +173,7 @@ class Producto extends Equatable {
   /// Alias booleano para compatibilidad con filtros del ViewModel.
   bool get sinStock => estadoStock == EstadoStock.sinStock;
 
-  /// Cuánto IVA va **dentro** de [precioVenta], según la tasa global [kIva].
+  /// Cuánto IVA va **dentro** de [precioVenta], según la tasa global [tasaIva].
   ///
   /// [precioVenta] ya es el precio final: el IVA no se le suma encima, se le
   /// extrae para poder discriminarlo. Es informativo —para ver en la ficha

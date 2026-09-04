@@ -1,22 +1,62 @@
 /// Tasa de IVA del negocio. **Única fuente de verdad de todo el sistema.**
 ///
-/// Antes convivían tres constantes con valores distintos —esta en 0, y dos
+/// Antes convivían tres constantes con valores distintos —una en 0, y dos
 /// `kTasaIva` en 0.19 (en `producto.dart` y en el repositorio de
 /// cotizaciones)—, así que el mismo producto salía sin IVA por el punto de
 /// venta y con 19% por una cotización. Ahora todo el cálculo pasa por aquí:
 /// cambiar este número cambia el POS, las cotizaciones, las órdenes y los
 /// productos a la vez.
 ///
+/// **Se configura, no se programa.** La tasa vive en la tabla `configuracion`
+/// (`ClaveConfiguracion.ivaPorcentaje`) y `main()` la carga con
+/// [configurarIva] antes del primer frame; la pantalla de Configuración la
+/// vuelve a aplicar al guardar. Fue una constante de compilación hasta que se
+/// conectó la clave, y por eso el valor por defecto sigue siendo 0: un taller
+/// que no factura IVA no tiene nada que hacer.
+///
 /// Si vale 0, el IVA es 0 en todas partes y la interfaz **esconde** el renglón
 /// en vez de mostrar un `$0` que solo estorba.
 ///
 /// No confundir con el IVA **guardado** en cada documento (`cotizaciones.iva`,
 /// `ventas.iva`): esos son el registro histórico de con qué tasa se cerró esa
-/// operación y no se recalculan al cambiar esta constante.
-const double kIva = 0.0;
+/// operación y no se recalculan al cambiar la tasa vigente. Subir el IVA
+/// mañana no reescribe la factura de ayer.
+///
+/// **Es un valor global y no una dependencia por constructor**, que es la
+/// excepción a `CLAUDE.md` §3: no es un colaborador que un test necesite
+/// sustituir por otro, es un escalar que leen funciones puras. Pasarlo por el
+/// constructor obligaría a enhebrarlo por seis repositorios, cuatro estados de
+/// editor y ocho widgets para que todos vean el mismo número —que es
+/// exactamente el problema que este archivo existe para resolver—. Lo que sí
+/// hace falta es que un test lo pueda fijar, y para eso está [configurarIva].
+library;
 
-/// `true` si hay que cobrar IVA. Evita repetir `kIva > 0` por toda la interfaz.
-bool get hayIva => kIva > 0;
+/// La tasa vigente. Empieza en 0 y la pisa [configurarIva] al arrancar.
+double _tasa = 0.0;
+
+/// La tasa de IVA de hoy: `0.19` es 19%.
+double get tasaIva => _tasa;
+
+/// Fija la tasa vigente. La llama `main()` con lo que diga la base, y la
+/// pantalla de Configuración cada vez que se guarda.
+///
+/// [porcentaje] es lo que el usuario teclea: `19` es 19%. Se recorta a
+/// `0..100` porque una tasa negativa no significa nada y una por encima de 100
+/// haría que la base imponible saliera negativa.
+///
+/// Devuelve la tasa que quedó, para que quien la fija pueda decir en pantalla
+/// qué se aplicó de verdad.
+double configurarIva(num porcentaje) {
+  _tasa = porcentaje.clamp(0, 100) / 100;
+  return _tasa;
+}
+
+/// La tasa como porcentaje entero, que es como se guarda y como se teclea.
+int get porcentajeIva => (_tasa * 100).round();
+
+/// `true` si hay que cobrar IVA. Evita repetir `tasaIva > 0` por toda la
+/// interfaz.
+bool get hayIva => _tasa > 0;
 
 /// Cuánto IVA hay **dentro** de [montoConIva].
 ///
@@ -38,14 +78,13 @@ bool get hayIva => kIva > 0;
 ///
 /// Con la tasa en 0 devuelve 0, así que quien lo llame no necesita comprobar
 /// [hayIva] antes.
-int ivaIncluidoEn(num montoConIva) => ivaIncluidoEnConTasa(montoConIva, kIva);
+int ivaIncluidoEn(num montoConIva) => ivaIncluidoEnConTasa(montoConIva, _tasa);
 
 /// [ivaIncluidoEn] con la tasa explícita.
 ///
-/// Existe porque [kIva] es una constante de compilación: sin este parámetro,
-/// la aritmética de extraer el IVA —que es lo más delicado de todo el cálculo—
-/// solo se podría probar con la tasa en 0, que devuelve 0 y no prueba nada.
-/// La app siempre llama a [ivaIncluidoEn]; esto es para los tests.
+/// Existe para poder probar la aritmética —que es lo más delicado de todo el
+/// cálculo— con varias tasas dentro del mismo test, sin tener que mover la
+/// global y acordarse de dejarla como estaba.
 int ivaIncluidoEnConTasa(num montoConIva, double tasa) {
   if (tasa <= 0) return 0;
   final base = (montoConIva / (1 + tasa)).round();
@@ -64,6 +103,6 @@ bool ivaCuadra(int montoConIva, double tasa) {
   return (montoConIva - iva) + iva == montoConIva;
 }
 
-/// Etiqueta del renglón de IVA: "IVA (19%) incluido". Sale de [kIva], no a
+/// Etiqueta del renglón de IVA: "IVA (19%) incluido". Sale de [tasaIva], no a
 /// mano. Dice "incluido" porque el renglón informa, no suma.
-String get etiquetaIva => 'IVA (${(kIva * 100).toStringAsFixed(0)}%) incluido';
+String get etiquetaIva => 'IVA ($porcentajeIva%) incluido';
