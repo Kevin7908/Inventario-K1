@@ -5,11 +5,14 @@ import 'package:inventario_k1/backend/share/database/app_db.dart';
 import '../../../../core/resultado.dart';
 import '../../../share/consecutivos/documento_consecutivo.dart';
 import '../../../share/consecutivos/repositorio_consecutivos.dart';
-import '../../../share/dominio/metodo_pago.dart';
 import '../../inventario/modelo/movimiento_inventario.dart';
 import '../../inventario/repositorio/repositorio_inventario.dart';
 import '../../inventario/repositorio/repositorio_inventario_impl.dart';
 import '../../ordenes/enum/enum_ordenes.dart';
+import '../../pos/enum/enum_ventas.dart';
+import '../../pos/modelo/linea_venta_documento.dart';
+import '../../pos/repositorio/repositorio_ventas.dart';
+import '../../pos/repositorio/repositorio_ventas_impl.dart';
 import '../enum/enum_deudor.dart';
 import '../mapper/deudor_mapper.dart';
 import '../modelo/deudor_detalle.dart';
@@ -63,6 +66,11 @@ class RepositorioDeudoresImpl
   late final RepositorioConsecutivos _consecutivos = RepositorioConsecutivos(
     _db,
   );
+
+  /// Saldar una deuda la mete en el historial de ventas. Se construye aquí y
+  /// no se recibe por el constructor por lo mismo que `_inventario`: es una
+  /// pieza del backend sobre la misma base y la misma sesión.
+  late final RepositorioVentas _ventas = RepositorioVentasImpl(_db, sesion);
 
   /// El **único** camino por el que cambia el stock (§7 de `REGLAS_BD.md`).
   late final RepositorioInventario _inventario = RepositorioInventarioImpl(
@@ -802,6 +810,20 @@ class RepositorioDeudoresImpl
     return _envolver(
       () => _db.transaction(() async {
         final deudor = await _fila(id);
+
+        // Una deuda saldada ya emitió su factura, y una factura no se borra
+        // —lo impide además una guarda de la base—. Sin este aviso, el
+        // `restrict` de `ventas.deudor_id` devolvería un error de SQLite que
+        // no se le puede enseñar a nadie.
+        final facturada = await _ventas.ventaDeDocumento(deudorId: id);
+        if (facturada != null) {
+          throw Exception(
+            'La deuda ${deudor?.numero ?? '#$id'} ya se cobró y quedó en la '
+            'factura ${facturada.numeroFactura}: una factura emitida no se '
+            'borra. Si hubo un error, anula la factura.',
+          );
+        }
+
         // La deuda que copia una orden **no devuelve nada**: sus repuestos
         // los sigue debiendo la orden, que es donde salieron del estante.
         // Devolverlos aquí inflaría el inventario con piezas que están
@@ -1107,6 +1129,65 @@ class RepositorioDeudoresImpl
         estado: Value(nuevoEstado.valor),
         actualizadoEn: Value(DateTime.now()),
       ),
+    );
+
+    // Terminar de pagar es cobrar: ahí es donde la deuda entra al historial de
+    // ventas. Va dentro de la transacción del pago para que una factura
+    // fallida no deje la deuda saldada sin su venta.
+    if (nuevoEstado == EstadoDeudor.pagada) {
+      await _facturarSaldo(deudorId);
+    }
+  }
+
+  /// Escribe la factura de la deuda recién saldada.
+  ///
+  /// **No mueve inventario**: la mercancía salió del estante cuando se fió, no
+  /// ahora. Y **no factura la orden de la que venga**: si la deuda nació de
+  /// una orden cerrada a crédito, esa orden no se facturó al entregarse
+  /// —`RepositorioOrdenes` lo comprueba— justamente para que el trabajo se
+  /// cobre una sola vez, aquí.
+  ///
+  /// Volver a saldar una deuda que ya tiene factura no escribe otra: lo
+  /// devuelve `registrarVentaDeDocumento`, y el `UNIQUE` de
+  /// `ventas.deudor_id` es la garantía. Importa porque este método corre en
+  /// cada recálculo del caché, no solo en el pago que la salda.
+  ///
+  /// El método de pago es el del **último** pago recibido, que es el que
+  /// cerró la cuenta: una deuda puede haberse pagado con tres abonos de
+  /// formas distintas y la factura solo tiene una casilla.
+  Future<void> _facturarSaldo(int deudorId) async {
+    final detalle = await obtenerDetalle(deudorId);
+    if (detalle.items.isEmpty) return;
+
+    await _ventas.registrarVentaDeDocumento(
+      tipo: TipoVenta.deuda,
+      deudorId: deudorId,
+      clienteId: detalle.resumen.clienteId,
+      metodoPago:
+          detalle.pagos.isEmpty ? MetodoPago.efectivo : detalle.pagos.last.metodoPago,
+      lineas: [
+        for (final item in detalle.items)
+          LineaVentaDocumento(
+            descripcion: item.descripcion,
+            cantidad: item.cantidad,
+            precioUnitario: item.precioUnitario,
+            // Sin producto es mano de obra o un cargo suelto de la orden que
+            // se fió: va como servicio sin catálogo detrás.
+            tipoItem: item.productoId == null
+                ? TipoItem.servicio
+                : TipoItem.producto,
+            productoId: item.productoId,
+          ),
+      ],
+      // El subtotal se reconstruye sumándole el descuento al total, como en el
+      // impreso: `monto_total` ya viene rebajado y la suma de las líneas no
+      // tiene por qué cuadrar al peso con lo que se fió.
+      subtotal: detalle.resumen.montoTotal + detalle.resumen.descuento,
+      descuento: detalle.resumen.descuento,
+      // El IVA ya va **dentro** de `monto_total`: la deuda hereda el total de
+      // la orden, que se cerró con su impuesto sumado. Se discrimina, no se
+      // vuelve a agregar (`core/iva_app.dart`).
+      iva: 0,
     );
   }
 

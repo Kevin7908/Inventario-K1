@@ -3,13 +3,16 @@ import '../../../../core/iva_app.dart';
 import '../../../../core/resultado.dart';
 import '../../../share/consecutivos/documento_consecutivo.dart';
 import '../../../share/consecutivos/repositorio_consecutivos.dart';
-import '../../../share/dominio/metodo_pago.dart';
 import 'package:drift/drift.dart';
 import 'package:inventario_k1/backend/share/database/app_db.dart';
 
 import '../../inventario/modelo/movimiento_inventario.dart';
 import '../../inventario/repositorio/repositorio_inventario.dart';
 import '../../inventario/repositorio/repositorio_inventario_impl.dart';
+import '../../pos/enum/enum_ventas.dart';
+import '../../pos/modelo/linea_venta_documento.dart';
+import '../../pos/repositorio/repositorio_ventas.dart';
+import '../../pos/repositorio/repositorio_ventas_impl.dart';
 import '../enum/enum_reserva.dart';
 import '../mapper/reserva_mapper.dart';
 import '../modelo/reserva_abono.dart';
@@ -62,6 +65,12 @@ class RepositorioReservasImpl
   late final RepositorioConsecutivos _consecutivos = RepositorioConsecutivos(
     _db,
   );
+
+  /// Terminar de abonar una reserva la mete en el historial de ventas. Se
+  /// construye aquí y no se recibe por el constructor por lo mismo que
+  /// `_inventario`: es una pieza del backend sobre la misma base y la misma
+  /// sesión.
+  late final RepositorioVentas _ventas = RepositorioVentasImpl(_db, sesion);
 
   /// Reservar y liberar mueven stock, y eso solo se hace por aquí.
   late final RepositorioInventario _inventario = RepositorioInventarioImpl(
@@ -776,6 +785,50 @@ class RepositorioReservasImpl
         pagadoAcumulado: Value(pagado),
         actualizadoEn: Value(DateTime.now()),
       ),
+    );
+
+    // Terminar de abonar es cobrar: ahí es donde la reserva entra al historial
+    // de ventas. Va dentro de la transacción del abono para que una factura
+    // fallida no deje la reserva pagada sin su venta.
+    if (reserva.totalReserva > 0 && pagado >= reserva.totalReserva) {
+      await _facturarReserva(reservaId);
+    }
+  }
+
+  /// Escribe la factura de la reserva que se terminó de abonar.
+  ///
+  /// **No mueve inventario**: la mercancía salió del estante cuando se apartó,
+  /// no ahora. Y volver a llamar aquí no escribe una segunda factura —lo
+  /// devuelve `registrarVentaDeDocumento`, con el `UNIQUE` de
+  /// `ventas.reserva_id` como garantía—, lo cual importa porque este método
+  /// corre en cada recálculo del caché, no solo en el abono que la salda.
+  ///
+  /// El método de pago es el del **último** abono: es el que cerró la cuenta,
+  /// y la factura solo tiene una casilla.
+  Future<void> _facturarReserva(int reservaId) async {
+    final detalle = await obtenerDetalle(reservaId);
+    if (detalle.items.isEmpty) return;
+
+    await _ventas.registrarVentaDeDocumento(
+      tipo: TipoVenta.reserva,
+      reservaId: reservaId,
+      clienteId: detalle.resumen.clienteId,
+      metodoPago: detalle.abonos.isEmpty
+          ? MetodoPago.efectivo
+          : detalle.abonos.last.metodoPago,
+      lineas: [
+        for (final item in detalle.items)
+          LineaVentaDocumento(
+            descripcion: item.nombreProducto,
+            cantidad: item.cantidad,
+            precioUnitario: item.precioUnitario,
+            productoId: item.productoId,
+          ),
+      ],
+      // Una reserva solo aparta productos del catálogo, así que su subtotal es
+      // la base gravable y el IVA el que se guardó al apartarla.
+      subtotal: detalle.resumen.baseGravable,
+      iva: detalle.resumen.iva,
     );
   }
 

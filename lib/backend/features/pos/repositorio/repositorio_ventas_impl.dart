@@ -9,6 +9,7 @@ import '../../inventario/repositorio/repositorio_inventario.dart';
 import '../../inventario/repositorio/repositorio_inventario_impl.dart';
 import '../enum/enum_ventas.dart';
 import '../mapper/ventas_mapper.dart';
+import '../modelo/linea_venta_documento.dart';
 import '../modelo/linea_venta_mostrador.dart';
 import '../modelo/venta_detalle.dart';
 import '../modelo/venta_resumen.dart';
@@ -316,6 +317,120 @@ class RepositorioVentasImpl with FirmaDeSesion implements RepositorioVentas {
       );
 
       return _obtenerResumenPorId(ventaId);
+    });
+  }
+
+  @override
+  Future<VentaResumen?> ventaDeDocumento({
+    int? ordenId,
+    int? deudorId,
+    int? reservaId,
+  }) async {
+    final (columna, valor) = switch ((ordenId, deudorId, reservaId)) {
+      (final int id, null, null) => ('orden_id', id),
+      (null, final int id, null) => ('deudor_id', id),
+      (null, null, final int id) => ('reserva_id', id),
+      _ => throw ArgumentError(
+          'Hay que preguntar por exactamente un documento.',
+        ),
+    };
+
+    final fila = await _db
+        .customSelect(
+          '$_sqlSelectResumen WHERE v.$columna = ?',
+          variables: [Variable.withInt(valor)],
+          readsFrom: _tablasDelResumen,
+        )
+        .getSingleOrNull();
+
+    return fila == null ? null : VentasMapper.resumenDesdeMap(fila.data);
+  }
+
+  @override
+  Future<VentaResumen> registrarVentaDeDocumento({
+    required TipoVenta tipo,
+    required List<LineaVentaDocumento> lineas,
+    required MetodoPago metodoPago,
+    int? clienteId,
+    int? ordenId,
+    int? deudorId,
+    int? reservaId,
+    required int subtotal,
+    int descuento = 0,
+    int iva = 0,
+  }) async {
+    exigir(Permiso.posVender);
+
+    if (lineas.isEmpty) {
+      throw Exception('El documento no tiene líneas que facturar.');
+    }
+
+    // Un documento se factura una vez. La garantía real es el `UNIQUE` de la
+    // columna; esto evita llegar a él con un error de SQLite que no se le
+    // puede enseñar a nadie, y hace que entregar dos veces la misma orden
+    // devuelva su factura en vez de reventar.
+    final yaEmitida = await ventaDeDocumento(
+      ordenId: ordenId,
+      deudorId: deudorId,
+      reservaId: reservaId,
+    );
+    if (yaEmitida != null) return yaEmitida;
+
+    return _db.transaction(() async {
+      final ventaId = await _db.into(_tablaVentas).insert(
+            VentasMapper.companionDeDocumento(
+              usuarioId: autorId,
+              numeroFactura:
+                  await _consecutivos.siguiente(DocumentoConsecutivo.factura),
+              tipo: tipo,
+              clienteId: clienteId,
+              ordenId: ordenId,
+              deudorId: deudorId,
+              reservaId: reservaId,
+              metodoPago: metodoPago,
+              iva: iva,
+              descuento: descuento,
+            ),
+          );
+
+      for (final linea in lineas) {
+        // **Sin `_agregarLinea`**: ese verifica y descuenta stock, y aquí la
+        // mercancía ya salió cuando se anotó en su documento. Descontarla otra
+        // vez dejaría el inventario en negativo.
+        await _db.into(_tablaItems).insert(
+              VentasMapper.itemDocumentoCompanion(
+                ventaId: ventaId,
+                linea: linea,
+              ),
+            );
+      }
+
+      // Los importes son los del documento y **no se recalculan**: la orden se
+      // cerró con su descuento y su IVA del día, y la factura tiene que decir
+      // lo mismo que se cobró. Es lo contrario que en el mostrador, donde el
+      // total sale de las líneas que quedaron guardadas.
+      final total = subtotal - descuento + iva;
+      await (_db.update(_tablaVentas)..where((t) => t.id.equals(ventaId)))
+          .write(
+        TablaVentasCompanion(
+          subtotal: Value(subtotal),
+          descuento: Value(descuento),
+          iva: Value(iva),
+          total: Value(total),
+          totalPagado: Value(total),
+          estadoPago: Value(EstadoPago.pagado.aTexto),
+          actualizadoEn: Value(DateTime.now()),
+        ),
+      );
+
+      final resumen = await _obtenerResumenPorId(ventaId);
+      await _anotar(
+        AccionAuditada.creo,
+        ventaId,
+        'Factura ${resumen.numeroFactura}',
+        detalle: 'Cierre de ${tipo.etiqueta.toLowerCase()}',
+      );
+      return resumen;
     });
   }
 

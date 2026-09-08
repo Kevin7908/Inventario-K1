@@ -1,3 +1,4 @@
+import '../modelo/linea_venta_documento.dart';
 import '../modelo/linea_venta_mostrador.dart';
 import '../modelo/venta_detalle.dart';
 import '../modelo/venta_resumen.dart';
@@ -129,6 +130,56 @@ abstract interface class RepositorioVentas {
     int? vendedorId,
     int iva,
     int descuento,
+  });
+
+  /// Escribe la factura de un documento que **ya cobró y ya movió su stock**:
+  /// la orden entregada, la deuda saldada, la reserva terminada de abonar.
+  ///
+  /// Existe porque hasta ahora solo el mostrador escribía en `ventas`, así que
+  /// los repuestos que se iban en una orden, en una deuda o en una reserva no
+  /// aparecían en ninguna parte donde se pudieran sumar con lo demás: el
+  /// historial y el cuadre del día contaban una fracción de lo que entró.
+  ///
+  /// **No toca el inventario**, y esa es toda la diferencia con
+  /// [registrarVentaMostrador]. El stock salió cuando se anotó el repuesto en
+  /// la orden, cuando se apartó la reserva o cuando se abrió la deuda;
+  /// descontarlo otra vez al facturar lo dejaría en negativo. Por eso las
+  /// líneas son [LineaVentaDocumento] y no `LineaVentaMostrador`: el tipo hace
+  /// imposible confundir los dos caminos.
+  ///
+  /// **Un documento se factura una vez.** Si ya tiene su venta, devuelve la
+  /// que hay en vez de escribir otra: entregar dos veces la misma orden no
+  /// puede cobrarla dos veces. La garantía real es el `UNIQUE` de la columna;
+  /// esto evita llegar a él con un error que no se le puede enseñar a nadie.
+  ///
+  /// [tipo] decide cuál de los tres ids es obligatorio, y el `CHECK` de la
+  /// tabla lo impone: una venta no puede decir que viene de una reserva y
+  /// apuntar a una orden.
+  ///
+  /// Los importes llegan **ya calculados desde el documento** y no se
+  /// recalculan: la orden se cerró con su descuento y su IVA del día, y la
+  /// factura tiene que decir lo mismo que se cobró.
+  Future<VentaResumen> registrarVentaDeDocumento({
+    required TipoVenta tipo,
+    required List<LineaVentaDocumento> lineas,
+    required MetodoPago metodoPago,
+    int? clienteId,
+    int? ordenId,
+    int? deudorId,
+    int? reservaId,
+    required int subtotal,
+    int descuento = 0,
+    int iva = 0,
+  });
+
+  /// La factura de un documento, si ya se emitió. `null` si todavía no.
+  ///
+  /// Lo usa quien va a facturar para no repetir, y la ficha del documento para
+  /// poder llevar a su factura.
+  Future<VentaResumen?> ventaDeDocumento({
+    int? ordenId,
+    int? deudorId,
+    int? reservaId,
   });
 
   /// Anula la venta y devuelve el stock que había salido.

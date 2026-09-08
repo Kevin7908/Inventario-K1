@@ -12,6 +12,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:inventario_k1/backend/features/pos/enum/enum_ventas.dart';
+import 'package:inventario_k1/backend/features/pos/modelo/linea_venta_documento.dart';
 import 'package:inventario_k1/backend/features/pos/modelo/linea_venta_mostrador.dart';
 import 'package:inventario_k1/backend/features/pos/modelo/venta_detalle.dart';
 import 'package:inventario_k1/backend/features/pos/modelo/venta_resumen.dart';
@@ -91,6 +92,29 @@ class _VentasFalsas implements RepositorioVentas {
     int descuento = 0,
   }) =>
       throw UnimplementedError('la pantalla no vende');
+
+  @override
+  Future<VentaResumen> registrarVentaDeDocumento({
+    required TipoVenta tipo,
+    required List<LineaVentaDocumento> lineas,
+    required MetodoPago metodoPago,
+    int? clienteId,
+    int? ordenId,
+    int? deudorId,
+    int? reservaId,
+    required int subtotal,
+    int descuento = 0,
+    int iva = 0,
+  }) =>
+      throw UnimplementedError('la pantalla no factura documentos');
+
+  @override
+  Future<VentaResumen?> ventaDeDocumento({
+    int? ordenId,
+    int? deudorId,
+    int? reservaId,
+  }) async =>
+      null;
 
   /// Los ids que se mandaron anular. La pantalla no debe llamar sin que el
   /// usuario confirme.

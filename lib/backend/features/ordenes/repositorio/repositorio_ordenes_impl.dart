@@ -5,6 +5,10 @@ import 'package:inventario_k1/backend/share/database/app_db.dart';
 import '../../inventario/modelo/movimiento_inventario.dart';
 import '../../inventario/repositorio/repositorio_inventario.dart';
 import '../../inventario/repositorio/repositorio_inventario_impl.dart';
+import '../../pos/enum/enum_ventas.dart';
+import '../../pos/modelo/linea_venta_documento.dart';
+import '../../pos/repositorio/repositorio_ventas.dart';
+import '../../pos/repositorio/repositorio_ventas_impl.dart';
 import '../../../share/consecutivos/documento_consecutivo.dart';
 import '../../../share/consecutivos/repositorio_consecutivos.dart';
 import '../enum/enum_ordenes.dart';
@@ -63,6 +67,12 @@ class RepositorioOrdenesImpl with FirmaDeSesion implements RepositorioOrdenes {
 
   /// El número de orden sale de la tabla `consecutivos`, dentro de la misma
   /// transacción que la crea (§7.1).
+  /// Entregar una orden la mete en el historial de ventas. Se construye aquí
+  /// y no se recibe por el constructor por lo mismo que `_inventario`: es una
+  /// pieza del backend sobre la misma base y la misma sesión, no una
+  /// dependencia que un test necesite sustituir.
+  late final RepositorioVentas _ventas = RepositorioVentasImpl(_db, sesion);
+
   late final RepositorioConsecutivos _consecutivos = RepositorioConsecutivos(
     _db,
   );
@@ -407,6 +417,13 @@ class RepositorioOrdenesImpl with FirmaDeSesion implements RepositorioOrdenes {
           detalle: 'Estado: ${estadoAntes.etiqueta} → ${estado.etiqueta}',
         );
       }
+
+      // Entregar es cobrar: ahí es donde la orden entra al historial de
+      // ventas. Va en esta misma transacción para que una factura fallida no
+      // deje la orden entregada sin su venta.
+      if (estado == EstadoOrden.entregada && estadoAntes != estado) {
+        await _facturarEntrega(id);
+      }
     });
 
     // Propagar cambio de cliente a la factura vinculada (si existe)
@@ -419,6 +436,73 @@ class RepositorioOrdenesImpl with FirmaDeSesion implements RepositorioOrdenes {
     }
 
     return _obtenerResumenPorId(id);
+  }
+
+  /// Escribe la factura de la orden recién entregada.
+  ///
+  /// **La orden fiada no pasa por aquí.** Cerrarla a crédito ya movió la plata
+  /// a una deuda, y esa deuda escribirá su propia factura al saldarse:
+  /// facturar las dos cobraría dos veces el mismo trabajo en el cuadre del
+  /// día. Por eso lo primero que se mira es si hay una `deudores.orden_id`
+  /// apuntando aquí.
+  ///
+  /// Tampoco factura una orden vacía —no habría qué cobrar— ni una que ya
+  /// tenga su venta: de eso último se encarga además el `UNIQUE` de
+  /// `ventas.orden_id`.
+  ///
+  /// El método de pago va en efectivo: la orden no guarda con qué se pagó, y
+  /// el mostrador de un taller cobra en efectivo salvo aviso. Es el dato que
+  /// pediría un `DialogoCobro` propio para la entrega, y está anotado como
+  /// deuda técnica.
+  Future<void> _facturarEntrega(int ordenId) async {
+    final fiada = await (_db.select(_db.tablaDeudor)
+          ..where((t) => t.ordenId.equals(ordenId))
+          ..limit(1))
+        .getSingleOrNull();
+    if (fiada != null) return;
+
+    final detalle = await obtenerDetalle(ordenId);
+    final lineas = [
+      for (final tarea in detalle.tareas)
+        LineaVentaDocumento(
+          descripcion: tarea.servicioNombre,
+          cantidad: 1,
+          precioUnitario: tarea.precioPactado,
+          tipoItem: TipoItem.servicio,
+          servicioId: tarea.servicioId,
+          tecnicoId: tarea.tecnicoId,
+        ),
+      for (final repuesto in detalle.repuestos)
+        LineaVentaDocumento(
+          descripcion: repuesto.productoNombre,
+          cantidad: repuesto.cantidad,
+          precioUnitario: repuesto.precioUnitario,
+          productoId: repuesto.productoId,
+          costoUnitario: repuesto.costoUnitario,
+        ),
+      // Los cargos sueltos van como servicio sin catálogo detrás: no tienen
+      // producto ni `servicio_id`, y el `CHECK` de `venta_detalles` acepta un
+      // servicio sin id pero no un producto sin él.
+      for (final cargo in detalle.cargos)
+        LineaVentaDocumento(
+          descripcion: cargo.descripcion,
+          cantidad: 1,
+          precioUnitario: cargo.precio,
+          tipoItem: TipoItem.servicio,
+        ),
+    ];
+    if (lineas.isEmpty) return;
+
+    await _ventas.registrarVentaDeDocumento(
+      tipo: TipoVenta.servicio,
+      ordenId: ordenId,
+      clienteId: detalle.clienteId,
+      metodoPago: MetodoPago.efectivo,
+      lineas: lineas,
+      subtotal: detalle.subtotal,
+      descuento: detalle.descuento,
+      iva: detalle.iva,
+    );
   }
 
   @override

@@ -3,6 +3,7 @@ import 'package:drift/drift.dart';
 import '../../../share/database/app_db.dart';
 import '../../../share/utils/fecha_sqlite.dart';
 import '../enum/enum_ventas.dart';
+import '../modelo/linea_venta_documento.dart';
 import '../modelo/venta_detalle.dart';
 import '../modelo/venta_resumen.dart';
 import '../modelo/venta_item.dart';
@@ -100,6 +101,63 @@ abstract final class VentasMapper {
         descuento: Value(descuento),
         creadoEn: Value(DateTime.now()),
         actualizadoEn: Value(DateTime.now()),
+      );
+
+  /// Cabecera de la factura que cierra un documento ya cobrado: la orden
+  /// entregada, la deuda saldada, la reserva terminada de abonar.
+  ///
+  /// Va aparte de [companionNuevo] y no como un parámetro suyo porque las dos
+  /// escriben cosas distintas: aquella fija `MOSTRADOR` y ninguna referencia,
+  /// y esta lleva el tipo y el id del documento del que salió. Con una sola
+  /// función de seis opcionales, el `CHECK` de la tabla sería lo único que
+  /// impediría escribir una venta incoherente.
+  static TablaVentasCompanion companionDeDocumento({
+    required int usuarioId,
+    required String numeroFactura,
+    required TipoVenta tipo,
+    int? clienteId,
+    int? ordenId,
+    int? deudorId,
+    int? reservaId,
+    required MetodoPago metodoPago,
+    int iva = 0,
+    int descuento = 0,
+  }) =>
+      TablaVentasCompanion.insert(
+        usuarioId: usuarioId,
+        numeroFactura: numeroFactura,
+        tipo: Value(tipo.aTexto),
+        clienteId: Value(clienteId),
+        ordenId: Value(ordenId),
+        deudorId: Value(deudorId),
+        reservaId: Value(reservaId),
+        metodoPago: Value(metodoPago.codigo),
+        // Estas facturas nacen pagadas: se emiten justo cuando el documento
+        // terminó de cobrarse.
+        estadoPago: Value(EstadoPago.pagado.aTexto),
+        iva: Value(iva),
+        descuento: Value(descuento),
+        creadoEn: Value(DateTime.now()),
+        actualizadoEn: Value(DateTime.now()),
+      );
+
+  /// Una línea de esa factura. Puede no ser un producto: una orden factura
+  /// mano de obra y cargos sueltos, que no tienen catálogo detrás.
+  static TablaVentaDetallesCompanion itemDocumentoCompanion({
+    required int ventaId,
+    required LineaVentaDocumento linea,
+  }) =>
+      TablaVentaDetallesCompanion.insert(
+        ventaId: ventaId,
+        tipoItem: linea.tipoItem.aTexto,
+        productoId: Value(linea.productoId),
+        servicioId: Value(linea.servicioId),
+        tecnicoId: Value(linea.tecnicoId),
+        descripcion: linea.descripcion,
+        cantidad: Value(linea.cantidad),
+        precioUnitario: linea.precioUnitario,
+        costoUnitario: Value(linea.costoUnitario),
+        subtotal: linea.subtotal,
       );
 
   /// Una línea de mostrador. Siempre es un producto: los servicios se cobran

@@ -426,10 +426,12 @@ void main() {
     });
 
     test('borrar la deuda se lleva sus líneas y sus pagos', () async {
+      // Con un pago **parcial**: saldarla emite su factura, y una deuda
+      // facturada ya no se borra (ver el test siguiente).
       final id = await _deudaCon(cantidad: 1, precio: 10000);
       await deudores.registrarPago(
         deudorId: id,
-        monto: 10000,
+        monto: 4000,
         metodoPago: MetodoPago.efectivo,
       );
 
@@ -442,6 +444,27 @@ void main() {
           .getSingle();
       expect(quedan.read<int>('i'), 0);
       expect(quedan.read<int>('p'), 0);
+    });
+
+    test('una deuda ya cobrada no se borra: tiene factura', () async {
+      // Saldarla la mete en el historial de ventas, y una factura emitida no
+      // se borra —lo impide además una guarda de la base—. El mensaje dice
+      // cuál es, para que se pueda ir a anularla.
+      final id = await _deudaCon(cantidad: 1, precio: 10000);
+      await deudores.registrarPago(
+        deudorId: id,
+        monto: 10000,
+        metodoPago: MetodoPago.efectivo,
+      );
+
+      final resultado = await deudores.eliminar(id);
+
+      expect(resultado, isA<Fallo>());
+      expect((resultado as Fallo).mensaje, contains('factura'));
+      final quedan = await db
+          .customSelect('SELECT COUNT(*) AS n FROM deudores')
+          .getSingle();
+      expect(quedan.read<int>('n'), 1);
     });
 
     test('no se borra a un cliente que debe', () async {
