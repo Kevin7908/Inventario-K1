@@ -52,14 +52,14 @@ void main() {
 
       expect(hayIva, isTrue);
       expect(porcentajeIva, 19);
-      expect(ivaIncluidoEn(119000), 19000);
-      expect(etiquetaIva, 'IVA (19%) incluido');
+      expect(ivaSobre(100000), 19000);
+      expect(etiquetaIva, 'IVA (19%)');
     });
 
     test('sin configurar nada el taller no factura IVA', () async {
       await arrancar();
       expect(hayIva, isFalse);
-      expect(ivaIncluidoEn(119000), 0);
+      expect(ivaSobre(100000), 0);
     });
 
     test('una clave con basura no deja la app sin arrancar', () async {
@@ -73,14 +73,14 @@ void main() {
     test('cambiar la tasa no reescribe lo ya emitido', () async {
       // El IVA de un documento se guarda en su propia fila y no se recalcula:
       // una factura de hace un año se cerró con la tasa de entonces. Aquí eso
-      // se comprueba sobre la única pieza que lo decide —`ivaIncluidoEn` mira
-      // la tasa de hoy, y el documento guarda su número—.
+      // se comprueba sobre la única pieza que lo decide —`ivaSobre` mira la
+      // tasa de hoy, y el documento guarda su número—.
       configurarIva(19);
-      final ivaDeAyer = ivaIncluidoEn(119000);
+      final ivaDeAyer = ivaSobre(100000);
 
       configurarIva(0);
       expect(ivaDeAyer, 19000, reason: 'el número guardado no cambia');
-      expect(ivaIncluidoEn(119000), 0, reason: 'lo nuevo sí');
+      expect(ivaSobre(100000), 0, reason: 'lo nuevo sí');
     });
   });
 

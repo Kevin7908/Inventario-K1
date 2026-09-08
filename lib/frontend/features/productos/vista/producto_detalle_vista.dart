@@ -3,6 +3,7 @@ import 'dart:io';
 import 'package:flutter/material.dart';
 
 import '../../../../core/formato.dart';
+import '../../../../core/iva_app.dart';
 
 import '../../../../backend/features/productos/modelo/producto.dart';
 import '../../../share/share.dart';
@@ -195,10 +196,13 @@ class _Ficha extends StatelessWidget {
             BadgeEstadoStock(estado: producto.estadoStock),
           ],
         ),
-        if (producto.aplicaIva) ...[
+        // Con la tasa en 0 el renglón no se pinta: un «+ $0 de IVA» solo
+        // estorba en la ficha de un taller que no factura impuesto.
+        if (hayIva) ...[
           const SizedBox(height: 6),
           Text(
-            'Incluye ${formatearPrecio(producto.ivaDelPrecio)} de IVA',
+            '+ ${formatearPrecio(producto.ivaDelPrecio)} de $etiquetaIva  ·  '
+            '${formatearPrecio(producto.precioConIva)} con impuesto',
             style: TipografiaApp.caption,
           ),
         ],

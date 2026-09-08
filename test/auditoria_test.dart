@@ -45,7 +45,6 @@ Producto _producto({String sku = 'ACE-1', String nombre = 'Aceite 20W50'}) =>
       precioVenta: 40000,
       stockActual: 0,
       stockMinimo: 0,
-      aplicaIva: true,
       activo: true,
     );
 

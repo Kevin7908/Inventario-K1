@@ -63,22 +63,51 @@ class SeccionesPdf {
                 pw.SizedBox(height: 1),
                 pw.Text(negocio.lineaContacto, style: _e.datosNegocio),
               ],
+              if (negocio.lineaFiscal.isNotEmpty) ...[
+                pw.SizedBox(height: 1),
+                pw.Text(negocio.lineaFiscal, style: _e.datosNegocio),
+              ],
             ],
           ),
         ),
-        pw.Column(
-          crossAxisAlignment: pw.CrossAxisAlignment.end,
-          children: [
-            pw.Text(doc.titulo, style: _e.tituloDocumento),
-            pw.SizedBox(height: 3),
-            pw.Text(doc.numero, style: _e.numeroDocumento),
-            pw.SizedBox(height: 3),
-            pw.Text(formatearFechaHora(doc.fecha), style: _e.datosNegocio),
-          ],
-        ),
+        _tarjetaDocumento(doc),
       ],
     );
   }
+
+  /// El recuadro de la derecha: qué documento es, su número y sus fechas.
+  ///
+  /// Va en un marco propio porque es lo primero que se busca al tener el papel
+  /// en la mano —el número con el que el cliente reclama— y porque separarlo
+  /// de los datos del taller evita que las dos columnas se lean como una sola.
+  pw.Widget _tarjetaDocumento(DocumentoImprimible doc) => pw.Container(
+        padding: const pw.EdgeInsets.symmetric(horizontal: 12, vertical: 9),
+        decoration: pw.BoxDecoration(
+          color: EstiloPdf.fondoEncabezado,
+          border: pw.Border.all(color: EstiloPdf.borde),
+          borderRadius: pw.BorderRadius.circular(4),
+        ),
+        child: pw.Column(
+          crossAxisAlignment: pw.CrossAxisAlignment.end,
+          children: [
+            pw.Text(doc.titulo, style: _e.tituloDocumento),
+            pw.SizedBox(height: 2),
+            pw.Text(doc.numero, style: _e.numeroDocumento),
+            pw.SizedBox(height: 6),
+            _fechaTarjeta('Emisión', formatearFechaHora(doc.fecha)),
+            if (doc.vencimiento != null)
+              _fechaTarjeta('Vencimiento', formatearFecha(doc.vencimiento!)),
+          ],
+        ),
+      );
+
+  pw.Widget _fechaTarjeta(String etiqueta, String valor) => pw.Row(
+        mainAxisSize: pw.MainAxisSize.min,
+        children: [
+          pw.Text('$etiqueta  ', style: _e.etiqueta),
+          pw.Text(valor, style: _e.datosNegocio),
+        ],
+      );
 
   pw.Widget _encabezadoTirilla(DocumentoImprimible doc, String? logoSvg) {
     final negocio = doc.negocio;
@@ -98,43 +127,63 @@ class SeccionesPdf {
           style: _e.nombreNegocio,
           textAlign: pw.TextAlign.center,
         ),
-        if (negocio.lineaUbicacion.isNotEmpty)
-          pw.Text(
-            negocio.lineaUbicacion,
-            style: _e.datosNegocio,
-            textAlign: pw.TextAlign.center,
-          ),
-        if (negocio.lineaContacto.isNotEmpty)
-          pw.Text(
-            negocio.lineaContacto,
-            style: _e.datosNegocio,
-            textAlign: pw.TextAlign.center,
-          ),
+        for (final linea in [
+          negocio.lineaUbicacion,
+          negocio.lineaContacto,
+          negocio.lineaFiscal,
+        ])
+          if (linea.isNotEmpty)
+            pw.Text(
+              linea,
+              style: _e.datosNegocio,
+              textAlign: pw.TextAlign.center,
+            ),
         pw.SizedBox(height: 7),
         pw.Text(doc.titulo, style: _e.tituloDocumento),
         pw.Text(
           '${doc.numero}  ·  ${formatearFechaHora(doc.fecha)}',
           style: _e.datosNegocio,
         ),
+        if (doc.vencimiento != null)
+          pw.Text(
+            'Vence ${formatearFecha(doc.vencimiento!)}',
+            style: _e.datosNegocio,
+          ),
       ],
     );
   }
 
-  /// La franja de «A quién / Atendido por». Se omite entera si el documento no
-  /// tiene ninguno de los dos: el mostrador vende sin pedir cédula.
+  /// La franja de «A quién / Quién atendió». Se omite entera si el documento
+  /// no tiene ninguno de los dos: el mostrador vende sin pedir cédula.
   pw.Widget? destinatario(DocumentoImprimible doc) {
-    final tieneCliente = (doc.cliente ?? '').isNotEmpty;
-    if (!tieneCliente && (doc.atendidoPor ?? '').isEmpty) return null;
+    final quien = doc.destinatario;
+    final personas = _personas(doc);
+    if (quien == null && personas.isEmpty) return null;
 
-    final quien = [
-      ?doc.cliente,
-      ?doc.documentoCliente,
-    ].where((s) => s.isNotEmpty).join('  ·  ');
+    return formato.esTirilla
+        ? _destinatarioTirilla(doc, quien, personas)
+        : _destinatarioCarta(doc, quien, personas);
+  }
 
-    // En la tirilla los dos datos van uno debajo del otro y sin recuadro: la
-    // franja de dos columnas dejaría cuatro caracteres por columna.
-    if (formato.esTirilla) {
-      return pw.Container(
+  /// Quién despachó el documento, en pares etiqueta/valor.
+  ///
+  /// El vendedor va aparte de quien lo registró porque responden preguntas
+  /// distintas: uno es a quién reclamarle por el trato y el otro es quién lo
+  /// tecleó. Cuando son la misma persona, el traductor manda solo uno.
+  List<(String, String)> _personas(DocumentoImprimible doc) => [
+        if ((doc.atendidoPor ?? '').isNotEmpty)
+          (doc.etiquetaAtendidoPor, doc.atendidoPor!),
+        if ((doc.vendedor ?? '').isNotEmpty) ('Vendedor', doc.vendedor!),
+      ];
+
+  // En la tirilla todo va en renglones de «Etiqueta: valor»: la franja de dos
+  // columnas dejaría cuatro caracteres por columna.
+  pw.Widget _destinatarioTirilla(
+    DocumentoImprimible doc,
+    DestinatarioImpreso? quien,
+    List<(String, String)> personas,
+  ) =>
+      pw.Container(
         padding: const pw.EdgeInsets.symmetric(vertical: 5),
         decoration: const pw.BoxDecoration(
           border: pw.Border(
@@ -145,38 +194,74 @@ class SeccionesPdf {
         child: pw.Column(
           crossAxisAlignment: pw.CrossAxisAlignment.start,
           children: [
-            if (tieneCliente)
-              pw.Text('${doc.etiquetaDestinatario}: $quien', style: _e.celda),
-            if ((doc.atendidoPor ?? '').isNotEmpty)
+            if (quien != null)
               pw.Text(
-                '${doc.etiquetaAtendidoPor}: ${doc.atendidoPor}',
-                style: _e.celdaTenue,
+                '${doc.etiquetaDestinatario}: ${quien.nombre}',
+                style: _e.celda,
+              ),
+            if (quien != null)
+              for (final (etiqueta, valor) in quien.campos)
+                pw.Text('$etiqueta: $valor', style: _e.celdaTenue),
+            for (final (etiqueta, valor) in personas)
+              pw.Text('$etiqueta: $valor', style: _e.celdaTenue),
+          ],
+        ),
+      );
+
+  /// En carta la franja son dos columnas: el cliente a la izquierda con sus
+  /// datos en renglones, y quién despachó a la derecha.
+  pw.Widget _destinatarioCarta(
+    DocumentoImprimible doc,
+    DestinatarioImpreso? quien,
+    List<(String, String)> personas,
+  ) =>
+      pw.Container(
+        padding: const pw.EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+        decoration: const pw.BoxDecoration(
+          color: EstiloPdf.fondoEncabezado,
+          border: pw.Border(
+            top: pw.BorderSide(color: EstiloPdf.borde),
+            bottom: pw.BorderSide(color: EstiloPdf.borde),
+          ),
+        ),
+        child: pw.Row(
+          crossAxisAlignment: pw.CrossAxisAlignment.start,
+          children: [
+            if (quien != null)
+              pw.Expanded(
+                flex: 3,
+                child: pw.Column(
+                  crossAxisAlignment: pw.CrossAxisAlignment.start,
+                  children: [
+                    pw.Text(doc.etiquetaDestinatario, style: _e.etiqueta),
+                    pw.SizedBox(height: 2),
+                    pw.Text(quien.nombre, style: _e.valor),
+                    for (final (etiqueta, valor) in quien.campos) ...[
+                      pw.SizedBox(height: 1),
+                      pw.Text('$etiqueta: $valor', style: _e.celdaTenue),
+                    ],
+                  ],
+                ),
+              ),
+            if (quien != null && personas.isNotEmpty) pw.SizedBox(width: 16),
+            if (personas.isNotEmpty)
+              pw.Expanded(
+                flex: 2,
+                child: pw.Column(
+                  crossAxisAlignment: pw.CrossAxisAlignment.end,
+                  children: [
+                    for (final (etiqueta, valor) in personas) ...[
+                      pw.Text(etiqueta, style: _e.etiqueta),
+                      pw.SizedBox(height: 2),
+                      pw.Text(valor, style: _e.valor),
+                      pw.SizedBox(height: 4),
+                    ],
+                  ],
+                ),
               ),
           ],
         ),
       );
-    }
-
-    return pw.Container(
-      padding: const pw.EdgeInsets.symmetric(horizontal: 10, vertical: 8),
-      decoration: const pw.BoxDecoration(
-        color: EstiloPdf.fondoEncabezado,
-        border: pw.Border(
-          top: pw.BorderSide(color: EstiloPdf.borde),
-          bottom: pw.BorderSide(color: EstiloPdf.borde),
-        ),
-      ),
-      child: pw.Row(
-        crossAxisAlignment: pw.CrossAxisAlignment.start,
-        children: [
-          if (tieneCliente)
-            pw.Expanded(child: _campo(doc.etiquetaDestinatario, quien)),
-          if ((doc.atendidoPor ?? '').isNotEmpty)
-            _campo(doc.etiquetaAtendidoPor, doc.atendidoPor!, alFinal: true),
-        ],
-      ),
-    );
-  }
 
   /// El encabezado de la tabla de líneas. En carta se repite en cada página;
   /// en tirilla se queda en las dos columnas que caben, porque la cantidad y
@@ -188,6 +273,16 @@ class SeccionesPdf {
         ),
         child: pw.Row(
           children: [
+            if (!formato.esTirilla) ...[
+              pw.SizedBox(
+                width: _anchoItem,
+                child: pw.Text('#', style: _e.encabezadoTabla),
+              ),
+              pw.Expanded(
+                flex: 3,
+                child: pw.Text('Código', style: _e.encabezadoTabla),
+              ),
+            ],
             pw.Expanded(
               flex: 6,
               child: pw.Text('Descripción', style: _e.encabezadoTabla),
@@ -201,9 +296,18 @@ class SeccionesPdf {
         ),
       );
 
+  /// Ancho de la columna del número de ítem. Fijo porque su contenido no
+  /// crece: con tres dígitos ya son más líneas de las que caben en una hoja.
+  static const double _anchoItem = 20;
+
   /// Un bloque de líneas con su título. Devuelve varios widgets para que el
   /// `MultiPage` pueda cortar entre líneas si la hoja se acaba.
-  List<pw.Widget> bloque(BloqueLineas bloque) {
+  ///
+  /// [desde] es el número que le toca a la primera línea del bloque. Se pasa
+  /// desde fuera para que la numeración sea **continua a lo largo del
+  /// documento**: en una orden con repuestos y mano de obra, el ítem 4 es el
+  /// cuarto del papel, no el primero del segundo bloque.
+  List<pw.Widget> bloque(BloqueLineas bloque, {int desde = 1}) {
     if (bloque.vacio) return const [];
     return [
       if (bloque.titulo != null) ...[
@@ -211,27 +315,47 @@ class SeccionesPdf {
         pw.Text(bloque.titulo!, style: _e.tituloGrupo),
         pw.SizedBox(height: 3),
       ],
-      ...bloque.lineas.map(_linea),
+      for (final (indice, linea) in bloque.lineas.indexed)
+        _linea(linea, desde + indice),
     ];
   }
 
-  pw.Widget _linea(LineaDocumento linea) => pw.Container(
+  pw.Widget _linea(LineaDocumento linea, int numero) => pw.Container(
         padding: const pw.EdgeInsets.symmetric(vertical: 5),
         decoration: const pw.BoxDecoration(
           border: pw.Border(bottom: pw.BorderSide(color: EstiloPdf.bordeFila)),
         ),
-        child: formato.esTirilla ? _lineaTirilla(linea) : _lineaCarta(linea),
+        child: formato.esTirilla
+            ? _lineaTirilla(linea)
+            : _lineaCarta(linea, numero),
       );
 
-  pw.Widget _lineaCarta(LineaDocumento linea) => pw.Row(
+  pw.Widget _lineaCarta(LineaDocumento linea, int numero) => pw.Row(
         crossAxisAlignment: pw.CrossAxisAlignment.start,
         children: [
+          pw.SizedBox(
+            width: _anchoItem,
+            child: pw.Text('$numero', style: _e.celdaTenue),
+          ),
+          pw.Expanded(
+            flex: 3,
+            child: pw.Text(
+              linea.tieneCodigo ? linea.codigo! : '—',
+              style: _e.celdaCodigo,
+            ),
+          ),
           pw.Expanded(flex: 6, child: _descripcion(linea)),
-          _celdaDerecha(formatearCantidad(linea.cantidad), 2, _e.celda),
+          _celdaDerecha(_cantidad(linea), 2, _e.celda),
           _celdaDerecha(formatearPrecio(linea.precioUnitario), 3, _e.celda),
           _celdaDerecha(formatearPrecio(linea.subtotal), 3, _e.celda),
         ],
       );
+
+  /// La cantidad con su unidad: «2 UND». Sin unidad cargada, solo el número.
+  String _cantidad(LineaDocumento linea) {
+    final cantidad = formatearCantidad(linea.cantidad);
+    return linea.unidad.isEmpty ? cantidad : '$cantidad ${linea.unidad}';
+  }
 
   /// En dos renglones: qué se llevó arriba, y debajo «2 × $28.000» contra el
   /// total. Es como se lee cualquier tirilla de tienda, y es lo único que cabe
@@ -245,7 +369,7 @@ class SeccionesPdf {
             children: [
               pw.Expanded(
                 child: pw.Text(
-                  '${formatearCantidad(linea.cantidad)} × '
+                  '${_cantidad(linea)} × '
                   '${formatearPrecio(linea.precioUnitario)}',
                   style: _e.celdaTenue,
                 ),
@@ -260,19 +384,12 @@ class SeccionesPdf {
         crossAxisAlignment: pw.CrossAxisAlignment.start,
         children: [
           pw.Text(linea.descripcion, style: _e.celda),
-          if ((linea.referencia ?? '').isNotEmpty)
-            pw.Text(linea.referencia!, style: _e.celdaTenue),
-        ],
-      );
-
-  pw.Widget _campo(String etiqueta, String valor, {bool alFinal = false}) =>
-      pw.Column(
-        crossAxisAlignment:
-            alFinal ? pw.CrossAxisAlignment.end : pw.CrossAxisAlignment.start,
-        children: [
-          pw.Text(etiqueta, style: _e.etiqueta),
-          pw.SizedBox(height: 2),
-          pw.Text(valor, style: _e.valor),
+          // En carta el código tiene su propia columna, así que aquí solo se
+          // repite en tirilla, donde esa columna no cabe.
+          if (linea.tieneCodigo && formato.esTirilla)
+            pw.Text(linea.codigo!, style: _e.celdaTenue),
+          if (linea.tieneDetalle)
+            pw.Text(linea.detalle!, style: _e.celdaTenue),
         ],
       );
 

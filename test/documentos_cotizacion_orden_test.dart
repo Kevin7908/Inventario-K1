@@ -190,13 +190,15 @@ void main() {
     test('la mano de obra dice qué técnico la hizo', () {
       final doc =
           documentoDeOrden(orden: _orden(tareas: [tarea]), negocio: _negocio);
-      expect(doc.bloques.single.lineas.single.referencia,
+      // Va en `detalle` y no en `codigo`: el código tiene su propia columna en
+      // la factura y «Técnico: Andrés Rojas» no es un código.
+      expect(doc.bloques.single.lineas.single.detalle,
           'Técnico: Andrés Rojas');
     });
 
     test('la moto con su placa identifica la orden', () {
       final doc = documentoDeOrden(orden: _orden(), negocio: _negocio);
-      expect(doc.documentoCliente, 'Boxer CT 100 · KMN12C');
+      expect(doc.destinatario?.documento, 'Boxer CT 100 · KMN12C');
     });
 
     test('el kilometraje y el diagnóstico van al pie', () {

@@ -55,7 +55,6 @@ Producto _producto({String sku = 'ACE-1'}) => Producto(
       precioVenta: 40000,
       stockActual: 0,
       stockMinimo: 0,
-      aplicaIva: true,
       activo: true,
     );
 

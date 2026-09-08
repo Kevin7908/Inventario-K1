@@ -35,7 +35,6 @@ Producto _producto({
       precioVenta: 2000,
       stockActual: stock,
       stockMinimo: stockMinimo,
-      aplicaIva: true,
       activo: true,
     );
 
@@ -52,7 +51,6 @@ Producto _conProveedor({
       precioVenta: 2000,
       stockActual: 10,
       stockMinimo: 3,
-      aplicaIva: true,
       activo: true,
     );
 

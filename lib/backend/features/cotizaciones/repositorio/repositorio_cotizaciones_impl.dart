@@ -304,8 +304,9 @@ class RepositorioCotizacionesImpl
       );
       final subtotal = items.fold(0, (s, d) => s + d.subtotal);
       final rebaja = _recortarDescuento(descuento, subtotal);
-      // Los precios ya traen el IVA dentro: se extrae del total, no se suma.
-      final iva = ivaIncluidoEn(subtotal - rebaja);
+      // El precio del catálogo es la base gravable: el descuento se resta
+      // antes y el impuesto se suma después (`iva_app.dart`).
+      final iva = ivaSobre(subtotal - rebaja);
 
       final id = await _db
           .into(_db.tablaCotizacion)
@@ -356,8 +357,9 @@ class RepositorioCotizacionesImpl
     return _db.transaction(() async {
       final subtotal = items.fold(0, (s, d) => s + d.subtotal);
       final rebaja = _recortarDescuento(descuento, subtotal);
-      // Los precios ya traen el IVA dentro: se extrae del total, no se suma.
-      final iva = ivaIncluidoEn(subtotal - rebaja);
+      // El precio del catálogo es la base gravable: el descuento se resta
+      // antes y el impuesto se suma después (`iva_app.dart`).
+      final iva = ivaSobre(subtotal - rebaja);
       await (_db.update(
         _db.tablaCotizacion,
       )..where((t) => t.id.equals(id))).write(
@@ -483,7 +485,7 @@ class RepositorioCotizacionesImpl
       TablaCotizacionCompanion(
         subtotal: Value(subtotal),
         descuento: Value(rebaja),
-        iva: Value(ivaIncluidoEn(subtotal - rebaja)),
+        iva: Value(ivaSobre(subtotal - rebaja)),
         actualizadoEn: Value(DateTime.now()),
       ),
     );

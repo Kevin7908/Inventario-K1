@@ -147,13 +147,16 @@ final class OrdenEditorState {
 
   int get subtotal => lineas.fold(0, (suma, l) => suma + l.subtotal);
 
-  /// Lo que se cobra: las líneas menos la rebaja. Nada que sumar después —los
-  /// precios ya traen el IVA dentro (ver `iva_app.dart`)—, así que el
-  /// descuento sale directo de lo que paga el cliente.
-  int get total => subtotal - descuento;
+  /// La base gravable: las líneas menos la rebaja, todavía sin impuesto.
+  ///
+  /// El descuento se resta **antes** del IVA (ver `iva_app.dart`).
+  int get baseGravable => subtotal - descuento;
 
-  /// Cuánto del [total] es impuesto. Informativo: se extrae, no se suma.
-  int get iva => ivaIncluidoEn(total);
+  /// El impuesto que se le suma a la base. Con la tasa en 0 es 0.
+  int get iva => ivaSobre(baseGravable);
+
+  /// Lo que se cobra: la base más su IVA.
+  int get total => baseGravable + iva;
 
   /// El técnico de la última tarea agregada, para precargar el selector.
   ///

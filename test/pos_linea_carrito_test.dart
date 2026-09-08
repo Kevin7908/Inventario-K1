@@ -19,7 +19,6 @@ Producto _producto({double stock = 12}) => Producto(
       precioVenta: 32000,
       stockActual: stock,
       stockMinimo: 2,
-      aplicaIva: false,
       activo: true,
     );
 

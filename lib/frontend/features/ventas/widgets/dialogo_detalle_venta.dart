@@ -221,20 +221,21 @@ class _Totales extends StatelessWidget {
             color: ColoresApp.statusWarning,
           ),
         ],
-        const SizedBox(height: 8),
-        RenglonCuenta(
-          etiqueta: 'Total cobrado',
-          valor: formatearPrecio(venta.total),
-        ),
-        // El IVA va **debajo** del total y no encima, por lo mismo que en
-        // `PieTotales`: los precios ya lo traen dentro, así que no suma.
-        if (hayIva) ...[
+        // El IVA va **encima** del total, por lo mismo que en `PieTotales`:
+        // el precio del catálogo es la base y el impuesto se le suma. Se pinta
+        // el guardado en la factura, no el de la tasa de hoy.
+        if (venta.iva > 0) ...[
           const SizedBox(height: 8),
           RenglonCuenta(
             etiqueta: etiquetaIva,
             valor: formatearPrecio(venta.iva),
           ),
         ],
+        const SizedBox(height: 8),
+        RenglonCuenta(
+          etiqueta: 'Total cobrado',
+          valor: formatearPrecio(venta.total),
+        ),
       ],
     );
   }

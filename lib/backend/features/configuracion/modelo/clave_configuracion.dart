@@ -9,6 +9,27 @@ enum ClaveConfiguracion {
   telefono('telefono', ''),
   ciudad('ciudad', ''),
 
+  /// Correo del negocio, para el encabezado del impreso.
+  correo('correo', ''),
+
+  /// Cómo responde el negocio ante el impuesto: «Responsable de IVA», «No
+  /// responsable de IVA», «Régimen simple»… Es **texto libre** y no un
+  /// catálogo porque no lo consume ningún cálculo: se imprime tal cual, igual
+  /// que la dirección. El día que algo dependa de él, será un enum con su
+  /// `CHECK` (`REGLAS_BD.md` §1.3).
+  regimenIva('regimen_iva', ''),
+
+  /// Código de actividad económica (CIIU). Va en el encabezado de la factura
+  /// porque es lo que el cliente compara contra su propia contabilidad.
+  actividadEconomica('actividad_economica', ''),
+
+  /// La letra pequeña del pie de la factura: condiciones de devolución,
+  /// garantía, lo que el taller quiera que quede escrito.
+  ///
+  /// Vacía por defecto: un pie inventado es peor que ninguno, porque el
+  /// cliente lo lee como si el taller lo hubiera prometido.
+  notaFactura('nota_factura', ''),
+
   /// Porcentaje entero: `19` es 19%.
   ///
   /// La lee `main()` al arrancar y la aplica con `configurarIva`, que es lo

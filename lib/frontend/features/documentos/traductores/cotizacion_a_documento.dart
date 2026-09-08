@@ -49,8 +49,15 @@ DocumentoImprimible documentoDeCotizacion({
     titulo: 'Cotización',
     numero: resumen.numero,
     fecha: resumen.creadoEn,
-    cliente: resumen.nombreCliente,
-    documentoCliente: resumen.nombreMoto.isEmpty ? null : resumen.nombreMoto,
+    // La vigencia va en el recuadro del documento y no solo en el pie: es la
+    // pregunta que se le hace a una cotización con el papel en la mano.
+    vencimiento: resumen.vigenciaHasta,
+    destinatario: DestinatarioImpreso(
+      nombre: resumen.nombreCliente,
+      // La moto identifica la cotización mejor que la cédula del dueño: es lo
+      // que se busca en el mostrador.
+      documento: resumen.nombreMoto,
+    ),
     atendidoPor: atendidoPor,
     bloques: [
       if (productos.isNotEmpty)

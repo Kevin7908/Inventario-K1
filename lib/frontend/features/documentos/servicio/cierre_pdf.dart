@@ -11,10 +11,15 @@ import 'formato_impreso.dart';
 /// Separado de `SeccionesPdf` porque responde otra pregunta: aquello pinta
 /// **qué se llevó el cliente**, esto pinta **cuánto debe y cuánto ha pagado**.
 ///
-/// La regla del IVA está en `core/iva_app.dart` y aquí solo se obedece: los
-/// precios lo llevan incluido, así que el renglón **discrimina** cuánto
-/// impuesto va dentro del total, no se lo suma. Por eso dice «incluido» y por
-/// eso el total es `subtotal - descuento` sin sumar nada más.
+/// La regla del IVA está en `core/iva_app.dart` y aquí solo se obedece: el
+/// precio del catálogo es la base gravable, así que el renglón va **entre el
+/// descuento y el total** —que es el orden en que se liquida— y el total es
+/// `subtotal − descuento + iva`.
+///
+/// El documento trae el importe ya calculado y esta clase no lo recalcula: la
+/// factura de hace un año se cerró con la tasa de entonces. Por eso tampoco
+/// pinta el porcentaje aquí: se lo pone quien traduce, que sí sabe si el
+/// impuesto se sumó o venía dentro.
 class CierrePdf {
   CierrePdf(this.formato) : _e = EstiloPdf.de(formato);
 
@@ -33,8 +38,8 @@ class CierrePdf {
         // Sin el porcentaje a propósito: `etiquetaIva` de `core/iva_app.dart`
         // lo saca de la tasa configurada **hoy**, y una factura de hace un año
         // se cerró con la de entonces. El monto sí es el guardado en el
-        // documento, así que «IVA incluido» siempre dice la verdad.
-        if (doc.iva != null) _renglon('IVA incluido', formatearPrecio(doc.iva!)),
+        // documento.
+        if (doc.iva != null) _renglon(doc.etiquetaIva, formatearPrecio(doc.iva!)),
         pw.SizedBox(height: 5),
         pw.Container(
           padding: const pw.EdgeInsets.only(top: 6),
@@ -166,6 +171,48 @@ class CierrePdf {
             ),
           ],
         ),
+      );
+
+  /// Las dos rayas de firma: quién elaboró el documento y quién lo recibió.
+  ///
+  /// Solo en carta y solo si el documento las pide (`conFirmas`): van en la
+  /// factura y en la remisión —los papeles que alguien firma al recibir la
+  /// mercancía— y no en la cotización, que no se entrega contra nada. Una
+  /// tirilla no las lleva porque no hay dónde firmar.
+  ///
+  /// La de la izquierda va **con el nombre debajo de la raya**: el papel sale
+  /// de la impresora ya diciendo quién lo hizo, y la raya es para el garabato.
+  /// La de la derecha va en blanco, que es lo que el cliente rellena.
+  List<pw.Widget> firmas(DocumentoImprimible doc) {
+    if (!doc.conFirmas || formato.esTirilla) return const [];
+
+    return [
+      pw.SizedBox(height: 34),
+      pw.Row(
+        children: [
+          pw.Expanded(
+            child: _rayaFirma('Elaborado por', doc.atendidoPor ?? ''),
+          ),
+          pw.SizedBox(width: 40),
+          pw.Expanded(child: _rayaFirma('Recibido', '')),
+        ],
+      ),
+    ];
+  }
+
+  pw.Widget _rayaFirma(String etiqueta, String nombre) => pw.Column(
+        crossAxisAlignment: pw.CrossAxisAlignment.start,
+        children: [
+          pw.Container(
+            decoration: const pw.BoxDecoration(
+              border: pw.Border(top: pw.BorderSide(color: EstiloPdf.borde)),
+            ),
+            padding: const pw.EdgeInsets.only(top: 4),
+            width: double.infinity,
+            child: pw.Text(etiqueta, style: _e.etiqueta),
+          ),
+          if (nombre.isNotEmpty) pw.Text(nombre, style: _e.celda),
+        ],
       );
 
   /// El pie de cada página: la nota del documento, la numeración y el nombre

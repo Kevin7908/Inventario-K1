@@ -73,16 +73,30 @@ class ConstructorPdf {
     // El cuerpo es el mismo en los dos formatos: lo que cambia es dónde se
     // corta. Se arma una sola vez para que no haya forma de que una hoja
     // lleve algo que la tirilla no.
+    // La numeración de ítems es continua a lo largo del documento, no por
+    // bloque: en una orden con repuestos y mano de obra, el ítem 4 es el
+    // cuarto del papel. Por eso el contador vive fuera del bucle.
+    List<pw.Widget> lineas() {
+      final widgets = <pw.Widget>[];
+      var numero = 1;
+      for (final bloque in doc.bloques) {
+        widgets.addAll(secciones.bloque(bloque, desde: numero));
+        numero += bloque.lineas.length;
+      }
+      return widgets;
+    }
+
     List<pw.Widget> cuerpo() => [
           secciones.encabezado(doc, logo),
           pw.SizedBox(height: formato.esTirilla ? 10 : 18),
           ?secciones.destinatario(doc),
           pw.SizedBox(height: formato.esTirilla ? 8 : 14),
           secciones.encabezadoLineas(),
-          for (final bloque in doc.bloques) ...secciones.bloque(bloque),
+          ...lineas(),
           pw.SizedBox(height: formato.esTirilla ? 8 : 14),
           cierre.totales(doc),
           ...cierre.movimientos(doc),
+          ...cierre.firmas(doc),
         ];
 
     if (formato.esTirilla) {

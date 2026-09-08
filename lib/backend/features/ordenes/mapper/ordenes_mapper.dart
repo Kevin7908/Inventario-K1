@@ -1,6 +1,7 @@
 import 'package:drift/drift.dart';
 
 import '../../../share/database/app_db.dart';
+import '../../../share/utils/fecha_sqlite.dart';
 import '../enum/enum_ordenes.dart';
 import '../modelo/orden_detalle.dart';
 import '../modelo/orden_cargo.dart';
@@ -35,7 +36,7 @@ abstract final class OrdenMapper {
       diagnostico: row['diagnostico'] as String?,
       // Convertimos el String de la BD al Enum
       estado: EstadoOrden.desdeTexto(row['estado'] as String? ?? 'ABIERTA'),
-      fechaIngreso: _parseFecha(row['fecha_ingreso']) ?? DateTime.now(),
+      fechaIngreso: fechaDeSqlite(row['fecha_ingreso']) ?? DateTime.now(),
     );
   }
 
@@ -69,8 +70,8 @@ abstract final class OrdenMapper {
       estado: EstadoOrden.desdeTexto(
         ordenRow['estado'] as String? ?? 'ABIERTA',
       ),
-      fechaIngreso: _parseFecha(ordenRow['fecha_ingreso']),
-      fechaSalida: _parseFecha(ordenRow['fecha_salida']),
+      fechaIngreso: fechaDeSqlite(ordenRow['fecha_ingreso']),
+      fechaSalida: fechaDeSqlite(ordenRow['fecha_salida']),
       // Mapeo de listas internas
       tareas: tareasRows.map(_tareaDesdeMap).toList(growable: false),
       repuestos: repuestosRows.map(_repuestoDesdeMap).toList(growable: false),
@@ -182,7 +183,7 @@ abstract final class OrdenMapper {
       precioPactado: (row['precio_pactado'] as num? ?? 0).round(),
       notas: row['notas'] as String?,
       completado: completado,
-      creadoEn: _parseFecha(row['creado_en']),
+      creadoEn: fechaDeSqlite(row['creado_en']),
     );
   }
 
@@ -196,25 +197,17 @@ abstract final class OrdenMapper {
         cantidad: (row['cantidad'] as num? ?? 0.0).toDouble(),
         precioUnitario: (row['precio_unitario'] as num? ?? 0).round(),
         costoUnitario: (row['precio_compra'] as num? ?? 0).round(),
-        creadoEn: _parseFecha(row['creado_en']),
+        creadoEn: fechaDeSqlite(row['creado_en']),
       );
 
   //  Utilidades
-
-  static DateTime? _parseFecha(dynamic valor) {
-    if (valor == null) return null;
-    if (valor is DateTime) return valor;
-    if (valor is int) return DateTime.fromMillisecondsSinceEpoch(valor);
-    if (valor is String && valor.isNotEmpty) return DateTime.tryParse(valor);
-    return null;
-  }
 
   static OrdenCargo _cargoDesdeMap(Map<String, dynamic> row) => OrdenCargo(
         id: row['id'] as int,
         ordenId: row['orden_id'] as int,
         descripcion: row['descripcion'] as String,
         precio: row['precio'] as int? ?? 0,
-        creadoEn: _parseFecha(row['creado_en']),
+        creadoEn: fechaDeSqlite(row['creado_en']),
       );
 
   static TablaOrdenesCargoCompanion cargoCompanionNuevo({

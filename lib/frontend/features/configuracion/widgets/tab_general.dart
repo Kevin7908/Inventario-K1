@@ -261,11 +261,12 @@ class _CampoIva extends StatelessWidget {
         const SizedBox(height: 8),
         Text(
           hayIva
-              ? 'Los precios del catálogo ya lo incluyen: el renglón del '
-                  'documento lo discrimina, no lo suma. En 0 no se imprime.'
+              ? 'El precio del catálogo es la base: el impuesto se le suma al '
+                  'facturar, después de restar el descuento. En 0 no se '
+                  'imprime.'
               : 'Hoy el taller no factura IVA, así que el renglón no se '
-                  'imprime en ningún documento. Los precios del catálogo son '
-                  'el total.',
+                  'imprime en ningún documento y el precio del catálogo es lo '
+                  'que se cobra.',
           style: TipografiaApp.caption.copyWith(color: ColoresApp.textMuted),
         ),
         const SizedBox(height: 6),

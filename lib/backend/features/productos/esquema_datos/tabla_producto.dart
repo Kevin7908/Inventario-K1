@@ -80,8 +80,6 @@ class TablaProducto extends Table {
 
   TextColumn get imagenUrl => text().nullable()();
 
-  BoolColumn get aplicaIva => boolean().withDefault(const Constant(true))();
-
   BoolColumn get activo => boolean().withDefault(const Constant(true))();
 
   DateTimeColumn get creadoEn => dateTime().withDefault(currentDateAndTime)();

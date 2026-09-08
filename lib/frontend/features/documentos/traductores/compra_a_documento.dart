@@ -53,13 +53,17 @@ DocumentoImprimible documentoDeCompra({
     titulo: resumen.anulada ? 'Remisión anulada' : 'Remisión de entrada',
     numero: resumen.numero,
     fecha: resumen.fecha,
-    cliente: resumen.proveedorNombre,
-    documentoCliente: (resumen.numeroFactura ?? '').isEmpty
-        ? null
-        : 'Factura ${resumen.numeroFactura}',
+    destinatario: DestinatarioImpreso(
+      nombre: resumen.proveedorNombre,
+      documento: (resumen.numeroFactura ?? '').isEmpty
+          ? ''
+          : 'Factura ${resumen.numeroFactura}',
+    ),
     etiquetaDestinatario: 'Proveedor',
     atendidoPor: recibidoPor,
     etiquetaAtendidoPor: 'Recibido por',
+    // La remisión se firma: es el papel contra el que se recibe la mercancía.
+    conFirmas: true,
     bloques: [
       BloqueLineas(lineas: compra.items.map(_linea).toList()),
     ],
@@ -92,7 +96,7 @@ String _pie(CompraResumen resumen, int lineas) {
 /// «a cómo salió» es a cómo se compró, no a cómo se vende.
 LineaDocumento _linea(CompraItem item) => LineaDocumento(
       descripcion: item.descripcion,
-      referencia: item.sku,
+      codigo: item.sku,
       cantidad: item.cantidad,
       precioUnitario: item.costoUnitario,
       subtotal: item.subtotal,

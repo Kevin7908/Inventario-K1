@@ -30,7 +30,6 @@ Producto _producto({String nombre = 'Aceite 20W50', int? categoriaId}) =>
       precioVenta: 40000,
       stockActual: 0,
       stockMinimo: 0,
-      aplicaIva: true,
       activo: true,
     );
 

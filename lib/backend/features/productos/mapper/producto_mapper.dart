@@ -26,7 +26,6 @@ class ProductoMapper {
       stockMinimo: fila.stockMinimo,
       ubicacionBodega: fila.ubicacionBodega,
       imagenUrl: fila.imagenUrl,
-      aplicaIva: fila.aplicaIva,
       activo: fila.activo,
       creadoEn: fila.creadoEn,
       actualizadoEn: fila.actualizadoEn,
@@ -70,7 +69,6 @@ class ProductoMapper {
       stockMinimo: fila.stockMinimo,
       ubicacionBodega: fila.ubicacionBodega,
       imagenUrl: fila.imagenUrl,
-      aplicaIva: fila.aplicaIva,
       activo: fila.activo,
       creadoEn: fila.creadoEn,
       actualizadoEn: fila.actualizadoEn,
@@ -102,7 +100,6 @@ class ProductoMapper {
       stockMinimo: Value(p.stockMinimo),
       ubicacionBodega: Value(p.ubicacionBodega),
       imagenUrl: Value(p.imagenUrl),
-      aplicaIva: Value(p.aplicaIva),
       activo: Value(p.activo),
       // `creadoEn` solo se manda si ya existe: en el alta lo pone el default
       // de la tabla. `actualizadoEn` se toca en todas las escrituras.

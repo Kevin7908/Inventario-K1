@@ -72,6 +72,12 @@ class RepositorioVentasImpl with FirmaDeSesion implements RepositorioVentas {
     SELECT
       v.*,
       COALESCE(pe.nombres || ' ' || COALESCE(pe.apellidos, ''), '— Sin cliente —') AS cliente_nombre,
+      pe.tipo_documento AS cliente_tipo_documento,
+      pe.documento      AS cliente_documento,
+      pe.direccion      AS cliente_direccion,
+      pe.ciudad         AS cliente_ciudad,
+      pe.telefono       AS cliente_telefono,
+      pe.email          AS cliente_correo,
       TRIM(pu.nombres || ' ' || COALESCE(pu.apellidos, '')) AS cajero,
       COALESCE((SELECT SUM(d.total) FROM devoluciones d WHERE d.venta_id = v.id), 0)
         AS total_devuelto
@@ -213,10 +219,24 @@ class RepositorioVentasImpl with FirmaDeSesion implements RepositorioVentas {
         .getSingleOrNull();
     if (ventaRow == null) throw Exception('Venta #$id no encontrada.');
 
+    // El SKU y la unidad se leen del catálogo, no de la línea: la factura los
+    // enseña para que el cliente pueda volver a pedir la misma pieza, y eso es
+    // la ficha de hoy. Lo que sí está congelado en la línea es la descripción.
+    // `LEFT JOIN` en los dos: un producto borrado no puede dejar sin imprimir
+    // una factura que ya se emitió.
     final itemsRows = await _db
         .customSelect(
-          'SELECT * FROM venta_detalles WHERE venta_id = ? ORDER BY id',
+          'SELECT d.*, p.sku AS sku, u.abreviatura AS unidad '
+          'FROM venta_detalles d '
+          'LEFT JOIN productos p ON p.id = d.producto_id '
+          'LEFT JOIN unidades_medida u ON u.id = p.unidad_medida_id '
+          'WHERE d.venta_id = ? ORDER BY d.id',
           variables: [Variable.withInt(id)],
+          readsFrom: {
+            _tablaItems,
+            _db.tablaProducto,
+            _db.tablaUnidadesMedida,
+          },
         )
         .get();
 
@@ -484,15 +504,17 @@ class RepositorioVentasImpl with FirmaDeSesion implements RepositorioVentas {
         ? subtotal
         : (ventaRow.descuento < 0 ? 0 : ventaRow.descuento);
 
-    // Los precios ya traen el IVA dentro (`iva_app.dart`): el total no se lo
-    // suma, y la columna `iva` guarda cuánto va contenido en él.
-    final total = subtotal - descuento;
+    // El precio del catálogo es la base gravable (`iva_app.dart`): el
+    // descuento se resta antes del impuesto y el total lo lleva sumado.
+    final base = subtotal - descuento;
+    final iva = ivaSobre(base);
+    final total = base + iva;
 
     await (_db.update(_tablaVentas)..where((t) => t.id.equals(ventaId))).write(
       TablaVentasCompanion(
         subtotal: Value(subtotal),
         descuento: Value(descuento),
-        iva: Value(ivaIncluidoEn(total)),
+        iva: Value(iva),
         total: Value(total),
         actualizadoEn: Value(DateTime.now()),
       ),

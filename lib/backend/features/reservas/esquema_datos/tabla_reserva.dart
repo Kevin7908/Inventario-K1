@@ -53,8 +53,18 @@ class TablaReserva extends Table {
   /// `ACTIVA` | `COMPLETADA` | `CANCELADA`.
   TextColumn get estado => text().withDefault(const Constant('ACTIVA'))();
 
-  /// Los dos en pesos enteros.
+  /// Los tres en pesos enteros.
+  ///
+  /// `total_reserva` es lo pactado **con impuesto**: el precio del catálogo es
+  /// la base gravable (`iva_app.dart`), así que apartar mercancía cuesta lo
+  /// mismo que llevársela del mostrador. `iva` guarda cuánto de ese total es
+  /// impuesto, liquidado con la tasa del día, para poder discriminarlo en el
+  /// papel sin recalcularlo con la tasa de mañana.
+  ///
+  /// Los dos son **caché** de las líneas —`total_reserva` es
+  /// `SUM(items) + iva`— y `RepositorioReservas.descuadresTotal()` lo afirma.
   IntColumn get totalReserva => integer()();
+  IntColumn get iva => integer().withDefault(const Constant(0))();
   IntColumn get pagadoAcumulado => integer().withDefault(const Constant(0))();
 
   /// Hasta cuándo se guarda la mercancía. Fecha sin hora, a medianoche.
@@ -78,7 +88,7 @@ class TablaReserva extends Table {
   List<String> get customConstraints => [
         "CHECK (estado IN ('ACTIVA', 'COMPLETADA', 'CANCELADA'))",
         'CHECK (length(trim(numero)) > 0)',
-        'CHECK (total_reserva >= 0 AND pagado_acumulado >= 0)',
+        'CHECK (total_reserva >= 0 AND pagado_acumulado >= 0 AND iva >= 0)',
         // Recibir más de lo pactado es siempre un error de captura.
         'CHECK (pagado_acumulado <= total_reserva)',
       ];

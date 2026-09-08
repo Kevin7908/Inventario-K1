@@ -31,8 +31,9 @@ import '../temas/tipografia_app.dart';
 /// - [subtotal]: importe ya formateado, o `null` para no pintar el renglón.
 ///   Sin descuento repite al total y suele esconderse.
 /// - [total]: importe ya formateado. Es el renglón grande.
-/// - [iva]: importe ya formateado del IVA contenido, o `null` si no hay.
-/// - [etiquetaIva]: cómo se llama ese renglón ('IVA (19%) incluido').
+/// - [iva]: importe ya formateado del IVA que se le suma, o `null` si no hay.
+///   Se pinta entre el descuento y el total, que es el orden en que se liquida.
+/// - [etiquetaIva]: cómo se llama ese renglón ('IVA (19%)').
 /// - [controladorDescuento], [focoDescuento]: los del campo editable.
 /// - [alCambiarDescuento]: texto crudo del campo; quien lo recibe lo parsea.
 /// - [hayDescuento]: en `true` el campo se pinta en ámbar y con el prefijo
@@ -62,7 +63,7 @@ class PieTotales extends StatelessWidget {
     required this.alCambiarDescuento,
     this.subtotal,
     this.iva,
-    this.etiquetaIva = 'IVA incluido',
+    this.etiquetaIva = 'IVA',
     this.etiquetaDescuento = 'Descuento',
     this.hayDescuento = false,
     this.editable = true,
@@ -95,6 +96,14 @@ class PieTotales extends StatelessWidget {
           activo: hayDescuento,
           editable: editable,
         ),
+        // El IVA va **encima** del total y debajo del descuento, que es el
+        // orden en que se liquida: la rebaja se resta primero y el impuesto
+        // se calcula sobre lo que queda. Estuvo debajo del total mientras los
+        // precios lo traían dentro y el renglón solo lo discriminaba.
+        if (iva != null) ...[
+          const SizedBox(height: 8),
+          _Renglon(etiqueta: etiquetaIva, valor: iva!),
+        ],
         const SizedBox(height: 12),
         // Línea punteada sobre el total, como en el diseño.
         const _SeparadorPunteado(),
@@ -112,10 +121,6 @@ class PieTotales extends StatelessWidget {
             ),
           ],
         ),
-        if (iva != null) ...[
-          const SizedBox(height: 6),
-          _Renglon(etiqueta: etiquetaIva, valor: iva!),
-        ],
       ],
     );
   }

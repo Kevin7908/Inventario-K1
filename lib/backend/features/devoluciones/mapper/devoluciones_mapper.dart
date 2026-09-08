@@ -1,4 +1,5 @@
 import '../../../share/database/app_db.dart';
+import '../../../share/utils/fecha_sqlite.dart';
 import '../enum/enum_devoluciones.dart';
 import '../modelo/devolucion.dart';
 
@@ -49,19 +50,10 @@ abstract final class DevolucionesMapper {
       notas: f['notas'] as String?,
       usuarioId: f['usuario_id'] as int,
       recibidoPor: (f['recibido_por'] as String? ?? '').trim(),
-      creadoEn: _fecha(f['creado_en']),
+      creadoEn: fechaDeSqliteObligatoria(f['creado_en']),
       lineas: lineas,
     );
   }
-
-  /// Drift guarda las fechas como segundos desde la época; un `customSelect`
-  /// las devuelve así de crudas.
-  static DateTime _fecha(Object? valor) => switch (valor) {
-        final int segundos =>
-          DateTime.fromMillisecondsSinceEpoch(segundos * 1000),
-        final DateTime fecha => fecha,
-        _ => DateTime.now(),
-      };
 
   static TablaDevolucionDetalleCompanion detalleACompanion({
     required int devolucionId,

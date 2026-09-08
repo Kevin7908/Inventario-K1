@@ -7,7 +7,6 @@ import '../../../../backend/features/categorias/modelo/categoria.dart';
 import '../../../../backend/features/productos/modelo/producto.dart';
 import '../../../../backend/features/proveedores/modelo/proveedor.dart';
 import '../../../../backend/features/unidades_medida/modelo/unidad_medida.dart';
-import '../../../../core/iva_app.dart';
 import '../../../../core/resultado.dart';
 import '../../../../core/validaciones.dart';
 import '../../../share/share.dart';
@@ -70,7 +69,6 @@ class _FormularioProductoState extends ConsumerState<FormularioProducto> {
   Proveedor? _proveedor;
   UnidadMedida? _unidad;
   String? _imagenRuta;
-  bool _aplicaIva = false;
   bool _activo = true;
 
   @override
@@ -92,7 +90,6 @@ class _FormularioProductoState extends ConsumerState<FormularioProducto> {
     _ubicacionCtrl = TextEditingController(text: p?.ubicacionBodega ?? '');
 
     _imagenRuta = p?.imagenUrl;
-    _aplicaIva = p?.aplicaIva ?? false;
     _activo = p?.activo ?? true;
 
     if (p != null) {
@@ -233,7 +230,6 @@ class _FormularioProductoState extends ConsumerState<FormularioProducto> {
       stockMinimo: _aDouble(_stockMinimoCtrl),
       ubicacionBodega: ubicacion.isEmpty ? null : ubicacion,
       imagenUrl: _imagenRuta,
-      aplicaIva: _aplicaIva,
       activo: _activo,
     );
 
@@ -447,19 +443,12 @@ class _FormularioProductoState extends ConsumerState<FormularioProducto> {
             ],
           ),
           const SizedBox(height: 16),
+          // Sin interruptor de IVA: la tasa del negocio es una sola y se
+          // configura en Configuración. Marcarlo por producto dejaba dos
+          // artículos idénticos facturando distinto según cómo se creó cada
+          // uno, que es el problema que `iva_app.dart` existe para evitar.
           Row(
             children: [
-              Expanded(
-                child: InterruptorCampo(
-                  etiqueta: 'Aplica IVA',
-                  detalle: _aplicaIva
-                      ? 'El precio ya incluye $porcentajeIva% de IVA'
-                      : 'Precio sin IVA',
-                  valor: _aplicaIva,
-                  alCambiar: (v) => setState(() => _aplicaIva = v),
-                ),
-              ),
-              const SizedBox(width: 16),
               Expanded(
                 child: InterruptorCampo(
                   etiqueta: 'Producto activo',

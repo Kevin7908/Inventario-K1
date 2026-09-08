@@ -25,9 +25,10 @@ import '../modelo/negocio_impreso.dart';
 /// - **Una devolución se imprime como lo que es.** El monto de un abono puede
 ///   ser negativo —quitar mercancía de una reserva ya pagada obliga a devolver
 ///   plata—, y ocultarlo dejaría una columna cuya suma no cuadra con el saldo.
-/// - **El IVA se calcula, no se lee.** Una reserva no guarda su IVA como lo
-///   hace una factura, así que se extrae del total con `ivaIncluidoEn` —los
-///   precios lo llevan dentro— y se omite si la tasa es cero.
+/// - **El IVA se lee, no se calcula.** La reserva lo guarda con la tasa del
+///   día en que se apartó, igual que una factura: recalcularlo con la de hoy
+///   cambiaría el papel de una reserva de hace un año. Se omite el renglón si
+///   ese IVA es cero.
 /// - **El saldo se imprime aunque esté en cero**: en una reserva, «Saldo
 ///   pendiente $0» es justamente la buena noticia que el cliente vino a
 ///   confirmar. Es lo contrario que en una factura, donde solo estorba.
@@ -55,14 +56,18 @@ DocumentoImprimible documentoDeReserva({
     titulo: 'Reserva',
     numero: resumen.numero,
     fecha: resumen.creadoEn,
-    cliente: resumen.nombreCliente,
-    documentoCliente: _moto(resumen.nombreMoto, resumen.placaMoto),
+    vencimiento: resumen.fechaLimite,
+    destinatario: DestinatarioImpreso(
+      nombre: resumen.nombreCliente,
+      documento: _moto(resumen.nombreMoto, resumen.placaMoto) ?? '',
+    ),
     atendidoPor: atendidoPor,
     bloques: [
       BloqueLineas(lineas: reserva.items.map(_linea).toList()),
     ],
-    subtotal: resumen.totalReserva,
-    iva: hayIva ? ivaIncluidoEn(resumen.totalReserva) : null,
+    subtotal: resumen.baseGravable,
+    iva: resumen.iva > 0 ? resumen.iva : null,
+    etiquetaIva: etiquetaIva,
     total: resumen.totalReserva,
     movimientos: abonos.map(_movimiento).toList(),
     saldoPendiente: resumen.saldo,
@@ -84,7 +89,7 @@ String? _moto(String? nombre, String? placa) {
 
 LineaDocumento _linea(ReservaItem item) => LineaDocumento(
       descripcion: item.nombreProducto,
-      referencia: item.sku,
+      codigo: item.sku,
       cantidad: item.cantidad,
       precioUnitario: item.precioUnitario,
       subtotal: (item.cantidad * item.precioUnitario).round(),

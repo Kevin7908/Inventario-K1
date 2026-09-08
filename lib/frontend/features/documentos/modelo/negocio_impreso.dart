@@ -14,7 +14,12 @@ import '../../../../backend/features/configuracion/modelo/clave_configuracion.da
 /// Parámetros:
 /// - [nombre]: razón social. Es el único que siempre tiene valor, porque
 ///   `ClaveConfiguracion.nombreNegocio` trae «Taller de Motos» por defecto.
-/// - [nit], [direccion], [telefono], [ciudad]: opcionales en la práctica.
+/// - [nit], [direccion], [telefono], [ciudad], [correo]: opcionales en la
+///   práctica.
+/// - [regimenIva]: cómo responde el negocio ante el impuesto («Responsable de
+///   IVA»). Texto libre: se imprime tal cual y ningún cálculo lo consume.
+/// - [actividadEconomica]: el código CIIU, que el cliente compara contra su
+///   propia contabilidad.
 ///
 /// Ejemplo:
 /// ```dart
@@ -29,6 +34,9 @@ class NegocioImpreso extends Equatable {
     this.direccion = '',
     this.telefono = '',
     this.ciudad = '',
+    this.correo = '',
+    this.regimenIva = '',
+    this.actividadEconomica = '',
   });
 
   /// Traduce el mapa que devuelve `RepositorioConfiguracion.observarTodas`.
@@ -44,6 +52,9 @@ class NegocioImpreso extends Equatable {
       direccion: leer(ClaveConfiguracion.direccion),
       telefono: leer(ClaveConfiguracion.telefono),
       ciudad: leer(ClaveConfiguracion.ciudad),
+      correo: leer(ClaveConfiguracion.correo),
+      regimenIva: leer(ClaveConfiguracion.regimenIva),
+      actividadEconomica: leer(ClaveConfiguracion.actividadEconomica),
     );
   }
 
@@ -52,6 +63,9 @@ class NegocioImpreso extends Equatable {
   final String direccion;
   final String telefono;
   final String ciudad;
+  final String correo;
+  final String regimenIva;
+  final String actividadEconomica;
 
   /// La segunda línea del encabezado: dirección y ciudad, si las hay.
   ///
@@ -64,8 +78,29 @@ class NegocioImpreso extends Equatable {
   String get lineaContacto => [
         if (nit.isNotEmpty) 'NIT $nit',
         if (telefono.isNotEmpty) 'Tel. $telefono',
+        if (correo.isNotEmpty) correo,
+      ].join(' · ');
+
+  /// La cuarta, la fiscal: régimen y actividad económica.
+  ///
+  /// Va aparte de [lineaContacto] porque responde otra pregunta —cómo factura
+  /// el negocio, no cómo se le llama— y porque un taller que no las cargó no
+  /// tiene por qué imprimir una línea vacía.
+  String get lineaFiscal => [
+        if (regimenIva.isNotEmpty) regimenIva,
+        if (actividadEconomica.isNotEmpty)
+          'Actividad económica $actividadEconomica',
       ].join(' · ');
 
   @override
-  List<Object?> get props => [nombre, nit, direccion, telefono, ciudad];
+  List<Object?> get props => [
+        nombre,
+        nit,
+        direccion,
+        telefono,
+        ciudad,
+        correo,
+        regimenIva,
+        actividadEconomica,
+      ];
 }

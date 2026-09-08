@@ -27,6 +27,7 @@ class ReservaMapper {
       cotizacionId: row.cotizacionId,
       estado: EstadoReserva.desdeValor(row.estado),
       totalReserva: row.totalReserva,
+      iva: row.iva,
       pagadoAcumulado: row.pagadoAcumulado,
       creadoEn: row.creadoEn,
       fechaLimite: row.fechaLimite,

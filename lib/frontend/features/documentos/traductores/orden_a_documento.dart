@@ -23,7 +23,7 @@ import '../modelo/negocio_impreso.dart';
 ///   mostrador, no el nombre del dueño.
 /// - **El kilometraje y el diagnóstico van al pie.** No son importes, pero son
 ///   la razón de ser del documento y lo que se compara en la visita siguiente.
-/// - **El IVA se calcula** con `ivaIncluidoEn`: una orden no lo guarda como lo
+/// - **El IVA se calcula** con `ivaSobre`: una orden no lo guarda como lo
 ///   hace una factura, y los precios lo llevan dentro.
 ///
 /// Parámetros:
@@ -45,9 +45,13 @@ DocumentoImprimible documentoDeOrden({
     titulo: 'Orden de servicio',
     numero: orden.numeroOrden,
     fecha: orden.fechaIngreso ?? DateTime.now(),
-    cliente: orden.clienteNombre,
-    documentoCliente: _moto(orden.motoDescripcion, orden.motoPlaca),
+    destinatario: DestinatarioImpreso(
+      nombre: orden.clienteNombre,
+      documento: _moto(orden.motoDescripcion, orden.motoPlaca) ?? '',
+    ),
     atendidoPor: atendidoPor,
+    // La orden se entrega con la moto, así que se firma igual que la factura.
+    conFirmas: true,
     bloques: [
       if (orden.tareas.isNotEmpty)
         BloqueLineas(
@@ -67,7 +71,8 @@ DocumentoImprimible documentoDeOrden({
     ],
     subtotal: orden.subtotal,
     descuento: orden.descuento,
-    iva: hayIva ? ivaIncluidoEn(orden.total) : null,
+    iva: orden.iva > 0 ? orden.iva : null,
+    etiquetaIva: etiquetaIva,
     total: orden.total,
     nota: _pie(orden),
   );
@@ -96,7 +101,7 @@ String? _pie(OrdenDetalle orden) {
 
 LineaDocumento _deTarea(OrdenTarea tarea) => LineaDocumento(
       descripcion: tarea.servicioNombre,
-      referencia: tarea.tecnicoNombre.isEmpty
+      detalle: tarea.tecnicoNombre.isEmpty
           ? null
           : 'Técnico: ${tarea.tecnicoNombre}',
       cantidad: 1,

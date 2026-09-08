@@ -28,9 +28,11 @@ import '../modelo/negocio_impreso.dart';
 /// - **El saldo se imprime aunque esté en cero**, como en la reserva: quien
 ///   viene a pedir el papel de una deuda saldada viene justamente a que diga
 ///   cero. Es lo contrario que en una factura, donde solo estorba.
-/// - **El IVA se calcula, no se lee.** Una deuda no lo guarda como lo hace una
-///   factura, así que se extrae del total con `ivaIncluidoEn` —los precios lo
-///   llevan dentro— y se omite si la tasa es cero.
+/// - **El IVA se discrimina, no se suma.** Una deuda no lo guarda: hereda el
+///   total de la orden que se cerró a crédito, y ese total **ya lo trae
+///   sumado**. Por eso va `ivaContenidoEn` y no `ivaSobre` —volver a sumarlo
+///   cobraría el impuesto dos veces— y por eso el renglón dice «incluido».
+///   Se omite si la tasa es cero.
 /// - **El subtotal es la suma de las líneas y `montoTotal` ya viene rebajado.**
 ///   Por eso el subtotal se reconstruye sumando el descuento al total en vez
 ///   de sumar las líneas: en la deuda que copia una orden, el descuento se
@@ -69,8 +71,11 @@ DocumentoImprimible documentoDeDeuda({
         : 'Cuenta por cobrar',
     numero: resumen.numero,
     fecha: resumen.creadoEn,
-    cliente: resumen.nombreCliente,
-    documentoCliente: resumen.descripcionMoto,
+    vencimiento: resumen.fechaVencimiento,
+    destinatario: DestinatarioImpreso(
+      nombre: resumen.nombreCliente,
+      documento: resumen.descripcionMoto ?? '',
+    ),
     atendidoPor: atendidoPor,
     bloques: [
       if (productos.isNotEmpty)
@@ -86,7 +91,9 @@ DocumentoImprimible documentoDeDeuda({
     ],
     subtotal: resumen.montoTotal + resumen.descuento,
     descuento: resumen.descuento,
-    iva: hayIva ? ivaIncluidoEn(resumen.montoTotal) : null,
+    iva: hayIva ? ivaContenidoEn(resumen.montoTotal) : null,
+    // «incluido»: el impuesto ya venía dentro del total que se hereda.
+    etiquetaIva: etiquetaIvaIncluido,
     total: resumen.montoTotal,
     movimientos: pagos.map(_movimiento).toList(),
     tituloMovimientos: 'Pagos recibidos',
@@ -117,7 +124,7 @@ String? _pie(DeudorResumen resumen) {
 
 LineaDocumento _linea(DeudorItem item) => LineaDocumento(
       descripcion: item.descripcion,
-      referencia: item.sku,
+      codigo: item.sku,
       cantidad: item.cantidad,
       precioUnitario: item.precioUnitario,
       subtotal: item.subtotal,

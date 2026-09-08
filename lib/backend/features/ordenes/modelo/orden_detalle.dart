@@ -65,13 +65,16 @@ class OrdenDetalle extends Equatable {
 
   int get subtotal => subtotalManoObra + subtotalRepuestos + subtotalCargos;
 
-  /// Lo que se cobra. Los precios ya traen el IVA dentro (`iva_app.dart`), así
-  /// que la rebaja sale directo de lo que paga el cliente y no hay nada que
-  /// sumar después.
-  int get total => subtotal - descuento;
+  /// La base gravable: las líneas menos la rebaja, todavía sin impuesto.
+  ///
+  /// El descuento se resta **antes** del IVA (ver `iva_app.dart`).
+  int get baseGravable => subtotal - descuento;
 
-  /// Cuánto del [total] es impuesto. Informativo: se extrae, no se suma.
-  int get iva => ivaIncluidoEn(total);
+  /// El impuesto que se le suma a la base. Con la tasa en 0 es 0.
+  int get iva => ivaSobre(baseGravable);
+
+  /// Lo que se cobra: la base más su IVA.
+  int get total => baseGravable + iva;
 
   @override
   List<Object?> get props => [

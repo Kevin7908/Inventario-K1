@@ -536,7 +536,6 @@ Producto _producto() => Producto(
       precioVenta: 30000,
       stockActual: 10,
       stockMinimo: 0,
-      aplicaIva: true,
       activo: true,
     );
 

@@ -84,6 +84,10 @@ class EstiloPdf {
 
   pw.TextStyle get celdaTenue => _texto(7.5, color: textoTenue);
 
+  /// La columna de código de la factura: el mismo cuerpo que la celda, en
+  /// gris. Se lee de reojo para volver a pedir la pieza, no se lee entera.
+  pw.TextStyle get celdaCodigo => _texto(8, color: textoSecundario);
+
   pw.TextStyle get tituloGrupo => _texto(9, color: verdeOscuro, negrita: true);
 
   pw.TextStyle get totalEtiqueta => _texto(9.5, color: textoSecundario);

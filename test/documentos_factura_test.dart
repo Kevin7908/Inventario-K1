@@ -256,7 +256,7 @@ void main() {
 
     test('la moto identifica la reserva, no la cédula', () {
       final doc = documentoDeReserva(reserva: reserva(), negocio: _negocio);
-      expect(doc.documentoCliente, 'Boxer CT 100 · KMN12C');
+      expect(doc.destinatario?.documento, 'Boxer CT 100 · KMN12C');
     });
 
     test('la vigencia va al pie cuando la reserva tiene fecha límite', () {
@@ -269,7 +269,7 @@ void main() {
 
     test('el SKU acompaña a la línea', () {
       final doc = documentoDeReserva(reserva: reserva(), negocio: _negocio);
-      expect(doc.bloques.single.lineas.single.referencia, 'KA-9021');
+      expect(doc.bloques.single.lineas.single.codigo, 'KA-9021');
       expect(doc.bloques.single.lineas.single.subtotal, 100000);
     });
   });

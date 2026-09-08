@@ -1,4 +1,5 @@
 import '../../motos/repositorio/join_moto.dart';
+import '../../../../core/iva_app.dart';
 import '../../../../core/resultado.dart';
 import '../../../share/consecutivos/documento_consecutivo.dart';
 import '../../../share/consecutivos/repositorio_consecutivos.dart';
@@ -727,7 +728,7 @@ class RepositorioReservasImpl
         .customSelect(
           '''
       SELECT r.id AS id,
-             r.total_reserva - COALESCE(
+             r.total_reserva - r.iva - COALESCE(
                SUM(CAST(ROUND(i.cantidad * i.precio_unitario) AS INTEGER)), 0
              ) AS diferencia
       FROM reservas r
@@ -791,7 +792,12 @@ class RepositorioReservasImpl
   ///   evalúa sobre la fila terminada, así que bajar el total y el pagado en
   ///   la misma escritura pasa; hacerlo en dos, no.
   Future<void> _recalcularTotales(int reservaId) async {
-    final total = await _sumaItems(reservaId);
+    // El precio del catálogo es la base gravable (`iva_app.dart`): apartar
+    // mercancía cuesta lo mismo que llevársela, así que lo pactado lleva el
+    // impuesto sumado y la columna `iva` guarda cuánto es.
+    final base = await _sumaItems(reservaId);
+    final iva = ivaSobre(base);
+    final total = base + iva;
     var pagado = await _sumaAbonos(reservaId);
 
     if (pagado > total) {
@@ -814,6 +820,7 @@ class RepositorioReservasImpl
     )..where((t) => t.id.equals(reservaId))).write(
       TablaReservaCompanion(
         totalReserva: Value(total),
+        iva: Value(iva),
         pagadoAcumulado: Value(pagado),
         actualizadoEn: Value(DateTime.now()),
       ),

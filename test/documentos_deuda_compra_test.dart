@@ -135,8 +135,8 @@ void main() {
 
     test('la moto identifica la cuenta, como en la reserva', () {
       final doc = documentoDeDeuda(deuda: _deuda(), negocio: _negocio);
-      expect(doc.cliente, 'José Muñoz');
-      expect(doc.documentoCliente, 'Boxer CT 100 · KMN12C');
+      expect(doc.destinatario?.nombre, 'José Muñoz');
+      expect(doc.destinatario?.documento, 'Boxer CT 100 · KMN12C');
     });
 
     test('solo repuestos: un bloque, sin título que no separa nada', () {
@@ -163,7 +163,7 @@ void main() {
       );
 
       expect(doc.bloques.map((b) => b.titulo), ['Repuestos', 'Mano de obra']);
-      expect(doc.bloques.last.lineas.single.referencia, isNull);
+      expect(doc.bloques.last.lineas.single.codigo, isNull);
     });
 
     test('el saldo se imprime aunque esté en cero', () {
@@ -270,14 +270,14 @@ void main() {
   group('una compra se traduce a papel', () {
     test('el destinatario es el proveedor, y el papel lo dice', () {
       final doc = documentoDeCompra(compra: _compra(), negocio: _negocio);
-      expect(doc.cliente, 'Distribuidora del Norte');
+      expect(doc.destinatario?.nombre, 'Distribuidora del Norte');
       expect(doc.etiquetaDestinatario, 'Proveedor');
       expect(doc.etiquetaAtendidoPor, 'Recibido por');
     });
 
     test('la factura del proveedor identifica la remisión', () {
       final doc = documentoDeCompra(compra: _compra(), negocio: _negocio);
-      expect(doc.documentoCliente, 'Factura FV-8871');
+      expect(doc.destinatario?.documento, 'Factura FV-8871');
     });
 
     test('sin factura del proveedor no se pinta un rótulo huérfano', () {
@@ -285,7 +285,9 @@ void main() {
         compra: _compra(numeroFactura: null),
         negocio: _negocio,
       );
-      expect(doc.documentoCliente, isNull);
+      // Cadena vacía y no `null`: el bloque del destinatario decide qué pinta
+      // mirando qué campos tienen texto, no cuáles son nulos.
+      expect(doc.destinatario?.documento, isEmpty);
     });
 
     test('no lleva IVA: quien lo factura es el proveedor', () {
@@ -306,7 +308,7 @@ void main() {
       expect(linea.precioUnitario, 6500);
       expect(linea.cantidad, 10);
       expect(linea.subtotal, 65000);
-      expect(linea.referencia, 'PF-100');
+      expect(linea.codigo, 'PF-100');
     });
 
     test('el subtotal suma las líneas y el total es el caché de la cabecera',

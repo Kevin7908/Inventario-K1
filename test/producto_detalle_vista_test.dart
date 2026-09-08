@@ -30,7 +30,6 @@ const _producto = Producto(
   stockActual: 12,
   stockMinimo: 4,
   ubicacionBodega: 'Estante A-3',
-  aplicaIva: true,
   activo: true,
 );
 
