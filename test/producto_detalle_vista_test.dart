@@ -4,6 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:inventario_k1/backend/features/inventario/modelo/movimiento_inventario.dart';
 import 'package:inventario_k1/backend/features/productos/modelo/producto.dart';
+import 'package:inventario_k1/backend/features/productos/modelo/proveedor_de_producto.dart';
 import 'package:inventario_k1/backend/share/dominio/permiso.dart';
 import 'package:inventario_k1/frontend/features/autenticacion/provider/auth_providers.dart';
 import 'package:inventario_k1/frontend/features/inventario/provider/inventario_providers.dart';
@@ -11,8 +12,7 @@ import 'package:inventario_k1/backend/features/productos/modelo/compatibilidad.d
 import 'package:inventario_k1/frontend/features/productos/provider/compatibilidades_provider.dart';
 import 'package:inventario_k1/frontend/features/productos/vista/producto_detalle_vista.dart';
 
-import 'package:inventario_k1/backend/features/compras/modelo/compra_item.dart';
-import 'package:inventario_k1/frontend/features/compras/provider/compras_providers.dart';
+import 'package:inventario_k1/frontend/features/productos/provider/productos_provider.dart';
 
 import 'soporte/repositorio_inventario_falso.dart';
 
@@ -41,7 +41,7 @@ Future<void> _pumpFicha(
   Size tamano, {
   List<MovimientoInventario> movimientos = const [],
   Set<Permiso> permisos = const {},
-  UltimaCompra? ultimaCompra,
+  List<ProveedorDeProducto> proveedores = const [],
   List<Compatibilidad> compatibilidades = const [],
   /// La ficha solo pinta sus acciones cuando es la página completa. Dentro de
   /// `DialogoDetalleProductoWidget` no recibe callbacks y es de solo lectura.
@@ -65,11 +65,11 @@ Future<void> _pumpFicha(
         // `repositorio_marcas_compatibilidad_test.dart`.
         compatibilidadesProvider(_producto.id!)
             .overrideWith((ref) => Stream.value(compatibilidades)),
-        // Lo mismo con la última compra: la ficha la muestra desde que las
-        // remisiones existen, y su consulta la cubre
-        // `repositorio_compras_test.dart`.
-        ultimaCompraProvider(_producto.id!)
-            .overrideWith((ref) => Stream.value(ultimaCompra)),
+        // Lo mismo con los proveedores: la ficha los muestra desde que un
+        // repuesto puede tener varios, y su consulta la cubre
+        // `producto_proveedores_test.dart`.
+        proveedoresDeProductoProvider(_producto.id!)
+            .overrideWith((ref) => Stream.value(proveedores)),
       ],
       child: MaterialApp(
         home: Scaffold(
@@ -166,37 +166,73 @@ void main() {
     expect(find.text('Entrada sin factura'), findsOneWidget);
   });
 
-  group('la última compra', () {
-    testWidgets('sin remisiones registradas lo dice', (tester) async {
+  group('quién me lo vende', () {
+    // Sustituye a los dos bloques de antes —«Proveedor», que enseñaba uno
+    // solo, y «Última compra», que enseñaba una sola—: los dos respondían a
+    // medias la única pregunta que se hace mirando esto.
+
+    testWidgets('sin proveedores vinculados lo dice', (tester) async {
       await _pumpFicha(tester, const Size(1400, 1200));
 
-      expect(
-        find.text('Todavía no se ha comprado con una remisión registrada.'),
-        findsOneWidget,
-      );
+      expect(find.text('Todavía no se le compra a nadie'), findsOneWidget);
     });
 
-    testWidgets('con remisión muestra el costo real y el proveedor',
-        (tester) async {
-      // Es lo que el diseño pedía y el backend no tenía: hasta que existieron
-      // las compras, la ficha solo podía enseñar `precio_compra`.
+    testWidgets('lista a los dos, con el principal marcado', (tester) async {
       await _pumpFicha(
         tester,
         const Size(1400, 1200),
-        ultimaCompra: UltimaCompra(
-          compraId: 7,
-          numero: 'COM-2026-0007',
-          fecha: DateTime.now().subtract(const Duration(days: 12)),
-          costoUnitario: 6500,
-          cantidad: 12,
-          proveedorNombre: 'Repuestos JR',
-        ),
+        proveedores: [
+          ProveedorDeProducto(
+            id: 1,
+            productoId: _producto.id!,
+            proveedorId: 4,
+            proveedorNombre: 'Repuestos JR',
+            ultimoCosto: 6500,
+            // Tres días y no doce: `formatearHaceCuanto` pasa a fecha
+            // exacta después de una semana, porque «hace 23 días» ya no le
+            // dice nada a nadie.
+            fechaUltimaCompra: DateTime.now().subtract(
+              const Duration(days: 3),
+            ),
+            esPrincipal: true,
+          ),
+          const ProveedorDeProducto(
+            id: 2,
+            productoId: 1,
+            proveedorId: 9,
+            proveedorNombre: 'Almacén Ana',
+            referenciaProveedor: 'A-778',
+          ),
+        ],
       );
 
-      expect(find.text(r'$6.500'), findsOneWidget);
-      expect(find.textContaining('hace 12 días'), findsOneWidget);
-      expect(find.textContaining('Repuestos JR'), findsOneWidget);
-      expect(find.text('Ver la remisión COM-2026-0007'), findsOneWidget);
+      expect(find.text('Repuestos JR'), findsOneWidget);
+      expect(find.text('Almacén Ana'), findsOneWidget);
+      expect(find.textContaining('Principal'), findsOneWidget);
+      expect(find.textContaining(r'$6.500'), findsOneWidget);
+      expect(find.textContaining('hace 3 días'), findsOneWidget);
+      expect(find.textContaining('Ref. A-778'), findsOneWidget);
+    });
+
+    testWidgets('un costo en cero sin compras no se lee como regalado',
+        (tester) async {
+      await _pumpFicha(
+        tester,
+        const Size(1400, 1200),
+        proveedores: const [
+          ProveedorDeProducto(
+            id: 1,
+            productoId: 1,
+            proveedorId: 4,
+            proveedorNombre: 'Repuestos JR',
+          ),
+        ],
+      );
+
+      expect(
+        find.textContaining('Sin remisiones registradas todavía'),
+        findsOneWidget,
+      );
     });
   });
 

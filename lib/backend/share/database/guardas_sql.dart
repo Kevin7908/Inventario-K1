@@ -413,4 +413,46 @@ const List<String> guardasSql = [
       'La bitácora de los últimos dos años no se borra.');
   END;
   ''',
+
+  // ── Un producto tiene como mucho un proveedor principal ─────────────────
+  //
+  // El principal es el que se propone al pedir y el que sale en la rejilla,
+  // así que con dos marcados la app tendría que elegir uno —y elegiría el que
+  // devolviera primero la consulta, que cambia sin avisar—.
+  //
+  // El repositorio ya apaga el anterior antes de encender el nuevo; esto es
+  // la red por si un método futuro se olvida. Va como guarda y no como índice
+  // único parcial porque `@TableIndex` de Drift no admite `WHERE`, y un
+  // índice único sobre `producto_id` a secas prohibiría el segundo proveedor,
+  // que es justo lo que esta tabla existe para permitir.
+  //
+  // Son dos triggers, uno por operación: SQLite no tiene un `BEFORE INSERT OR
+  // UPDATE` que valga para las dos.
+  '''
+  CREATE TRIGGER IF NOT EXISTS guarda_un_solo_proveedor_principal_insert
+  BEFORE INSERT ON producto_proveedores
+  FOR EACH ROW
+  WHEN NEW.es_principal = 1
+   AND EXISTS (SELECT 1 FROM producto_proveedores
+               WHERE producto_id = NEW.producto_id AND es_principal = 1)
+  BEGIN
+    SELECT RAISE(ABORT,
+      'El producto ya tiene un proveedor principal: quita el anterior primero.');
+  END;
+  ''',
+
+  '''
+  CREATE TRIGGER IF NOT EXISTS guarda_un_solo_proveedor_principal_update
+  BEFORE UPDATE ON producto_proveedores
+  FOR EACH ROW
+  WHEN NEW.es_principal = 1
+   AND EXISTS (SELECT 1 FROM producto_proveedores
+               WHERE producto_id = NEW.producto_id
+                 AND es_principal = 1
+                 AND id <> NEW.id)
+  BEGIN
+    SELECT RAISE(ABORT,
+      'El producto ya tiene un proveedor principal: quita el anterior primero.');
+  END;
+  ''',
 ];

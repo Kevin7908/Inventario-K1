@@ -243,8 +243,15 @@ final compraDetalleProvider =
   (ref, id) => ref.watch(repositorioComprasProvider).obtenerDetalle(id),
 );
 
-/// Lo último que se compró de un producto, para su ficha: «última compra hace
-/// 12 días, a $6.500». Sale de `compra_detalles`, no de `precio_compra`.
+/// Lo último que se compró de un producto: «última compra hace 12 días, a
+/// $6.500». Sale de `compra_detalles`, no de `precio_compra`.
+///
+/// **Hoy no lo consume nadie.** Era el panel «Última compra» de la ficha del
+/// producto, que se fue el 07/09/2026 al poder un repuesto tener varios
+/// proveedores: la ficha enseña ahora el último costo **de cada uno**, que es
+/// lo que permite comparar. Se conserva porque es el dato que le falta a la
+/// rejilla del editor de compras —«¿a cómo salió la vez pasada?»—, anotado en
+/// `DEUDA_TECNICA.md` §6 bis.
 final ultimaCompraProvider =
     StreamProvider.autoDispose.family<UltimaCompra?, int>(
   name: 'ultimaCompraProvider',
@@ -259,4 +266,25 @@ final resumenProveedorComprasProvider =
   (ref, proveedorId) => ref
       .watch(repositorioComprasProvider)
       .observarResumenProveedor(proveedorId),
+);
+
+/// De qué producto y a qué proveedor: las dos mitades de «¿a cómo me lo ha
+/// dejado?».
+///
+/// Es un `record` y no dos parámetros sueltos porque una `family` acepta uno
+/// solo, y los records tienen igualdad estructural: tocar dos veces el mismo
+/// proveedor comparte el provider en vez de abrir otro stream.
+typedef ComprasDeProducto = ({int productoId, int proveedorId});
+
+/// Todas las veces que ese proveedor trajo ese repuesto.
+///
+/// La ficha del producto lo abre al tocar un proveedor de la lista. La última
+/// compra sola dice el precio de hoy; esto dice si subió.
+final comprasDeProductoProvider = StreamProvider.autoDispose
+    .family<List<UltimaCompra>, ComprasDeProducto>(
+  name: 'comprasDeProductoProvider',
+  (ref, cual) => ref.watch(repositorioComprasProvider).observarComprasDe(
+        productoId: cual.productoId,
+        proveedorId: cual.proveedorId,
+      ),
 );

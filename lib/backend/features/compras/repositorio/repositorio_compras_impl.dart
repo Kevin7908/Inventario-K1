@@ -311,6 +311,57 @@ class RepositorioComprasImpl with FirmaDeSesion implements RepositorioCompras {
   }
 
   @override
+  Stream<List<UltimaCompra>> observarComprasDe({
+    required int productoId,
+    required int proveedorId,
+  }) {
+    // Es la misma consulta que `observarUltimaCompra` con un filtro más y sin
+    // `LIMIT`. Se deja escrita aparte y no se generaliza aquella porque las
+    // dos preguntas son distintas —«¿a cómo está?» y «¿a cómo ha estado?»— y
+    // una función con un `proveedorId` opcional y un `limite` opcional se lee
+    // peor que estas dos.
+    return _db
+        .customSelect(
+          '''
+      SELECT c.id, c.numero, c.fecha, d.costo_unitario, d.cantidad,
+             TRIM(pe.nombres || ' ' || COALESCE(pe.apellidos, '')) AS proveedor
+      FROM compra_detalles d
+      JOIN compras     c  ON c.id  = d.compra_id
+      JOIN proveedores pr ON pr.id = c.proveedor_id
+      JOIN personas    pe ON pe.id = pr.persona_id
+      WHERE d.producto_id = ? AND c.proveedor_id = ? AND c.estado = ?
+      ORDER BY c.fecha DESC, c.id DESC
+      ''',
+          variables: [
+            Variable.withInt(productoId),
+            Variable.withInt(proveedorId),
+            Variable.withString(EstadoCompra.registrada.codigo),
+          ],
+          readsFrom: {
+            _db.tablaCompraDetalle,
+            _db.tablaCompra,
+            _db.tablaProveedor,
+            _db.tablaPersona,
+          },
+        )
+        .watch()
+        .map(
+          (filas) => filas
+              .map(
+                (fila) => UltimaCompra(
+                  compraId: fila.read<int>('id'),
+                  numero: fila.read<String>('numero'),
+                  fecha: fila.read<DateTime>('fecha'),
+                  costoUnitario: fila.read<int>('costo_unitario'),
+                  cantidad: fila.read<double>('cantidad'),
+                  proveedorNombre: fila.read<String>('proveedor'),
+                ),
+              )
+              .toList(),
+        );
+  }
+
+  @override
   Stream<ResumenProveedorCompras> observarResumenProveedor(int proveedorId) {
     exigir(Permiso.comprasVer);
 
@@ -509,6 +560,7 @@ class RepositorioComprasImpl with FirmaDeSesion implements RepositorioCompras {
 
         await _meterAlInventario(compraId, productoId, cantidad);
         await _fijarCosto(productoId, costoUnitario);
+        await _anotarCostoDelProveedor(compraId, productoId, costoUnitario);
         await _recalcularTotal(compraId);
       });
       return const Exito();
@@ -558,6 +610,11 @@ class RepositorioComprasImpl with FirmaDeSesion implements RepositorioCompras {
 
         if (costoUnitario != null) {
           await _fijarCosto(actual.productoId, costoUnitario);
+          await _anotarCostoDelProveedor(
+            actual.compraId,
+            actual.productoId,
+            costoUnitario,
+          );
         }
         await _recalcularTotal(actual.compraId);
       });
@@ -846,6 +903,74 @@ class RepositorioComprasImpl with FirmaDeSesion implements RepositorioCompras {
           actualizadoEn: Value(DateTime.now()),
         ),
       );
+
+  /// [_fijarCostoDelProveedor] resolviendo antes de quién es la remisión.
+  Future<void> _anotarCostoDelProveedor(
+    int compraId,
+    int productoId,
+    int costo,
+  ) async {
+    final compra = await (_db.select(_db.tablaCompra)
+          ..where((t) => t.id.equals(compraId)))
+        .getSingleOrNull();
+    if (compra == null) return;
+
+    await _fijarCostoDelProveedor(
+      productoId: productoId,
+      proveedorId: compra.proveedorId,
+      costo: costo,
+      fecha: compra.fecha,
+    );
+  }
+
+  /// Deja anotado a cómo dejó **ese** proveedor esa pieza, y lo vincula si es
+  /// la primera vez que se la compra.
+  ///
+  /// `productos.precio_compra` guarda el último costo, venga de quien venga;
+  /// esto guarda el de cada uno, que es lo que permite ver si esta vez subió o
+  /// si el otro lo tenía más barato. Sin ello, «¿quién me lo vende mejor?» no
+  /// se podía responder: cada remisión pisaba a la anterior.
+  ///
+  /// **Vincula pero no marca principal.** Comprarle una vez a alguien no lo
+  /// convierte en el proveedor de cabecera del repuesto; eso lo decide quien
+  /// mira la ficha.
+  ///
+  /// Va dentro de la transacción de la línea, como el movimiento de
+  /// inventario: si la remisión se revierte, el costo anotado se va con ella.
+  Future<void> _fijarCostoDelProveedor({
+    required int productoId,
+    required int proveedorId,
+    required int costo,
+    required DateTime fecha,
+  }) async {
+    final vinculos = _db.tablaProductoProveedor;
+    final existente = await (_db.select(vinculos)
+          ..where((t) =>
+              t.productoId.equals(productoId) &
+              t.proveedorId.equals(proveedorId)))
+        .getSingleOrNull();
+
+    if (existente == null) {
+      await _db.into(vinculos).insert(
+            TablaProductoProveedorCompanion.insert(
+              productoId: productoId,
+              proveedorId: proveedorId,
+              ultimoCosto: Value(costo),
+              fechaUltimaCompra: Value(fecha),
+            ),
+          );
+      return;
+    }
+
+    await (_db.update(vinculos)..where((t) => t.id.equals(existente.id)))
+        .write(
+      TablaProductoProveedorCompanion(
+        ultimoCosto: Value(costo),
+        fechaUltimaCompra: Value(fecha),
+        actualizadoEn: Value(DateTime.now()),
+      ),
+    );
+  }
 
   /// Recalcula el caché **entero** desde las líneas, nunca sumándole el delta
   /// al valor anterior: así no puede desviarse aunque una escritura falle a

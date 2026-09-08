@@ -1,4 +1,6 @@
+import '../../../../core/resultado.dart';
 import '../modelo/producto.dart';
+import '../modelo/proveedor_de_producto.dart';
 
 /// Una página de resultados junto al total de coincidencias.
 ///
@@ -172,4 +174,44 @@ abstract class RepositorioProducto {
   /// catálogo, que es lo que necesita el encabezado de la pantalla.
   Stream<({int total, int enStock, int stockBajo, int sinStock})>
       observarResumen({FiltroProductos filtro});
+
+  // Proveedores del producto
+
+  /// Quiénes le venden este repuesto al taller, con su último costo.
+  ///
+  /// El principal va primero y el resto por nombre. Es un stream porque la
+  /// ficha lo muestra mientras se edita: vincular un proveedor tiene que
+  /// verse sin recargar.
+  Stream<List<ProveedorDeProducto>> observarProveedoresDe(int productoId);
+
+  /// Agrega un proveedor a un repuesto, o actualiza el vínculo si ya estaba.
+  ///
+  /// [esPrincipal] apaga al anterior en la misma transacción: la guarda de la
+  /// base rechaza dos principales, así que hacerlo en dos escrituras
+  /// reventaría a mitad.
+  ///
+  /// Devuelve `Fallo` con `MotivoFallo.validacion` si el proveedor no existe
+  /// o si el producto no está guardado todavía.
+  Future<Resultado> vincularProveedor({
+    required int productoId,
+    required int proveedorId,
+    String? referenciaProveedor,
+    bool esPrincipal = false,
+  });
+
+  /// Quita el vínculo. No toca las remisiones: lo que ese proveedor trajo
+  /// alguna vez sigue en `compras`, que es donde vive el historial.
+  Future<Resultado> desvincularProveedor({
+    required int productoId,
+    required int proveedorId,
+  });
+
+  /// Marca cuál es el de cabecera, apagando al anterior.
+  ///
+  /// Con [proveedorId] en `null` el producto se queda sin principal, que es
+  /// un estado legítimo: hay repuestos que se compran a quien los tenga.
+  Future<Resultado> fijarProveedorPrincipal({
+    required int productoId,
+    required int? proveedorId,
+  });
 }

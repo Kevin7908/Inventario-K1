@@ -233,6 +233,20 @@ abstract class RepositorioCompras {
   /// solo número que se pisa con cada compra. Ignora las anuladas.
   Stream<UltimaCompra?> observarUltimaCompra(int productoId);
 
+  /// **Todas** las veces que ese proveedor trajo ese repuesto, de la más
+  /// reciente a la más vieja.
+  ///
+  /// Es lo que responde «a cómo me lo ha dejado» con la ficha delante: la
+  /// última compra sola dice el precio de hoy, pero no si subió. Ignora las
+  /// anuladas, como [observarUltimaCompra].
+  ///
+  /// Sin `exigir` por lo mismo que aquella: es el costo de unas líneas, no el
+  /// documento entero, y lo mira quien puede ver el producto.
+  Stream<List<UltimaCompra>> observarComprasDe({
+    required int productoId,
+    required int proveedorId,
+  });
+
   /// Cuánto se le lleva comprado a un proveedor. Responde la pregunta que el
   /// taller hace todos los meses.
   Stream<ResumenProveedorCompras> observarResumenProveedor(int proveedorId);

@@ -13,7 +13,9 @@ import '../../../share/consecutivos/repositorio_consecutivos.dart';
 import '../../../share/utils/sku_utils.dart';
 import '../../../share/utils/texto_utils.dart';
 import '../mapper/producto_mapper.dart';
+import '../../../../core/resultado.dart';
 import '../modelo/producto.dart';
+import '../modelo/proveedor_de_producto.dart';
 import 'repositorio_producto.dart';
 import '../../../share/dominio/permiso.dart';
 
@@ -61,6 +63,13 @@ class RepositorioProductosImpl with FirmaDeSesion implements RepositorioProducto
 
   // Helper: JOIN base
 
+  /// El proveedor **principal**, que es lo que la rejilla y la ficha enseñan.
+  ///
+  /// Va por `producto_proveedores` y no por una columna de `productos`: un
+  /// repuesto se le compra a varios y la marca de principal vive con la
+  /// relación. El filtro `esPrincipal` va en la condición del JOIN y no en un
+  /// `WHERE`, porque en un `WHERE` convertiría el `LEFT` en `INNER` y dejaría
+  /// fuera los productos sin proveedor asignado.
   JoinedSelectStatement<HasResultSet, dynamic> _queryConJoin() {
     return _db.select(_db.tablaProducto).join([
       leftOuterJoin(
@@ -68,8 +77,14 @@ class RepositorioProductosImpl with FirmaDeSesion implements RepositorioProducto
         _db.tablaCategoria.id.equalsExp(_db.tablaProducto.categoriaId),
       ),
       leftOuterJoin(
+        _db.tablaProductoProveedor,
+        _db.tablaProductoProveedor.productoId.equalsExp(_db.tablaProducto.id) &
+            _db.tablaProductoProveedor.esPrincipal.equals(true),
+      ),
+      leftOuterJoin(
         _db.tablaProveedor,
-        _db.tablaProveedor.id.equalsExp(_db.tablaProducto.proveedorId),
+        _db.tablaProveedor.id
+            .equalsExp(_db.tablaProductoProveedor.proveedorId),
       ),
       // La razón social del proveedor vive en `personas`.
       leftOuterJoin(
@@ -113,21 +128,29 @@ class RepositorioProductosImpl with FirmaDeSesion implements RepositorioProducto
   }
 
   @override
+  /// Va por el JOIN y no por la fila pelada: desde que el proveedor vive en
+  /// `producto_proveedores`, leer solo `productos` devuelve un modelo sin
+  /// proveedor —y sin categoría ni unidad—, y quien pide un producto por id lo
+  /// pide para enseñarlo.
+  @override
   Future<Producto?> obtenerPorId(int id) async {
     exigir(Permiso.productosVer);
-    final fila = await (_db.select(_db.tablaProducto)
-          ..where((t) => t.id.equals(id)))
-        .getSingleOrNull();
-    return fila != null ? ProductoMapper.filaAModelo(fila) : null;
+    final filas =
+        await (_queryConJoin()..where(_db.tablaProducto.id.equals(id))).get();
+    return filas.isEmpty
+        ? null
+        : ProductoMapper.filaJoinAModelo(filas.first, _db);
   }
 
   @override
   Future<Producto?> obtenerPorSku(String sku) async {
     exigir(Permiso.productosVer);
-    final fila = await (_db.select(_db.tablaProducto)
-          ..where((t) => t.sku.equals(sku)))
-        .getSingleOrNull();
-    return fila != null ? ProductoMapper.filaAModelo(fila) : null;
+    final filas = await (_queryConJoin()
+          ..where(_db.tablaProducto.sku.equals(sku)))
+        .get();
+    return filas.isEmpty
+        ? null
+        : ProductoMapper.filaJoinAModelo(filas.first, _db);
   }
 
   @override
@@ -152,12 +175,21 @@ class RepositorioProductosImpl with FirmaDeSesion implements RepositorioProducto
     );
   }
 
+  /// Todo lo que ese proveedor le vende al taller, sea principal o no.
+  ///
+  /// El `WHERE` no puede ir sobre el JOIN del principal —ese trae solo la
+  /// fila marcada—, así que se resuelve con un `IN` sobre la tabla de
+  /// vínculos: un producto sale si ese proveedor está entre los suyos.
   @override
   Future<List<Producto>> obtenerPorProveedor(int proveedorId) async {
     exigir(Permiso.productosVer);
+    final vinculados = _db.selectOnly(_db.tablaProductoProveedor)
+      ..addColumns([_db.tablaProductoProveedor.productoId])
+      ..where(_db.tablaProductoProveedor.proveedorId.equals(proveedorId));
+
     return _mapear(
       await (_queryConJoin()
-            ..where(_db.tablaProducto.proveedorId.equals(proveedorId)))
+            ..where(_db.tablaProducto.id.isInQuery(vinculados)))
           .get(),
     );
   }
@@ -256,6 +288,11 @@ class RepositorioProductosImpl with FirmaDeSesion implements RepositorioProducto
         );
       }
 
+      // El proveedor del formulario es el **principal**, y ya no es una
+      // columna de `productos`: se escribe como vínculo, en esta misma
+      // transacción, para que un alta fallida no deje la relación suelta.
+      await _sincronizarPrincipal(id, producto.proveedorId);
+
       await _anotar(AccionAuditada.creo, id, _nombreDe(conSku));
 
       // No hay SELECT extra: el stream de Drift emite el dato completo.
@@ -294,6 +331,8 @@ class RepositorioProductosImpl with FirmaDeSesion implements RepositorioProducto
           ),
         );
       }
+
+      await _sincronizarPrincipal(producto.id!, producto.proveedorId);
 
       await _anotar(
         AccionAuditada.modifico,
@@ -358,6 +397,275 @@ class RepositorioProductosImpl with FirmaDeSesion implements RepositorioProducto
         antes == null ? 'Producto #$id' : '${antes.nombre} (${antes.sku})',
       );
     });
+  }
+
+  // Proveedores del producto
+
+  $TablaProductoProveedorTable get _vinculos => _db.tablaProductoProveedor;
+
+  /// Deja como principal al proveedor que trae el formulario.
+  ///
+  /// Es lo que traduce el único selector del formulario a la tabla de
+  /// vínculos: si el proveedor todavía no estaba entre los del repuesto, se
+  /// agrega; si venía en `null`, el producto se queda sin principal y **los
+  /// demás vínculos no se tocan**, que es lo que distingue «no tiene
+  /// preferido» de «no le compro a nadie».
+  ///
+  /// Va sin `exigir`: lo llaman `crear` y `actualizar`, que ya comprobaron su
+  /// permiso, y dentro de su misma transacción.
+  Future<void> _sincronizarPrincipal(int productoId, int? proveedorId) async {
+    await _apagarPrincipal(productoId);
+    if (proveedorId == null) return;
+
+    final existente = await (_db.select(_vinculos)
+          ..where((t) =>
+              t.productoId.equals(productoId) &
+              t.proveedorId.equals(proveedorId)))
+        .getSingleOrNull();
+
+    if (existente == null) {
+      await _db.into(_vinculos).insert(
+            TablaProductoProveedorCompanion.insert(
+              productoId: productoId,
+              proveedorId: proveedorId,
+              esPrincipal: const Value(true),
+            ),
+          );
+      return;
+    }
+
+    await (_db.update(_vinculos)..where((t) => t.id.equals(existente.id)))
+        .write(
+      TablaProductoProveedorCompanion(
+        esPrincipal: const Value(true),
+        actualizadoEn: Value(DateTime.now()),
+      ),
+    );
+  }
+
+  @override
+  Stream<List<ProveedorDeProducto>> observarProveedoresDe(int productoId) {
+    exigir(Permiso.productosVer);
+
+    // La razón social del proveedor vive en `personas`, no en `proveedores`:
+    // hacen falta los dos JOIN encadenados, como en el resto del proyecto.
+    final consulta = _db.select(_vinculos).join([
+      innerJoin(
+        _db.tablaProveedor,
+        _db.tablaProveedor.id.equalsExp(_vinculos.proveedorId),
+      ),
+      innerJoin(
+        _db.tablaPersona,
+        _db.tablaPersona.id.equalsExp(_db.tablaProveedor.personaId),
+      ),
+    ])
+      ..where(_vinculos.productoId.equals(productoId))
+      // El principal primero —es el que se propone al pedir— y el resto por
+      // nombre. `desc` sobre un booleano pone el `true` arriba.
+      ..orderBy([
+        OrderingTerm.desc(_vinculos.esPrincipal),
+        OrderingTerm.asc(_db.tablaPersona.nombres),
+      ]);
+
+    return consulta.watch().map(
+          (filas) => filas.map((fila) {
+            final vinculo = fila.readTable(_vinculos);
+            final persona = fila.readTable(_db.tablaPersona);
+            return ProveedorDeProducto(
+              id: vinculo.id,
+              productoId: vinculo.productoId,
+              proveedorId: vinculo.proveedorId,
+              proveedorNombre: persona.nombres,
+              proveedorTelefono: persona.telefono,
+              referenciaProveedor: vinculo.referenciaProveedor,
+              ultimoCosto: vinculo.ultimoCosto,
+              fechaUltimaCompra: vinculo.fechaUltimaCompra,
+              esPrincipal: vinculo.esPrincipal,
+            );
+          }).toList(),
+        );
+  }
+
+  @override
+  Future<Resultado> vincularProveedor({
+    required int productoId,
+    required int proveedorId,
+    String? referenciaProveedor,
+    bool esPrincipal = false,
+  }) async {
+    exigir(Permiso.productosEditar);
+
+    return _db.transaction(() async {
+      final proveedor = await (_db.select(_db.tablaProveedor)
+            ..where((t) => t.id.equals(proveedorId)))
+          .getSingleOrNull();
+      if (proveedor == null) {
+        return const Fallo(
+          MotivoFallo.validacion,
+          'Ese proveedor ya no está en el catálogo.',
+        );
+      }
+
+      // Se apaga el anterior **antes** de encender el nuevo: la guarda de la
+      // base rechaza dos principales a la vez, así que el orden no es un
+      // detalle de estilo.
+      if (esPrincipal) await _apagarPrincipal(productoId);
+
+      final existente = await (_db.select(_vinculos)
+            ..where((t) =>
+                t.productoId.equals(productoId) &
+                t.proveedorId.equals(proveedorId)))
+          .getSingleOrNull();
+
+      if (existente == null) {
+        await _db.into(_vinculos).insert(
+              TablaProductoProveedorCompanion.insert(
+                productoId: productoId,
+                proveedorId: proveedorId,
+                referenciaProveedor: Value(referenciaProveedor),
+                esPrincipal: Value(esPrincipal),
+              ),
+            );
+      } else {
+        await (_db.update(_vinculos)..where((t) => t.id.equals(existente.id)))
+            .write(
+          TablaProductoProveedorCompanion(
+            // La referencia solo se pisa si llega una: volver a marcar
+            // principal desde la ficha no puede borrar el código que alguien
+            // tecleó.
+            referenciaProveedor: referenciaProveedor == null
+                ? const Value.absent()
+                : Value(referenciaProveedor),
+            esPrincipal: Value(esPrincipal || existente.esPrincipal),
+            actualizadoEn: Value(DateTime.now()),
+          ),
+        );
+      }
+
+      await _anotarProveedor(
+        productoId,
+        'Proveedor vinculado: ${await _nombreProveedor(proveedorId)}',
+      );
+      return const Exito();
+    });
+  }
+
+  @override
+  Future<Resultado> desvincularProveedor({
+    required int productoId,
+    required int proveedorId,
+  }) async {
+    exigir(Permiso.productosEditar);
+
+    return _db.transaction(() async {
+      final borradas = await (_db.delete(_vinculos)
+            ..where((t) =>
+                t.productoId.equals(productoId) &
+                t.proveedorId.equals(proveedorId)))
+          .go();
+
+      if (borradas == 0) {
+        return const Fallo(
+          MotivoFallo.validacion,
+          'Ese proveedor ya no estaba en la lista.',
+        );
+      }
+
+      await _anotarProveedor(
+        productoId,
+        'Proveedor quitado: ${await _nombreProveedor(proveedorId)}',
+      );
+      return const Exito();
+    });
+  }
+
+  @override
+  Future<Resultado> fijarProveedorPrincipal({
+    required int productoId,
+    required int? proveedorId,
+  }) async {
+    exigir(Permiso.productosEditar);
+
+    return _db.transaction(() async {
+      await _apagarPrincipal(productoId);
+      if (proveedorId == null) {
+        await _anotarProveedor(productoId, 'Sin proveedor principal');
+        return const Exito();
+      }
+
+      final encendidas = await (_db.update(_vinculos)
+            ..where((t) =>
+                t.productoId.equals(productoId) &
+                t.proveedorId.equals(proveedorId)))
+          .write(
+        TablaProductoProveedorCompanion(
+          esPrincipal: const Value(true),
+          actualizadoEn: Value(DateTime.now()),
+        ),
+      );
+
+      if (encendidas == 0) {
+        return const Fallo(
+          MotivoFallo.validacion,
+          'Ese proveedor no está entre los del repuesto.',
+        );
+      }
+
+      await _anotarProveedor(
+        productoId,
+        'Proveedor principal: ${await _nombreProveedor(proveedorId)}',
+      );
+      return const Exito();
+    });
+  }
+
+  /// La razón social del proveedor, que vive en `personas`.
+  ///
+  /// La bitácora guarda el **nombre** y no el id, como snapshot de §1.2: es la
+  /// parte legible que sobrevive al borrado del proveedor.
+  Future<String> _nombreProveedor(int proveedorId) async {
+    final fila = await (_db.select(_db.tablaProveedor).join([
+      innerJoin(
+        _db.tablaPersona,
+        _db.tablaPersona.id.equalsExp(_db.tablaProveedor.personaId),
+      ),
+    ])
+          ..where(_db.tablaProveedor.id.equals(proveedorId)))
+        .getSingleOrNull();
+
+    return fila?.readTable(_db.tablaPersona).nombres ?? '#$proveedorId';
+  }
+
+  /// Deja al producto sin ningún principal marcado.
+  Future<void> _apagarPrincipal(int productoId) =>
+      (_db.update(_vinculos)
+            ..where((t) =>
+                t.productoId.equals(productoId) & t.esPrincipal.equals(true)))
+          .write(
+        TablaProductoProveedorCompanion(
+          esPrincipal: const Value(false),
+          actualizadoEn: Value(DateTime.now()),
+        ),
+      );
+
+  /// El renglón de bitácora de un cambio de proveedores.
+  ///
+  /// Se lee el producto para poder nombrarlo: «Ana modificó Pastilla de freno
+  /// (FRE-0012) · Proveedor principal: 4» dice algo; «modificó el producto 47»
+  /// no le sirve a nadie.
+  Future<void> _anotarProveedor(int productoId, String detalle) async {
+    final producto = await (_db.select(_db.tablaProducto)
+          ..where((t) => t.id.equals(productoId)))
+        .getSingleOrNull();
+
+    await _anotar(
+      AccionAuditada.modifico,
+      productoId,
+      producto == null
+          ? 'Producto #$productoId'
+          : '${producto.nombre} (${producto.sku})',
+      detalle: detalle,
+    );
   }
 
   /// Cómo se lee un producto en la bitácora: nombre y SKU, que es lo que
@@ -707,19 +1015,24 @@ class RepositorioProductosImpl with FirmaDeSesion implements RepositorioProducto
     });
   }
 
+  /// Cuántos repuestos le compra el taller a cada proveedor.
+  ///
+  /// Cuenta **todos** los vínculos, no solo los principales: la tarjeta del
+  /// proveedor dice de cuántas piezas es una opción, que es lo que se quiere
+  /// saber al llamarlo. Sale de un `GROUP BY` sobre la tabla de vínculos, no
+  /// de recorrer el catálogo (`REGLAS_BD.md` §5).
   @override
   Stream<Map<int, int>> observarConteoPorProveedor() {
     exigir(Permiso.productosVer);
-    final cantidad = _db.tablaProducto.id.count();
-    final consulta = _db.selectOnly(_db.tablaProducto)
-      ..addColumns([_db.tablaProducto.proveedorId, cantidad])
-      ..where(_db.tablaProducto.proveedorId.isNotNull())
-      ..groupBy([_db.tablaProducto.proveedorId]);
+    final cantidad = _db.tablaProductoProveedor.productoId.count();
+    final consulta = _db.selectOnly(_db.tablaProductoProveedor)
+      ..addColumns([_db.tablaProductoProveedor.proveedorId, cantidad])
+      ..groupBy([_db.tablaProductoProveedor.proveedorId]);
 
     return consulta.watch().map((filas) {
       final conteo = <int, int>{};
       for (final fila in filas) {
-        final id = fila.read(_db.tablaProducto.proveedorId);
+        final id = fila.read(_db.tablaProductoProveedor.proveedorId);
         if (id != null) conteo[id] = fila.read(cantidad) ?? 0;
       }
       return conteo;

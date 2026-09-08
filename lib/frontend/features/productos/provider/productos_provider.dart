@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../../backend/features/productos/modelo/producto.dart';
+import '../../../../backend/features/productos/modelo/proveedor_de_producto.dart';
 import '../../../../backend/features/productos/repositorio/repositorio_producto.dart';
 import '../../../../backend/features/productos/repositorio/repositorio_producto_impl.dart';
 import '../../../../backend/share/database/app_db_provider.dart';
@@ -332,4 +333,15 @@ final hayFiltroProductosProvider = Provider<bool>(
   (ref) => ref.watch(
     productosProvider.select((s) => s.value?.hayFiltro ?? false),
   ),
+);
+
+/// Quiénes le venden un repuesto al taller, con el último costo de cada uno.
+///
+/// `family` por producto y no un provider por ficha abierta: la ficha se abre
+/// de una en una y Riverpod descarta la suscripción al cerrarla.
+final proveedoresDeProductoProvider =
+    StreamProvider.autoDispose.family<List<ProveedorDeProducto>, int>(
+  name: 'proveedoresDeProductoProvider',
+  (ref, productoId) =>
+      ref.watch(repositorioProductosProvider).observarProveedoresDe(productoId),
 );

@@ -1,7 +1,6 @@
 import 'package:drift/drift.dart';
 
 import '../../categorias/esquema_datos/tabla_categoria.dart';
-import '../../proveedores/esquema_datos/tabla_proveedor.dart';
 import '../../unidades_medida/esquema_datos/tabla_unidades_medida.dart';
 
 /// El catálogo de repuestos del taller.
@@ -12,7 +11,6 @@ import '../../unidades_medida/esquema_datos/tabla_unidades_medida.dart';
 /// absurdo, pero nadie lo escribe a mano —solo `RepositorioInventario`, que
 /// mueve las dos tablas en la misma transacción.
 @TableIndex(name: 'idx_productos_categoria', columns: {#categoriaId})
-@TableIndex(name: 'idx_productos_proveedor', columns: {#proveedorId})
 @TableIndex(name: 'idx_productos_activo', columns: {#activo})
 // Cubre el WHERE codigoBarras = ? del lector del POS.
 @TableIndex(name: 'idx_productos_codigo_barras', columns: {#codigoBarras})
@@ -43,8 +41,14 @@ class TablaProducto extends Table {
 
   TextColumn get descripcion => text().nullable()();
 
-  /// `setNull` en los tres: borrar una categoría, un proveedor o una unidad no
-  /// puede llevarse el producto por delante; solo lo deja sin clasificar.
+  /// `setNull` en los dos: borrar una categoría o una unidad no puede
+  /// llevarse el producto por delante; solo lo deja sin clasificar.
+  ///
+  /// **El proveedor no está aquí.** Un repuesto se le compra a varios según
+  /// quién lo tenga y a cómo, así que la relación vive en
+  /// `producto_proveedores` con su marca de principal. Con una columna, cada
+  /// remisión pisaba a la anterior y «¿quién me lo vende más barato?» no se
+  /// podía responder.
   IntColumn get categoriaId => integer()
       .nullable()
       .references(TablaCategoria, #id, onDelete: KeyAction.setNull)();
@@ -52,10 +56,6 @@ class TablaProducto extends Table {
   IntColumn get unidadMedidaId => integer()
       .nullable()
       .references(TablaUnidadesMedida, #id, onDelete: KeyAction.setNull)();
-
-  IntColumn get proveedorId => integer()
-      .nullable()
-      .references(TablaProveedor, #id, onDelete: KeyAction.setNull)();
 
   /// Los tres precios en **pesos enteros**. El peso colombiano no tiene
   /// decimales y `REAL` arrastraba error de coma flotante: mil líneas de

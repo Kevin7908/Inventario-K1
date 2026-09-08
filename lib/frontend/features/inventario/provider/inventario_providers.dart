@@ -257,3 +257,66 @@ final movimientosPaginaProvider = Provider<List<MovimientoDetalle>>(
   name: 'movimientosPaginaProvider',
   (ref) => ref.watch(movimientosProvider).value?.items ?? const [],
 );
+
+/// El kardex **de un repuesto**, paginado.
+///
+/// Es aparte de [movimientosProvider] y no un filtro suyo a propósito: aquel
+/// es la pantalla de Movimientos, con sus filtros puestos por quien la está
+/// mirando, y abrir el historial de un producto desde su ficha no puede
+/// cambiárselos por debajo. Aquí el producto va fijo y lo único que se mueve
+/// es la página.
+///
+/// `family` por id y `autoDispose`: se abre desde una ficha y se cierra con
+/// ella.
+class KardexProductoNotifier extends AsyncNotifier<PaginaMovimientos> {
+  KardexProductoNotifier(this.productoId);
+
+  final int productoId;
+
+  /// `late` **sin `final`**: Riverpod conserva la instancia y vuelve a llamar
+  /// a `build()` cuando el provider se invalida.
+  late RepositorioInventario _repo;
+  StreamSubscription<PaginaMovimientos>? _sub;
+
+  /// Página visible, de base cero.
+  int _pagina = 0;
+  int get pagina => _pagina;
+
+  static const tamanoPagina = 15;
+
+  @override
+  Future<PaginaMovimientos> build() async {
+    _repo = ref.watch(repositorioInventarioProvider);
+    ref.onDispose(() => _sub?.cancel());
+
+    final primera = await _flujo().first;
+    _suscribir();
+    return primera;
+  }
+
+  Stream<PaginaMovimientos> _flujo() => _repo.observarPagina(
+        filtro: FiltroMovimientos(productoId: productoId),
+        pagina: _pagina,
+        tamano: tamanoPagina,
+      );
+
+  void _suscribir() {
+    _sub?.cancel();
+    _sub = _flujo().listen(
+      (pagina) => state = AsyncData(pagina),
+      onError: (Object e, StackTrace st) => state = AsyncError(e, st),
+    );
+  }
+
+  void irAPagina(int pagina) {
+    if (pagina < 0 || pagina == _pagina) return;
+    _pagina = pagina;
+    _suscribir();
+  }
+}
+
+final kardexProductoProvider = AsyncNotifierProvider.autoDispose
+    .family<KardexProductoNotifier, PaginaMovimientos, int>(
+  KardexProductoNotifier.new,
+  name: 'kardexProductoProvider',
+);

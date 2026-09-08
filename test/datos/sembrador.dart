@@ -470,7 +470,6 @@ class Sembrador {
             descripcion: const Value('Producto de prueba'),
             categoriaId: Value(_uno(_categorias)),
             unidadMedidaId: Value(_uno(_unidades)),
-            proveedorId: Value(_uno(_proveedores)),
             precioCompra: Value(compra),
             precioVenta: Value(venta),
             stockMinimo: Value(_rnd.nextInt(6).toDouble()),
@@ -484,6 +483,36 @@ class Sembrador {
     });
 
     _productos = [for (var i = 1; i <= volumen.productos; i++) desde + i];
+
+    // El proveedor dejó de ser una columna de `productos`: cada repuesto se
+    // vincula con uno o dos, y el primero queda de principal. Sembrar dos es
+    // lo que hace que la ficha enseñe de verdad el caso que la tabla existe
+    // para admitir.
+    await db.batch((b) {
+      for (final productoId in _productos) {
+        final principal = _uno(_proveedores);
+        final segundo = _uno(_proveedores);
+        b.insert(
+          db.tablaProductoProveedor,
+          TablaProductoProveedorCompanion.insert(
+            productoId: productoId,
+            proveedorId: principal,
+            ultimoCosto: Value(1000 * (5 + _rnd.nextInt(40))),
+            esPrincipal: const Value(true),
+          ),
+        );
+        if (segundo != principal) {
+          b.insert(
+            db.tablaProductoProveedor,
+            TablaProductoProveedorCompanion.insert(
+              productoId: productoId,
+              proveedorId: segundo,
+              ultimoCosto: Value(1000 * (5 + _rnd.nextInt(40))),
+            ),
+          );
+        }
+      }
+    });
 
     await db.batch((b) {
       for (final id in _productos) {

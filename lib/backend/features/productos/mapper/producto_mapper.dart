@@ -6,31 +6,11 @@ import '../modelo/producto.dart';
 class ProductoMapper {
   ProductoMapper._(); // clase utilitaria, no instanciar
 
-  static Producto filaAModelo(TablaProductoData fila) {
-    return Producto(
-      id: fila.id,
-      sku: fila.sku,
-      codigoBarras: fila.codigoBarras,
-      nombre: fila.nombre,
-      descripcion: fila.descripcion,
-      categoriaId: fila.categoriaId,
-      unidadMedidaId: fila.unidadMedidaId,
-      proveedorId: fila.proveedorId,
-      categoriaNombre: null,
-      unidadMedidaNombre: null,
-      proveedorNombre: null,
-      precioCompra: fila.precioCompra,
-      precioVenta: fila.precioVenta,
-      precioVentaTaller: fila.precioVentaTaller,
-      stockActual: fila.stockActual,
-      stockMinimo: fila.stockMinimo,
-      ubicacionBodega: fila.ubicacionBodega,
-      imagenUrl: fila.imagenUrl,
-      activo: fila.activo,
-      creadoEn: fila.creadoEn,
-      actualizadoEn: fila.actualizadoEn,
-    );
-  }
+  // `filaAModelo` se fue. Leía una fila pelada de `productos` y desde que el
+  // proveedor vive en `producto_proveedores` devolvía un modelo a medias: sin
+  // proveedor, sin categoría y sin unidad. Sus dos llamadores —`obtenerPorId`
+  // y `obtenerPorSku`— pasaron al JOIN, que es lo que necesitaban desde el
+  // principio: quien pide un producto lo pide para enseñarlo.
 
   // Lectura con JOIN
   // Usada por: obtenerTodos, observarTodos, observarConStockBajo,
@@ -45,6 +25,7 @@ class ProductoMapper {
     // El proveedor aporta la fila de rol, pero su razón social está en
     // `personas`: por eso se lee esa y no `tablaProveedor`.
     final proveedor = resultado.readTableOrNull(db.tablaPersona);
+    final vinculo = resultado.readTableOrNull(db.tablaProductoProveedor);
     final unidad = resultado.readTableOrNull(db.tablaUnidadesMedida);
 
     return Producto(
@@ -55,7 +36,9 @@ class ProductoMapper {
       descripcion: fila.descripcion,
       categoriaId: fila.categoriaId,
       unidadMedidaId: fila.unidadMedidaId,
-      proveedorId: fila.proveedorId,
+      // El principal, resuelto desde `producto_proveedores`. Es lectura, como
+      // `categoriaNombre`: escribirlo lo hace `fijarProveedorPrincipal`.
+      proveedorId: vinculo?.proveedorId,
       // Nombres hidratados directamente desde SQL — O(N) real
       categoriaNombre: categoria?.nombre,
       unidadMedidaNombre: unidad != null
@@ -79,6 +62,7 @@ class ProductoMapper {
   // Convierte el modelo al Companion de Drift para INSERT / UPDATE.
   // Los nombres desnormalizados (categoriaNombre, proveedorNombre,
   // unidadMedidaNombre) se ignoran explícitamente: no existen en la tabla.
+  // `proveedorId` tampoco: dejó de ser una columna de `productos`.
   static TablaProductoCompanion modeloACompanion(Producto p) {
     return TablaProductoCompanion(
       sku: Value(p.sku),
@@ -90,7 +74,9 @@ class ProductoMapper {
       descripcion: Value(p.descripcion),
       categoriaId: Value(p.categoriaId),
       unidadMedidaId: Value(p.unidadMedidaId),
-      proveedorId: Value(p.proveedorId),
+      // `proveedorId` **no** se escribe aquí: la relación vive en
+      // `producto_proveedores` y la escribe `fijarProveedorPrincipal`, dentro
+      // de la misma transacción del guardado.
       precioCompra: Value(p.precioCompra),
       precioVenta: Value(p.precioVenta),
       precioVentaTaller: Value(p.precioVentaTaller),

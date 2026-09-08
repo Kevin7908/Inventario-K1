@@ -14,6 +14,7 @@ import '../../categorias/widgets/panel_categorias_catalogo.dart';
 import '../provider/productos_provider.dart';
 import '../widgets/columnas_tabla_producto.dart';
 import 'producto_detalle_vista.dart';
+import 'producto_movimientos_vista.dart';
 import 'producto_formulario_vista.dart';
 
 /// Pantalla de Productos: catálogo de repuestos en tabla.
@@ -29,7 +30,7 @@ class ProductosVista extends ConsumerStatefulWidget {
 }
 
 /// Vista activa dentro del módulo.
-enum _Pantalla { lista, detalle, formulario }
+enum _Pantalla { lista, detalle, formulario, movimientos }
 
 class _ProductosVistaState extends ConsumerState<ProductosVista> {
   final _busquedaController = TextEditingController();
@@ -71,6 +72,15 @@ class _ProductosVistaState extends ConsumerState<ProductosVista> {
   });
 
   void _volverALista() => setState(() => _pantalla = _Pantalla.lista);
+
+  /// El libro mayor completo del repuesto, al que lleva el «Ver todos» de la
+  /// ficha. Es una pantalla más de este módulo y no un salto a Movimientos: la
+  /// navegación de la app es un `IndexedStack` sin router, así que irse a otra
+  /// sección no tendría vuelta atrás.
+  void _verMovimientos() =>
+      setState(() => _pantalla = _Pantalla.movimientos);
+
+  void _volverAlDetalle() => setState(() => _pantalla = _Pantalla.detalle);
 
   void _mostrarError(String error) {
     ScaffoldMessenger.of(context).showSnackBar(
@@ -117,6 +127,11 @@ class _ProductosVistaState extends ConsumerState<ProductosVista> {
         alVolver: _volverALista,
         alEditar: () => _editar(_seleccionado!),
         alEliminar: () => _eliminar(_seleccionado!),
+        alVerMovimientos: _verMovimientos,
+      ),
+      _Pantalla.movimientos => ProductoMovimientosVista(
+        producto: _seleccionado!,
+        alVolver: _volverAlDetalle,
       ),
       _Pantalla.formulario => ProductoFormularioVista(
         productoAEditar: _seleccionado,
