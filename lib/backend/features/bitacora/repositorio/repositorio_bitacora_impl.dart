@@ -83,7 +83,34 @@ class RepositorioBitacoraImpl with FirmaDeSesion implements RepositorioBitacora 
   }) async {
     exigir(Permiso.bitacoraVer);
 
-    final filas = await (_conAutor()
+    final filas = await (_consultaHistorial(entidad, entidadId, limite)).get();
+    return filas.map((f) => BitacoraMapper.filaAModelo(f, _db)).toList();
+  }
+
+  @override
+  Stream<List<EntradaBitacora>> observarHistorialDe(
+    EntidadAuditada entidad,
+    int entidadId, {
+    int limite = 20,
+  }) {
+    exigir(Permiso.bitacoraVer);
+
+    return _consultaHistorial(entidad, entidadId, limite)
+        .watch()
+        .map((filas) =>
+            filas.map((f) => BitacoraMapper.filaAModelo(f, _db)).toList());
+  }
+
+  /// La consulta que comparten las dos lecturas de arriba.
+  ///
+  /// Escribirla una sola vez no es cosmética: si el `Future` y el `Stream`
+  /// ordenaran distinto, la ficha cambiaría de orden al refrescarse.
+  JoinedSelectStatement<HasResultSet, dynamic> _consultaHistorial(
+    EntidadAuditada entidad,
+    int entidadId,
+    int limite,
+  ) {
+    return (_conAutor()
           ..where(_tabla.entidad.equals(entidad.codigo) &
               _tabla.entidadId.equals(entidadId))
           // El `id` desempata: dos cambios dentro del mismo milisegundo
@@ -93,10 +120,7 @@ class RepositorioBitacoraImpl with FirmaDeSesion implements RepositorioBitacora 
             OrderingTerm.desc(_tabla.creadoEn),
             OrderingTerm.desc(_tabla.id),
           ])
-          ..limit(limite))
-        .get();
-
-    return filas.map((f) => BitacoraMapper.filaAModelo(f, _db)).toList();
+          ..limit(limite));
   }
 
   @override

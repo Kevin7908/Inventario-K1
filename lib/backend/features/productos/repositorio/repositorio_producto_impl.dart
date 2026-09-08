@@ -1,5 +1,6 @@
 import 'package:drift/drift.dart';
 
+import '../../../../core/formato.dart';
 import '../../../share/database/app_db.dart';
 import '../../../share/dominio/sesion_actual.dart';
 import '../../bitacora/modelo/entrada_bitacora.dart';
@@ -298,9 +299,7 @@ class RepositorioProductosImpl with FirmaDeSesion implements RepositorioProducto
         AccionAuditada.modifico,
         producto.id,
         _nombreDe(producto),
-        detalle: diferencia == 0
-            ? null
-            : 'Stock ajustado en ${diferencia > 0 ? '+' : ''}$diferencia',
+        detalle: _queCambio(antes, producto, diferencia),
       );
 
       // No hay SELECT extra: el stream emite el resultado actualizado.
@@ -365,6 +364,83 @@ class RepositorioProductosImpl with FirmaDeSesion implements RepositorioProducto
   /// permite reconocerlo cuando la fila ya no existe.
   static String _nombreDe(Producto producto) =>
       '${producto.nombre} (${producto.sku})';
+
+  /// Qué cambió de verdad, campo por campo, para el renglón de la bitácora.
+  ///
+  /// Sin esto la ficha decía «Ana modificó Pastilla de freno» y nada más, que
+  /// es justo lo que no responde la pregunta con la que se abre ese panel: por
+  /// qué cambió el precio, quién movió el stock mínimo. La bitácora guarda el
+  /// **qué**, no un diff completo: los valores de antes y después de los tres
+  /// o cuatro campos que se tocaron, en una línea que se lee de un vistazo.
+  ///
+  /// Devuelve `null` si no cambió nada de lo que se vigila —guardar el
+  /// formulario sin tocar un campo no tiene por qué contar nada—, y entonces
+  /// el renglón queda con la fecha y el autor, como antes.
+  ///
+  /// El stock va aparte porque no se escribe en la columna: se registra como
+  /// movimiento (§7 de las reglas de base de datos) y aquí solo se nombra.
+  static String? _queCambio(
+    TablaProductoData? antes,
+    Producto ahora,
+    double diferenciaStock,
+  ) {
+    if (antes == null) return null;
+
+    final cambios = <String>[
+      ?_campo('Nombre', antes.nombre, ahora.nombre),
+      ?_campo('SKU', antes.sku, ahora.sku),
+      ?_precio('Precio de venta', antes.precioVenta, ahora.precioVenta),
+      ?_precio('Precio de compra', antes.precioCompra, ahora.precioCompra),
+      ?_precio(
+        'Precio de taller',
+        antes.precioVentaTaller,
+        ahora.precioVentaTaller,
+      ),
+      ?_campo(
+        'Stock mínimo',
+        _cantidad(antes.stockMinimo),
+        _cantidad(ahora.stockMinimo),
+      ),
+      ?_campo('Ubicación', antes.ubicacionBodega, ahora.ubicacionBodega),
+      ?_campo(
+        'Estado',
+        antes.activo ? 'activo' : 'inactivo',
+        ahora.activo ? 'activo' : 'inactivo',
+      ),
+      if (diferenciaStock != 0)
+        'Stock ajustado en ${diferenciaStock > 0 ? '+' : ''}'
+            '${_cantidad(diferenciaStock)}',
+    ];
+
+    return cambios.isEmpty ? null : cambios.join(' · ');
+  }
+
+  /// «Precio de venta: \$10.000 → \$12.000», o `null` si no se movió.
+  ///
+  /// El importe sale de `core/formato.dart`, que es el único sitio donde se
+  /// formatea dinero (`CLAUDE.md` §6). No rompe la regla de que el repositorio
+  /// no conozca Flutter: `core/` es Dart puro —lo mismo que `iva_app.dart`,
+  /// que este archivo ya usa— y lo que se escribe aquí no es una pantalla,
+  /// es el texto que queda guardado en la bitácora.
+  static String? _precio(String etiqueta, int? antes, int? ahora) => _campo(
+        etiqueta,
+        antes == null ? '' : formatearPrecio(antes),
+        ahora == null ? '' : formatearPrecio(ahora),
+      );
+
+  static String? _campo(String etiqueta, String? antes, String? ahora) {
+    final viejo = (antes ?? '').trim();
+    final nuevo = (ahora ?? '').trim();
+    if (viejo == nuevo) return null;
+    return '$etiqueta: ${viejo.isEmpty ? '—' : viejo} → '
+        '${nuevo.isEmpty ? '—' : nuevo}';
+  }
+
+  /// Una cantidad sin decimales de relleno: `12` y no `12.0`.
+  static String _cantidad(double valor) =>
+      valor.truncateToDouble() == valor
+          ? valor.toInt().toString()
+          : valor.toStringAsFixed(2);
 
   // Validaciones
 

@@ -252,16 +252,22 @@ typedef FilaAuditada = ({EntidadAuditada entidad, int id});
 
 /// Lo último que se le hizo a una fila concreta, para su ficha.
 ///
-/// Es un `FutureProvider` y no un stream porque la bitácora no se edita: lo
-/// que hay cuando se abre la ficha es lo que hay. Se relee al invalidarlo,
-/// que es lo que hace la ficha después de guardar.
+/// **Es un stream, y eso es el arreglo de un bug.** Era un `FutureProvider`
+/// con la idea de que la ficha lo invalidara después de guardar, y no lo hacía
+/// nadie: se editaba el precio de un producto y el panel «Últimos cambios»
+/// seguía diciendo «nadie la ha modificado todavía» hasta reabrir la
+/// aplicación. Un stream de Drift se entera solo, y la bitácora es de solo
+/// escritura, así que no hay nada que se pueda re-emitir de más.
+///
+/// `autoDispose`: son las fichas abiertas, no una lista de la pantalla
+/// principal; el stream se cierra al cerrar la ficha.
 ///
 /// Exige `bitacoraVer` —la compuerta está en el repositorio—, así que quien
 /// no lo tenga recibe el error y la vista no pinta el panel.
 final historialDeFilaProvider =
-    FutureProvider.family<List<EntradaBitacora>, FilaAuditada>(
+    StreamProvider.autoDispose.family<List<EntradaBitacora>, FilaAuditada>(
   name: 'historialDeFilaProvider',
   (ref, fila) => ref
       .watch(repositorioBitacoraProvider)
-      .historialDe(fila.entidad, fila.id, limite: 5),
+      .observarHistorialDe(fila.entidad, fila.id, limite: 5),
 );

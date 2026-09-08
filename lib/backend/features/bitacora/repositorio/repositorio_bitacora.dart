@@ -74,6 +74,20 @@ abstract class RepositorioBitacora {
     int limite = 20,
   });
 
+  /// [historialDe] en vivo.
+  ///
+  /// La ficha observa esto y no el `Future`. Con el `Future` había que
+  /// acordarse de invalidar el provider después de cada guardado, y **no lo
+  /// hacía nadie**: se editaba el precio de un producto y el panel «Últimos
+  /// cambios» seguía diciendo que nadie lo había tocado. Un stream de Drift se
+  /// entera solo, que es la misma razón por la que el resto de las listas del
+  /// proyecto son streams.
+  Stream<List<EntradaBitacora>> observarHistorialDe(
+    EntidadAuditada entidad,
+    int entidadId, {
+    int limite = 20,
+  });
+
   /// Cuántas anotaciones tienen más de [meses], ya recortado al piso.
   ///
   /// Es lo que el diálogo de poda enseña **antes** de borrar nada: «se van

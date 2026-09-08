@@ -70,12 +70,21 @@ class _BitacoraFalsa implements RepositorioBitacora {
   }
 
   @override
+  Stream<List<EntradaBitacora>> observarHistorialDe(
+    EntidadAuditada entidad,
+    int entidadId, {
+    int limite = 20,
+  }) =>
+      Stream.value(const []);
+
+  @override
   Future<List<EntradaBitacora>> historialDe(
     EntidadAuditada entidad,
     int entidadId, {
     int limite = 20,
   }) async =>
       entradas;
+
   @override
   Future<int> cuantasPodaria({required int meses}) async => 0;
 
