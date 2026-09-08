@@ -9,6 +9,7 @@ import '../../../share/share.dart';
 import '../../tecnicos/provider/tecnico_provider.dart';
 import '../provider/especializacion_provider.dart';
 import '../widgets/dialogo_especializacion.dart';
+import '../widgets/dialogo_tecnicos_especializacion.dart';
 
 /// Pestaña "Especializaciones" de Configuración: catálogo de áreas técnicas
 /// presentado como grilla de tarjetas, con creación, edición y eliminación.
@@ -146,6 +147,12 @@ class _EspecializacionesVistaState
           icono: Icons.build_outlined,
           titulo: especializacion.nombre,
           subtitulo: total == 1 ? '1 técnico' : '$total técnicos',
+          // El conteo ya estaba; lo que faltaba era poder ver **cuáles**. Sin
+          // esto había que irse a Técnicos y leer la columna fila por fila.
+          alPresionar: () => DialogoTecnicosEspecializacion.mostrar(
+            context,
+            especializacion: especializacion,
+          ),
           acciones: Row(
             mainAxisSize: MainAxisSize.min,
             children: [

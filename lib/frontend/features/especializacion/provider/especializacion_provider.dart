@@ -7,8 +7,11 @@ import '../../../../backend/features/especializacion/modelo/especializacion.dart
 import '../../../../backend/features/especializacion/repositorio/repositorio_especializacion.dart';
 import '../../../../backend/features/especializacion/repositorio/repositorio_especializacion_impl.dart';
 import '../../../../backend/share/database/app_db_provider.dart';
+import '../../../../backend/features/tecnicos/modelo/tecnico.dart';
+import '../../../../backend/share/utils/texto_utils.dart';
 import '../../../../core/resultado.dart';
 import '../../autenticacion/provider/auth_providers.dart';
+import '../../tecnicos/provider/tecnico_provider.dart';
 
 // Repositorio concreto. Cambiar la impl aquí no toca ninguna otra capa.
 final repositorioEspecializacionProvider =
@@ -96,4 +99,36 @@ final especializacionesFiltradasProvider =
     });
   },
   name: 'especializacionesFiltradasProvider',
+);
+
+/// Los técnicos que tienen una especialidad, para el diálogo de su tarjeta.
+///
+/// Se deriva del catálogo que ya está en vivo y **no abre una consulta
+/// nueva**: es la misma lista que alimenta el conteo de las tarjetas, así que
+/// filtrar aquí no cuesta un viaje a la base. Va en un `Provider` y no dentro
+/// del `build()` del diálogo por la regla de los cálculos derivados
+/// (`CLAUDE.md` §3): dentro de la vista se repetiría el filtro en cada
+/// repintado aunque la lista no hubiera cambiado.
+///
+/// Los inactivos van al final: quien pregunta quién sabe de frenos también
+/// quiere saber que el que sabía ya no está, pero no antes que los que están.
+/// Dentro de cada grupo, por nombre.
+final tecnicosDeEspecializacionProvider =
+    Provider.family<AsyncValue<List<Tecnico>>, int>(
+  name: 'tecnicosDeEspecializacionProvider',
+  (ref, especializacionId) =>
+      ref.watch(catalogoTecnicosProvider).whenData((todos) {
+    final suyos = todos
+        .where((t) => t.especializacionId == especializacionId)
+        .toList()
+      ..sort((a, b) {
+        if (a.activo != b.activo) return a.activo ? -1 : 1;
+        // `aplanarTexto` y no `toLowerCase`: con el orden de puntos de código,
+        // «Álvaro» cae después de «Bernardo» porque la «á» está más allá de
+        // la «z». Es el mismo helper que usa el buscador del catálogo.
+        return aplanarTexto(a.datosPersona.nombreCompleto)
+            .compareTo(aplanarTexto(b.datosPersona.nombreCompleto));
+      });
+    return suyos;
+  }),
 );

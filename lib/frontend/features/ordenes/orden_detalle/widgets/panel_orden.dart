@@ -12,6 +12,7 @@ import '../modelo/linea_orden_editor.dart';
 import '../modelo/orden_editor_state.dart';
 import '../provider/catalogo_orden_providers.dart';
 import '../provider/orden_editor_provider.dart';
+import 'botones_estado_orden.dart';
 import 'dialogo_datos_orden.dart';
 import 'linea_orden.dart';
 import 'totales_orden.dart';
@@ -251,6 +252,8 @@ class _Pie extends ConsumerWidget {
         children: [
           TotalesOrden(ordenId: ordenId),
           const SizedBox(height: 16),
+          BotonesEstadoOrden(ordenId: ordenId),
+          const SizedBox(height: 10),
           BotonPrimario(
             etiqueta: 'Imprimir orden',
             icono: Icons.print_outlined,
