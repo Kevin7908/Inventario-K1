@@ -28,6 +28,8 @@ import '../../ordenes/esquema_datos/tabla_ordenes_servicio.dart';
 @TableIndex(name: 'idx_ventas_estado', columns: {#estadoPago})
 @TableIndex(name: 'idx_ventas_creado', columns: {#creadoEn})
 @TableIndex(name: 'idx_ventas_usuario', columns: {#usuarioId})
+// Cubre el «cuánto vendió cada quien» del cierre de caja: WHERE vendedor_id = ?
+@TableIndex(name: 'idx_ventas_vendedor', columns: {#vendedorId})
 class TablaVentas extends Table {
   @override
   String get tableName => 'ventas';
@@ -77,6 +79,20 @@ class TablaVentas extends Table {
   /// `Companion.insert` que genera Drift lo exige como parámetro obligatorio y
   /// un método de escritura nuevo que se olvide del autor no compila.
   IntColumn get usuarioId => integer()
+      .references(TablaUsuario, #id, onDelete: KeyAction.restrict)();
+
+  /// Quién **vendió**, si no es el mismo que la registró.
+  ///
+  /// Es otra pregunta que [usuarioId] y por eso es otra columna: uno responde
+  /// quién tecleó la factura —el de la caja— y este, a quién reclamarle por el
+  /// trato. En un mostrador con un solo cajero y tres vendedores son personas
+  /// distintas todos los días.
+  ///
+  /// `NULL` significa «el mismo que la registró», no «no se sabe»: así el caso
+  /// normal no obliga a elegir nada al cobrar. `restrict` como el otro: borrar
+  /// la cuenta destruiría la atribución que esta columna existe para conservar.
+  IntColumn get vendedorId => integer()
+      .nullable()
       .references(TablaUsuario, #id, onDelete: KeyAction.restrict)();
 
   DateTimeColumn get creadoEn => dateTime().withDefault(currentDateAndTime)();

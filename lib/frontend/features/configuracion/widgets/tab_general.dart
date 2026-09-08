@@ -6,6 +6,7 @@ import '../../../../core/iva_app.dart';
 import '../../../share/share.dart';
 import '../../documentos/servicio/formato_impreso.dart';
 import '../provider/configuracion_provider.dart';
+import 'paneles_negocio.dart';
 
 /// Los datos del negocio: nombre, NIT, contacto, ubicación, IVA y papel.
 ///
@@ -42,6 +43,10 @@ class _TabGeneralState extends ConsumerState<TabGeneral> {
     ClaveConfiguracion.telefono,
     ClaveConfiguracion.direccion,
     ClaveConfiguracion.ciudad,
+    ClaveConfiguracion.correo,
+    ClaveConfiguracion.regimenIva,
+    ClaveConfiguracion.actividadEconomica,
+    ClaveConfiguracion.notaFactura,
   ];
 
   final _iva = TextEditingController();
@@ -144,57 +149,9 @@ class _TabGeneralState extends ConsumerState<TabGeneral> {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
-                  PanelSeccion(
-                    titulo: 'Datos del negocio',
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        const AvisoEnLinea(
-                          tono: TonoAviso.informacion,
-                          mensaje:
-                              'Esto es lo que sale impreso en la cabecera de '
-                              'las facturas, reservas y cotizaciones.',
-                        ),
-                        const SizedBox(height: 16),
-                        FilaCampos(
-                          hijos: [
-                            CampoTexto(
-                              etiqueta: 'Nombre del taller',
-                              controlador: _controladores[
-                                  ClaveConfiguracion.nombreNegocio]!,
-                            ),
-                            CampoTexto(
-                              etiqueta: 'NIT',
-                              controlador:
-                                  _controladores[ClaveConfiguracion.nit]!,
-                              monoespaciado: true,
-                            ),
-                          ],
-                        ),
-                        const SizedBox(height: 16),
-                        FilaCampos(
-                          hijos: [
-                            CampoTexto(
-                              etiqueta: 'Teléfono',
-                              controlador:
-                                  _controladores[ClaveConfiguracion.telefono]!,
-                            ),
-                            CampoTexto(
-                              etiqueta: 'Dirección',
-                              controlador:
-                                  _controladores[ClaveConfiguracion.direccion]!,
-                            ),
-                          ],
-                        ),
-                        const SizedBox(height: 16),
-                        CampoTexto(
-                          etiqueta: 'Ciudad',
-                          controlador:
-                              _controladores[ClaveConfiguracion.ciudad]!,
-                        ),
-                      ],
-                    ),
-                  ),
+                  PanelDatosNegocio(controladores: _controladores),
+                  const SizedBox(height: 18),
+                  PanelPieFactura(controladores: _controladores),
                   const SizedBox(height: 18),
                   PanelSeccion(
                     titulo: 'Impuestos e impresión',

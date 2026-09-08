@@ -66,6 +66,7 @@ class PosNotifier extends Notifier<PosState> {
   /// es `null`.
   Future<({Resultado resultado, int? ventaId})> cobrar({
     required MetodoPago metodoPago,
+    int? vendedorId,
   }) async {
     if (state.vacio) {
       return (
@@ -112,6 +113,7 @@ class PosNotifier extends Notifier<PosState> {
             ],
             metodoPago: metodoPago,
             clienteId: venta.cliente?.id,
+            vendedorId: vendedorId,
             iva: venta.iva,
             descuento: venta.descuento,
           );

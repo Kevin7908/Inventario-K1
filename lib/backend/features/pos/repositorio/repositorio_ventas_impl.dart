@@ -79,6 +79,7 @@ class RepositorioVentasImpl with FirmaDeSesion implements RepositorioVentas {
       pe.telefono       AS cliente_telefono,
       pe.email          AS cliente_correo,
       TRIM(pu.nombres || ' ' || COALESCE(pu.apellidos, '')) AS cajero,
+      TRIM(pv.nombres || ' ' || COALESCE(pv.apellidos, '')) AS vendedor,
       COALESCE((SELECT SUM(d.total) FROM devoluciones d WHERE d.venta_id = v.id), 0)
         AS total_devuelto
     FROM ventas v
@@ -86,6 +87,8 @@ class RepositorioVentasImpl with FirmaDeSesion implements RepositorioVentas {
     LEFT JOIN personas pe ON pe.id = c.persona_id
     INNER JOIN usuarios u  ON u.id  = v.usuario_id
     INNER JOIN personas pu ON pu.id = u.persona_id
+    LEFT  JOIN usuarios uv ON uv.id = v.vendedor_id
+    LEFT  JOIN personas pv ON pv.id = uv.persona_id
   ''';
 
   /// Las tablas que hacen re-emitir el stream. Si falta una, el historial no
@@ -264,6 +267,7 @@ class RepositorioVentasImpl with FirmaDeSesion implements RepositorioVentas {
     required List<LineaVentaMostrador> lineas,
     required MetodoPago metodoPago,
     int? clienteId,
+    int? vendedorId,
     int iva = 0,
     int descuento = 0,
   }) {
@@ -282,6 +286,9 @@ class RepositorioVentasImpl with FirmaDeSesion implements RepositorioVentas {
     return _db.transaction(() async {
       final ventaId = await _crearCabecera(
         clienteId: clienteId,
+        // `null` cuando vende el mismo que cobra, que es el caso normal: la
+        // columna guarda la excepción, no la repetición.
+        vendedorId: vendedorId == autorId ? null : vendedorId,
         metodoPago: metodoPago,
         iva: iva,
         descuento: descuento,
@@ -319,6 +326,7 @@ class RepositorioVentasImpl with FirmaDeSesion implements RepositorioVentas {
   /// cualquier `INSERT` fallido se saltaba un número para siempre.
   Future<int> _crearCabecera({
     int? clienteId,
+    int? vendedorId,
     required MetodoPago metodoPago,
     required int iva,
     required int descuento,
@@ -329,6 +337,7 @@ class RepositorioVentasImpl with FirmaDeSesion implements RepositorioVentas {
             numeroFactura:
                 await _consecutivos.siguiente(DocumentoConsecutivo.factura),
             clienteId: clienteId,
+            vendedorId: vendedorId,
             metodoPago: metodoPago,
             iva: iva,
             descuento: descuento,

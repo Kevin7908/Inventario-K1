@@ -11,10 +11,18 @@ export '../../configuracion/provider/configuracion_provider.dart'
 /// Van juntos porque salen de la misma lectura. Separarlos costaría dos
 /// consultas por cada factura para responder lo mismo.
 class AjustesImpresion {
-  const AjustesImpresion({required this.negocio, required this.formato});
+  const AjustesImpresion({
+    required this.negocio,
+    required this.formato,
+    this.notaFactura = '',
+  });
 
   /// El encabezado del taller.
   final NegocioImpreso negocio;
+
+  /// La letra pequeña del pie de la factura, tal como la escribió el taller.
+  /// Vacía, la factura no lleva pie.
+  final String notaFactura;
 
   /// El papel del taller: el que sale sin preguntar. El diálogo de vista
   /// previa deja cambiarlo para una impresión suelta sin tocar la clave.
@@ -63,5 +71,6 @@ Future<AjustesImpresion> leerAjustesImpresion(
   return AjustesImpresion(
     negocio: NegocioImpreso.desdeConfiguracion(valores),
     formato: FormatoImpreso.desdeCodigo(valores[clave] ?? clave.porDefecto),
+    notaFactura: (valores[ClaveConfiguracion.notaFactura] ?? '').trim(),
   );
 }

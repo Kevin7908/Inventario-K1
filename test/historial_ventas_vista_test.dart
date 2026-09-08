@@ -86,6 +86,7 @@ class _VentasFalsas implements RepositorioVentas {
     required List<LineaVentaMostrador> lineas,
     required MetodoPago metodoPago,
     int? clienteId,
+    int? vendedorId,
     int iva = 0,
     int descuento = 0,
   }) =>

@@ -122,6 +122,11 @@ abstract interface class RepositorioVentas {
     required List<LineaVentaMostrador> lineas,
     required MetodoPago metodoPago,
     int? clienteId,
+
+    /// Quién vendió, si no es quien está en la caja. En `null` —o si coincide
+    /// con la sesión— la columna queda vacía: guarda la excepción, no la
+    /// repetición.
+    int? vendedorId,
     int iva,
     int descuento,
   });

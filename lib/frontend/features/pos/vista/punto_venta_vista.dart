@@ -40,11 +40,13 @@ class _PuntoVentaVistaState extends ConsumerState<PuntoVentaVista> {
 
   Future<void> _cobrar() async {
     final total = ref.read(posProvider).total;
-    final metodoPago = await DialogoCobro.mostrar(context, total: total);
-    if (metodoPago == null || !mounted) return;
+    final cobro = await DialogoCobro.mostrar(context, total: total);
+    if (cobro == null || !mounted) return;
 
-    final (:resultado, :ventaId) =
-        await ref.read(posProvider.notifier).cobrar(metodoPago: metodoPago);
+    final (:resultado, :ventaId) = await ref.read(posProvider.notifier).cobrar(
+          metodoPago: cobro.metodoPago,
+          vendedorId: cobro.vendedorId,
+        );
     if (!mounted) return;
 
     switch (resultado) {
@@ -73,7 +75,13 @@ class _PuntoVentaVistaState extends ConsumerState<PuntoVentaVista> {
 
       await DialogoVistaPrevia.mostrar(
         context,
-        documento: documentoDeVenta(venta: venta, negocio: ajustes.negocio),
+        documento: documentoDeVenta(
+          venta: venta,
+          negocio: ajustes.negocio,
+          atendidoPor: venta.cajero,
+          vendedor: venta.vendedor,
+          nota: ajustes.notaFactura,
+        ),
         formato: ajustes.formato,
       );
     } catch (e) {

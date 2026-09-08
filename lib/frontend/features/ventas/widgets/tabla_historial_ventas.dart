@@ -256,7 +256,13 @@ class _Acciones extends ConsumerWidget {
 
       await DialogoVistaPrevia.mostrar(
         context,
-        documento: documentoDeVenta(venta: detalle, negocio: ajustes.negocio),
+        documento: documentoDeVenta(
+          venta: detalle,
+          negocio: ajustes.negocio,
+          atendidoPor: detalle.cajero,
+          vendedor: detalle.vendedor,
+          nota: ajustes.notaFactura,
+        ),
         formato: ajustes.formato,
       );
     } catch (e) {

@@ -25,6 +25,8 @@ class VentaDetalle extends Equatable {
     required this.metodoPago,
     required this.estadoPago,
     this.creadoEn,
+    this.cajero = '',
+    this.vendedor = '',
     required this.items,
   });
 
@@ -55,6 +57,15 @@ class VentaDetalle extends Equatable {
   final MetodoPago metodoPago;
   final EstadoPago estadoPago;
   final DateTime? creadoEn;
+
+  /// Quién la registró y quién la vendió, ya resueltos a nombre.
+  ///
+  /// [vendedor] queda **vacío cuando vende el mismo que cobra**, que es el
+  /// caso normal: la columna guarda la excepción, no la repetición. El impreso
+  /// pinta el renglón solo si hay alguien distinto.
+  final String cajero;
+  final String vendedor;
+
   final List<VentaItem> items;
 
   List<VentaItem> get itemsProducto =>
@@ -87,6 +98,8 @@ class VentaDetalle extends Equatable {
         metodoPago,
         estadoPago,
         creadoEn,
+        cajero,
+        vendedor,
         items,
       ];
 }

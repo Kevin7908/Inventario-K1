@@ -67,6 +67,8 @@ abstract final class VentasMapper {
       metodoPago: MetodoPago.desdeCodigo(ventaRow['metodo_pago'] as String? ?? 'EFECTIVO'),
       estadoPago: EstadoPago.desdeTexto(ventaRow['estado_pago'] as String? ?? 'PENDIENTE'),
       creadoEn: fechaDeSqlite(ventaRow['creado_en']),
+      cajero: _texto(ventaRow['cajero']),
+      vendedor: _texto(ventaRow['vendedor']),
       items: itemsRows.map(_itemDesdeMap).toList(growable: false),
     );
   }
@@ -81,6 +83,7 @@ abstract final class VentasMapper {
     required int usuarioId,
     required String numeroFactura,
     int? clienteId,
+    int? vendedorId,
     required MetodoPago metodoPago,
     int iva = 0,
     int descuento = 0,
@@ -90,6 +93,7 @@ abstract final class VentasMapper {
         numeroFactura: numeroFactura,
         tipo: Value(TipoVenta.mostrador.aTexto),
         clienteId: Value(clienteId),
+        vendedorId: Value(vendedorId),
         metodoPago: Value(metodoPago.codigo),
         estadoPago: Value(EstadoPago.pagado.aTexto),
         iva: Value(iva),
