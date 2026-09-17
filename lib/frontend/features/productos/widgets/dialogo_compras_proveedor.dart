@@ -7,6 +7,7 @@ import '../../../../core/formato.dart';
 import '../../../share/share.dart';
 import '../../compras/provider/compras_providers.dart';
 import '../../compras/widgets/dialogo_detalle_compra.dart';
+import 'acciones_proveedor_producto.dart';
 
 /// Todas las veces que este proveedor trajo este repuesto.
 ///
@@ -98,12 +99,9 @@ class DialogoComprasProveedor extends ConsumerWidget {
                 },
               ),
               const SizedBox(height: 20),
-              Align(
-                alignment: Alignment.centerRight,
-                child: BotonSecundario(
-                  etiqueta: 'Cerrar',
-                  alPresionar: () => Navigator.of(context).pop(),
-                ),
+              AccionesProveedorProducto(
+                productoId: productoId,
+                proveedor: proveedor,
               ),
             ],
           ),

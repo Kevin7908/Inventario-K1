@@ -1,11 +1,16 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../../backend/features/productos/modelo/proveedor_de_producto.dart';
+import '../../../../backend/share/dominio/permiso.dart';
 import '../../../../core/formato.dart';
 import '../../../share/share.dart';
 import '../provider/productos_provider.dart';
+import '../../autenticacion/widgets/si_puede.dart';
 import 'dialogo_compras_proveedor.dart';
+import 'dialogo_vincular_proveedor.dart';
 
 /// «Quién me lo vende», con el último costo de cada uno.
 ///
@@ -39,8 +44,29 @@ class PanelProveedoresProducto extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final proveedores = ref.watch(proveedoresDeProductoProvider(productoId));
 
+    // Agregar uno es orden, no control: la compuerta que vale está en
+    // `vincularProveedor`. Esto evita ofrecer un gesto que el repositorio va
+    // a rechazar.
+    final agregar = SiPuede(
+      permiso: Permiso.productosEditar,
+      child: BotonSecundario(
+        etiqueta: 'Agregar',
+        icono: Icons.add,
+        alPresionar: () => unawaited(
+          DialogoVincularProveedor.mostrar(
+            context,
+            productoId: productoId,
+            yaVinculados: {
+              for (final p in proveedores.value ?? const []) p.proveedorId,
+            },
+          ),
+        ),
+      ),
+    );
+
     return PanelSeccion(
       titulo: 'Quién me lo vende',
+      accion: agregar,
       child: switch (proveedores) {
         AsyncData(value: final lista) when lista.isEmpty => const _Hueco(),
         AsyncData(value: final lista) =>
