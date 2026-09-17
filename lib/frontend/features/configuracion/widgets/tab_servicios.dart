@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../../backend/features/servicios/modelo/servicio.dart';
+import '../../../../core/resultado.dart';
 import '../../../share/share.dart';
 import '../../servicios/provider/servicios_provider.dart';
 import '../../servicios/widgets/dialogo_servicios.dart';
@@ -45,18 +46,6 @@ class _TabServiciosState extends ConsumerState<TabServicios> {
         .toList(growable: false);
   }
 
-  void _mostrarError(String error) {
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text(
-          error,
-          style: TipografiaApp.sobrePrimario(TipografiaApp.cuerpo),
-        ),
-        backgroundColor: ColoresApp.statusDanger,
-      ),
-    );
-  }
-
   Future<void> _eliminar(Servicio servicio) async {
     final confirmado = await DialogoConfirmacion.mostrar(
       context,
@@ -65,10 +54,15 @@ class _TabServiciosState extends ConsumerState<TabServicios> {
     );
     if (confirmado != true || !mounted) return;
 
-    final error =
+    final resultado =
         await ref.read(serviciosProvider.notifier).eliminar(servicio.id);
-    if (!mounted || error == null) return;
-    _mostrarError(error);
+    if (!mounted) return;
+    switch (resultado) {
+      case Exito():
+        MensajeApp.exito(context, 'Servicio eliminado.');
+      case Fallo(:final mensaje):
+        MensajeApp.error(context, mensaje);
+    }
   }
 
   @override

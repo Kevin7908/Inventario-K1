@@ -658,4 +658,33 @@ void main() {
       expect(detalle.abonos.single.metodoPago, MetodoPago.daviplata);
     });
   });
+
+  group('clics rápidos sobre la misma tarjeta', () {
+    // El usuario reportó que «al clickear muy rápido se buguea». La adición
+    // escribe en la base por cada clic, así que cinco toques seguidos lanzan
+    // cinco escrituras solapadas sobre la misma línea. `agregarItem` hace
+    // leer-modificar-escribir para sumar a la línea existente, y eso es
+    // exactamente la forma que pierde incrementos si dos se cruzan.
+    test('cinco adiciones concurrentes dejan las cinco unidades', () async {
+      final id = await _reserva(cantidad: 1);
+
+      await Future.wait([
+        for (var i = 0; i < 5; i++)
+          reservas.agregarItem(
+            reservaId: id,
+            productoId: taller.productoId,
+            cantidad: 1,
+            precioUnitario: 30000,
+          ),
+      ]);
+
+      final detalle = await reservas.obtenerDetalle(id);
+      expect(detalle.items, hasLength(1),
+          reason: 'el mismo producto no puede abrir cinco líneas');
+      expect(detalle.items.single.cantidad, 6,
+          reason: 'la de la reserva más las cinco apartadas');
+      expect(await inventario.descuadres(), isEmpty,
+          reason: 'el stock tiene que cuadrar con el libro mayor');
+    });
+  });
 }

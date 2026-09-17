@@ -6,14 +6,31 @@
 //
 // Y lo que no protegen: el `.sqlite` está en el disco del taller. Esto evita
 // la equivocación, no a alguien decidido a saltárselo.
+import 'package:drift/drift.dart' show Variable;
 import 'package:flutter_test/flutter_test.dart';
 import 'package:inventario_k1/backend/features/autenticacion/repositorio/repositorio_auth_impl.dart';
 import 'package:inventario_k1/backend/features/bitacora/modelo/entrada_bitacora.dart';
 import 'package:inventario_k1/backend/features/bitacora/repositorio/repositorio_bitacora.dart';
 import 'package:inventario_k1/backend/features/bitacora/repositorio/repositorio_bitacora_impl.dart';
 import 'package:inventario_k1/backend/features/autenticacion/resultado/resultados_auth.dart';
+import 'package:inventario_k1/backend/features/categorias/repositorio/repositorio_categorias_impl.dart';
+import 'package:inventario_k1/backend/features/clientes/repositorio/repositorio_cliente_impl.dart';
+import 'package:inventario_k1/backend/features/configuracion/repositorio/repositorio_configuracion_impl.dart';
+import 'package:inventario_k1/backend/features/cotizaciones/repositorio/repositorio_cotizaciones_impl.dart';
+import 'package:inventario_k1/backend/features/deudores/repositorio/repositorio_deudores.dart';
+import 'package:inventario_k1/backend/features/deudores/repositorio/repositorio_deudores_impl.dart';
+import 'package:inventario_k1/backend/features/ordenes/repositorio/repositorio_ordenes_impl.dart';
+import 'package:inventario_k1/backend/features/pos/enum/enum_ventas.dart';
+import 'package:inventario_k1/backend/features/pos/modelo/linea_venta_mostrador.dart';
+import 'package:inventario_k1/backend/features/pos/repositorio/repositorio_ventas_impl.dart';
 import 'package:inventario_k1/backend/features/productos/modelo/producto.dart';
+import 'package:inventario_k1/backend/features/productos/repositorio/repositorio_producto.dart';
 import 'package:inventario_k1/backend/features/productos/repositorio/repositorio_producto_impl.dart';
+import 'package:inventario_k1/backend/features/proveedores/repositorio/repositorio_proveedor_impl.dart';
+import 'package:inventario_k1/backend/features/tecnicos/repositorio/repositorio_tecnico_impl.dart';
+import 'package:inventario_k1/backend/features/reservas/enum/enum_reserva.dart';
+import 'package:inventario_k1/backend/features/reservas/repositorio/repositorio_reservas.dart';
+import 'package:inventario_k1/backend/features/reservas/repositorio/repositorio_reservas_impl.dart';
 import 'package:inventario_k1/backend/share/database/app_db.dart';
 import 'package:inventario_k1/backend/share/dominio/permiso.dart';
 import 'package:inventario_k1/backend/share/dominio/rol_usuario.dart';
@@ -21,6 +38,7 @@ import 'package:inventario_k1/backend/share/dominio/sesion_actual.dart';
 import 'package:inventario_k1/core/resultado.dart';
 
 import 'soporte/base_en_memoria.dart';
+import 'soporte/datos_taller.dart';
 import 'soporte/sesion_de_prueba.dart';
 
 late AppDb db;
@@ -37,7 +55,6 @@ Producto _producto({String sku = 'ACE-1'}) => Producto(
       precioVenta: 40000,
       stockActual: 0,
       stockMinimo: 0,
-      aplicaIva: true,
       activo: true,
     );
 
@@ -274,6 +291,221 @@ void main() {
 
       final restantes = await db.select(db.tablaUsuarioPermiso).get();
       expect(restantes.where((p) => p.usuarioId == anaId), isEmpty);
+    });
+  });
+
+  group('los permisos de ver cortan la consulta, no solo el sidebar', () {
+    // Esconder la sección del sidebar es orden: al catálogo se llega también
+    // desde el editor de órdenes, el de cotizaciones, el de compras y el
+    // mostrador. La compuerta que impide leer va en el repositorio.
+    //
+    // Se prueba con la sesión **sin ningún permiso** y llamando a la lectura
+    // principal de cada módulo: lo que se fija es que exista la compuerta, no
+    // qué devuelve la consulta.
+
+    late Map<String, void Function()> lecturas;
+
+    setUp(() {
+      final ciego = _cajeroCon(const {});
+      lecturas = {
+        'productos': () => RepositorioProductosImpl(db, ciego).observarPagina(
+              filtro: const FiltroProductos(),
+              pagina: 0,
+              tamano: 10,
+            ),
+        'categorías': () =>
+            RepositorioCategoriasImpl(db, ciego).observarTodas(),
+        'proveedores': () =>
+            RepositorioProveedoresImpl(db, ciego).observarTodas(),
+        'clientes': () => RepositorioClientesImpl(db, ciego).observarTodos(),
+        'técnicos': () => RepositorioTecnicoDrift(db, ciego).observarTodos(),
+        'órdenes': () => RepositorioOrdenesImpl(db, ciego).observarTodas(),
+        'cotizaciones': () =>
+            RepositorioCotizacionesImpl(db, ciego).observarTodas(),
+        'reservas': () => RepositorioReservasImpl(db, ciego).observarTodas(),
+        'cuentas por cobrar': () =>
+            RepositorioDeudoresImpl(db, ciego).observarPagina(
+              filtro: const FiltroDeudores(),
+              pagina: 0,
+              tamano: 10,
+            ),
+        'configuración': () =>
+            RepositorioConfiguracionImpl(db, ciego).observarTodas(),
+      };
+    });
+
+    test('ninguna lectura llega a la base sin su permiso', () {
+      for (final entrada in lecturas.entries) {
+        expect(
+          entrada.value,
+          throwsA(isA<PermisoDenegado>()),
+          reason: 'la lectura de ${entrada.key} no tiene compuerta',
+        );
+      }
+    });
+
+    test('con el permiso, la misma lectura pasa', () async {
+      // El contraejemplo: si la compuerta estuviera mal puesta —exigiendo un
+      // permiso que nadie tiene—, el test de arriba pasaría igual.
+      final catalogo = RepositorioProductosImpl(
+        db,
+        _cajeroCon({Permiso.productosVer}),
+      );
+
+      final pagina = await catalogo
+          .observarPagina(
+            filtro: const FiltroProductos(),
+            pagina: 0,
+            tamano: 10,
+          )
+          .first;
+
+      expect(pagina.total, 0);
+    });
+
+    test('imprimir no pasa por la compuerta de Configuración', () async {
+      // `leerTodas` existe aparte de `observarTodas` justo por esto: el
+      // encabezado de una factura lo consulta un cajero, que no tiene
+      // `CONFIGURACION_VER`.
+      final cajero = RepositorioConfiguracionImpl(db, _cajeroCon(const {}));
+
+      expect(await cajero.leerTodas(), isNotEmpty);
+    });
+  });
+
+  group('rebajar el total es su propio permiso', () {
+    // Cobrar a precio de lista y regalar plata del taller no son la misma
+    // decisión, y por eso son dos interruptores.
+
+    late DatosTaller taller;
+
+    setUp(() async => taller = await sembrarTaller(db, usuarioId: sesion.usuarioId));
+
+    List<LineaVentaMostrador> lineas() => [
+          LineaVentaMostrador(
+            productoId: taller.productoId,
+            descripcion: 'Pastilla de freno',
+            cantidad: 1,
+            precioUnitario: 30000,
+            costoUnitario: 18000,
+          ),
+        ];
+
+    test('sin POS_DESCUENTO, la venta con rebaja no pasa', () {
+      final cajero = RepositorioVentasImpl(
+        db,
+        _cajeroCon({Permiso.posVer, Permiso.posVender}),
+      );
+
+      // Con closure: la compuerta va antes del `return _db.transaction(...)`,
+      // así que lanza antes de que exista el `Future`.
+      expect(
+        () => cajero.registrarVentaMostrador(
+          lineas: lineas(),
+          metodoPago: MetodoPago.efectivo,
+          descuento: 5000,
+        ),
+        throwsA(isA<PermisoDenegado>()),
+      );
+    });
+
+    test('sin el permiso sí puede cobrar a precio de lista', () async {
+      // Lo que se exige es la rebaja, no el cobro: un descuento en cero no
+      // puede dejar sin vender a media caja.
+      final cajero = RepositorioVentasImpl(
+        db,
+        _cajeroCon({Permiso.posVer, Permiso.posVender}),
+      );
+
+      final venta = await cajero.registrarVentaMostrador(
+        lineas: lineas(),
+        metodoPago: MetodoPago.efectivo,
+      );
+
+      expect(venta.total, 30000);
+    });
+
+    test('con el permiso, la rebaja se aplica', () async {
+      final cajero = RepositorioVentasImpl(
+        db,
+        _cajeroCon({Permiso.posVer, Permiso.posVender, Permiso.posDescuento}),
+      );
+
+      final venta = await cajero.registrarVentaMostrador(
+        lineas: lineas(),
+        metodoPago: MetodoPago.efectivo,
+        descuento: 5000,
+      );
+
+      expect(venta.total, 25000);
+    });
+  });
+
+  group('cancelar una reserva pide lo mismo que borrarla', () {
+    // Las dos devuelven la mercancía apartada a la bodega. Sin la compuerta en
+    // el cambio de estado, quien no podía borrar cancelaba y conseguía lo
+    // mismo por otro botón.
+
+    late DatosTaller taller;
+    late int reservaId;
+
+    setUp(() async {
+      taller = await sembrarTaller(db, usuarioId: sesion.usuarioId);
+      reservaId = await RepositorioReservasImpl(db, sesion).crear(
+        clienteId: taller.clienteId,
+        fechaLimite: null,
+        totalReserva: 60000,
+        items: [
+          ItemReservaDraft(
+            productoId: taller.productoId,
+            cantidad: 2,
+            precioUnitario: 30000,
+          ),
+        ],
+      );
+    });
+
+    Future<double> stock() async {
+      final fila = await db
+          .customSelect('SELECT stock_actual AS s FROM productos WHERE id = ?',
+              variables: [Variable.withInt(taller.productoId)])
+          .getSingle();
+      return fila.read<double>('s');
+    }
+
+    test('sin RESERVAS_ELIMINAR, la mercancía no vuelve a la bodega', () async {
+      final antes = await stock();
+      final cajero = RepositorioReservasImpl(
+        db,
+        _cajeroCon({Permiso.reservasVer, Permiso.reservasCrear}),
+      );
+
+      await expectLater(
+        cajero.cambiarEstado(reservaId, EstadoReserva.cancelada),
+        throwsA(isA<PermisoDenegado>()),
+      );
+      expect(await stock(), antes);
+    });
+
+    test('los demás estados no piden nada: no mueven stock', () async {
+      final cajero = RepositorioReservasImpl(
+        db,
+        _cajeroCon({Permiso.reservasVer, Permiso.reservasCrear}),
+      );
+
+      await cajero.cambiarEstado(reservaId, EstadoReserva.completada);
+    });
+
+    test('con el permiso, cancela y devuelve lo apartado', () async {
+      final antes = await stock();
+      final cajero = RepositorioReservasImpl(
+        db,
+        _cajeroCon({Permiso.reservasVer, Permiso.reservasEliminar}),
+      );
+
+      await cajero.cambiarEstado(reservaId, EstadoReserva.cancelada);
+
+      expect(await stock(), antes + 2);
     });
   });
 

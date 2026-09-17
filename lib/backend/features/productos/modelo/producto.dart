@@ -9,6 +9,12 @@ class Producto extends Equatable {
 
   final int? id;
   final String sku;
+
+  /// El código de barras del empaque, si lo trae. Es aparte del [sku]: aquel
+  /// lo inventa el taller y siempre está, este viene impreso de fábrica y
+  /// falta en todo lo que llega a granel.
+  final String? codigoBarras;
+
   final String nombre;
   final String? descripcion;
 
@@ -35,7 +41,6 @@ class Producto extends Equatable {
 
   final String? ubicacionBodega;
   final String? imagenUrl;
-  final bool aplicaIva;
   final bool activo;
   final DateTime? creadoEn;
   final DateTime? actualizadoEn;
@@ -43,6 +48,7 @@ class Producto extends Equatable {
     const Producto({
     this.id,
     required this.sku,
+    this.codigoBarras,
     required this.nombre,
     this.descripcion,
     // FKs (IDs) — se persisten en la tabla
@@ -62,7 +68,6 @@ class Producto extends Equatable {
     // Metadata
     this.ubicacionBodega,
     this.imagenUrl,
-    required this.aplicaIva,
     required this.activo,
     this.creadoEn,
     this.actualizadoEn,
@@ -92,7 +97,6 @@ class Producto extends Equatable {
         stockMinimo,
         ubicacionBodega,
         imagenUrl,
-        aplicaIva,
         activo,
       ];
 
@@ -103,6 +107,7 @@ class Producto extends Equatable {
   Producto copyWith({
     int? id,
     String? sku,
+    String? codigoBarras,
     String? nombre,
     String? descripcion,
     int? categoriaId,
@@ -118,7 +123,6 @@ class Producto extends Equatable {
     double? stockMinimo,
     String? ubicacionBodega,
     String? imagenUrl,
-    bool? aplicaIva,
     bool? activo,
     DateTime? creadoEn,
     DateTime? actualizadoEn,
@@ -126,6 +130,7 @@ class Producto extends Equatable {
     return Producto(
       id: id ?? this.id,
       sku: sku ?? this.sku,
+      codigoBarras: codigoBarras ?? this.codigoBarras,
       nombre: nombre ?? this.nombre,
       descripcion: descripcion ?? this.descripcion,
       categoriaId: categoriaId ?? this.categoriaId,
@@ -141,7 +146,6 @@ class Producto extends Equatable {
       stockMinimo: stockMinimo ?? this.stockMinimo,
       ubicacionBodega: ubicacionBodega ?? this.ubicacionBodega,
       imagenUrl: imagenUrl ?? this.imagenUrl,
-      aplicaIva: aplicaIva ?? this.aplicaIva,
       activo: activo ?? this.activo,
       creadoEn: creadoEn ?? this.creadoEn,
       actualizadoEn: actualizadoEn ?? this.actualizadoEn,
@@ -164,16 +168,21 @@ class Producto extends Equatable {
   /// Alias booleano para compatibilidad con filtros del ViewModel.
   bool get sinStock => estadoStock == EstadoStock.sinStock;
 
-  /// Cuánto IVA va **dentro** de [precioVenta], según la tasa global [kIva].
+  /// Cuánto IVA se le **suma** a [precioVenta], según la tasa global [tasaIva].
   ///
-  /// [precioVenta] ya es el precio final: el IVA no se le suma encima, se le
-  /// extrae para poder discriminarlo. Es informativo —para ver en la ficha
-  /// cuánto del precio es impuesto—; los documentos lo recalculan sobre su
-  /// propio total con [ivaIncluidoEn].
-  int get ivaDelPrecio => aplicaIva ? ivaIncluidoEn(precioVenta) : 0;
+  /// [precioVenta] es la base gravable: el precio del catálogo es lo que vale
+  /// la mercancía y el impuesto se agrega al facturar (ver `iva_app.dart`).
+  /// Es informativo —para ver en la ficha en cuánto sale con impuesto—; los
+  /// documentos lo liquidan sobre su propia base, ya descontada.
+  ///
+  /// **Ya no hay `aplica_iva` por producto.** La columna existía para poder
+  /// marcar exento uno suelto, y en la práctica dejaba dos productos idénticos
+  /// facturando distinto según cómo se hubiera creado cada uno. La tasa del
+  /// negocio es una sola y se configura en un sitio.
+  int get ivaDelPrecio => ivaSobre(precioVenta);
 
-  /// Lo que queda del precio una vez descontado su IVA.
-  int get precioSinIva => precioVenta - ivaDelPrecio;
+  /// Lo que costaría con el impuesto ya sumado.
+  int get precioConIva => precioVenta + ivaDelPrecio;
 
   /// Margen de ganancia en porcentaje sobre el precio de compra.
   double get margenGanancia => precioCompra > 0

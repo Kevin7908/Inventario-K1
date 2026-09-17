@@ -6,17 +6,29 @@ import '../modelo/moto.dart';
 class MotoMapper {
   MotoMapper._();
 
-  // Fila Drift → Modelo de dominio
-  static Moto filaAModelo(TablaMotoData fila, {String? nombreCliente}) {
+  /// Fila Drift → modelo de dominio.
+  ///
+  /// [marca], [modelo] y [cilindraje] no salen de la fila: los resuelve el
+  /// JOIN con el catálogo y los pasa el repositorio, igual que
+  /// [nombreCliente]. En `motos` solo están las FK.
+  static Moto filaAModelo(
+    TablaMotoData fila, {
+    String? nombreCliente,
+    required String marca,
+    String? modelo,
+    int? cilindraje,
+  }) {
     return Moto(
       id: fila.id,
       clienteId: fila.clienteId,
       nombreCliente: nombreCliente,
       placa: fila.placa,
-      marca: fila.marca,
-      modelo: fila.modelo,
+      marcaId: fila.marcaId,
+      marca: marca,
+      modeloId: fila.modeloId,
+      modelo: modelo,
+      cilindraje: cilindraje,
       anio: fila.anio,
-      cilindraje: fila.cilindraje,
       color: fila.color,
       numeroMotor: fila.numeroMotor,
       notas: fila.notas,
@@ -32,10 +44,10 @@ class MotoMapper {
       id: moto.id == 0 ? const Value.absent() : Value(moto.id),
       clienteId: Value(moto.clienteId),
       placa: Value(moto.placa),
-      marca: Value(moto.marca),
-      modelo: Value(moto.modelo),
+      // Solo viajan las FK: los nombres son de presentación.
+      marcaId: Value(moto.marcaId),
+      modeloId: Value(moto.modeloId),
       anio: Value(moto.anio),
-      cilindraje: Value(moto.cilindraje),
       color: Value(moto.color),
       numeroMotor: Value(moto.numeroMotor),
       notas: Value(moto.notas),

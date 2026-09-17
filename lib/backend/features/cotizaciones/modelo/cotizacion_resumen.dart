@@ -43,18 +43,17 @@ class CotizacionResumen extends Equatable {
     this.cantidadItems = 0,
   });
 
-  /// Lo que se cobraría: las líneas menos el descuento.
+  /// La base gravable: las líneas menos el descuento, todavía sin impuesto.
   ///
-  /// **No se le suma [iva]**: los precios del sistema ya lo traen dentro (ver
-  /// `iva_app.dart`), y la columna guarda cuánto impuesto va contenido en este
-  /// total, con la tasa del día en que se emitió.
+  /// El descuento se resta **antes** del IVA, que es como se liquida (ver
+  /// `iva_app.dart`).
+  int get baseGravable => subtotal - descuento;
+
+  /// Lo que se cobraría: la base más el [iva] que se liquidó ese día.
   ///
   /// No es una columna. Era `subtotal + iva`, dos campos de su misma fila, y
   /// guardarlo solo abría la puerta a que se desincronizara.
-  int get total => subtotal - descuento;
-
-  /// Lo que queda del total una vez discriminado el IVA.
-  int get baseSinIva => total - iva;
+  int get total => baseGravable + iva;
 
   /// Vigente, por vencer o vencida, según cuánto falta para [vigenciaHasta].
   ///

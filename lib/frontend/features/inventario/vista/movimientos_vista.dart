@@ -9,6 +9,7 @@ import '../../../../backend/share/dominio/permiso.dart';
 import '../../../../core/formato.dart';
 import '../../../layout/encabezado_con_cuenta.dart';
 import '../../../share/share.dart';
+import '../../autenticacion/widgets/selector_cuenta.dart';
 import '../../autenticacion/widgets/si_puede.dart';
 import '../provider/inventario_providers.dart';
 import '../widgets/dialogo_entrada_compra.dart';
@@ -170,7 +171,8 @@ class _Filtros extends ConsumerWidget {
     final notifier = ref.read(movimientosProvider.notifier);
 
     return FilaCampos(
-      pesos: const [3, 2, 2],
+      // «Por qué» y «Quién» llevan nombres largos; las fechas caben en menos.
+      pesos: const [3, 3, 2, 2],
       hijos: [
         SelectorWidget<String>(
           etiqueta: 'Por qué',
@@ -182,6 +184,13 @@ class _Filtros extends ConsumerWidget {
           alCambiar: (valor) => notifier.filtrarPorTipo(
             valor == _todos ? null : TipoMovimiento.desdeCodigo(valor),
           ),
+        ),
+        // Quién movió el stock. El `WHERE` y su índice existían desde la
+        // tanda de auditoría; lo que faltaba era este desplegable, que es el
+        // mismo de la bitácora porque es la misma pregunta.
+        SelectorCuenta(
+          usuarioId: estado.usuarioId,
+          alCambiar: notifier.filtrarPorUsuario,
         ),
         CampoFecha(
           etiqueta: 'Desde',

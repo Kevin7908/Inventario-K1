@@ -22,6 +22,8 @@ dependencies:
   flutter_svg: ^2.3.0
   integration_test:
     sdk: flutter
+  pdf: ^3.13.0
+  printing: ^5.15.0
 
 dev_dependencies:
   flutter_test:
@@ -35,3 +37,7 @@ flutter:
   assets:
     - assets/images/
     - assets/images/gatos/
+    # Van como asset y no en la sección `fonts:` a propósito: solo las carga el
+    # PDF, con `rootBundle.load` desde `ConstructorPdf`. Declararlas como
+    # familia de Flutter las metería en el tema de la interfaz, que no las usa.
+    - assets/fonts/

@@ -1,7 +1,6 @@
 import 'package:drift/drift.dart';
 
 import '../../categorias/esquema_datos/tabla_categoria.dart';
-import '../../proveedores/esquema_datos/tabla_proveedor.dart';
 import '../../unidades_medida/esquema_datos/tabla_unidades_medida.dart';
 
 /// El catálogo de repuestos del taller.
@@ -12,8 +11,9 @@ import '../../unidades_medida/esquema_datos/tabla_unidades_medida.dart';
 /// absurdo, pero nadie lo escribe a mano —solo `RepositorioInventario`, que
 /// mueve las dos tablas en la misma transacción.
 @TableIndex(name: 'idx_productos_categoria', columns: {#categoriaId})
-@TableIndex(name: 'idx_productos_proveedor', columns: {#proveedorId})
 @TableIndex(name: 'idx_productos_activo', columns: {#activo})
+// Cubre el WHERE codigoBarras = ? del lector del POS.
+@TableIndex(name: 'idx_productos_codigo_barras', columns: {#codigoBarras})
 class TablaProducto extends Table {
   @override
   String get tableName => 'productos';
@@ -24,12 +24,31 @@ class TablaProducto extends Table {
   /// entre el `existeSku()` de validación y el `INSERT` cabe otra escritura.
   TextColumn get sku => text().unique()();
 
+  /// El código de barras del empaque (EAN-13, UPC-A…), para buscar pasando el
+  /// lector en el mostrador.
+  ///
+  /// Es **aparte del SKU** y no un segundo uso de la misma columna: el SKU lo
+  /// inventa el taller y siempre está; este viene impreso de fábrica y falta
+  /// en todo lo que llega a granel. Por eso es nullable, y `UNIQUE` acepta
+  /// varios NULL sin estorbar.
+  ///
+  /// Se guarda normalizado —sin espacios ni guiones— desde el repositorio: un
+  /// lector que mande «7 702001 234567» y otro que mande «7702001234567» tienen
+  /// que encontrar el mismo producto.
+  TextColumn get codigoBarras => text().nullable().unique()();
+
   TextColumn get nombre => text()();
 
   TextColumn get descripcion => text().nullable()();
 
-  /// `setNull` en los tres: borrar una categoría, un proveedor o una unidad no
-  /// puede llevarse el producto por delante; solo lo deja sin clasificar.
+  /// `setNull` en los dos: borrar una categoría o una unidad no puede
+  /// llevarse el producto por delante; solo lo deja sin clasificar.
+  ///
+  /// **El proveedor no está aquí.** Un repuesto se le compra a varios según
+  /// quién lo tenga y a cómo, así que la relación vive en
+  /// `producto_proveedores` con su marca de principal. Con una columna, cada
+  /// remisión pisaba a la anterior y «¿quién me lo vende más barato?» no se
+  /// podía responder.
   IntColumn get categoriaId => integer()
       .nullable()
       .references(TablaCategoria, #id, onDelete: KeyAction.setNull)();
@@ -37,10 +56,6 @@ class TablaProducto extends Table {
   IntColumn get unidadMedidaId => integer()
       .nullable()
       .references(TablaUnidadesMedida, #id, onDelete: KeyAction.setNull)();
-
-  IntColumn get proveedorId => integer()
-      .nullable()
-      .references(TablaProveedor, #id, onDelete: KeyAction.setNull)();
 
   /// Los tres precios en **pesos enteros**. El peso colombiano no tiene
   /// decimales y `REAL` arrastraba error de coma flotante: mil líneas de
@@ -65,8 +80,6 @@ class TablaProducto extends Table {
 
   TextColumn get imagenUrl => text().nullable()();
 
-  BoolColumn get aplicaIva => boolean().withDefault(const Constant(true))();
-
   BoolColumn get activo => boolean().withDefault(const Constant(true))();
 
   DateTimeColumn get creadoEn => dateTime().withDefault(currentDateAndTime)();
@@ -77,6 +90,10 @@ class TablaProducto extends Table {
   @override
   List<String> get customConstraints => [
         'CHECK (length(trim(sku)) > 0)',
+        // Un código de barras vacío es un NULL mal escrito: sin esto, dos
+        // productos «sin código» chocarían contra el `UNIQUE` con la cadena
+        // vacía en vez de convivir como NULL.
+        'CHECK (codigo_barras IS NULL OR length(trim(codigo_barras)) > 0)',
         'CHECK (length(trim(nombre)) > 0)',
         'CHECK (precio_compra >= 0)',
         'CHECK (precio_venta >= 0)',

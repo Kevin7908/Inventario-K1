@@ -1,5 +1,6 @@
 import 'package:drift/drift.dart';
 
+import '../../../../core/resultado.dart';
 import '../../../share/database/app_db.dart';
 import '../mapper/servicio_mapper.dart';
 import '../modelo/servicio.dart';
@@ -82,79 +83,108 @@ class RepositorioServiciosImpl with FirmaDeSesion implements RepositorioServicio
   }
 
   @override
-  Future<Servicio> agregar({
+  Future<Resultado> agregar({
     required String nombre,
     String? descripcion,
     int precioSugerido = 0,
     bool activo = true,
-  }) async {
-    final companion = ServicioMapper.aCompanionNuevo(
-      nombre: nombre.trim(),
-      descripcion: descripcion?.trim(),
-      precioSugerido: precioSugerido,
-      activo: activo,
-    );
-    return _db.transaction(() async {
-      final id = await _db.into(_tabla).insert(companion);
-      await _anotar(AccionAuditada.creo, id, nombre.trim());
-      return _porId(id);
-    });
-  }
+  }) =>
+      intentar(() async {
+        exigir(Permiso.configuracionEditar);
+        final limpio = nombre.trim();
+        if (limpio.isEmpty) {
+          return const Fallo(
+            MotivoFallo.validacion,
+            'El nombre del servicio no puede estar vacío.',
+          );
+        }
+        if (await existeNombre(limpio)) {
+          return const Fallo(
+            MotivoFallo.nombreDuplicado,
+            'Ya existe un servicio con ese nombre.',
+          );
+        }
+        await _db.transaction(() async {
+          final id = await _db.into(_tabla).insert(
+                ServicioMapper.aCompanionNuevo(
+                  nombre: limpio,
+                  descripcion: descripcion?.trim(),
+                  precioSugerido: precioSugerido,
+                  activo: activo,
+                ),
+              );
+          await _anotar(AccionAuditada.creo, id, limpio);
+        });
+        return const Exito();
+      });
 
   @override
-  Future<Servicio> actualizar({
+  Future<Resultado> actualizar({
     required int id,
     required String nombre,
     String? descripcion,
     int precioSugerido = 0,
     required bool activo,
-  }) async {
-    final companion = ServicioMapper.aCompanionActualizar(
-      id: id,
-      nombre: nombre.trim(),
-      descripcion: descripcion?.trim(),
-      precioSugerido: precioSugerido,
-      activo: activo,
-    );
-    return _db.transaction(() async {
-      await (_db.update(_tabla)..where((t) => t.id.equals(id))).write(companion);
-      await _anotar(AccionAuditada.modifico, id, nombre.trim());
-      return _porId(id);
-    });
-  }
+  }) =>
+      intentar(() async {
+        exigir(Permiso.configuracionEditar);
+        final limpio = nombre.trim();
+        if (limpio.isEmpty) {
+          return const Fallo(
+            MotivoFallo.validacion,
+            'El nombre del servicio no puede estar vacío.',
+          );
+        }
+        if (await existeNombre(limpio, ignorarId: id)) {
+          return const Fallo(
+            MotivoFallo.nombreDuplicado,
+            'Ya existe un servicio con ese nombre.',
+          );
+        }
+        await _db.transaction(() async {
+          final tocadas =
+              await (_db.update(_tabla)..where((t) => t.id.equals(id))).write(
+            ServicioMapper.aCompanionActualizar(
+              id: id,
+              nombre: limpio,
+              descripcion: descripcion?.trim(),
+              precioSugerido: precioSugerido,
+              activo: activo,
+            ),
+          );
+          if (tocadas == 0) throw Exception('El servicio ya no existe.');
+          await _anotar(AccionAuditada.modifico, id, limpio);
+        });
+        return const Exito();
+      });
 
   @override
-  Future<void> eliminar(int id) {
-    exigir(Permiso.configuracionEditar);
-    return _db.transaction(() async {
-      final antes = await (_db.select(_tabla)..where((t) => t.id.equals(id)))
-          .getSingleOrNull();
+  Future<Resultado> eliminar(int id) => intentar(() async {
+        exigir(Permiso.configuracionEditar);
+        await _db.transaction(() async {
+          final antes =
+              await (_db.select(_tabla)..where((t) => t.id.equals(id)))
+                  .getSingleOrNull();
 
-      final eliminados =
-          await (_db.delete(_tabla)..where((t) => t.id.equals(id))).go();
-      if (eliminados == 0) {
-        throw Exception('No se encontro el servicio con id $id.');
-      }
+          final eliminados =
+              await (_db.delete(_tabla)..where((t) => t.id.equals(id))).go();
+          if (eliminados == 0) throw Exception('El servicio ya no existe.');
 
-      await _anotar(
-        AccionAuditada.elimino,
-        id,
-        antes?.nombre ?? 'Servicio #$id',
-      );
-    });
-  }
+          await _anotar(
+            AccionAuditada.elimino,
+            id,
+            antes?.nombre ?? 'Servicio #$id',
+          );
+        });
+        return const Exito();
+      });
 
   @override
-  Future<void> alternarActivo(int id, {required bool activo}) async {
-    await (_db.update(_tabla)..where((t) => t.id.equals(id)))
-        .write(TablaServicioCompanion(activo: Value(activo)));
-  }
-
-  // Helper privado
-
-  Future<Servicio> _porId(int id) async {
-    final fila =
-        await (_db.select(_tabla)..where((t) => t.id.equals(id))).getSingle();
-    return ServicioMapper.desdeFila(fila);
-  }
+  Future<Resultado> alternarActivo(int id, {required bool activo}) =>
+      intentar(() async {
+        exigir(Permiso.configuracionEditar);
+        await (_db.update(_tabla)..where((t) => t.id.equals(id)))
+            .write(TablaServicioCompanion(activo: Value(activo)));
+        return const Exito();
+      });
 }

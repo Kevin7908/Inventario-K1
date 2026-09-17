@@ -13,6 +13,13 @@ import 'package:flutter/services.dart';
 /// un salto de línea. En los campos de una sola línea, `Enter` ya envía por su
 /// cuenta a través de `onFieldSubmitted`.
 ///
+/// **No le quita el foco a los campos de dentro.** El nodo que escucha las
+/// teclas es un `FocusScope`, no un `Focus`: un scope delega en el descendiente
+/// que pida `autofocus` y solo se queda él con el foco si no lo pide nadie. Con
+/// un `Focus` normal pasaba lo contrario y costó un bug —el campo «Recibido»
+/// del diálogo de cobro tiene `autofocus`, y al elegir «Efectivo» no se podía
+/// teclear el monto porque el foco se lo quedaba este envoltorio—.
+///
 /// Parámetros:
 /// - [alGuardar]: acción de guardado. Si es `null`, el atajo no hace nada
 ///   (útil mientras la operación está en curso).
@@ -51,8 +58,9 @@ class AtajosFormulario extends StatelessWidget {
             alGuardar?.call(),
       },
       // `autofocus` para que los atajos funcionen apenas se abre el diálogo,
-      // sin obligar al usuario a hacer clic dentro primero.
-      child: Focus(autofocus: true, child: child),
+      // sin obligar al usuario a hacer clic dentro primero. `FocusScope` y no
+      // `Focus`: si un campo de dentro pide el foco, se lo queda él.
+      child: FocusScope(autofocus: true, child: child),
     );
   }
 }

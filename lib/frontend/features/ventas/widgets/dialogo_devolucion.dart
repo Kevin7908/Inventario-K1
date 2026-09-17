@@ -20,6 +20,11 @@ import '../provider/devoluciones_providers.dart';
 /// **No es anular.** Anular deshace la factura entera; esto le quita una parte
 /// y la deja viva con su número.
 ///
+/// El interruptor «Vuelve al inventario» es lo que separa la pieza que se
+/// vuelve a vender de la que se le reclama al proveedor. Lo **propone** el
+/// motivo —una defectuosa nace apagado— y quien recibe lo cambia si la pieza
+/// resulta estar bien.
+///
 /// Parámetros:
 /// - [venta]: la factura contra la que se devuelve.
 ///
@@ -54,6 +59,12 @@ class _DialogoDevolucionState extends ConsumerState<DialogoDevolucion> {
   final Map<int, double> _cantidades = {};
 
   MotivoDevolucion _motivo = MotivoDevolucion.defectuoso;
+
+  /// Si la mercancía vuelve al estante. Arranca en lo que propone el motivo y
+  /// **se vuelve a poner cada vez que el motivo cambia**: el motivo es la
+  /// razón, así que es lo que manda mientras nadie diga otra cosa después.
+  bool _reingresa = MotivoDevolucion.defectuoso.reponeStockPorDefecto;
+
   bool _guardando = false;
   String? _error;
 
@@ -99,6 +110,7 @@ class _DialogoDevolucionState extends ConsumerState<DialogoDevolucion> {
                 ventaId: widget.venta.id,
                 motivo: _motivo,
                 lineas: elegidas,
+                reingresaStock: _reingresa,
                 notas: _notas.text,
               );
 
@@ -109,7 +121,10 @@ class _DialogoDevolucionState extends ConsumerState<DialogoDevolucion> {
           Navigator.of(context).pop(true);
           MensajeApp.exito(
             context,
-            'Devolución registrada. La mercancía volvió al inventario.',
+            _reingresa
+                ? 'Devolución registrada. La mercancía volvió al inventario.'
+                : 'Devolución registrada. La mercancía NO volvió al '
+                    'inventario: recuerda apartarla para el proveedor.',
           );
         case Fallo(:final mensaje):
           setState(() {
@@ -151,8 +166,8 @@ class _DialogoDevolucionState extends ConsumerState<DialogoDevolucion> {
         const Text('Recibir devolución', style: TipografiaApp.heading3),
         const SizedBox(height: 4),
         Text(
-          'Factura ${widget.venta.numeroFactura} · la mercancía vuelve al '
-          'inventario y la factura sigue viva.',
+          'Factura ${widget.venta.numeroFactura} · la factura sigue viva; lo '
+          'devuelto se le descuenta.',
           style: TipografiaApp.caption.copyWith(color: ColoresApp.textMuted),
         ),
         const SizedBox(height: 18),
@@ -181,8 +196,23 @@ class _DialogoDevolucionState extends ConsumerState<DialogoDevolucion> {
           opciones: [for (final m in MotivoDevolucion.values) m.codigo],
           constructorEtiqueta: (codigo) =>
               MotivoDevolucion.desdeCodigo(codigo).etiqueta,
-          alCambiar: (codigo) =>
-              setState(() => _motivo = MotivoDevolucion.desdeCodigo(codigo)),
+          alCambiar: (codigo) => setState(() {
+            _motivo = MotivoDevolucion.desdeCodigo(codigo);
+            // Cambiar el motivo vuelve a proponer lo suyo, aunque el
+            // interruptor ya se hubiera tocado: quien elige «defectuosa»
+            // después de «se arrepintió» está diciendo otra cosa.
+            _reingresa = _motivo.reponeStockPorDefecto;
+          }),
+        ),
+        const SizedBox(height: 12),
+        InterruptorCampo(
+          etiqueta: 'Vuelve al inventario',
+          detalle: _reingresa
+              ? 'La pieza está bien y se puede volver a vender'
+              : 'Se aparta para el proveedor: no vuelve al estante',
+          detalleEnUnaLinea: false,
+          valor: _reingresa,
+          alCambiar: (valor) => setState(() => _reingresa = valor),
         ),
         const SizedBox(height: 14),
         CampoTexto(

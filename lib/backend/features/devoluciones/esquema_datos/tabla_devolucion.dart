@@ -42,6 +42,29 @@ class TablaDevolucion extends Table {
   /// Uno de [MotivoDevolucion]. El `CHECK` sale del propio enum.
   TextColumn get motivo => text()();
 
+  /// Si la mercancía volvió al estante o se quedó fuera del inventario.
+  ///
+  /// Una pieza que llegó rota no se vuelve a vender: se le reclama al
+  /// proveedor. Sin esta columna, `MotivoDevolucion.defectuoso` se guardaba y
+  /// no cambiaba nada —la unidad volvía a `stock_actual` y quedaba
+  /// disponible—, que es el error que más caro sale de los que no dan error.
+  ///
+  /// **El motivo la propone, no la decide** (ver
+  /// `MotivoDevolucion.reponeStockPorDefecto`): «defectuosa» es lo que dijo el
+  /// cliente, y quien recibe puede ver que la pieza está bien.
+  ///
+  /// `DEFAULT true` porque es el caso corriente y porque las devoluciones que
+  /// existían antes de esta columna sí repusieron stock: el valor por defecto
+  /// tiene que decir la verdad sobre ellas.
+  ///
+  /// **En `false`, la unidad no se cuenta en ninguna parte**, y también es una
+  /// decisión: no hay un saldo de «defectuosas pendientes de reclamar». Saber
+  /// cuántas hay se resuelve filtrando las devoluciones. Contarlas en el
+  /// kardex pediría un tipo de movimiento que no sume a `stock_actual`, y con
+  /// eso, una segunda columna de stock.
+  BoolColumn get reingresaStock =>
+      boolean().withDefault(const Constant(true))();
+
   /// Lo que se le regresa al cliente, en pesos enteros.
   IntColumn get total => integer()();
 

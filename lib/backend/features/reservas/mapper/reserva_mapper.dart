@@ -27,6 +27,7 @@ class ReservaMapper {
       cotizacionId: row.cotizacionId,
       estado: EstadoReserva.desdeValor(row.estado),
       totalReserva: row.totalReserva,
+      iva: row.iva,
       pagadoAcumulado: row.pagadoAcumulado,
       creadoEn: row.creadoEn,
       fechaLimite: row.fechaLimite,
@@ -83,12 +84,14 @@ class ReservaMapper {
   }
 
   static TablaReservaItemCompanion itemACompanion({
+    required int usuarioId,
     required int reservaId,
     required int productoId,
     required double cantidad,
     required int precioUnitario,
   }) {
     return TablaReservaItemCompanion.insert(
+      usuarioId: usuarioId,
       reservaId: reservaId,
       productoId: productoId,
       cantidad: cantidad,

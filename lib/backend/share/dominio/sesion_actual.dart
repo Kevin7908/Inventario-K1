@@ -1,3 +1,4 @@
+import '../../../core/resultado.dart';
 import 'permiso.dart';
 import 'rol_usuario.dart';
 
@@ -79,6 +80,44 @@ mixin FirmaDeSesion {
   /// el `Future`, no.
   void exigir(Permiso permiso) {
     if (!puede(permiso)) throw PermisoDenegado(permiso);
+  }
+
+  /// Corre [operacion] y traduce a [Fallo] lo que pueda salir mal.
+  ///
+  /// Es el envoltorio de los métodos que devuelven `Resultado` (§8): deja
+  /// usar `exigir` y lanzar `Exception('…')` dentro de una transacción —que es
+  /// lo que la revierte entera— sin que cada método repita el mismo
+  /// `try/catch` de seis líneas.
+  ///
+  /// Los dos `catch` están separados a propósito. Un permiso que falta **no
+  /// es un fallo de persistencia**: la base nunca llegó a tocarse, y la vista
+  /// necesita poder distinguirlo para no decir «error al guardar» cuando lo
+  /// que pasó es que a la cuenta le falta una casilla.
+  ///
+  /// Ejemplo:
+  /// ```dart
+  /// Future<Resultado> eliminar(int id) => intentar(() async {
+  ///       exigir(Permiso.configuracionEditar);
+  ///       if (await _tieneUsos(id)) {
+  ///         return const Fallo(MotivoFallo.validacion, 'Está en uso.');
+  ///       }
+  ///       await _db.transaction(() => _borrar(id));
+  ///       return const Exito();
+  ///     });
+  /// ```
+  Future<Resultado> intentar(Future<Resultado> Function() operacion) async {
+    try {
+      return await operacion();
+    } on PermisoDenegado catch (e) {
+      return Fallo(MotivoFallo.validacion, e.mensaje);
+    } catch (e) {
+      // `Exception: ` delante de un mensaje ya redactado es ruido del
+      // lenguaje, no información para quien está en el mostrador.
+      return Fallo(
+        MotivoFallo.persistencia,
+        e.toString().replaceFirst('Exception: ', ''),
+      );
+    }
   }
 }
 

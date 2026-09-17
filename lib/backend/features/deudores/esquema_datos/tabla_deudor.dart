@@ -3,6 +3,7 @@ import 'package:drift/drift.dart';
 import '../../autenticacion/esquema_datos/tabla_usuario.dart';
 import '../../clientes/esquema_datos/tabla_cliente.dart';
 import '../../motos/esquema_datos/tabla_moto.dart';
+import '../../ordenes/esquema_datos/tabla_ordenes_servicio.dart';
 
 /// Lo que un cliente quedó debiendo por mercancía que **ya se llevó**, con sus
 /// líneas y sus abonos.
@@ -19,10 +20,12 @@ import '../../motos/esquema_datos/tabla_moto.dart';
 /// `descuadres()` son las consultas que afirman que coinciden —que es lo único
 /// que justifica tenerlos (§7 de `REGLAS_BD.md`)—.
 ///
-/// **La deuda nace en Cuentas por cobrar, no en una factura.** Hubo una
-/// columna `venta_id` que apuntaba a la venta que la originó; se quitó cuando
-/// el mostrador dejó de fiar —toda venta se cobra completa— y nadie volvió a
-/// escribirla.
+/// **La deuda nace en Cuentas por cobrar o al cerrar una orden a crédito.**
+/// Hubo una columna `venta_id` que apuntaba a la venta que la originó; se
+/// quitó cuando el mostrador dejó de fiar —toda venta se cobra completa— y
+/// nadie volvió a escribirla. [ordenId] sí se escribe, y es lo que impide el
+/// descuento doble: fiar lo que ya salió por una orden era anotar el mismo
+/// repuesto en dos sitios y descontarlo dos veces del inventario.
 ///
 /// `VENCIDA` es un estado guardado y a la vez calculable desde
 /// `fecha_vencimiento`. Se guarda porque el usuario puede marcar una deuda
@@ -47,6 +50,26 @@ class TablaDeudor extends Table {
   IntColumn get clienteId =>
       integer().references(TablaCliente, #id, onDelete: KeyAction.restrict)();
 
+  /// La orden de servicio que se cerró a crédito, cuando la deuda nació así.
+  ///
+  /// **`UNIQUE`**: una orden se fía una sola vez. Sin eso, cerrar dos veces la
+  /// misma orden abriría dos deudas por el mismo trabajo, y el `UNIQUE` de
+  /// una columna nulable no estorba a las deudas de mostrador —SQLite admite
+  /// tantos NULL como haga falta—.
+  ///
+  /// **`restrict`**: la orden que explica la deuda no se borra. Es lo mismo
+  /// que hace `ventas.orden_id`, y por lo mismo: sin ella, las líneas de la
+  /// deuda dejan de tener de dónde salieron.
+  ///
+  /// Las líneas de una deuda con orden **no mueven inventario**: el repuesto
+  /// salió del estante al anotarlo en la orden. Que no se pueda anotar dos
+  /// veces no lo garantiza esta columna sola, sino la guarda de
+  /// `guardas_sql.dart` que cierra sus líneas a la edición a mano.
+  IntColumn get ordenId => integer()
+      .nullable()
+      .unique()
+      .references(TablaOrdenesServicio, #id, onDelete: KeyAction.restrict)();
+
   /// En qué moto se montó lo fiado. `setNull`: es informativa —hay fiados de
   /// mostrador que no van a ninguna moto— y la deuda sigue en pie aunque la
   /// moto se borre.
@@ -65,6 +88,17 @@ class TablaDeudor extends Table {
 
   /// Caché de la suma de los abonos.
   IntColumn get montoPagado => integer().withDefault(const Constant(0))();
+
+  /// Rebaja sobre la suma de las líneas, en pesos. `monto_total` es
+  /// `SUM(líneas) − descuento`, y por eso [montoTotal] sigue siendo lo que el
+  /// cliente debe de verdad.
+  ///
+  /// Existe porque una orden puede llevar rebaja: sin esta columna, cerrar a
+  /// crédito una orden con descuento abriría una deuda por más de lo que el
+  /// documento dice. **No hay `CHECK (descuento <= …)`**, por lo mismo que en
+  /// `ordenes_servicio`: la suma de las líneas no es una columna y un `CHECK`
+  /// no puede consultarla. Lo recorta `RepositorioDeudores`.
+  IntColumn get descuento => integer().withDefault(const Constant(0))();
 
   /// `ACTIVA` | `VENCIDA` | `PAGADA` | `INCOBRABLE`.
   TextColumn get estado => text().withDefault(const Constant('ACTIVA'))();
@@ -94,6 +128,7 @@ class TablaDeudor extends Table {
         'CHECK (length(trim(numero)) > 0)',
         'CHECK (concepto IS NULL OR length(trim(concepto)) > 0)',
         'CHECK (monto_total >= 0 AND monto_pagado >= 0)',
+        'CHECK (descuento >= 0)',
         // Recibir más de lo debido es siempre un error de captura.
         'CHECK (monto_pagado <= monto_total)',
       ];

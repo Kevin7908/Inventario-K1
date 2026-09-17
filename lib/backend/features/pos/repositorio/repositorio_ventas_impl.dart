@@ -9,6 +9,7 @@ import '../../inventario/repositorio/repositorio_inventario.dart';
 import '../../inventario/repositorio/repositorio_inventario_impl.dart';
 import '../enum/enum_ventas.dart';
 import '../mapper/ventas_mapper.dart';
+import '../modelo/linea_venta_documento.dart';
 import '../modelo/linea_venta_mostrador.dart';
 import '../modelo/venta_detalle.dart';
 import '../modelo/venta_resumen.dart';
@@ -72,7 +73,14 @@ class RepositorioVentasImpl with FirmaDeSesion implements RepositorioVentas {
     SELECT
       v.*,
       COALESCE(pe.nombres || ' ' || COALESCE(pe.apellidos, ''), '— Sin cliente —') AS cliente_nombre,
+      pe.tipo_documento AS cliente_tipo_documento,
+      pe.documento      AS cliente_documento,
+      pe.direccion      AS cliente_direccion,
+      pe.ciudad         AS cliente_ciudad,
+      pe.telefono       AS cliente_telefono,
+      pe.email          AS cliente_correo,
       TRIM(pu.nombres || ' ' || COALESCE(pu.apellidos, '')) AS cajero,
+      TRIM(pv.nombres || ' ' || COALESCE(pv.apellidos, '')) AS vendedor,
       COALESCE((SELECT SUM(d.total) FROM devoluciones d WHERE d.venta_id = v.id), 0)
         AS total_devuelto
     FROM ventas v
@@ -80,6 +88,8 @@ class RepositorioVentasImpl with FirmaDeSesion implements RepositorioVentas {
     LEFT JOIN personas pe ON pe.id = c.persona_id
     INNER JOIN usuarios u  ON u.id  = v.usuario_id
     INNER JOIN personas pu ON pu.id = u.persona_id
+    LEFT  JOIN usuarios uv ON uv.id = v.vendedor_id
+    LEFT  JOIN personas pv ON pv.id = uv.persona_id
   ''';
 
   /// Las tablas que hacen re-emitir el stream. Si falta una, el historial no
@@ -118,8 +128,17 @@ class RepositorioVentasImpl with FirmaDeSesion implements RepositorioVentas {
 
     // Dos consultas: el total no lo puede recortar el `LIMIT`, o el paginador
     // diría que hay una página cuando hay veinte.
+    //
+    // El `SUM` viaja con el `COUNT` y no en una tercera consulta: los dos
+    // hablan del mismo conjunto filtrado y separarlos abriría la puerta a que
+    // un día filtren distinto. Se resta lo devuelto y se descartan las
+    // anuladas: lo que interesa es la plata que quedó en el cajón.
     final consultaTotal = _db.customSelect(
-      'SELECT COUNT(*) AS total FROM ventas v '
+      'SELECT COUNT(*) AS total, '
+      "COALESCE(SUM(CASE WHEN v.estado_pago = 'ANULADA' THEN 0 ELSE "
+      'v.total - COALESCE((SELECT SUM(d.total) FROM devoluciones d '
+      'WHERE d.venta_id = v.id), 0) END), 0) AS suma_neta '
+      'FROM ventas v '
       'LEFT JOIN clientes c ON c.id = v.cliente_id '
       'LEFT JOIN personas pe ON pe.id = c.persona_id '
       'INNER JOIN usuarios u ON u.id = v.usuario_id '
@@ -141,11 +160,14 @@ class RepositorioVentasImpl with FirmaDeSesion implements RepositorioVentas {
         )
         .watch()
         .asyncMap((filas) async {
-      final total = await consultaTotal.getSingleOrNull();
+      final agregados = await consultaTotal.getSingleOrNull();
       return PaginaVentas(
         items:
             VentasMapper.resumenesDesdeMapas(filas.map((f) => f.data).toList()),
-        total: total?.data['total'] as int? ?? 0,
+        total: agregados?.data['total'] as int? ?? 0,
+        // `SUM` sobre columnas enteras devuelve entero, pero SQLite no lo
+        // promete si algún día alguna fuera REAL: se lee como `num`.
+        sumaNeta: (agregados?.data['suma_neta'] as num?)?.round() ?? 0,
       );
     });
   }
@@ -201,10 +223,24 @@ class RepositorioVentasImpl with FirmaDeSesion implements RepositorioVentas {
         .getSingleOrNull();
     if (ventaRow == null) throw Exception('Venta #$id no encontrada.');
 
+    // El SKU y la unidad se leen del catálogo, no de la línea: la factura los
+    // enseña para que el cliente pueda volver a pedir la misma pieza, y eso es
+    // la ficha de hoy. Lo que sí está congelado en la línea es la descripción.
+    // `LEFT JOIN` en los dos: un producto borrado no puede dejar sin imprimir
+    // una factura que ya se emitió.
     final itemsRows = await _db
         .customSelect(
-          'SELECT * FROM venta_detalles WHERE venta_id = ? ORDER BY id',
+          'SELECT d.*, p.sku AS sku, u.abreviatura AS unidad '
+          'FROM venta_detalles d '
+          'LEFT JOIN productos p ON p.id = d.producto_id '
+          'LEFT JOIN unidades_medida u ON u.id = p.unidad_medida_id '
+          'WHERE d.venta_id = ? ORDER BY d.id',
           variables: [Variable.withInt(id)],
+          readsFrom: {
+            _tablaItems,
+            _db.tablaProducto,
+            _db.tablaUnidadesMedida,
+          },
         )
         .get();
 
@@ -232,10 +268,16 @@ class RepositorioVentasImpl with FirmaDeSesion implements RepositorioVentas {
     required List<LineaVentaMostrador> lineas,
     required MetodoPago metodoPago,
     int? clienteId,
+    int? vendedorId,
     int iva = 0,
     int descuento = 0,
   }) {
     exigir(Permiso.posVender);
+
+    // Rebajar el total es una decisión aparte de cobrar: es la plata del
+    // taller. Solo se exige cuando de verdad hay rebaja, para que una cuenta
+    // sin el permiso siga pudiendo cobrar a precio de lista.
+    if (descuento > 0) exigir(Permiso.posDescuento);
 
     if (lineas.isEmpty) {
       throw Exception('La venta no tiene productos.');
@@ -245,6 +287,9 @@ class RepositorioVentasImpl with FirmaDeSesion implements RepositorioVentas {
     return _db.transaction(() async {
       final ventaId = await _crearCabecera(
         clienteId: clienteId,
+        // `null` cuando vende el mismo que cobra, que es el caso normal: la
+        // columna guarda la excepción, no la repetición.
+        vendedorId: vendedorId == autorId ? null : vendedorId,
         metodoPago: metodoPago,
         iva: iva,
         descuento: descuento,
@@ -275,6 +320,120 @@ class RepositorioVentasImpl with FirmaDeSesion implements RepositorioVentas {
     });
   }
 
+  @override
+  Future<VentaResumen?> ventaDeDocumento({
+    int? ordenId,
+    int? deudorId,
+    int? reservaId,
+  }) async {
+    final (columna, valor) = switch ((ordenId, deudorId, reservaId)) {
+      (final int id, null, null) => ('orden_id', id),
+      (null, final int id, null) => ('deudor_id', id),
+      (null, null, final int id) => ('reserva_id', id),
+      _ => throw ArgumentError(
+          'Hay que preguntar por exactamente un documento.',
+        ),
+    };
+
+    final fila = await _db
+        .customSelect(
+          '$_sqlSelectResumen WHERE v.$columna = ?',
+          variables: [Variable.withInt(valor)],
+          readsFrom: _tablasDelResumen,
+        )
+        .getSingleOrNull();
+
+    return fila == null ? null : VentasMapper.resumenDesdeMap(fila.data);
+  }
+
+  @override
+  Future<VentaResumen> registrarVentaDeDocumento({
+    required TipoVenta tipo,
+    required List<LineaVentaDocumento> lineas,
+    required MetodoPago metodoPago,
+    int? clienteId,
+    int? ordenId,
+    int? deudorId,
+    int? reservaId,
+    required int subtotal,
+    int descuento = 0,
+    int iva = 0,
+  }) async {
+    exigir(Permiso.posVender);
+
+    if (lineas.isEmpty) {
+      throw Exception('El documento no tiene líneas que facturar.');
+    }
+
+    // Un documento se factura una vez. La garantía real es el `UNIQUE` de la
+    // columna; esto evita llegar a él con un error de SQLite que no se le
+    // puede enseñar a nadie, y hace que entregar dos veces la misma orden
+    // devuelva su factura en vez de reventar.
+    final yaEmitida = await ventaDeDocumento(
+      ordenId: ordenId,
+      deudorId: deudorId,
+      reservaId: reservaId,
+    );
+    if (yaEmitida != null) return yaEmitida;
+
+    return _db.transaction(() async {
+      final ventaId = await _db.into(_tablaVentas).insert(
+            VentasMapper.companionDeDocumento(
+              usuarioId: autorId,
+              numeroFactura:
+                  await _consecutivos.siguiente(DocumentoConsecutivo.factura),
+              tipo: tipo,
+              clienteId: clienteId,
+              ordenId: ordenId,
+              deudorId: deudorId,
+              reservaId: reservaId,
+              metodoPago: metodoPago,
+              iva: iva,
+              descuento: descuento,
+            ),
+          );
+
+      for (final linea in lineas) {
+        // **Sin `_agregarLinea`**: ese verifica y descuenta stock, y aquí la
+        // mercancía ya salió cuando se anotó en su documento. Descontarla otra
+        // vez dejaría el inventario en negativo.
+        await _db.into(_tablaItems).insert(
+              VentasMapper.itemDocumentoCompanion(
+                ventaId: ventaId,
+                linea: linea,
+              ),
+            );
+      }
+
+      // Los importes son los del documento y **no se recalculan**: la orden se
+      // cerró con su descuento y su IVA del día, y la factura tiene que decir
+      // lo mismo que se cobró. Es lo contrario que en el mostrador, donde el
+      // total sale de las líneas que quedaron guardadas.
+      final total = subtotal - descuento + iva;
+      await (_db.update(_tablaVentas)..where((t) => t.id.equals(ventaId)))
+          .write(
+        TablaVentasCompanion(
+          subtotal: Value(subtotal),
+          descuento: Value(descuento),
+          iva: Value(iva),
+          total: Value(total),
+          totalPagado: Value(total),
+          estadoPago: Value(EstadoPago.pagado.aTexto),
+          actualizadoEn: Value(DateTime.now()),
+        ),
+      );
+
+      final resumen = await _obtenerResumenPorId(ventaId);
+      await _anotar(
+        AccionAuditada.creo,
+        ventaId,
+        'Factura ${resumen.numeroFactura}',
+        detalle: 'Cierre de ${tipo.etiqueta.toLowerCase()}',
+      );
+      return resumen;
+    });
+  }
+
   /// Inserta la cabecera y devuelve su `id`.
   ///
   /// El número se pide **antes** de insertar. Antes se guardaba `'FAC-TEMP'` y
@@ -282,6 +441,7 @@ class RepositorioVentasImpl with FirmaDeSesion implements RepositorioVentas {
   /// cualquier `INSERT` fallido se saltaba un número para siempre.
   Future<int> _crearCabecera({
     int? clienteId,
+    int? vendedorId,
     required MetodoPago metodoPago,
     required int iva,
     required int descuento,
@@ -292,6 +452,7 @@ class RepositorioVentasImpl with FirmaDeSesion implements RepositorioVentas {
             numeroFactura:
                 await _consecutivos.siguiente(DocumentoConsecutivo.factura),
             clienteId: clienteId,
+            vendedorId: vendedorId,
             metodoPago: metodoPago,
             iva: iva,
             descuento: descuento,
@@ -348,9 +509,14 @@ class RepositorioVentasImpl with FirmaDeSesion implements RepositorioVentas {
               ..where((t) => t.ventaId.equals(id)))
             .get();
 
-        // Lo que una devolución parcial ya repuso **no se repone otra vez**.
-        // Sin este descuento, vender 5, devolver 2 y anular después dejaba 7
-        // en la estantería: el libro mayor lo contaba dos veces.
+        // Lo que el cliente ya trajo de vuelta **no vuelve otra vez**. Sin
+        // este descuento, vender 5, devolver 2 y anular después dejaba 7 en la
+        // estantería: el libro mayor lo contaba dos veces.
+        //
+        // Se descuenta lo devuelto **aunque no haya repuesto stock**
+        // (`devoluciones.reingresa_stock` en `false`, la pieza rota que se le
+        // reclama al proveedor): esas unidades tampoco están en manos del
+        // cliente, así que anular no tiene nada que reponer por ellas.
         final yaDevuelto = await _devueltoPorLinea(id);
 
         for (final item in items) {
@@ -462,15 +628,17 @@ class RepositorioVentasImpl with FirmaDeSesion implements RepositorioVentas {
         ? subtotal
         : (ventaRow.descuento < 0 ? 0 : ventaRow.descuento);
 
-    // Los precios ya traen el IVA dentro (`iva_app.dart`): el total no se lo
-    // suma, y la columna `iva` guarda cuánto va contenido en él.
-    final total = subtotal - descuento;
+    // El precio del catálogo es la base gravable (`iva_app.dart`): el
+    // descuento se resta antes del impuesto y el total lo lleva sumado.
+    final base = subtotal - descuento;
+    final iva = ivaSobre(base);
+    final total = base + iva;
 
     await (_db.update(_tablaVentas)..where((t) => t.id.equals(ventaId))).write(
       TablaVentasCompanion(
         subtotal: Value(subtotal),
         descuento: Value(descuento),
-        iva: Value(ivaIncluidoEn(total)),
+        iva: Value(iva),
         total: Value(total),
         actualizadoEn: Value(DateTime.now()),
       ),

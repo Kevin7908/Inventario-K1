@@ -6,31 +6,11 @@ import '../modelo/producto.dart';
 class ProductoMapper {
   ProductoMapper._(); // clase utilitaria, no instanciar
 
-  static Producto filaAModelo(TablaProductoData fila) {
-    return Producto(
-      id: fila.id,
-      sku: fila.sku,
-      nombre: fila.nombre,
-      descripcion: fila.descripcion,
-      categoriaId: fila.categoriaId,
-      unidadMedidaId: fila.unidadMedidaId,
-      proveedorId: fila.proveedorId,
-      categoriaNombre: null,
-      unidadMedidaNombre: null,
-      proveedorNombre: null,
-      precioCompra: fila.precioCompra,
-      precioVenta: fila.precioVenta,
-      precioVentaTaller: fila.precioVentaTaller,
-      stockActual: fila.stockActual,
-      stockMinimo: fila.stockMinimo,
-      ubicacionBodega: fila.ubicacionBodega,
-      imagenUrl: fila.imagenUrl,
-      aplicaIva: fila.aplicaIva,
-      activo: fila.activo,
-      creadoEn: fila.creadoEn,
-      actualizadoEn: fila.actualizadoEn,
-    );
-  }
+  // `filaAModelo` se fue. Leía una fila pelada de `productos` y desde que el
+  // proveedor vive en `producto_proveedores` devolvía un modelo a medias: sin
+  // proveedor, sin categoría y sin unidad. Sus dos llamadores —`obtenerPorId`
+  // y `obtenerPorSku`— pasaron al JOIN, que es lo que necesitaban desde el
+  // principio: quien pide un producto lo pide para enseñarlo.
 
   // Lectura con JOIN
   // Usada por: obtenerTodos, observarTodos, observarConStockBajo,
@@ -45,16 +25,20 @@ class ProductoMapper {
     // El proveedor aporta la fila de rol, pero su razón social está en
     // `personas`: por eso se lee esa y no `tablaProveedor`.
     final proveedor = resultado.readTableOrNull(db.tablaPersona);
+    final vinculo = resultado.readTableOrNull(db.tablaProductoProveedor);
     final unidad = resultado.readTableOrNull(db.tablaUnidadesMedida);
 
     return Producto(
       id: fila.id,
       sku: fila.sku,
+      codigoBarras: fila.codigoBarras,
       nombre: fila.nombre,
       descripcion: fila.descripcion,
       categoriaId: fila.categoriaId,
       unidadMedidaId: fila.unidadMedidaId,
-      proveedorId: fila.proveedorId,
+      // El principal, resuelto desde `producto_proveedores`. Es lectura, como
+      // `categoriaNombre`: escribirlo lo hace `fijarProveedorPrincipal`.
+      proveedorId: vinculo?.proveedorId,
       // Nombres hidratados directamente desde SQL — O(N) real
       categoriaNombre: categoria?.nombre,
       unidadMedidaNombre: unidad != null
@@ -68,7 +52,6 @@ class ProductoMapper {
       stockMinimo: fila.stockMinimo,
       ubicacionBodega: fila.ubicacionBodega,
       imagenUrl: fila.imagenUrl,
-      aplicaIva: fila.aplicaIva,
       activo: fila.activo,
       creadoEn: fila.creadoEn,
       actualizadoEn: fila.actualizadoEn,
@@ -79,14 +62,21 @@ class ProductoMapper {
   // Convierte el modelo al Companion de Drift para INSERT / UPDATE.
   // Los nombres desnormalizados (categoriaNombre, proveedorNombre,
   // unidadMedidaNombre) se ignoran explícitamente: no existen en la tabla.
+  // `proveedorId` tampoco: dejó de ser una columna de `productos`.
   static TablaProductoCompanion modeloACompanion(Producto p) {
     return TablaProductoCompanion(
       sku: Value(p.sku),
+      // Normalizado aquí y no en el formulario: un lector que mande
+      // «7 702001 234567» y otro que mande «7702001234567» tienen que
+      // encontrar el mismo producto (`REGLAS_BD.md` §2).
+      codigoBarras: Value(normalizarCodigoBarras(p.codigoBarras)),
       nombre: Value(p.nombre),
       descripcion: Value(p.descripcion),
       categoriaId: Value(p.categoriaId),
       unidadMedidaId: Value(p.unidadMedidaId),
-      proveedorId: Value(p.proveedorId),
+      // `proveedorId` **no** se escribe aquí: la relación vive en
+      // `producto_proveedores` y la escribe `fijarProveedorPrincipal`, dentro
+      // de la misma transacción del guardado.
       precioCompra: Value(p.precioCompra),
       precioVenta: Value(p.precioVenta),
       precioVentaTaller: Value(p.precioVentaTaller),
@@ -96,7 +86,6 @@ class ProductoMapper {
       stockMinimo: Value(p.stockMinimo),
       ubicacionBodega: Value(p.ubicacionBodega),
       imagenUrl: Value(p.imagenUrl),
-      aplicaIva: Value(p.aplicaIva),
       activo: Value(p.activo),
       // `creadoEn` solo se manda si ya existe: en el alta lo pone el default
       // de la tabla. `actualizadoEn` se toca en todas las escrituras.
@@ -104,4 +93,13 @@ class ProductoMapper {
       actualizadoEn: Value(DateTime.now()),
     );
   }
+}
+/// Deja un código de barras como se guarda: sin espacios ni guiones, o `null`
+/// si no queda nada.
+///
+/// Vive fuera de la clase para que lo comparta quien **busque** por código: si
+/// se guarda normalizado y se busca en crudo, el lector nunca encuentra nada.
+String? normalizarCodigoBarras(String? valor) {
+  final limpio = (valor ?? '').replaceAll(RegExp(r'[\s-]'), '');
+  return limpio.isEmpty ? null : limpio;
 }

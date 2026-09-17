@@ -1,11 +1,18 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../../../core/resultado.dart';
 import '../../../../share/share.dart';
+import '../../../documentos/provider/documentos_providers.dart';
+import '../../../documentos/traductores/orden_a_documento.dart';
+import '../../../documentos/widgets/dialogo_vista_previa.dart';
+import '../../provider/ordenes_providers.dart';
 import '../modelo/orden_editor_state.dart';
 import '../provider/orden_editor_provider.dart';
+import '../widgets/dialogo_cerrar_credito.dart';
 import '../widgets/panel_catalogo_orden.dart';
 import '../widgets/panel_orden.dart';
 
@@ -67,6 +74,55 @@ class _OrdenDetalleVistaState extends ConsumerState<OrdenDetalleVista> {
     widget.alCerrar();
   }
 
+  /// Abre la orden impresa: el papel que se entrega con la moto.
+  ///
+  /// Guarda antes lo que esté pendiente. El editor escribe con retardo, así
+  /// que sin esto la última tarea agregada podría no salir en el impreso.
+  Future<void> _imprimir() async {
+    await ref.read(ordenEditorProvider(widget.ordenId).notifier).guardarAhora();
+    if (!mounted) return;
+
+    try {
+      final orden =
+          await ref.read(ordenDetalleProvider(widget.ordenId).future);
+      final ajustes = await leerAjustesImpresion(
+        ref.read(repositorioConfiguracionProvider),
+      );
+      if (!mounted) return;
+
+      await DialogoVistaPrevia.mostrar(
+        context,
+        documento: documentoDeOrden(orden: orden, negocio: ajustes.negocio),
+        formato: ajustes.formato,
+      );
+    } catch (e) {
+      if (!mounted) return;
+      _avisar('No se pudo abrir la orden: $e', esError: true);
+    }
+  }
+
+  /// Fía la orden entera: abre la deuda con estas líneas dentro y cierra el
+  /// editor.
+  ///
+  /// **El inventario no se vuelve a mover**: los repuestos salieron del
+  /// estante al anotarse aquí. Al terminar se sale del editor porque la orden
+  /// queda `ENTREGADA` y ya no admite cambios; lo que siga se hace en la
+  /// deuda.
+  Future<void> _cerrarACredito() async {
+    final estado = ref.read(ordenEditorProvider(widget.ordenId)).value;
+    if (estado == null) return;
+
+    final fiada = await DialogoCerrarACredito.mostrar(
+      context,
+      ordenId: widget.ordenId,
+      numero: estado.numero,
+      total: estado.total,
+    );
+    if (fiada != true || !mounted) return;
+
+    widget.alCerrar();
+  }
+
   @override
   Widget build(BuildContext context) {
     final provider = ordenEditorProvider(widget.ordenId);
@@ -102,8 +158,8 @@ class _OrdenDetalleVistaState extends ConsumerState<OrdenDetalleVista> {
                   ),
                   PanelOrden(
                     ordenId: widget.ordenId,
-                    alImprimir: () =>
-                        _avisar('Próximamente: vista previa en PDF.'),
+                    alImprimir: () => unawaited(_imprimir()),
+                    alCerrarACredito: () => unawaited(_cerrarACredito()),
                   ),
                 ],
               ),

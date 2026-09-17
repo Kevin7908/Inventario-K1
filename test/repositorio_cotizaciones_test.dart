@@ -91,7 +91,6 @@ void main() {
         precioVenta: 10000,
         stockActual: 0,
         stockMinimo: 0,
-        aplicaIva: false,
         activo: true,
       ),
     ))
@@ -250,14 +249,28 @@ void main() {
   });
 
   group('IVA', () {
-    test('la cotización guarda el IVA de la tasa global', () async {
+    tearDown(() => configurarIva(0));
+
+    test('la cotización guarda el IVA de la tasa del día', () async {
+      configurarIva(19);
       final id = await _cotizacion(diasDeVigencia: 30, precio: 100000);
       final detalle = await repo.obtenerDetalle(id);
 
       expect(detalle.resumen.subtotal, 100000);
-      expect(detalle.resumen.iva, ivaIncluidoEn(100000));
-      expect(detalle.resumen.total, 100000,
-          reason: 'el precio ya trae el IVA dentro');
+      expect(detalle.resumen.iva, 19000);
+      expect(detalle.resumen.total, 119000,
+          reason: 'el precio es la base y el impuesto se le suma');
+    });
+
+    test('bajar la tasa después no reescribe la cotización de ayer', () async {
+      configurarIva(19);
+      final id = await _cotizacion(diasDeVigencia: 30, precio: 100000);
+
+      configurarIva(0);
+      final detalle = await repo.obtenerDetalle(id);
+
+      expect(detalle.resumen.iva, 19000, reason: 'el IVA es el de su día');
+      expect(detalle.resumen.total, 119000);
     });
   });
 
@@ -360,7 +373,6 @@ void main() {
           precioVenta: 32000,
           stockActual: 12,
           stockMinimo: 2,
-          aplicaIva: false,
           activo: true,
         ),
       );
@@ -415,7 +427,6 @@ void main() {
           precioVenta: 45000,
           stockActual: 0,
           stockMinimo: 1,
-          aplicaIva: false,
           activo: true,
         ),
       );

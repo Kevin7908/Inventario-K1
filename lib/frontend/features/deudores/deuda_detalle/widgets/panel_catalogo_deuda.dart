@@ -32,6 +32,7 @@ class PanelCatalogoDeuda extends ConsumerWidget {
       deudaEditorProvider(deudaId).select((s) => (
             panel: s.value?.seccionActiva ?? SeccionDeuda.productos,
             editable: s.value?.editable ?? false,
+            motivo: s.value?.motivoNoEditable,
           )),
     );
 
@@ -68,9 +69,16 @@ class PanelCatalogoDeuda extends ConsumerWidget {
                         panel: vista.panel,
                         conPadding: false,
                       ),
+                      // Por qué el panel está apagado: cerrada, o copia de
+                      // una orden. Decir cuál evita que el usuario busque el
+                      // botón que le falta.
                       if (!vista.editable) ...[
                         const SizedBox(height: 12),
-                        const _AvisoCerrada(),
+                        AvisoEnLinea(
+                          mensaje: vista.motivo ??
+                              'La deuda está cerrada: no admite más repuestos.',
+                          tono: TonoAviso.alerta,
+                        ),
                       ],
                       const SizedBox(height: 16),
                       Expanded(
@@ -162,35 +170,6 @@ class _BarraState extends ConsumerState<_Barra> {
               alCambiar: _notifier.buscarEnCatalogo,
             ),
           ],
-        ],
-      ),
-    );
-  }
-}
-
-/// Por qué el panel está apagado.
-class _AvisoCerrada extends StatelessWidget {
-  const _AvisoCerrada();
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
-      decoration: BoxDecoration(
-        color: ColoresApp.statusWarningBg,
-        borderRadius: BorderRadius.circular(10),
-      ),
-      child: const Row(
-        children: [
-          Icon(Icons.lock_outline_rounded,
-              size: 15, color: ColoresApp.statusWarning),
-          SizedBox(width: 8),
-          Expanded(
-            child: Text(
-              'La deuda está cerrada: no admite más repuestos.',
-              style: TipografiaApp.caption,
-            ),
-          ),
         ],
       ),
     );

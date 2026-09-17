@@ -50,6 +50,7 @@ final class MovimientosState {
     this.desde,
     this.hasta,
     this.productoId,
+    this.usuarioId,
   });
 
   final List<MovimientoDetalle> items;
@@ -64,6 +65,10 @@ final class MovimientosState {
   final DateTime? hasta;
   final int? productoId;
 
+  /// Quién movió el stock. Ya estaba resuelto en SQL y con su índice; lo que
+  /// faltaba era el desplegable que lo eligiera.
+  final int? usuarioId;
+
   int get totalPaginas =>
       total <= 0 ? 1 : (total + tamanoPagina - 1) ~/ tamanoPagina;
 
@@ -76,6 +81,7 @@ final class MovimientosState {
         desde: desde,
         hasta: hasta,
         busqueda: busqueda,
+        usuarioId: usuarioId,
       );
 
   /// Los campos que se pueden **quitar** llevan un `bool` aparte: con solo el
@@ -95,6 +101,8 @@ final class MovimientosState {
     bool limpiarHasta = false,
     int? productoId,
     bool limpiarProducto = false,
+    int? usuarioId,
+    bool limpiarUsuario = false,
   }) =>
       MovimientosState(
         items: items ?? this.items,
@@ -108,6 +116,7 @@ final class MovimientosState {
         desde: limpiarDesde ? null : (desde ?? this.desde),
         hasta: limpiarHasta ? null : (hasta ?? this.hasta),
         productoId: limpiarProducto ? null : (productoId ?? this.productoId),
+        usuarioId: limpiarUsuario ? null : (usuarioId ?? this.usuarioId),
       );
 }
 
@@ -184,6 +193,17 @@ class MovimientosNotifier extends AsyncNotifier<MovimientosState> {
     ));
   }
 
+  /// Quién movió el stock. `null` vuelve a «cualquiera».
+  void filtrarPorUsuario(int? usuarioId) {
+    final actual = state.value;
+    if (actual == null || actual.usuarioId == usuarioId) return;
+    _aplicar(actual.copyWith(
+      usuarioId: usuarioId,
+      limpiarUsuario: usuarioId == null,
+      pagina: 0,
+    ));
+  }
+
   void filtrarPorSentido(bool? soloEntradas) {
     final actual = state.value;
     if (actual == null) return;
@@ -236,4 +256,67 @@ final movimientosProvider =
 final movimientosPaginaProvider = Provider<List<MovimientoDetalle>>(
   name: 'movimientosPaginaProvider',
   (ref) => ref.watch(movimientosProvider).value?.items ?? const [],
+);
+
+/// El kardex **de un repuesto**, paginado.
+///
+/// Es aparte de [movimientosProvider] y no un filtro suyo a propósito: aquel
+/// es la pantalla de Movimientos, con sus filtros puestos por quien la está
+/// mirando, y abrir el historial de un producto desde su ficha no puede
+/// cambiárselos por debajo. Aquí el producto va fijo y lo único que se mueve
+/// es la página.
+///
+/// `family` por id y `autoDispose`: se abre desde una ficha y se cierra con
+/// ella.
+class KardexProductoNotifier extends AsyncNotifier<PaginaMovimientos> {
+  KardexProductoNotifier(this.productoId);
+
+  final int productoId;
+
+  /// `late` **sin `final`**: Riverpod conserva la instancia y vuelve a llamar
+  /// a `build()` cuando el provider se invalida.
+  late RepositorioInventario _repo;
+  StreamSubscription<PaginaMovimientos>? _sub;
+
+  /// Página visible, de base cero.
+  int _pagina = 0;
+  int get pagina => _pagina;
+
+  static const tamanoPagina = 15;
+
+  @override
+  Future<PaginaMovimientos> build() async {
+    _repo = ref.watch(repositorioInventarioProvider);
+    ref.onDispose(() => _sub?.cancel());
+
+    final primera = await _flujo().first;
+    _suscribir();
+    return primera;
+  }
+
+  Stream<PaginaMovimientos> _flujo() => _repo.observarPagina(
+        filtro: FiltroMovimientos(productoId: productoId),
+        pagina: _pagina,
+        tamano: tamanoPagina,
+      );
+
+  void _suscribir() {
+    _sub?.cancel();
+    _sub = _flujo().listen(
+      (pagina) => state = AsyncData(pagina),
+      onError: (Object e, StackTrace st) => state = AsyncError(e, st),
+    );
+  }
+
+  void irAPagina(int pagina) {
+    if (pagina < 0 || pagina == _pagina) return;
+    _pagina = pagina;
+    _suscribir();
+  }
+}
+
+final kardexProductoProvider = AsyncNotifierProvider.autoDispose
+    .family<KardexProductoNotifier, PaginaMovimientos, int>(
+  KardexProductoNotifier.new,
+  name: 'kardexProductoProvider',
 );

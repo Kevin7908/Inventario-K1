@@ -48,7 +48,6 @@ Producto _producto({int? categoriaId, int? proveedorId}) => Producto(
       precioVenta: 2000,
       stockActual: 10,
       stockMinimo: 3,
-      aplicaIva: true,
       activo: true,
     );
 

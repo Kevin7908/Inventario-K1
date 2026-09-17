@@ -50,17 +50,28 @@ Future<int> _venta({double cantidad = 5, int precio = 30000}) async {
   return resumen.id;
 }
 
-Future<Resultado> _devolver(int ventaId, double cantidad) async {
+/// Devuelve [cantidad] de la única línea de la venta.
+///
+/// El motivo por defecto es «No era la pieza» y no «Llegó defectuosa» a
+/// propósito: la pieza está bien y vuelve al estante, que es el caso que mira
+/// la mayoría de estos tests. Lo defectuoso tiene su grupo aparte.
+Future<Resultado> _devolver(
+  int ventaId,
+  double cantidad, {
+  MotivoDevolucion motivo = MotivoDevolucion.equivocado,
+  bool? reingresaStock,
+}) async {
   final lineas = await devoluciones.lineasDevolvibles(ventaId);
   return devoluciones.registrar(
     ventaId: ventaId,
-    motivo: MotivoDevolucion.defectuoso,
+    motivo: motivo,
     lineas: [
       LineaADevolver(
         ventaDetalleId: lineas.single.ventaDetalleId,
         cantidad: cantidad,
       ),
     ],
+    reingresaStock: reingresaStock,
   );
 }
 
@@ -136,7 +147,7 @@ void main() {
 
       expect(documento.total, 60000);
       expect(documento.numero, startsWith('DEV-'));
-      expect(documento.motivo, MotivoDevolucion.defectuoso);
+      expect(documento.motivo, MotivoDevolucion.equivocado);
       expect(documento.lineas.single.descripcion, 'Pastilla de freno');
       expect(documento.recibidoPor, isNotEmpty);
     });
@@ -171,6 +182,104 @@ void main() {
 
       expect(await _stock(), 20);
       expect((await devoluciones.lineasDevolvibles(ventaId)).single.disponible, 0);
+    });
+  });
+
+  group('la pieza rota no vuelve al estante', () {
+    // Era el hueco más caro de los que no dan error: `MotivoDevolucion
+    // .defectuoso` se guardaba y no cambiaba nada, así que la pastilla que
+    // llegó rota volvía a `stock_actual` y quedaba lista para venderse otra
+    // vez. En un taller esa pieza se le reclama al proveedor.
+
+    test('con motivo defectuoso el stock no se mueve, pero el documento sí',
+        () async {
+      final ventaId = await _venta(cantidad: 5);
+      expect(await _stock(), 15);
+
+      expect(
+        await _devolver(ventaId, 2, motivo: MotivoDevolucion.defectuoso),
+        isA<Exito>(),
+      );
+
+      // Ni una unidad de vuelta al estante...
+      expect(await _stock(), 15);
+      // ...y ni un movimiento que lo cuente: el libro mayor sigue cuadrando
+      // porque no pasó nada, no porque se haya tapado algo.
+      expect(await inventario.descuadres(), isEmpty);
+
+      // Pero la plata sí se le devolvió al cliente, y el documento existe.
+      final documento =
+          (await devoluciones.observarPorVenta(ventaId).first).single;
+      expect(documento.total, 60000);
+      expect(documento.reingresaStock, isFalse);
+    });
+
+    test('la garantía tampoco repone', () async {
+      final ventaId = await _venta(cantidad: 5);
+
+      await _devolver(ventaId, 1, motivo: MotivoDevolucion.garantia);
+
+      expect(await _stock(), 15);
+    });
+
+    test('quien recibe puede decir que la pieza sí sirve', () async {
+      // «Defectuosa» es lo que dijo el cliente. A veces la pieza está bien, y
+      // el interruptor es lo que deja corregirlo sin inventar otro motivo.
+      final ventaId = await _venta(cantidad: 5);
+
+      await _devolver(
+        ventaId,
+        2,
+        motivo: MotivoDevolucion.defectuoso,
+        reingresaStock: true,
+      );
+
+      expect(await _stock(), 17);
+      expect(
+        (await devoluciones.observarPorVenta(ventaId).first)
+            .single
+            .reingresaStock,
+        isTrue,
+      );
+    });
+
+    test('y al revés: una pieza sana puede quedarse fuera', () async {
+      final ventaId = await _venta(cantidad: 5);
+
+      await _devolver(
+        ventaId,
+        2,
+        motivo: MotivoDevolucion.equivocado,
+        reingresaStock: false,
+      );
+
+      expect(await _stock(), 15);
+    });
+
+    test('lo devuelto sin reponer igual cuenta como devuelto', () async {
+      // Dos cosas distintas: la unidad no volvió al estante, pero tampoco
+      // está en manos del cliente. No se puede devolver dos veces.
+      final ventaId = await _venta(cantidad: 5);
+
+      await _devolver(ventaId, 5, motivo: MotivoDevolucion.defectuoso);
+
+      final linea = (await devoluciones.lineasDevolvibles(ventaId)).single;
+      expect(linea.cantidadDevuelta, 5);
+      expect(linea.disponible, 0);
+    });
+
+    test('anular después no repone lo que se quedó fuera', () async {
+      // Vender 5, devolver 2 rotas, anular. Vuelven las 3 que el cliente
+      // todavía tenía; las 2 rotas no, porque no están en el estante ni en
+      // sus manos.
+      final ventaId = await _venta(cantidad: 5);
+      await _devolver(ventaId, 2, motivo: MotivoDevolucion.defectuoso);
+      expect(await _stock(), 15);
+
+      await ventas.anular(ventaId);
+
+      expect(await _stock(), 18);
+      expect(await inventario.descuadres(), isEmpty);
     });
   });
 

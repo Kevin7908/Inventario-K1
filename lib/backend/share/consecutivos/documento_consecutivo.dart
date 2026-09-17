@@ -14,7 +14,11 @@ enum DocumentoConsecutivo {
   deuda('DEUDA', 'DEU', digitos: 3, porAnio: false),
   // Por año: lo que se devuelve se cuadra contra la caja del año, y el
   // número lo lee un cliente que trae la pieza de vuelta.
-  devolucion('DEVOLUCION', 'DEV', digitos: 4, porAnio: true);
+  devolucion('DEVOLUCION', 'DEV', digitos: 4, porAnio: true),
+  // Por año, como las cotizaciones: lo que se compra se cuadra contra el
+  // gasto del año, y el número solo lo usa el taller para archivar —el que
+  // cita el proveedor es el suyo, que va en `compras.numero_factura`—.
+  compra('COMPRA', 'COM', digitos: 4, porAnio: true);
 
   const DocumentoConsecutivo(
     this.codigo,

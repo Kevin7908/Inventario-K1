@@ -8,6 +8,10 @@ import '../../../../../backend/features/deudores/modelo/deudor_item.dart';
 import '../../../../../core/formato.dart';
 import '../../../../../core/resultado.dart';
 import '../../../../share/share.dart';
+import '../../../documentos/provider/documentos_providers.dart';
+import '../../../documentos/traductores/deuda_a_documento.dart';
+import '../../../documentos/widgets/dialogo_vista_previa.dart';
+import '../../provider/deudores_providers.dart';
 import '../../widgets/estado_deuda_ui.dart';
 import '../provider/catalogo_deuda_providers.dart';
 import '../provider/deuda_editor_provider.dart';
@@ -52,6 +56,7 @@ class _Cabecera extends ConsumerWidget {
             cliente: s.value?.clienteNombre ?? '',
             moto: s.value?.motoDescripcion,
             concepto: s.value?.concepto,
+            numeroOrden: s.value?.numeroOrden,
             vence: s.value?.fechaVencimiento,
             vencida: s.value?.estaVencida ?? false,
             estado: s.value?.estado,
@@ -61,7 +66,10 @@ class _Cabecera extends ConsumerWidget {
 
     final subtitulo = [
       ?datos.moto,
-      ?datos.concepto,
+      // De dónde salió, cuando salió de una orden: es lo que lleva al sitio
+      // donde sí se pueden corregir las líneas.
+      if (datos.numeroOrden != null) 'de la orden ${datos.numeroOrden}',
+      if (datos.numeroOrden == null) ?datos.concepto,
       if (datos.vence != null)
         datos.vencida
             ? 'venció el ${formatearFecha(datos.vence!)}'
@@ -236,6 +244,41 @@ class _Pie extends ConsumerWidget {
         .cambiarEstado(EstadoDeudor.incobrable);
   }
 
+  /// Abre el comprobante: lo que el cliente se lleva de una cuenta por
+  /// cobrar, con sus pagos y su saldo.
+  ///
+  /// **Guarda antes lo que esté pendiente y relee el detalle.** La ficha
+  /// escribe con retardo y el editor solo conoce las líneas y los totales, no
+  /// los pagos; el papel tiene que salir de lo que está guardado, no de lo que
+  /// hay en pantalla.
+  Future<void> _imprimir(BuildContext context, WidgetRef ref) async {
+    final guardado =
+        await ref.read(deudaEditorProvider(deudaId).notifier).guardarAhora();
+    if (!context.mounted) return;
+    if (guardado case Fallo(:final mensaje)) {
+      MensajeApp.error(context, 'No se guardó el último cambio: $mensaje');
+      return;
+    }
+
+    try {
+      ref.invalidate(detalleDeudaProvider(deudaId));
+      final deuda = await ref.read(detalleDeudaProvider(deudaId).future);
+      final ajustes = await leerAjustesImpresion(
+        ref.read(repositorioConfiguracionProvider),
+      );
+      if (!context.mounted) return;
+
+      await DialogoVistaPrevia.mostrar(
+        context,
+        documento: documentoDeDeuda(deuda: deuda, negocio: ajustes.negocio),
+        formato: ajustes.formato,
+      );
+    } catch (e) {
+      if (!context.mounted) return;
+      MensajeApp.error(context, 'No se pudo abrir el comprobante: $e');
+    }
+  }
+
   Future<void> _reabrir(BuildContext context, WidgetRef ref) async {
     final resultado = await ref
         .read(deudaEditorProvider(deudaId).notifier)
@@ -252,7 +295,7 @@ class _Pie extends ConsumerWidget {
             pagado: s.value?.montoPagado ?? 0,
             saldo: s.value?.saldo ?? 0,
             lineas: s.value?.lineas.length ?? 0,
-            editable: s.value?.editable ?? false,
+            viva: s.value?.viva ?? false,
             estado: s.value?.estado,
             vencida: s.value?.estaVencida ?? false,
           )),
@@ -260,7 +303,10 @@ class _Pie extends ConsumerWidget {
 
     // Sin nada fiado no hay deuda que dar por perdida: cerrar una vacía solo
     // la saca del listado sin haber hecho nada.
-    final puedeCerrar = datos.editable && datos.lineas > 0;
+    //
+    // Mira `viva` y no `editable`: la que copia una orden no admite líneas
+    // nuevas y aun así se puede dar por perdida, que es un cambio de estado.
+    final puedeCerrar = datos.viva && datos.lineas > 0;
 
     final situacion = switch (datos.estado) {
       EstadoDeudor.pagada => SituacionDeuda.pagada,
@@ -281,6 +327,7 @@ class _Pie extends ConsumerWidget {
         alDarPorPerdida: puedeCerrar
             ? () => unawaited(_darPorPerdida(context, ref, datos.saldo))
             : null,
+        alImprimir: () => unawaited(_imprimir(context, ref)),
         // Solo la que se dio por perdida se puede reabrir: una pagada no se
         // «reabre», se le anota otro repuesto o se le borra el abono.
         alReabrir: datos.estado == EstadoDeudor.incobrable

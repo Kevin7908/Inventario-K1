@@ -1,9 +1,20 @@
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../../../backend/features/autenticacion/modelo/usuario.dart';
 import '../../../../backend/features/pos/enum/enum_ventas.dart';
 import '../../../../core/formato.dart';
+import '../../../../core/validaciones.dart';
 import '../../../share/share.dart';
+import '../../autenticacion/provider/auth_providers.dart';
+import '../../autenticacion/provider/usuarios_provider.dart';
+
+/// Lo que devuelve el cuadro de cobro: cómo pagó y quién vendió.
+///
+/// Es un record y no dos diálogos porque son la misma decisión —cerrar la
+/// venta— y se toman en el mismo gesto. [vendedorId] va en `null` cuando vende
+/// el mismo que está en la caja, que es el caso normal.
+typedef CobroConfirmado = ({MetodoPago metodoPago, int? vendedorId});
 
 /// Cuadro de cobro del punto de venta: cómo paga el cliente y, si es en
 /// efectivo, cuánto entregó y cuánto hay que devolverle.
@@ -17,16 +28,22 @@ import '../../../share/share.dart';
 ///
 /// El vuelto es una ayuda de caja, no un dato que se guarde: lo que queda en
 /// la factura es que se pagó el total.
-class DialogoCobro extends StatefulWidget {
+///
+/// **El vendedor se elige aquí y viene puesto con quien tiene la sesión.** En
+/// un mostrador con un cajero y tres vendedores no son la misma persona, y la
+/// factura tiene que decir a quién reclamarle por el trato; pero el caso normal
+/// —vende quien cobra— no puede costar un clic más, así que el selector arranca
+/// en la cuenta abierta y solo se toca cuando hace falta.
+class DialogoCobro extends ConsumerStatefulWidget {
   const DialogoCobro({super.key, required this.total});
 
   final int total;
 
-  static Future<MetodoPago?> mostrar(
+  static Future<CobroConfirmado?> mostrar(
     BuildContext context, {
     required int total,
   }) {
-    return showDialog<MetodoPago>(
+    return showDialog<CobroConfirmado>(
       context: context,
       builder: (_) => DialogoCobro(total: total),
     );
@@ -41,14 +58,18 @@ class DialogoCobro extends StatefulWidget {
   ];
 
   @override
-  State<DialogoCobro> createState() => _DialogoCobroState();
+  ConsumerState<DialogoCobro> createState() => _DialogoCobroState();
 }
 
-class _DialogoCobroState extends State<DialogoCobro> {
+class _DialogoCobroState extends ConsumerState<DialogoCobro> {
   final _recibido = TextEditingController();
 
   MetodoPago _metodo = MetodoPago.efectivo;
   int _entregado = 0;
+
+  /// `null` hasta que alguien lo toque: entonces vale la sesión, que es lo que
+  /// se manda si no se cambia.
+  int? _vendedorId;
 
   bool get _esEfectivo => _metodo == MetodoPago.efectivo;
 
@@ -66,7 +87,7 @@ class _DialogoCobroState extends State<DialogoCobro> {
 
   void _cobrar() {
     if (!_sePuedeCobrar) return;
-    Navigator.of(context).pop(_metodo);
+    Navigator.of(context).pop((metodoPago: _metodo, vendedorId: _vendedorId));
   }
 
   @override
@@ -103,6 +124,11 @@ class _DialogoCobroState extends State<DialogoCobro> {
               _SelectorMetodo(
                 actual: _metodo,
                 alCambiar: (metodo) => setState(() => _metodo = metodo),
+              ),
+              const SizedBox(height: 16),
+              _SelectorVendedor(
+                elegido: _vendedorId ?? ref.watch(sesionActualProvider)?.usuarioId,
+                alCambiar: (id) => setState(() => _vendedorId = id),
               ),
               if (_esEfectivo) ...[
                 const SizedBox(height: 16),
@@ -202,6 +228,12 @@ class _SelectorMetodo extends StatelessWidget {
   }
 }
 
+/// Con cuánto paga el cliente.
+///
+/// Es `CampoTexto` de share y no un `TextField` propio: antes duplicaba el
+/// borde, el relleno y el prefijo `$` a mano, y aun así no agrupaba los miles,
+/// así que en el mismo diálogo el total salía «$85.000» y lo recibido
+/// «85000». Con `comoPrecio` los dos se leen igual.
 class _CampoRecibido extends StatelessWidget {
   const _CampoRecibido({required this.controlador, required this.alCambiar});
 
@@ -210,41 +242,16 @@ class _CampoRecibido extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        const Text('Recibido', style: TipografiaApp.etiquetaCampo),
-        const SizedBox(height: 7),
-        TextField(
-          controller: controlador,
-          autofocus: true,
-          keyboardType: TextInputType.number,
-          inputFormatters: [FilteringTextInputFormatter.digitsOnly],
-          style: TipografiaApp.cuerpo,
-          onChanged: (texto) => alCambiar(int.tryParse(texto) ?? 0),
-          decoration: InputDecoration(
-            isDense: true,
-            prefixText: r'$ ',
-            prefixStyle: TipografiaApp.cuerpo,
-            hintText: 'Con cuánto paga',
-            hintStyle: TipografiaApp.deshabilitado(TipografiaApp.cuerpo),
-            filled: true,
-            fillColor: ColoresApp.bgInput,
-            contentPadding:
-                const EdgeInsets.symmetric(horizontal: 14, vertical: 13),
-            border: _borde(ColoresApp.borderInput),
-            enabledBorder: _borde(ColoresApp.borderInput),
-            focusedBorder: _borde(ColoresApp.borderFocus),
-          ),
-        ),
-      ],
+    return CampoTexto(
+      etiqueta: 'Recibido',
+      controlador: controlador,
+      placeholder: 'Con cuánto paga',
+      comoPrecio: true,
+      autofocus: true,
+      alCambiar: (texto) =>
+          alCambiar(int.tryParse(normalizarDigitos(texto)) ?? 0),
     );
   }
-
-  OutlineInputBorder _borde(Color color) => OutlineInputBorder(
-        borderRadius: BorderRadius.circular(11),
-        borderSide: BorderSide(color: color),
-      );
 }
 
 /// El vuelto, o el aviso de que todavía falta plata.
@@ -270,6 +277,42 @@ class _Cambio extends StatelessWidget {
           style: TipografiaApp.cuerpoMedium.copyWith(fontSize: 15, color: color),
         ),
       ],
+    );
+  }
+}
+
+/// Quién vendió, de entre las cuentas activas del taller.
+///
+/// Solo aparece **si hay más de una cuenta**: en un taller de un solo usuario
+/// el selector no ofrecería ninguna elección y sería un renglón que estorba.
+/// Las cuentas inactivas quedan fuera: quien ya no trabaja aquí no vendió hoy.
+class _SelectorVendedor extends ConsumerWidget {
+  const _SelectorVendedor({required this.elegido, required this.alCambiar});
+
+  final int? elegido;
+  final ValueChanged<int?> alCambiar;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final cuentas = (ref.watch(usuariosProvider).value ?? const <Usuario>[])
+        .where((u) => u.estaActivo)
+        .toList();
+    if (cuentas.length < 2) return const SizedBox.shrink();
+
+    // Si la cuenta de la sesión ya no está en la lista —se desactivó mientras
+    // el diálogo estaba abierto—, cae en la primera activa en vez de dejar el
+    // selector sin valor, que es lo que reventaría el desplegable.
+    final actual = cuentas.any((c) => c.id == elegido)
+        ? elegido!
+        : cuentas.first.id;
+
+    return SelectorWidget<int>(
+      etiqueta: 'Vendedor',
+      valor: actual,
+      opciones: [for (final cuenta in cuentas) cuenta.id],
+      constructorEtiqueta: (id) =>
+          cuentas.firstWhere((c) => c.id == id).nombre,
+      alCambiar: alCambiar,
     );
   }
 }

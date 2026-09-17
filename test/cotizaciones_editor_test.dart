@@ -152,19 +152,34 @@ void main() {
   });
 
   group('totales', () {
-    // `kIva` es una constante de compilación, así que un test no puede
-    // moverla: lo que se comprueba es que **hoy**, con la tasa en 0, el pie no
-    // pinta ni subtotal ni IVA. Si algún día `kIva` deja de ser 0, este test
-    // avisa cambiando de resultado y hay que actualizarlo.
+    // La tasa se configura, así que este grupo puede probar las dos caras. La
+    // global se devuelve a 0 después de cada test: sin eso, el orden en que
+    // corran cambiaría el resultado del siguiente.
+    tearDown(() => configurarIva(0));
+
     testWidgets('sin IVA el pie va directo al total', (tester) async {
+      configurarIva(0);
       await _pump(tester, const TotalesCotizacion(cotizacionId: null));
       await tester.pumpAndSettle();
 
       expect(find.text('Total'), findsOneWidget);
-      expect(hayIva, isFalse, reason: 'el taller no factura IVA hoy');
+      expect(hayIva, isFalse);
       expect(find.text(etiquetaIva), findsNothing);
       // Sin descuento, subtotal y total son el mismo número.
       expect(find.text('Subtotal'), findsNothing);
+    });
+
+    testWidgets('con la tasa puesta el pie liquida el IVA', (tester) async {
+      configurarIva(19);
+      await _pump(tester, const TotalesCotizacion(cotizacionId: null));
+      await tester.pumpAndSettle();
+
+      // El renglón dice el porcentaje vigente, no uno quemado: es lo que
+      // dejaba de poder probarse cuando la tasa era una constante de
+      // compilación. Y dice «IVA (19%)» a secas, sin «incluido»: el impuesto
+      // se le suma al subtotal, no se le extrae.
+      expect(find.text('IVA (19%)'), findsOneWidget);
+      expect(find.text(etiquetaIva), findsOneWidget);
     });
   });
 
@@ -288,7 +303,10 @@ void main() {
       expect(items.single.precioUnitario, 0);
     });
 
-    test('el total no le suma IVA: ya viene dentro del precio', () async {
+    test('el total le suma el IVA al subtotal', () async {
+      configurarIva(19);
+      addTearDown(() => configurarIva(0));
+
       await container.read(cotizacionEditorProvider(null).future);
       container
           .read(cotizacionEditorProvider(null).notifier)
@@ -296,8 +314,8 @@ void main() {
 
       final estado = container.read(cotizacionEditorProvider(null)).value!;
       expect(estado.subtotal, 100000);
-      expect(estado.total, 100000);
-      expect(estado.iva, ivaIncluidoEn(100000));
+      expect(estado.iva, 19000);
+      expect(estado.total, 119000);
     });
   });
 
@@ -456,11 +474,11 @@ void main() {
         items: [_item(TipoItemCotizacion.producto, cantidad: 1, precio: 100000)],
       ).conDescuento(20000);
 
-      // Misma regla que el punto de venta: los precios ya traen el IVA dentro,
-      // así que rebajar 20.000 rebaja 20.000 de lo que paga el cliente.
-      expect(estado.total, 80000);
-      expect(estado.iva, ivaIncluidoEn(80000),
-          reason: 'el IVA se extrae del total, no se le suma');
+      // Misma regla que el punto de venta: la rebaja se resta antes de
+      // liquidar el impuesto.
+      expect(estado.baseGravable, 80000);
+      expect(estado.iva, ivaSobre(80000));
+      expect(estado.total, 80000 + ivaSobre(80000));
     });
   });
 

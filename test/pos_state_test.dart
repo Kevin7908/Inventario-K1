@@ -19,7 +19,6 @@ Producto _producto({
       precioVenta: precioVenta,
       stockActual: stockActual,
       stockMinimo: 2,
-      aplicaIva: false,
       activo: true,
     );
 
@@ -101,17 +100,41 @@ void main() {
       expect(conUnaLinea.total, 0);
     });
 
-    test('el descuento sale del precio con IVA: el total no le suma nada', () {
+    test('el descuento se resta antes del IVA', () {
+      configurarIva(19);
+      addTearDown(() => configurarIva(0));
+
       final estado = const PosState()
           .conProducto(_producto(precioVenta: 100000))
           .conDescuento(20000);
 
-      // Los precios ya traen el IVA dentro, así que rebajar 20.000 rebaja
-      // exactamente eso de lo que paga el cliente. Antes el descuento salía de
-      // una base imponible y con IVA al 19% le quitaba 23.800.
-      expect(estado.total, 80000);
-      expect(estado.iva, ivaIncluidoEn(80000),
-          reason: 'el IVA se extrae del total, no se suma');
+      // El precio del catálogo es la base gravable: la rebaja baja también el
+      // impuesto que esos 20.000 habrían generado.
+      expect(estado.baseGravable, 80000);
+      expect(estado.iva, 15200);
+      expect(estado.total, 95200, reason: 'el total lleva el IVA sumado');
+    });
+
+    test('un producto de 10.000 al 19% se cobra en 11.900', () {
+      // El caso exacto que reportó el taller: antes el total se quedaba en
+      // 10.000 y el renglón de IVA decía 1.597.
+      configurarIva(19);
+      addTearDown(() => configurarIva(0));
+
+      final estado =
+          const PosState().conProducto(_producto(precioVenta: 10000));
+
+      expect(estado.subtotal, 10000);
+      expect(estado.iva, 1900);
+      expect(estado.total, 11900);
+    });
+
+    test('sin tasa configurada el total es el subtotal', () {
+      final estado =
+          const PosState().conProducto(_producto(precioVenta: 10000));
+
+      expect(estado.iva, 0);
+      expect(estado.total, 10000);
     });
   });
 }

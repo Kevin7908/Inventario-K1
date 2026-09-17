@@ -3,6 +3,8 @@ import 'package:drift/drift.dart';
 import '../../../share/database/app_db.dart';
 import '../../motos/mapper/moto_mapper.dart';
 import '../../motos/modelo/moto.dart';
+import '../../motos/repositorio/repositorio_marcas_moto.dart';
+import '../../motos/repositorio/repositorio_marcas_moto_impl.dart';
 import '../../persona/modelo/persona.dart';
 import '../../persona/repositorio/repositorio_persona.dart';
 import '../../persona/repositorio/repositorio_persona_impl.dart';
@@ -16,7 +18,16 @@ import '../../bitacora/repositorio/repositorio_bitacora_impl.dart';
 import '../../../share/dominio/permiso.dart';
 
 class RepositorioClientesImpl with FirmaDeSesion implements RepositorioClientes {
-  RepositorioClientesImpl(this._db, this.sesion);
+  RepositorioClientesImpl(
+    this._db,
+    this.sesion, {
+    RepositorioMarcasMoto? marcas,
+  }) : _marcas = marcas ?? RepositorioMarcasMotoImpl(_db, sesion);
+
+  /// El catálogo de marcas y modelos, para traducir a id lo que se teclea en
+  /// las motos del cliente. Es una dependencia del constructor, sustituible en
+  /// un test (`CLAUDE.md` §3).
+  final RepositorioMarcasMoto _marcas;
 
   /// Quién firma lo que este repositorio escribe. La inyecta Riverpod por el
   /// constructor, no la busca en ningún registro global.
@@ -72,27 +83,36 @@ class RepositorioClientesImpl with FirmaDeSesion implements RepositorioClientes 
   // Streams y consultas simples
 
   @override
-  Stream<List<Cliente>> observarTodos() =>
-      (_conPersona()..orderBy([OrderingTerm.asc(_persona.nombres)]))
-          .watch()
-          .map(_mapear);
+  Stream<List<Cliente>> observarTodos() {
+    exigir(Permiso.clientesVer);
+    return (_conPersona()..orderBy([OrderingTerm.asc(_persona.nombres)]))
+        .watch()
+        .map(_mapear);
+  }
 
   @override
-  Future<List<Cliente>> obtenerTodos() async => _mapear(
-        await (_conPersona()..orderBy([OrderingTerm.asc(_persona.nombres)]))
-            .get(),
-      );
+  Future<List<Cliente>> obtenerTodos() async {
+    exigir(Permiso.clientesVer);
+    return _mapear(
+      await (_conPersona()..orderBy([OrderingTerm.asc(_persona.nombres)]))
+          .get(),
+    );
+  }
 
   @override
-  Future<List<Cliente>> buscar(String query) async => _mapear(
-        await (_conPersona()
-              ..where(_texto(query))
-              ..orderBy([OrderingTerm.asc(_persona.nombres)]))
-            .get(),
-      );
+  Future<List<Cliente>> buscar(String query) async {
+    exigir(Permiso.clientesVer);
+    return _mapear(
+      await (_conPersona()
+            ..where(_texto(query))
+            ..orderBy([OrderingTerm.asc(_persona.nombres)]))
+          .get(),
+    );
+  }
 
   @override
   Future<Cliente?> obtenerPorId(int id) async {
+    exigir(Permiso.clientesVer);
     final fila = await (_conPersona()..where(_tabla.id.equals(id)))
         .getSingleOrNull();
     return fila == null ? null : ClienteMapper.filaJoinAModelo(fila, _db);
@@ -150,6 +170,7 @@ class RepositorioClientesImpl with FirmaDeSesion implements RepositorioClientes 
     required int pagina,
     required int tamano,
   }) {
+    exigir(Permiso.clientesVer);
     final condicion = _condicion(filtro);
 
     final consultaPagina = _conPersona()
@@ -175,6 +196,7 @@ class RepositorioClientesImpl with FirmaDeSesion implements RepositorioClientes 
 
   @override
   Stream<ResumenClientes> observarResumen() {
+    exigir(Permiso.clientesVer);
     // El total sale de `clientes`; el de "con saldo" cruza con `deudores`, así
     // que va en la misma consulta cruda para no abrir dos streams que habría
     // que combinar a mano.
@@ -204,6 +226,7 @@ class RepositorioClientesImpl with FirmaDeSesion implements RepositorioClientes 
 
   @override
   Stream<Map<int, SaldoCliente>> observarSaldos() {
+    exigir(Permiso.clientesVer);
     // Un `GROUP BY` en SQL, no un recorrido de deudas en memoria. Se filtra
     // por `monto_total > monto_pagado` además de por estado para que una deuda
     // saldada pero aún marcada ACTIVA no deje al cliente en rojo.
@@ -330,8 +353,24 @@ class RepositorioClientesImpl with FirmaDeSesion implements RepositorioClientes 
       for (final moto in motos) {
         // El clienteId se fuerza aquí y no en el formulario: al crear todavía
         // no existe el id, y al editar no debe poder cambiarse por accidente.
-        final companion =
-            MotoMapper.modeloACompanion(moto.copyWith(clienteId: clienteId));
+        //
+        // La marca y el modelo llegan como texto y se traducen contra el
+        // catálogo, igual que en `RepositorioMotos`: es la misma resolución en
+        // los dos caminos que dan de alta motos, y por eso ninguno puede colar
+        // una marca escrita de otra forma (`REGLAS_BD.md` §2).
+        final marcaId = await _marcas.asegurarMarca(moto.marca);
+        final modeloId = await _marcas.asegurarModelo(
+          marcaId: marcaId,
+          nombre: moto.modelo,
+          cilindraje: moto.cilindraje,
+        );
+        final companion = MotoMapper.modeloACompanion(
+          moto.copyWith(
+            clienteId: clienteId,
+            marcaId: marcaId,
+            modeloId: modeloId,
+          ),
+        );
 
         if (moto.id == 0) {
           conservadas.add(await _db.into(motosTabla).insert(companion));

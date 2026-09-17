@@ -1,6 +1,7 @@
 import 'package:drift/drift.dart';
 
 import '../../../share/database/app_db.dart';
+import '../../../share/utils/fecha_sqlite.dart';
 import '../modelo/movimiento_detalle.dart';
 import '../modelo/movimiento_inventario.dart';
 
@@ -17,12 +18,13 @@ abstract final class MovimientoMapper {
       ordenId: fila.ordenId,
       reservaId: fila.reservaId,
       deudorId: fila.deudorId,
+      compraId: fila.compraId,
       notas: fila.notas,
       creadoEn: fila.creadoEn,
     );
   }
 
-  /// El kardex va por `customSelect` —necesita cuatro `LEFT JOIN` para
+  /// El kardex va por `customSelect` —necesita cinco `LEFT JOIN` para
   /// resolver el documento de origen—, así que la fila llega como mapa crudo
   /// y no como `TablaMovimientoInventarioData`.
   static MovimientoDetalle detalleDesdeMapa(Map<String, dynamic> f) {
@@ -36,8 +38,9 @@ abstract final class MovimientoMapper {
         ordenId: f['orden_id'] as int?,
         reservaId: f['reserva_id'] as int?,
         deudorId: f['deudor_id'] as int?,
+        compraId: f['compra_id'] as int?,
         notas: f['notas'] as String?,
-        creadoEn: _fecha(f['creado_en']),
+        creadoEn: fechaDeSqliteObligatoria(f['creado_en']),
       ),
       productoNombre: f['producto_nombre'] as String? ?? '',
       productoSku: f['producto_sku'] as String? ?? '',
@@ -45,15 +48,6 @@ abstract final class MovimientoMapper {
       numeroDocumento: f['numero_documento'] as String?,
     );
   }
-
-  /// Drift guarda las fechas como segundos desde la época; un `customSelect`
-  /// las devuelve así de crudas.
-  static DateTime _fecha(Object? valor) => switch (valor) {
-        final int segundos =>
-          DateTime.fromMillisecondsSinceEpoch(segundos * 1000),
-        final DateTime fecha => fecha,
-        _ => DateTime.now(),
-      };
 
   /// [usuarioId] no viene en la solicitud sino aparte: quien mueve stock es
   /// quien tiene la sesión abierta, y eso lo sabe el repositorio, no cada uno
@@ -71,6 +65,7 @@ abstract final class MovimientoMapper {
       ordenId: Value(s.ordenId),
       reservaId: Value(s.reservaId),
       deudorId: Value(s.deudorId),
+      compraId: Value(s.compraId),
       notas: Value(s.notas),
     );
   }

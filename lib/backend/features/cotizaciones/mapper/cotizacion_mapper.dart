@@ -82,6 +82,7 @@ class CotizacionMapper {
   /// puede saltarse: una línea `LIBRE` deja las dos en NULL, y las otras dos
   /// llenan exactamente una.
   static TablaCotizacionItemCompanion itemACompanion({
+    required int usuarioId,
     required int cotizacionId,
     required TipoItemCotizacion tipo,
     int? referenciaId,
@@ -91,6 +92,7 @@ class CotizacionMapper {
     required int subtotal,
   }) {
     return TablaCotizacionItemCompanion.insert(
+      usuarioId: usuarioId,
       cotizacionId: cotizacionId,
       tipoItem: tipo.valor,
       productoId: Value(

@@ -48,14 +48,43 @@ class GrillaProductosOrden extends ConsumerWidget {
     }
 
     if (productos.isEmpty) {
-      return const Center(
+      // El motivo importa: con «solo para esta moto» encendido, un catálogo sin
+      // compatibilidades declaradas se ve vacío y parecería que la app falla.
+      // Decirlo, y ofrecer apagarlo, es la diferencia entre un filtro y un
+      // callejón sin salida.
+      final soloCompatibles = ref.watch(
+        ordenEditorProvider(ordenId)
+            .select((s) => s.value?.soloCompatibles ?? false),
+      );
+
+      return Center(
         child: Padding(
-          padding: EdgeInsets.all(32),
-          child: Text(
-            'Ningún repuesto coincide con la búsqueda o la categoría.',
-            textAlign: TextAlign.center,
-            style: TipografiaApp.caption,
-          ),
+          padding: const EdgeInsets.all(32),
+          child: soloCompatibles
+              ? Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    const EstadoVacio(
+                      icono: Icons.two_wheeler_outlined,
+                      titulo: 'Nada declarado para esta moto',
+                      pista: 'La compatibilidad se declara en la ficha de '
+                          'cada repuesto. Quita el filtro para ver el '
+                          'catálogo completo.',
+                    ),
+                    const SizedBox(height: 12),
+                    BotonSecundario(
+                      etiqueta: 'Ver todo el catálogo',
+                      alPresionar: ref
+                          .read(ordenEditorProvider(ordenId).notifier)
+                          .alternarSoloCompatibles,
+                    ),
+                  ],
+                )
+              : const Text(
+                  'Ningún repuesto coincide con la búsqueda o la categoría.',
+                  textAlign: TextAlign.center,
+                  style: TipografiaApp.caption,
+                ),
         ),
       );
     }

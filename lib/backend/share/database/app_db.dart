@@ -12,14 +12,20 @@ import '../../features/autenticacion/esquema_datos/tabla_usuario_permiso.dart';
 import '../../features/bitacora/esquema_datos/tabla_bitacora.dart';
 import '../../features/categorias/esquema_datos/tabla_categoria.dart';
 import '../../features/clientes/esquema_datos/tabla_cliente.dart';
+import '../../features/compras/esquema_datos/tabla_compra.dart';
+import '../../features/compras/esquema_datos/tabla_compra_detalle.dart';
 import '../../features/configuracion/esquema_datos/configuracion_tabla.dart';
 import '../../features/cotizaciones/esquema_datos/tabla_cotizacion.dart';
 import '../../features/cotizaciones/esquema_datos/tabla_cotizacion_item.dart';
 import '../../features/especializacion/esquema_datos/tabla_especializacion.dart';
 import '../../features/inventario/esquema_datos/tabla_movimiento_inventario.dart';
+import '../../features/motos/esquema_datos/tabla_marca_moto.dart';
+import '../../features/motos/esquema_datos/tabla_modelo_moto.dart';
 import '../../features/motos/esquema_datos/tabla_moto.dart';
 import '../../features/persona/esquema_datos/tabla_persona.dart';
 import '../../features/productos/esquema_datos/tabla_producto.dart';
+import '../../features/productos/esquema_datos/tabla_producto_compatibilidad.dart';
+import '../../features/productos/esquema_datos/tabla_producto_proveedor.dart';
 import '../../features/tecnicos/esquema_datos/tabla_tecnico.dart';
 import '../../features/unidades_medida/esquema_datos/tabla_unidades_medida.dart';
 import '../../features/proveedores/esquema_datos/tabla_proveedor.dart';
@@ -50,10 +56,16 @@ part 'app_db.g.dart';
     TablaUnidadesMedida,
     TablaProveedor,
     TablaProducto,
+    TablaProductoProveedor,
+    TablaProductoCompatibilidad,
+    TablaCompra,
+    TablaCompraDetalle,
     TablaMovimientoInventario,
     TablaUsuario,
     TablaUsuarioPermiso,
     TablaCliente,
+    TablaMarcaMoto,
+    TablaModeloMoto,
     TablaMoto,
     TablaEspecializacion,
     TablaTecnico,

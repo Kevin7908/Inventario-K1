@@ -12,6 +12,11 @@ class VentaDetalle extends Equatable {
     this.numeroOrden,
     this.clienteId,
     required this.clienteNombre,
+    this.clienteDocumento = '',
+    this.clienteDireccion = '',
+    this.clienteCiudad = '',
+    this.clienteTelefono = '',
+    this.clienteCorreo = '',
     required this.subtotal,
     required this.iva,
     required this.descuento,
@@ -20,6 +25,8 @@ class VentaDetalle extends Equatable {
     required this.metodoPago,
     required this.estadoPago,
     this.creadoEn,
+    this.cajero = '',
+    this.vendedor = '',
     required this.items,
   });
 
@@ -30,6 +37,17 @@ class VentaDetalle extends Equatable {
   final String? numeroOrden;
   final int? clienteId;
   final String clienteNombre;
+
+  /// Los datos del cliente que la factura enseña, ya resueltos desde
+  /// `personas`. Vacíos en una venta de mostrador sin cliente identificado,
+  /// que es el caso normal: el impreso omite los renglones que no tienen
+  /// valor en vez de pintar etiquetas huérfanas.
+  final String clienteDocumento;
+  final String clienteDireccion;
+  final String clienteCiudad;
+  final String clienteTelefono;
+  final String clienteCorreo;
+
   /// Los cinco, en pesos enteros (ver `TablaVentas`).
   final int subtotal;
   final int iva;
@@ -39,6 +57,15 @@ class VentaDetalle extends Equatable {
   final MetodoPago metodoPago;
   final EstadoPago estadoPago;
   final DateTime? creadoEn;
+
+  /// Quién la registró y quién la vendió, ya resueltos a nombre.
+  ///
+  /// [vendedor] queda **vacío cuando vende el mismo que cobra**, que es el
+  /// caso normal: la columna guarda la excepción, no la repetición. El impreso
+  /// pinta el renglón solo si hay alguien distinto.
+  final String cajero;
+  final String vendedor;
+
   final List<VentaItem> items;
 
   List<VentaItem> get itemsProducto =>
@@ -58,6 +85,11 @@ class VentaDetalle extends Equatable {
         numeroOrden,
         clienteId,
         clienteNombre,
+        clienteDocumento,
+        clienteDireccion,
+        clienteCiudad,
+        clienteTelefono,
+        clienteCorreo,
         subtotal,
         iva,
         descuento,
@@ -66,6 +98,8 @@ class VentaDetalle extends Equatable {
         metodoPago,
         estadoPago,
         creadoEn,
+        cajero,
+        vendedor,
         items,
       ];
 }

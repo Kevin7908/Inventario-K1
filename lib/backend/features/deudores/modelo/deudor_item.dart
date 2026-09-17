@@ -1,15 +1,21 @@
-/// Una línea de lo fiado: qué producto se llevó el cliente, cuánto y a qué
-/// precio salió.
+/// Una línea de lo fiado: qué se llevó el cliente, cuánto y a qué precio
+/// salió.
 ///
-/// El precio es el del día en que se fió, copiado del catálogo: la deuda es un
-/// documento cerrado y no se revaloriza si mañana sube el repuesto.
+/// El precio y la descripción son los del día en que se fió, copiados del
+/// catálogo: la deuda es un documento cerrado y no se revaloriza si mañana
+/// sube el repuesto o le cambian el nombre.
+///
+/// **[productoId] falta en lo que no es una pieza.** Una orden cerrada a
+/// crédito trae también su mano de obra y sus cargos sueltos, que se cobran
+/// igual y no tienen catálogo detrás. Por eso el que siempre está es
+/// [descripcion], y `esProducto` es lo que distingue una línea de la otra.
 class DeudorItem {
   const DeudorItem({
     required this.id,
     required this.deudorId,
-    required this.productoId,
-    required this.nombreProducto,
-    required this.sku,
+    this.productoId,
+    required this.descripcion,
+    this.sku,
     this.imagenUrl,
     required this.cantidad,
     required this.precioUnitario,
@@ -17,12 +23,22 @@ class DeudorItem {
 
   final int id;
   final int deudorId;
-  final int productoId;
-  final String nombreProducto;
-  final String sku;
+
+  /// El producto, cuando la línea es una pieza del catálogo.
+  final int? productoId;
+
+  /// Qué es la línea, congelado al fiar.
+  final String descripcion;
+
+  /// El SKU del producto. `null` en la mano de obra y en los cargos.
+  final String? sku;
   final String? imagenUrl;
   final double cantidad;
   final int precioUnitario;
+
+  /// Si detrás de la línea hay una pieza del inventario. Lo que decide es la
+  /// FK, no el texto: una tarea puede llamarse igual que un repuesto.
+  bool get esProducto => productoId != null;
 
   int get subtotal => (cantidad * precioUnitario).round();
 }

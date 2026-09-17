@@ -108,6 +108,8 @@ class OrdenEditorNotifier extends AsyncNotifier<OrdenEditorState> {
       motoId: detalle.motoId,
       motoDescripcion: detalle.motoDescripcion,
       motoPlaca: detalle.motoPlaca,
+      motoMarcaId: detalle.motoMarcaId,
+      motoModeloId: detalle.motoModeloId,
       kilometrajeEntrada: detalle.kilometrajeEntrada,
       estado: detalle.estado,
       diagnostico: detalle.diagnosticoCliente ?? '',
@@ -119,6 +121,7 @@ class OrdenEditorNotifier extends AsyncNotifier<OrdenEditorState> {
       busquedaCatalogo: conservando?.busquedaCatalogo ?? '',
       categoriaId: conservando?.categoriaId,
       paginaCatalogo: conservando?.paginaCatalogo ?? 0,
+      soloCompatibles: conservando?.soloCompatibles ?? false,
     );
   }
 
@@ -155,7 +158,30 @@ class OrdenEditorNotifier extends AsyncNotifier<OrdenEditorState> {
   ///
   /// Devuelve el fallo en vez de lanzarlo: el editor tiene que seguir en pie
   /// aunque el stock no alcance, con el motivo a la vista.
-  Future<Resultado> _escribir(Future<void> Function() operacion) async {
+  /// La cola de escrituras. **Una detrás de otra, nunca a la vez.**
+  ///
+  /// Sin esto, tocar cinco veces seguidas una tarjeta del catálogo lanzaba
+  /// cinco escrituras concurrentes con sus cinco recargas intercaladas: la
+  /// última en responder pisaba a las demás y en pantalla aparecían tres de
+  /// las cinco unidades. El usuario lo veía como que «se buguea al clickear
+  /// rápido», y es de los fallos que no se reproducen despacio.
+  ///
+  /// Encadenar es suficiente y es lo correcto: son escrituras del mismo
+  /// documento, y el orden en que el usuario las pidió es el orden en que
+  /// tienen que quedar.
+  Future<void> _cola = Future<void>.value();
+
+  Future<Resultado> _escribir(Future<void> Function() operacion) {
+    // Se encola antes de nada para que dos llamadas seguidas no puedan
+    // colarse entre el `await` y la asignación.
+    final propia = _cola.then((_) => _escribirEnOrden(operacion));
+    // El `onError` vacío evita que un fallo de una escritura rompa la cadena
+    // y deje la cola envenenada para todas las siguientes.
+    _cola = propia.then((_) {}, onError: (_) {});
+    return propia;
+  }
+
+  Future<Resultado> _escribirEnOrden(Future<void> Function() operacion) async {
     final actual = state.value;
     if (actual == null) {
       return const Fallo(
@@ -252,6 +278,15 @@ class OrdenEditorNotifier extends AsyncNotifier<OrdenEditorState> {
 
   void filtrarPorCategoria(int? categoriaId) => _actualizar(
         (a) => a.copyWith(categoriaId: categoriaId, paginaCatalogo: 0),
+      );
+
+  /// Acota la rejilla a los repuestos declarados compatibles con esta moto.
+  /// Vuelve a la primera página por lo mismo que buscar y filtrar.
+  void alternarSoloCompatibles() => _actualizar(
+        (a) => a.copyWith(
+          soloCompatibles: !a.soloCompatibles,
+          paginaCatalogo: 0,
+        ),
       );
 
   void irAPaginaCatalogo(int pagina) =>

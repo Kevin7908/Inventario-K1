@@ -10,6 +10,8 @@
 /// sirve—.
 library;
 
+import 'texto_utils.dart';
+
 /// Cuántas letras tiene un prefijo antes de alargarse para desempatar.
 const int _largoBase = 3;
 
@@ -17,18 +19,13 @@ const int _largoBase = 3;
 const String prefijoSinCategoria = 'PRD';
 
 /// Quita tildes y todo lo que no sea letra o dígito, y pasa a mayúsculas.
-String normalizarCategoria(String nombre) {
-  const mapa = {
-    'á': 'a', 'é': 'e', 'í': 'i', 'ó': 'o', 'ú': 'u', 'ü': 'u', 'ñ': 'n',
-    'Á': 'A', 'É': 'E', 'Í': 'I', 'Ó': 'O', 'Ú': 'U', 'Ü': 'U', 'Ñ': 'N',
-  };
-  return nombre
-      .split('')
-      .map((c) => mapa[c] ?? c)
-      .join()
-      .replaceAll(RegExp(r'[^a-zA-Z0-9]'), '')
-      .toUpperCase();
-}
+///
+/// El mapa de tildes es el mismo que usa el buscador del catálogo, y por eso
+/// vive en `texto_utils.dart`: tenerlo dos veces era la forma de que un día
+/// dejaran de coincidir.
+String normalizarCategoria(String nombre) => aplanarTexto(nombre)
+    .replaceAll(RegExp(r'[^a-z0-9]'), '')
+    .toUpperCase();
 
 /// El prefijo de [nombre], alargado lo justo para no chocar con [anteriores].
 ///

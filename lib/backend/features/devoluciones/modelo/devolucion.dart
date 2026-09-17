@@ -85,6 +85,7 @@ final class Devolucion extends Equatable {
     required this.ventaId,
     required this.numeroFactura,
     required this.motivo,
+    required this.reingresaStock,
     required this.total,
     this.notas,
     required this.usuarioId,
@@ -101,6 +102,13 @@ final class Devolucion extends Equatable {
   final String numeroFactura;
 
   final MotivoDevolucion motivo;
+
+  /// Si la mercancía volvió al estante o se quedó fuera del inventario.
+  ///
+  /// En `false` la devolución **no movió stock**: la pieza llegó rota y se le
+  /// reclama al proveedor. La plata se le regresó al cliente igual, así que
+  /// [total] no cambia.
+  final bool reingresaStock;
 
   /// En pesos enteros.
   final int total;
@@ -122,6 +130,7 @@ final class Devolucion extends Equatable {
         ventaId,
         numeroFactura,
         motivo,
+        reingresaStock,
         total,
         notas,
         usuarioId,

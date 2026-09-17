@@ -78,6 +78,13 @@ abstract class RepositorioInventario {
   /// Es su propio método y no un [registrar] con `ENTRADA_COMPRA` a mano
   /// porque tiene **otra compuerta**: recibir mercancía no es lo mismo que
   /// corregir existencias a mano, y en un taller no las hace la misma persona.
+  ///
+  /// **No pide proveedor ni costo, y es a propósito.** Desde que existe el
+  /// módulo de Compras hay dos caminos para lo que entra: la remisión —con
+  /// proveedor, factura y costo por línea— y este, que se conservó para lo que
+  /// llega sin papel. El riesgo conocido es que alguien use siempre el atajo y
+  /// el costo no quede registrado en ninguna parte; se vigila mirando cuántos
+  /// `ENTRADA_COMPRA` quedan sin `compra_id`.
   Future<void> registrarEntradaCompra({
     required int productoId,
     required double cantidad,

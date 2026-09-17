@@ -126,6 +126,11 @@ abstract class RepositorioReservas {
     String? referenciaPago,
   });
 
+  /// Mueve la reserva de estado.
+  ///
+  /// Pasar a `cancelada` exige `RESERVAS_ELIMINAR`, porque hace lo mismo que
+  /// [eliminar]: devuelve la mercancía apartada a la bodega. Los demás
+  /// estados no mueven stock y no piden nada.
   Future<void> cambiarEstado(int id, EstadoReserva nuevoEstado);
 
   Future<void> eliminar(int id);

@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../../../../backend/features/proveedores/modelo/proveedor.dart';
 import '../../../share/share.dart';
+import '../../compras/widgets/linea_compras_proveedor.dart';
 import 'identidad_proveedor.dart';
 
 /// Tarjeta de un proveedor en la grilla del catálogo.
@@ -129,6 +130,12 @@ class _Contacto extends StatelessWidget {
           color: ColoresApp.castletonGreen,
           destacado: true,
         ),
+        // Cuánto se le lleva comprado. Lo trae su propio consumer para que la
+        // grilla entera no se repinte cuando entra una remisión.
+        if (proveedor.id != null) ...[
+          const SizedBox(height: 9),
+          LineaComprasProveedor(proveedorId: proveedor.id!),
+        ],
       ],
     );
   }

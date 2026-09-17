@@ -46,7 +46,6 @@ const _productos = [
     precioVenta: 32000,
     stockActual: 12,
     stockMinimo: 2,
-    aplicaIva: false,
     activo: true,
   ),
   Producto(
@@ -57,7 +56,6 @@ const _productos = [
     precioVenta: 45000,
     stockActual: 0,
     stockMinimo: 1,
-    aplicaIva: false,
     activo: true,
   ),
 ];

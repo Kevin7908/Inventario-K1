@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../../backend/features/unidades_medida/modelo/unidad_medida.dart';
+import '../../../../core/resultado.dart';
 import '../../../share/share.dart';
 import '../provider/unidades_medida_provider.dart';
 
@@ -27,6 +28,11 @@ class _UnidadesMedidaVistaState extends ConsumerState<UnidadesMedidaVista> {
   int _pagina = 0;
   bool _guardando = false;
 
+  /// Lo que rechazó la última escritura, para pintarlo **dentro** del
+  /// formulario y no en un aviso que se va solo: el usuario todavía tiene que
+  /// corregir algo, y para eso está `AvisoEnLinea` (§feedback de share).
+  String? _avisoFormulario;
+
   final _busquedaController = TextEditingController();
   final _nombreController = TextEditingController();
   final _abreviaturaController = TextEditingController();
@@ -45,6 +51,7 @@ class _UnidadesMedidaVistaState extends ConsumerState<UnidadesMedidaVista> {
   void _abrirFormularioNuevo() {
     setState(() {
       _unidadEnEdicion = null;
+      _avisoFormulario = null;
       _nombreController.clear();
       _abreviaturaController.clear();
       _descripcionController.clear();
@@ -56,6 +63,7 @@ class _UnidadesMedidaVistaState extends ConsumerState<UnidadesMedidaVista> {
   void _abrirFormularioEditar(UnidadMedida unidad) {
     setState(() {
       _unidadEnEdicion = unidad;
+      _avisoFormulario = null;
       _nombreController.text = unidad.nombre;
       _abreviaturaController.text = unidad.abreviatura;
       _descripcionController.text = unidad.descripcion ?? '';
@@ -66,21 +74,12 @@ class _UnidadesMedidaVistaState extends ConsumerState<UnidadesMedidaVista> {
 
   void _cerrarFormulario() => setState(() => _modo = _Modo.lista);
 
-  void _mostrarError(String error) {
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text(error, style: TipografiaApp.sobrePrimario(TipografiaApp.cuerpo)),
-        backgroundColor: ColoresApp.statusDanger,
-      ),
-    );
-  }
-
   Future<void> _guardar() async {
     setState(() => _guardando = true);
 
     final notifier = ref.read(unidadesMedidaProvider.notifier);
     final unidadEnEdicion = _unidadEnEdicion;
-    final error = unidadEnEdicion == null
+    final resultado = unidadEnEdicion == null
         ? await notifier.crear(
             nombre: _nombreController.text,
             abreviatura: _abreviaturaController.text,
@@ -98,11 +97,22 @@ class _UnidadesMedidaVistaState extends ConsumerState<UnidadesMedidaVista> {
     if (!mounted) return;
     setState(() => _guardando = false);
 
-    if (error != null) {
-      _mostrarError(error);
-      return;
+    switch (resultado) {
+      // El nombre y la abreviatura repetidos se quedan a la vista: el
+      // formulario sigue abierto y el mensaje del repositorio ya dice cuál de
+      // los dos estorba. Un `SnackBar` se iría antes de que se corrija.
+      case Fallo(
+            motivo: MotivoFallo.nombreDuplicado ||
+                MotivoFallo.abreviaturaDuplicada ||
+                MotivoFallo.validacion,
+            :final mensaje,
+          ):
+        setState(() => _avisoFormulario = mensaje);
+      case Fallo(:final mensaje):
+        MensajeApp.error(context, mensaje);
+      case Exito():
+        _cerrarFormulario();
     }
-    _cerrarFormulario();
   }
 
   Future<void> _eliminar(UnidadMedida unidad) async {
@@ -113,10 +123,15 @@ class _UnidadesMedidaVistaState extends ConsumerState<UnidadesMedidaVista> {
     );
     if (confirmado != true || !mounted) return;
 
-    final error =
+    final resultado =
         await ref.read(unidadesMedidaProvider.notifier).eliminar(unidad.id!);
-    if (!mounted || error == null) return;
-    _mostrarError(error);
+    if (!mounted) return;
+    switch (resultado) {
+      case Exito():
+        MensajeApp.exito(context, 'Unidad eliminada.');
+      case Fallo(:final mensaje):
+        MensajeApp.error(context, mensaje);
+    }
   }
 
   @override
@@ -292,6 +307,10 @@ class _UnidadesMedidaVistaState extends ConsumerState<UnidadesMedidaVista> {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
+                  if (_avisoFormulario case final aviso?) ...[
+                    AvisoEnLinea(mensaje: aviso),
+                    const SizedBox(height: 16),
+                  ],
                   Row(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
@@ -301,6 +320,9 @@ class _UnidadesMedidaVistaState extends ConsumerState<UnidadesMedidaVista> {
                           etiqueta: 'Nombre',
                           controlador: _nombreController,
                           placeholder: 'Ej: Kilogramo',
+                          alCambiar: _avisoFormulario == null
+                              ? null
+                              : (_) => setState(() => _avisoFormulario = null),
                         ),
                       ),
                       const SizedBox(width: 16),
@@ -309,6 +331,9 @@ class _UnidadesMedidaVistaState extends ConsumerState<UnidadesMedidaVista> {
                           etiqueta: 'Abreviatura',
                           controlador: _abreviaturaController,
                           placeholder: 'Ej: kg',
+                          alCambiar: _avisoFormulario == null
+                              ? null
+                              : (_) => setState(() => _avisoFormulario = null),
                         ),
                       ),
                     ],

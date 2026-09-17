@@ -11,7 +11,10 @@ class DeudorResumen extends Equatable {
     this.motoId,
     this.nombreMoto,
     this.placaMoto,
+    this.ordenId,
+    this.numeroOrden,
     this.concepto,
+    this.descuento = 0,
     required this.montoTotal,
     required this.montoPagado,
     required this.estado,
@@ -28,10 +31,26 @@ class DeudorResumen extends Equatable {
   final String? nombreMoto;
   final String? placaMoto;
 
+  /// La orden que se cerró a crédito, cuando la deuda nació así. Con ella la
+  /// ficha puede llevar a la orden, que es donde de verdad están las líneas.
+  final int? ordenId;
+
+  /// El consecutivo visible de esa orden (`ORD-0041`), ya resuelto por SQL
+  /// para no abrir una consulta por fila.
+  final String? numeroOrden;
+
+  /// Si la deuda es el reflejo de una orden. Sus líneas no se tocan a mano:
+  /// el repuesto ya salió del estante al anotarse en la orden.
+  bool get vieneDeOrden => ordenId != null;
+
   /// Por qué se debe, si se escribió. Las líneas ya dicen qué se llevó, así
   /// que esto es opcional: sirve para nombrar el fiado («Reparación del
   /// motor») cuando el listado de repuestos no lo explica solo.
   final String? concepto;
+  /// Rebaja sobre la suma de las líneas, en pesos. [montoTotal] ya la trae
+  /// descontada: es lo que el cliente debe.
+  final int descuento;
+
   final int montoTotal;
   final int montoPagado;
   final EstadoDeudor estado;
@@ -80,7 +99,10 @@ class DeudorResumen extends Equatable {
         motoId,
         nombreMoto,
         placaMoto,
+        ordenId,
+        numeroOrden,
         concepto,
+        descuento,
         montoTotal,
         montoPagado,
         estado,

@@ -774,11 +774,21 @@ void main() {
       final cliente = await db
           .into(db.tablaCliente)
           .insert(TablaClienteCompanion.insert(personaId: persona));
+      // El catálogo es FK: la marca y el modelo se dan de alta antes.
+      final marcaId = await db
+          .into(db.tablaMarcaMoto)
+          .insert(TablaMarcaMotoCompanion.insert(nombre: marca));
+      final modeloId = await db.into(db.tablaModeloMoto).insert(
+            TablaModeloMotoCompanion.insert(
+              marcaId: marcaId,
+              nombre: modelo,
+            ),
+          );
       return db.into(db.tablaMoto).insert(
             TablaMotoCompanion.insert(
               clienteId: cliente,
-              marca: marca,
-              modelo: modelo,
+              marcaId: marcaId,
+              modeloId: Value(modeloId),
               placa: Value(placa),
             ),
           );

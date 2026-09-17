@@ -8,8 +8,12 @@ import '../../../../backend/share/dominio/permiso.dart';
 import '../../../../backend/share/dominio/sesion_actual.dart';
 import '../../../share/share.dart';
 import '../../autenticacion/widgets/si_puede.dart';
+import '../../documentos/provider/documentos_providers.dart';
+import '../../documentos/traductores/venta_a_documento.dart';
+import '../../documentos/widgets/dialogo_vista_previa.dart';
 import '../../pos/provider/pos_providers.dart';
 import '../provider/historial_ventas_providers.dart';
+import 'dialogo_detalle_venta.dart';
 import 'dialogo_devolucion.dart';
 
 /// Color de cada estado de pago, en un solo sitio.
@@ -92,7 +96,9 @@ class TablaHistorialVentas extends ConsumerWidget {
         ),
         ColumnaTabla<VentaResumen>(
           titulo: '',
-          ancho: 92,
+          // Cuatro botones: ver, imprimir, devolver y anular. Con 92 px —el
+          // ancho de cuando eran tres— el último se salía de la celda.
+          ancho: 124,
           alineacion: Alignment.centerRight,
           constructor: (v) => _Acciones(venta: v),
         ),
@@ -234,31 +240,86 @@ class _Acciones extends ConsumerWidget {
     }
   }
 
+  /// Vuelve a abrir la factura ya emitida.
+  ///
+  /// El cliente que pierde el papel vuelve al mostrador, y hasta ahora la
+  /// única forma de imprimir era al cobrar. Sale de lo guardado, así que una
+  /// factura anulada se reimprime diciendo que está anulada.
+  Future<void> _imprimir(BuildContext context, WidgetRef ref) async {
+    try {
+      final detalle =
+          await ref.read(repositorioVentasProvider).obtenerDetalle(venta.id);
+      final ajustes = await leerAjustesImpresion(
+        ref.read(repositorioConfiguracionProvider),
+      );
+      if (!context.mounted) return;
+
+      await DialogoVistaPrevia.mostrar(
+        context,
+        documento: documentoDeVenta(
+          venta: detalle,
+          negocio: ajustes.negocio,
+          atendidoPor: detalle.cajero,
+          vendedor: detalle.vendedor,
+          nota: ajustes.notaFactura,
+        ),
+        formato: ajustes.formato,
+      );
+    } catch (e) {
+      if (!context.mounted) return;
+      MensajeApp.error(context, 'No se pudo abrir la factura: $e');
+    }
+  }
+
   @override
   Widget build(BuildContext context, WidgetRef ref) {
+    // Ver el detalle y reimprimir no están detrás de `POS_ANULAR` ni se
+    // esconden en una factura anulada: mirar lo que se cobró no cambia nada, y
+    // el documento anulado es justo el que a veces hay que enseñar.
+    final ver = BotonIcono(
+      icono: Icons.receipt_long_outlined,
+      tooltip: 'Ver qué se vendió y qué volvió',
+      alPresionar: () =>
+          DialogoDetalleVenta.mostrar(context, ventaId: venta.id),
+    );
+
+    final imprimir = BotonIcono(
+      icono: Icons.print_outlined,
+      tooltip: 'Imprimir la factura',
+      alPresionar: () => _imprimir(context, ref),
+    );
+
     // Una factura anulada está cerrada: ni se devuelve ni se vuelve a anular.
     if (venta.estadoPago == EstadoPago.anulada) {
-      return const SizedBox.shrink();
+      return Row(mainAxisSize: MainAxisSize.min, children: [ver, imprimir]);
     }
 
-    return SiPuede(
-      permiso: Permiso.posAnular,
-      child: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          BotonIcono(
-            icono: Icons.keyboard_return_rounded,
-            tooltip: 'Recibir una devolución',
-            alPresionar: () => DialogoDevolucion.mostrar(context, venta: venta),
+    return Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        ver,
+        imprimir,
+        SiPuede(
+          permiso: Permiso.posAnular,
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              BotonIcono(
+                icono: Icons.keyboard_return_rounded,
+                tooltip: 'Recibir una devolución',
+                alPresionar: () =>
+                    DialogoDevolucion.mostrar(context, venta: venta),
+              ),
+              BotonIcono(
+                icono: Icons.block_outlined,
+                tooltip: 'Anular la venta entera',
+                color: ColoresApp.statusDanger,
+                alPresionar: () => _anular(context, ref),
+              ),
+            ],
           ),
-          BotonIcono(
-            icono: Icons.block_outlined,
-            tooltip: 'Anular la venta entera',
-            color: ColoresApp.statusDanger,
-            alPresionar: () => _anular(context, ref),
-          ),
-        ],
-      ),
+        ),
+      ],
     );
   }
 }

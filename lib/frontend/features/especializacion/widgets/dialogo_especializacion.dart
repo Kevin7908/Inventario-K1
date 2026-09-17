@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../../backend/features/especializacion/modelo/especializacion.dart';
+import '../../../../core/resultado.dart';
 import '../../../share/share.dart';
 import '../provider/especializacion_provider.dart';
 
@@ -45,6 +46,11 @@ class _DialogoEspecializacionState
 
   bool _guardando = false;
 
+  /// El «ya existe» que devolvió la última escritura. Se limpia en cuanto
+  /// el usuario toca el campo: un error pegado a un texto que ya cambió
+  /// dice algo que dejó de ser cierto.
+  String? _errorNombre;
+
   @override
   void initState() {
     super.initState();
@@ -60,77 +66,52 @@ class _DialogoEspecializacionState
     super.dispose();
   }
 
-  void _mostrarMensaje(String texto, {required bool esError}) {
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text(
-          texto,
-          style: TipografiaApp.sobrePrimario(TipografiaApp.cuerpo),
-        ),
-        backgroundColor:
-            esError ? ColoresApp.statusDanger : ColoresApp.statusSuccess,
-      ),
-    );
-  }
-
-  /// Validación de nombre único contra el repositorio, antes de persistir.
-  Future<String?> _validarNombreUnico(String nombre) async {
-    if (nombre.trim().length < 2) return null;
-
-    final repo = ref.read(repositorioEspecializacionProvider);
-    final existe = await repo.existeNombre(
-      nombre.trim(),
-      ignorarId: widget.especializacionAEditar?.id,
-    );
-    if (existe) return 'Ya existe una especialización con ese nombre.';
-    return null;
-  }
-
   Future<void> _guardar() async {
     if (!_formKey.currentState!.validate()) return;
 
     setState(() => _guardando = true);
 
-    final errorUnicidad = await _validarNombreUnico(_nombreCtrl.text);
-    if (errorUnicidad != null) {
-      if (!mounted) return;
-      _mostrarMensaje(errorUnicidad, esError: true);
-      setState(() => _guardando = false);
-      return;
-    }
-
     final notifier = ref.read(especializacionesProvider.notifier);
     final descripcion = _descripcionCtrl.text.trim();
-    final String? error;
 
-    if (widget.esEdicion) {
-      error = await notifier.actualizar(
-        id: widget.especializacionAEditar!.id,
-        nombre: _nombreCtrl.text.trim(),
-        descripcion: descripcion.isEmpty ? null : descripcion,
-      );
-    } else {
-      error = await notifier.agregar(
-        nombre: _nombreCtrl.text.trim(),
-        descripcion: descripcion.isEmpty ? null : descripcion,
-      );
-    }
+    // El nombre repetido ya no se pregunta antes de escribir: lo decide el
+    // repositorio dentro de la misma llamada, y vuelve como
+    // `MotivoFallo.nombreDuplicado`. Preguntar primero dejaba un hueco entre
+    // el `SELECT` y el `INSERT`, que es justo lo que el `UNIQUE` cierra.
+    final resultado = widget.esEdicion
+        ? await notifier.actualizar(
+            id: widget.especializacionAEditar!.id,
+            nombre: _nombreCtrl.text.trim(),
+            descripcion: descripcion.isEmpty ? null : descripcion,
+          )
+        : await notifier.agregar(
+            nombre: _nombreCtrl.text.trim(),
+            descripcion: descripcion.isEmpty ? null : descripcion,
+          );
 
     if (!mounted) return;
 
-    if (error != null) {
-      _mostrarMensaje(error, esError: true);
-      setState(() => _guardando = false);
-      return;
+    switch (resultado) {
+      case Fallo(motivo: MotivoFallo.nombreDuplicado, :final mensaje):
+        // El conflicto es del campo, así que se señala en el campo y el
+        // diálogo se queda abierto con lo que el usuario ya tecleó.
+        setState(() {
+          _errorNombre = mensaje;
+          _guardando = false;
+        });
+        _formKey.currentState!.validate();
+      case Fallo(:final mensaje):
+        MensajeApp.error(context, mensaje);
+        setState(() => _guardando = false);
+      case Exito():
+        Navigator.of(context).pop();
+        MensajeApp.exito(
+          context,
+          widget.esEdicion
+              ? 'Especialización actualizada correctamente.'
+              : 'Especialización creada correctamente.',
+        );
     }
-
-    Navigator.of(context).pop();
-    _mostrarMensaje(
-      widget.esEdicion
-          ? 'Especialización actualizada correctamente.'
-          : 'Especialización creada correctamente.',
-      esError: false,
-    );
   }
 
   @override
@@ -206,6 +187,9 @@ class _DialogoEspecializacionState
                         controlador: _nombreCtrl,
                         placeholder: 'Ej: Motor, Eléctrico, Suspensión...',
                         autofocus: true,
+                        alCambiar: _errorNombre == null
+                            ? null
+                            : (_) => setState(() => _errorNombre = null),
                         validador: (v) {
                           final texto = v?.trim() ?? '';
                           if (texto.isEmpty) {
@@ -215,7 +199,7 @@ class _DialogoEspecializacionState
                           if (texto.length > 120) {
                             return 'Máximo 120 caracteres.';
                           }
-                          return null;
+                          return _errorNombre;
                         },
                       ),
                       const SizedBox(height: 18),

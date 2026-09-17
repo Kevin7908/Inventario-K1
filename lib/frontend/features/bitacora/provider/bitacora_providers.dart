@@ -242,3 +242,32 @@ final bitacoraPaginaProvider = Provider<List<EntradaBitacora>>(
   name: 'bitacoraPaginaProvider',
   (ref) => ref.watch(bitacoraListaProvider).value?.items ?? const [],
 );
+
+/// De qué fila se quiere el historial: la entidad y su id.
+///
+/// Es un `record` y no dos parámetros sueltos porque una `family` de Riverpod
+/// acepta un solo argumento, y los records tienen igualdad estructural: dos
+/// fichas abiertas sobre el mismo producto comparten el provider.
+typedef FilaAuditada = ({EntidadAuditada entidad, int id});
+
+/// Lo último que se le hizo a una fila concreta, para su ficha.
+///
+/// **Es un stream, y eso es el arreglo de un bug.** Era un `FutureProvider`
+/// con la idea de que la ficha lo invalidara después de guardar, y no lo hacía
+/// nadie: se editaba el precio de un producto y el panel «Últimos cambios»
+/// seguía diciendo «nadie la ha modificado todavía» hasta reabrir la
+/// aplicación. Un stream de Drift se entera solo, y la bitácora es de solo
+/// escritura, así que no hay nada que se pueda re-emitir de más.
+///
+/// `autoDispose`: son las fichas abiertas, no una lista de la pantalla
+/// principal; el stream se cierra al cerrar la ficha.
+///
+/// Exige `bitacoraVer` —la compuerta está en el repositorio—, así que quien
+/// no lo tenga recibe el error y la vista no pinta el panel.
+final historialDeFilaProvider =
+    StreamProvider.autoDispose.family<List<EntradaBitacora>, FilaAuditada>(
+  name: 'historialDeFilaProvider',
+  (ref, fila) => ref
+      .watch(repositorioBitacoraProvider)
+      .observarHistorialDe(fila.entidad, fila.id, limite: 5),
+);

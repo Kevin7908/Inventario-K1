@@ -1,6 +1,7 @@
 import 'package:drift/drift.dart';
 
 import '../../autenticacion/esquema_datos/tabla_usuario.dart';
+import '../../compras/esquema_datos/tabla_compra.dart';
 import '../../deudores/esquema_datos/tabla_deudor.dart';
 import '../../productos/esquema_datos/tabla_producto.dart';
 import '../../reservas/esquema_datos/tabla_reserva.dart';
@@ -51,12 +52,12 @@ class TablaMovimientoInventario extends Table {
   /// Con signo: `+` entra al inventario, `−` sale. Nunca cero.
   RealColumn get cantidad => real()();
 
-  /// De qué documento vino el movimiento. Son cuatro columnas y no un par
+  /// De qué documento vino el movimiento. Son cinco columnas y no un par
   /// `referencia_tipo` / `referencia_id` a propósito: una FK polimórfica no la
   /// puede verificar la base, y el `CHECK` de abajo garantiza que como mucho
-  /// una esté puesta. Un ajuste manual las deja las cuatro en NULL.
+  /// una esté puesta. Un ajuste manual las deja las cinco en NULL.
   ///
-  /// `setNull` en las cuatro: si el documento desaparece, el movimiento sigue
+  /// `setNull` en las cinco: si el documento desaparece, el movimiento sigue
   /// contando para el stock aunque pierda su origen.
   IntColumn get ventaId => integer()
       .nullable()
@@ -77,6 +78,13 @@ class TablaMovimientoInventario extends Table {
   IntColumn get deudorId => integer()
       .nullable()
       .references(TablaDeudor, #id, onDelete: KeyAction.setNull)();
+
+  /// La remisión por la que entró la mercancía. Es lo que convierte una
+  /// entrada suelta en parte de un documento con proveedor y costo: sin ella,
+  /// «entraron doce pastillas» no sabe a quién se le compraron ni a cómo.
+  IntColumn get compraId => integer()
+      .nullable()
+      .references(TablaCompra, #id, onDelete: KeyAction.setNull)();
 
   TextColumn get notas => text().nullable()();
 
@@ -102,6 +110,7 @@ class TablaMovimientoInventario extends Table {
             "'DEVOLUCION_FIADO'))",
         'CHECK (cantidad <> 0)',
         'CHECK ((venta_id IS NOT NULL) + (orden_id IS NOT NULL) + '
-            '(reserva_id IS NOT NULL) + (deudor_id IS NOT NULL) <= 1)',
+            '(reserva_id IS NOT NULL) + (deudor_id IS NOT NULL) + '
+            '(compra_id IS NOT NULL) <= 1)',
       ];
 }

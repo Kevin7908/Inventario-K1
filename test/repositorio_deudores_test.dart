@@ -4,7 +4,7 @@
 // módulo: apartar deja el repuesto en la bodega —cancelar lo devuelve—, fiar
 // lo saca montado en una moto. Si dar una deuda por perdida devolviera stock,
 // el taller creería tener piezas que ya no están.
-import 'package:drift/drift.dart' show Variable;
+import 'package:drift/drift.dart' show Value, Variable;
 import 'package:flutter_test/flutter_test.dart';
 import 'package:inventario_k1/backend/features/deudores/enum/enum_deudor.dart';
 import 'package:inventario_k1/backend/features/deudores/repositorio/repositorio_deudores.dart';
@@ -359,8 +359,10 @@ void main() {
       expect(
         () => db.into(db.tablaDeudorItem).insert(
               TablaDeudorItemCompanion.insert(
+                usuarioId: sesion.usuarioId,
                 deudorId: id,
-                productoId: taller.productoId,
+                productoId: Value(taller.productoId),
+                descripcion: 'Pastilla de freno',
                 cantidad: 0,
                 precioUnitario: 30000,
               ),
@@ -369,20 +371,42 @@ void main() {
       );
     });
 
-    test('el mismo producto no entra dos veces en la misma deuda', () async {
-      final id = await _deudaCon(cantidad: 1);
+    test('una línea sin descripción se rechaza', () async {
+      // La descripción es lo único que siempre está: el producto falta en la
+      // mano de obra de una orden fiada.
+      final id = await _deuda();
 
       expect(
         () => db.into(db.tablaDeudorItem).insert(
               TablaDeudorItemCompanion.insert(
+                usuarioId: sesion.usuarioId,
                 deudorId: id,
-                productoId: taller.productoId,
+                descripcion: '   ',
                 cantidad: 1,
                 precioUnitario: 30000,
               ),
             ),
         throwsA(isA<Exception>()),
       );
+    });
+
+    test('el mismo producto se suma a su línea, no abre otra', () async {
+      // La regla ya no la sostiene un UNIQUE —una orden fiada puede traer el
+      // mismo repuesto dos veces a precios distintos—, así que la sostiene el
+      // repositorio y por eso se prueba aquí.
+      final id = await _deudaCon(cantidad: 1, precio: 30000);
+
+      await deudores.agregarItem(
+        deudorId: id,
+        productoId: taller.productoId,
+        cantidad: 2,
+        precioUnitario: 30000,
+      );
+
+      final detalle = await deudores.obtenerDetalle(id);
+      expect(detalle.items, hasLength(1));
+      expect(detalle.items.single.cantidad, 3);
+      expect(detalle.resumen.montoTotal, 90000);
     });
 
     test('un pago con método fuera del enum se rechaza', () async {
@@ -402,10 +426,12 @@ void main() {
     });
 
     test('borrar la deuda se lleva sus líneas y sus pagos', () async {
+      // Con un pago **parcial**: saldarla emite su factura, y una deuda
+      // facturada ya no se borra (ver el test siguiente).
       final id = await _deudaCon(cantidad: 1, precio: 10000);
       await deudores.registrarPago(
         deudorId: id,
-        monto: 10000,
+        monto: 4000,
         metodoPago: MetodoPago.efectivo,
       );
 
@@ -418,6 +444,27 @@ void main() {
           .getSingle();
       expect(quedan.read<int>('i'), 0);
       expect(quedan.read<int>('p'), 0);
+    });
+
+    test('una deuda ya cobrada no se borra: tiene factura', () async {
+      // Saldarla la mete en el historial de ventas, y una factura emitida no
+      // se borra —lo impide además una guarda de la base—. El mensaje dice
+      // cuál es, para que se pueda ir a anularla.
+      final id = await _deudaCon(cantidad: 1, precio: 10000);
+      await deudores.registrarPago(
+        deudorId: id,
+        monto: 10000,
+        metodoPago: MetodoPago.efectivo,
+      );
+
+      final resultado = await deudores.eliminar(id);
+
+      expect(resultado, isA<Fallo>());
+      expect((resultado as Fallo).mensaje, contains('factura'));
+      final quedan = await db
+          .customSelect('SELECT COUNT(*) AS n FROM deudores')
+          .getSingle();
+      expect(quedan.read<int>('n'), 1);
     });
 
     test('no se borra a un cliente que debe', () async {

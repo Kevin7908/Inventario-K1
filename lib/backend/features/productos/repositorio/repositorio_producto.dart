@@ -1,4 +1,6 @@
+import '../../../../core/resultado.dart';
 import '../modelo/producto.dart';
+import '../modelo/proveedor_de_producto.dart';
 
 /// Una página de resultados junto al total de coincidencias.
 ///
@@ -22,9 +24,23 @@ class FiltroProductos {
     this.soloSinStock = false,
     this.soloEnStock = false,
     this.soloActivos = false,
+    this.compatibleConMarcaId,
+    this.compatibleConModeloId,
   });
 
-  /// Coincide contra nombre, SKU o nombre de categoría.
+  /// Coincide contra nombre, SKU o nombre de categoría, **palabra por
+  /// palabra**: «freno yamaha» encuentra «Frenos Yamaha FZ» aunque nadie las
+  /// haya escrito en ese orden. Todas las palabras tienen que aparecer, cada
+  /// una donde sea.
+  ///
+  /// Los resultados llegan **por relevancia**: primero lo que coincide en el
+  /// nombre, después en el SKU y al final lo que solo coincide por su
+  /// categoría. Sin ese orden, buscar «freno» en un catálogo con una
+  /// categoría «Frenos» sepultaba las pastillas debajo de todo lo demás de esa
+  /// categoría.
+  ///
+  /// Un código de barras completo se compara aparte, exacto y normalizado: lo
+  /// escribe un lector, no una persona.
   final String busqueda;
   final int? categoriaId;
   final bool soloStockBajo;
@@ -35,6 +51,23 @@ class FiltroProductos {
   /// de venta y cotizaciones—, no el catálogo: en Productos, un producto
   /// inactivo tiene que verse para poder reactivarlo.
   final bool soloActivos;
+
+  /// Deja solo lo que le sirve a una moto concreta.
+  ///
+  /// Cuentan **las dos cosas a la vez**: lo declarado para ese modelo exacto y
+  /// lo declarado para toda su marca. Quien busca repuestos para una FZ 2.0
+  /// también quiere ver el aceite que sirve para cualquier Yamaha.
+  ///
+  /// [compatibleConModeloId] puede ir en nulo con la marca puesta —hay motos
+  /// registradas sin modelo—, y entonces solo cuenta la marca. Con la marca en
+  /// nulo el filtro no se aplica: sin marca no hay moto contra la que cruzar.
+  ///
+  /// **Se resuelve en SQL**, con un `EXISTS` correlacionado. Traer el conjunto
+  /// de ids compatibles a Dart para descartar filas después rompería la
+  /// paginación: el `COUNT` contaría lo que la página ya no muestra
+  /// (`REGLAS_BD.md` §5).
+  final int? compatibleConMarcaId;
+  final int? compatibleConModeloId;
 }
 
 /// Contrato abstracto del repositorio de productos.
@@ -141,4 +174,44 @@ abstract class RepositorioProducto {
   /// catálogo, que es lo que necesita el encabezado de la pantalla.
   Stream<({int total, int enStock, int stockBajo, int sinStock})>
       observarResumen({FiltroProductos filtro});
+
+  // Proveedores del producto
+
+  /// Quiénes le venden este repuesto al taller, con su último costo.
+  ///
+  /// El principal va primero y el resto por nombre. Es un stream porque la
+  /// ficha lo muestra mientras se edita: vincular un proveedor tiene que
+  /// verse sin recargar.
+  Stream<List<ProveedorDeProducto>> observarProveedoresDe(int productoId);
+
+  /// Agrega un proveedor a un repuesto, o actualiza el vínculo si ya estaba.
+  ///
+  /// [esPrincipal] apaga al anterior en la misma transacción: la guarda de la
+  /// base rechaza dos principales, así que hacerlo en dos escrituras
+  /// reventaría a mitad.
+  ///
+  /// Devuelve `Fallo` con `MotivoFallo.validacion` si el proveedor no existe
+  /// o si el producto no está guardado todavía.
+  Future<Resultado> vincularProveedor({
+    required int productoId,
+    required int proveedorId,
+    String? referenciaProveedor,
+    bool esPrincipal = false,
+  });
+
+  /// Quita el vínculo. No toca las remisiones: lo que ese proveedor trajo
+  /// alguna vez sigue en `compras`, que es donde vive el historial.
+  Future<Resultado> desvincularProveedor({
+    required int productoId,
+    required int proveedorId,
+  });
+
+  /// Marca cuál es el de cabecera, apagando al anterior.
+  ///
+  /// Con [proveedorId] en `null` el producto se queda sin principal, que es
+  /// un estado legítimo: hay repuestos que se compran a quien los tenga.
+  Future<Resultado> fijarProveedorPrincipal({
+    required int productoId,
+    required int? proveedorId,
+  });
 }

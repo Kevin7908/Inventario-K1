@@ -6,7 +6,8 @@ import '../modelo/devolucion.dart';
 ///
 /// **Anular y devolver no son lo mismo.** Anular (`RepositorioVentas.anular`)
 /// deshace la venta entera y la deja en `ANULADA`; devolver le quita una parte
-/// y la factura sigue viva. Las dos reponen stock, y las dos lo hacen por
+/// y la factura sigue viva. Las dos reponen stock —salvo la devolución que
+/// dice que no, ver [registrar]— y las dos lo hacen por
 /// `RepositorioInventario`: ningún `UPDATE productos SET stock_actual` vive
 /// fuera de ahí.
 abstract interface class RepositorioDevoluciones {
@@ -25,12 +26,19 @@ abstract interface class RepositorioDevoluciones {
   /// (`REGLAS_BD.md` §6). El total no se recibe: se calcula con el precio al
   /// que se vendió cada línea, que es el único que no puede discutirse.
   ///
+  /// [reingresaStock] decide si la mercancía vuelve al estante. En `false` se
+  /// guarda el documento y se le regresa la plata al cliente, pero **no se
+  /// escribe ningún movimiento de inventario**: la pieza llegó rota y se le
+  /// reclama al proveedor, no se vuelve a vender. Si no se pasa, lo propone el
+  /// motivo (`MotivoDevolucion.reponeStockPorDefecto`).
+  ///
   /// Devuelve [Fallo] con [MotivoFallo.validacion] si no hay líneas, si
   /// alguna cantidad se pasa de lo que queda, o si la venta está anulada.
   Future<Resultado> registrar({
     required int ventaId,
     required MotivoDevolucion motivo,
     required List<LineaADevolver> lineas,
+    bool? reingresaStock,
     String? notas,
   });
 

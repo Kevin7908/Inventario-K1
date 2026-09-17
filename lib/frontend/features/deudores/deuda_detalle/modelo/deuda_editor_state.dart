@@ -33,6 +33,8 @@ final class DeudaEditorState {
     required this.montoPagado,
     this.motoId,
     this.motoDescripcion,
+    this.ordenId,
+    this.numeroOrden,
     this.concepto,
     this.notas,
     this.fechaVencimiento,
@@ -55,6 +57,11 @@ final class DeudaEditorState {
   final String clienteNombre;
   final int? motoId;
   final String? motoDescripcion;
+
+  /// La orden que se cerró a crédito, si la deuda nació así. Sus líneas son
+  /// una copia congelada de lo que la orden cobra.
+  final int? ordenId;
+  final String? numeroOrden;
   final String? concepto;
   final String? notas;
   final EstadoDeudor estado;
@@ -81,14 +88,41 @@ final class DeudaEditorState {
   final EstadoGuardadoDeuda guardado;
   final String? motivoBloqueo;
 
+  /// Si la deuda es el reflejo de una orden cerrada a crédito.
+  bool get vieneDeOrden => ordenId != null;
+
+  /// Si sigue esperando plata. Es lo contrario de estar cerrada, y es distinto
+  /// de [editable]: una deuda que copia una orden está viva —se le cobra, se
+  /// puede dar por perdida— aunque sus líneas no se toquen.
+  bool get viva =>
+      estado == EstadoDeudor.activa || estado == EstadoDeudor.vencida;
+
   /// Si todavía se le pueden mover líneas.
   ///
   /// Una deuda cobrada o dada por perdida se lee pero no se toca: cambiarle
   /// una línea movería stock de mercancía que salió del taller hace tiempo.
-  /// Es la misma condición que aplica el repositorio para rechazarlo, así que
-  /// la interfaz y la garantía no pueden decir cosas distintas.
-  bool get editable =>
-      estado == EstadoDeudor.activa || estado == EstadoDeudor.vencida;
+  /// **Una que copia una orden, tampoco**: sus repuestos ya salieron del
+  /// estante al anotarse allá, así que anotarlos otra vez aquí los descontaría
+  /// dos veces —que es justo el descuadre que el cierre a crédito vino a
+  /// cerrar—.
+  ///
+  /// Es la misma condición que aplica el repositorio para rechazarlo, y que la
+  /// guarda de la base impide del todo: la interfaz y la garantía no pueden
+  /// decir cosas distintas.
+  bool get editable => !vieneDeOrden && viva;
+
+  /// Por qué no se puede tocar, para poder decirlo en pantalla. `null` cuando
+  /// sí se puede.
+  String? get motivoNoEditable {
+    if (editable) return null;
+    if (vieneDeOrden) {
+      return 'Es la orden ${numeroOrden ?? ''} cerrada a crédito: sus líneas '
+          'se corrigen en la orden.';
+    }
+    return estado == EstadoDeudor.pagada
+        ? 'La deuda está pagada y ya no admite cambios.'
+        : 'La deuda se dio por perdida y ya no admite cambios.';
+  }
 
   int get saldo => (montoTotal - montoPagado).clamp(0, montoTotal);
 
@@ -99,8 +133,11 @@ final class DeudaEditorState {
 
   /// Si el plazo ya se cumplió. Misma regla que `DeudorResumen.estaVencida`:
   /// la marca del usuario **más** el calendario.
+  ///
+  /// Mira el **estado**, no [editable]: una deuda que copia una orden no se
+  /// puede tocar y aun así vence como cualquier otra.
   bool get estaVencida {
-    if (!editable) return false;
+    if (!viva) return false;
     if (estado == EstadoDeudor.vencida) return true;
     final limite = fechaVencimiento;
     if (limite == null) return false;
@@ -123,6 +160,8 @@ final class DeudaEditorState {
     Object? motoId = _sinCambio,
     Object? motoDescripcion = _sinCambio,
     Object? concepto = _sinCambio,
+    int? ordenId,
+    String? numeroOrden,
     Object? notas = _sinCambio,
     EstadoDeudor? estado,
     Object? fechaVencimiento = _sinCambio,
@@ -146,6 +185,10 @@ final class DeudaEditorState {
         motoDescripcion: identical(motoDescripcion, _sinCambio)
             ? this.motoDescripcion
             : motoDescripcion as String?,
+        // Sin centinela: el enlace con la orden se pone al nacer la deuda y no
+        // se quita nunca —la base tiene una guarda que lo impide—.
+        ordenId: ordenId ?? this.ordenId,
+        numeroOrden: numeroOrden ?? this.numeroOrden,
         concepto: identical(concepto, _sinCambio)
             ? this.concepto
             : concepto as String?,

@@ -12,7 +12,8 @@ import '../../motos/esquema_datos/tabla_moto.dart';
 /// cálculo, no una columna.
 ///
 /// Tampoco lleva `total`: era `subtotal + iva`, dos columnas de su misma fila.
-/// Lo calcula `CotizacionResumen.total`, que además resta el descuento.
+/// Lo calcula `CotizacionResumen.total` —`subtotal − descuento + iva`—, que
+/// además resta el descuento antes de liquidar el impuesto.
 /// `subtotal` sí se guarda —es caché de la suma de las líneas, que la lista
 /// muestra sin abrirlas— e `iva` también, porque es la tasa que se aplicó ese
 /// día y no se recalcula al cambiar la del negocio.
@@ -44,8 +45,9 @@ class TablaCotizacion extends Table {
   /// Los tres en pesos enteros.
   IntColumn get subtotal => integer().withDefault(const Constant(0))();
 
-  /// Rebaja sobre el subtotal, en pesos. Como los precios ya traen el IVA
-  /// dentro, rebajar aquí rebaja exactamente eso de lo que paga el cliente.
+  /// Rebaja sobre el subtotal, en pesos. Se resta **antes** del IVA (ver
+  /// `iva_app.dart`), así que rebajar aquí baja también el impuesto que esa
+  /// parte habría generado.
   IntColumn get descuento => integer().withDefault(const Constant(0))();
 
   IntColumn get iva => integer().withDefault(const Constant(0))();

@@ -25,11 +25,19 @@ final paginaProductosOrdenProvider =
   name: 'paginaProductosOrdenProvider',
   (ref, ordenId) {
     final repositorio = ref.watch(repositorioProductosProvider);
+    // El filtro entero sale del estado —`OrdenEditorState.filtroProductos`—
+    // para no armarlo dos veces con criterios que podrían separarse. Lo que se
+    // observa siguen siendo los campos sueltos: un record solo notifica si
+    // alguno cambió, y `FiltroProductos` todavía no tiene igualdad
+    // estructural.
     final consulta = ref.watch(
       ordenEditorProvider(ordenId).select((s) => (
             busqueda: s.value?.busquedaCatalogo ?? '',
             categoriaId: s.value?.categoriaId,
             pagina: s.value?.paginaCatalogo ?? 0,
+            soloCompatibles: s.value?.soloCompatibles ?? false,
+            marcaId: s.value?.motoMarcaId,
+            modeloId: s.value?.motoModeloId,
           )),
     );
 
@@ -38,6 +46,10 @@ final paginaProductosOrdenProvider =
         busqueda: consulta.busqueda,
         categoriaId: consulta.categoriaId,
         soloActivos: true,
+        compatibleConMarcaId:
+            consulta.soloCompatibles ? consulta.marcaId : null,
+        compatibleConModeloId:
+            consulta.soloCompatibles ? consulta.modeloId : null,
       ),
       pagina: consulta.pagina,
       tamano: OrdenEditorState.tamanoPaginaCatalogo,

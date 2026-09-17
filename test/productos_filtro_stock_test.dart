@@ -38,7 +38,6 @@ Producto _producto({
       precioVenta: 2000,
       stockActual: stock,
       stockMinimo: 3,
-      aplicaIva: true,
       activo: true,
     );
 

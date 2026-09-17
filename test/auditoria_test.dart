@@ -11,6 +11,8 @@ import 'package:inventario_k1/backend/features/bitacora/modelo/entrada_bitacora.
 import 'package:inventario_k1/backend/features/bitacora/repositorio/repositorio_bitacora.dart';
 import 'package:inventario_k1/backend/features/bitacora/repositorio/repositorio_bitacora_impl.dart';
 import 'package:inventario_k1/backend/features/inventario/modelo/movimiento_inventario.dart';
+import 'package:inventario_k1/backend/features/ordenes/enum/enum_ordenes.dart';
+import 'package:inventario_k1/backend/features/ordenes/repositorio/repositorio_ordenes_impl.dart';
 import 'package:inventario_k1/backend/features/inventario/repositorio/repositorio_inventario_impl.dart';
 import 'package:inventario_k1/backend/features/pos/modelo/linea_venta_mostrador.dart';
 import 'package:inventario_k1/backend/features/pos/repositorio/repositorio_ventas_impl.dart';
@@ -18,6 +20,8 @@ import 'package:inventario_k1/backend/features/productos/modelo/producto.dart';
 import 'package:inventario_k1/backend/features/productos/repositorio/repositorio_producto_impl.dart';
 import 'package:inventario_k1/backend/share/database/app_db.dart';
 import 'package:inventario_k1/backend/share/dominio/metodo_pago.dart';
+import 'package:inventario_k1/backend/share/dominio/permiso.dart';
+import 'package:inventario_k1/backend/share/dominio/rol_usuario.dart';
 import 'package:inventario_k1/backend/share/dominio/sesion_actual.dart';
 
 import 'soporte/base_en_memoria.dart';
@@ -41,7 +45,6 @@ Producto _producto({String sku = 'ACE-1', String nombre = 'Aceite 20W50'}) =>
       precioVenta: 40000,
       stockActual: 0,
       stockMinimo: 0,
-      aplicaIva: true,
       activo: true,
     );
 
@@ -211,6 +214,154 @@ void main() {
 
       expect(pagina.total, 1);
       expect(pagina.items.single.descripcion, contains('Bujía'));
+    });
+  });
+
+  group('cerrar o anular una orden deja rastro de quién fue', () {
+    // `ordenes_servicio.usuario_id` dice quién la **abrió** y nada más. Cerrar
+    // le pone precio al trabajo y anular devuelve los repuestos al estante:
+    // son los dos gestos que valen plata, y hasta ahora no constaban.
+
+    late RepositorioOrdenesImpl ordenes;
+    late int ordenId;
+
+    setUp(() async {
+      ordenes = RepositorioOrdenesImpl(db, sesion);
+      final orden = await ordenes.agregar(
+        motoId: taller.motoId,
+        clienteId: taller.clienteId,
+        kilometrajeEntrada: 12000,
+      );
+      ordenId = orden.id;
+    });
+
+    Future<void> pasarA(EstadoOrden estado) => ordenes.actualizar(
+          id: ordenId,
+          estado: estado,
+          kilometrajeEntrada: 12000,
+        );
+
+    Future<List<EntradaBitacora>> historial() =>
+        bitacora.historialDe(EntidadAuditada.orden, ordenId);
+
+    test('cerrarla queda anotado, con el estado de dónde a dónde', () async {
+      await pasarA(EstadoOrden.lista);
+
+      final renglon = (await historial()).single;
+      expect(renglon.accion, AccionAuditada.modifico);
+      expect(renglon.usuarioId, sesion.usuarioId);
+      expect(renglon.detalle, 'Estado: Abierta → Lista');
+    });
+
+    test('anularla se anota como anulación, no como edición', () async {
+      // Quien revisa la caja tiene que distinguir de un vistazo la orden que
+      // se deshizo de la que solo cambió de mano.
+      await pasarA(EstadoOrden.anulada);
+
+      expect((await historial()).single.accion, AccionAuditada.anulo);
+    });
+
+    test('guardar la cabecera sin mover el estado no anota nada', () async {
+      // `actualizar` es también el autoguardado: un renglón por pasada
+      // llenaría la bitácora de ruido mientras alguien teclea el diagnóstico.
+      await ordenes.actualizar(
+        id: ordenId,
+        estado: EstadoOrden.abierta,
+        kilometrajeEntrada: 12500,
+        diagnostico: 'Suena la cadena',
+      );
+
+      expect(await historial(), isEmpty);
+    });
+  });
+
+  group('la bitácora se poda, pero no se puede tapar nada con eso', () {
+    // Crece un renglón por cada alta, edición y borrado de catálogo, y no
+    // tenía nada que la recortara. Ahora sí, con un piso: los últimos dos años
+    // no los borra nadie, ni desde la app ni abriendo el `.sqlite` a mano.
+
+    /// Envejece a la fuerza lo anotado, para no depender del reloj ni tener
+    /// que esperar dos años. Es un `UPDATE` sobre la bitácora, que su guarda
+    /// prohíbe, así que hay que quitarla y devolverla.
+    ///
+    /// El `CAST(... AS INTEGER)` es obligatorio: Drift guarda las fechas como
+    /// segundos de época, y escribir ahí el texto de `datetime('now', …)`
+    /// dejaría la columna con un valor que ninguna comparación entiende.
+    Future<void> envejecer(int meses) async {
+      await db.customStatement('DROP TRIGGER guarda_bitacora_inmutable');
+      await db.customStatement(
+        "UPDATE bitacora SET creado_en = "
+        "CAST(strftime('%s', 'now', ?) AS INTEGER)",
+        ['-$meses months'],
+      );
+      await db.customStatement('''
+        CREATE TRIGGER guarda_bitacora_inmutable
+        BEFORE UPDATE ON bitacora
+        FOR EACH ROW
+        BEGIN
+          SELECT RAISE(ABORT, 'La bitácora no se edita.');
+        END;
+      ''');
+    }
+
+    test('lo viejo se va y deja dicho cuánto se fue', () async {
+      await productos.crear(_producto());
+      await envejecer(30);
+
+      expect(await bitacora.cuantasPodaria(meses: 24), 1);
+      expect(await bitacora.podar(meses: 24), 1);
+
+      // La poda deja **su propio** renglón: sería el único acto de la app sin
+      // rastro, y justo el que serviría para tapar los demás.
+      final quedan = await bitacora
+          .observarPagina(
+            filtro: const FiltroBitacora(),
+            pagina: 0,
+            tamano: 10,
+          )
+          .first;
+
+      expect(quedan.total, 1);
+      expect(quedan.items.single.accion, AccionAuditada.elimino);
+      expect(quedan.items.single.detalle, contains('1 anotaciones'));
+    });
+
+    test('lo reciente no se va, aunque se pidan doce meses', () async {
+      await productos.crear(_producto());
+      await envejecer(18);
+
+      // El piso son dos años y el repositorio recorta: pedir doce meses no
+      // borra de menos, no revienta contra la guarda.
+      expect(await bitacora.podar(meses: 12), 0);
+      expect(await bitacora.cuantasPodaria(meses: 12), 0);
+    });
+
+    test('la guarda de la base rechaza el borrado de lo reciente', () async {
+      // El repositorio recorta, pero la garantía es ésta: quien abra el
+      // `.sqlite` con un visor tampoco puede.
+      await productos.crear(_producto());
+
+      expect(
+        db.customStatement('DELETE FROM bitacora'),
+        throwsA(anything),
+      );
+    });
+
+    test('podar no lo puede hacer cualquiera que la lea', () async {
+      // Recortarla no es leerla: es el gesto con el que se taparía lo demás.
+      final auditor = RepositorioBitacoraImpl(
+        db,
+        SesionActual(
+          usuarioId: sesion.usuarioId,
+          rol: RolUsuario.cajero,
+          permisos: const {Permiso.bitacoraVer},
+        ),
+      );
+
+      await expectLater(
+        auditor.podar(meses: 24),
+        throwsA(isA<PermisoDenegado>()),
+      );
     });
   });
 

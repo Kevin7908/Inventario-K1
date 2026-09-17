@@ -7,7 +7,11 @@ import '../../../../backend/features/especializacion/modelo/especializacion.dart
 import '../../../../backend/features/especializacion/repositorio/repositorio_especializacion.dart';
 import '../../../../backend/features/especializacion/repositorio/repositorio_especializacion_impl.dart';
 import '../../../../backend/share/database/app_db_provider.dart';
+import '../../../../backend/features/tecnicos/modelo/tecnico.dart';
+import '../../../../backend/share/utils/texto_utils.dart';
+import '../../../../core/resultado.dart';
 import '../../autenticacion/provider/auth_providers.dart';
+import '../../tecnicos/provider/tecnico_provider.dart';
 
 // Repositorio concreto. Cambiar la impl aquí no toca ninguna otra capa.
 final repositorioEspecializacionProvider =
@@ -41,60 +45,28 @@ class EspecializacionesNotifier
     return repo.obtenerTodas();
   }
 
-  /// Retorna null si tuvo éxito, o el mensaje de error si falló.
-  Future<String?> agregar({
+  /// El repositorio ya valida, decide el motivo y redacta el texto: aquí no
+  /// queda nada que traducir. Antes este notifier buscaba `UNIQUE` dentro del
+  /// `toString()` de la excepción para adivinar que el nombre estaba repetido,
+  /// que es justo lo que `Resultado` vino a evitar.
+  ///
+  /// Tampoco toca `state`: el stream de Drift que suscribe `build()` re-emite
+  /// solo en cuanto la tabla cambia. El `AsyncLoading` + recarga manual que
+  /// había aquí hacía el mismo trabajo dos veces y parpadeaba la lista.
+  Future<Resultado> agregar({
     required String nombre,
     String? descripcion,
-  }) async {
-    state = const AsyncLoading();
-    final result = await AsyncValue.guard(
-      () => _repo.agregar(nombre: nombre, descripcion: descripcion),
-    );
-    if (result is AsyncError) {
-      // Restaura lista actual antes de retornar error
-      state = await AsyncValue.guard(_repo.obtenerTodas);
-      return _mensajeDeError(result.error);
-    }
-    return null; // éxito
-  }
+  }) =>
+      _repo.agregar(nombre: nombre, descripcion: descripcion);
 
-  // Actualizar 
-  Future<String?> actualizar({
+  Future<Resultado> actualizar({
     required int id,
     required String nombre,
     String? descripcion,
-  }) async {
-    state = const AsyncLoading();
-    final result = await AsyncValue.guard(
-      () => _repo.actualizar(id: id, nombre: nombre, descripcion: descripcion),
-    );
-    if (result is AsyncError) {
-      state = await AsyncValue.guard(_repo.obtenerTodas);
-      return _mensajeDeError(result.error);
-    }
-    return null;
-  }
+  }) =>
+      _repo.actualizar(id: id, nombre: nombre, descripcion: descripcion);
 
-  // Eliminar
-  Future<String?> eliminar(int id) async {
-    state = const AsyncLoading();
-    final result = await AsyncValue.guard(() => _repo.eliminar(id));
-    if (result is AsyncError) {
-      state = await AsyncValue.guard(_repo.obtenerTodas);
-      return _mensajeDeError(result.error);
-    }
-    return null;
-  }
-
-  //  Helper 
-  String _mensajeDeError(Object? error) {
-    if (error == null) return 'Error desconocido';
-    final msg = error.toString();
-    if (msg.contains('UNIQUE')) {
-      return 'Ya existe una especialización con ese nombre.';
-    }
-    return msg;
-  }
+  Future<Resultado> eliminar(int id) => _repo.eliminar(id);
 }
 
 final especializacionesProvider =
@@ -127,4 +99,36 @@ final especializacionesFiltradasProvider =
     });
   },
   name: 'especializacionesFiltradasProvider',
+);
+
+/// Los técnicos que tienen una especialidad, para el diálogo de su tarjeta.
+///
+/// Se deriva del catálogo que ya está en vivo y **no abre una consulta
+/// nueva**: es la misma lista que alimenta el conteo de las tarjetas, así que
+/// filtrar aquí no cuesta un viaje a la base. Va en un `Provider` y no dentro
+/// del `build()` del diálogo por la regla de los cálculos derivados
+/// (`CLAUDE.md` §3): dentro de la vista se repetiría el filtro en cada
+/// repintado aunque la lista no hubiera cambiado.
+///
+/// Los inactivos van al final: quien pregunta quién sabe de frenos también
+/// quiere saber que el que sabía ya no está, pero no antes que los que están.
+/// Dentro de cada grupo, por nombre.
+final tecnicosDeEspecializacionProvider =
+    Provider.family<AsyncValue<List<Tecnico>>, int>(
+  name: 'tecnicosDeEspecializacionProvider',
+  (ref, especializacionId) =>
+      ref.watch(catalogoTecnicosProvider).whenData((todos) {
+    final suyos = todos
+        .where((t) => t.especializacionId == especializacionId)
+        .toList()
+      ..sort((a, b) {
+        if (a.activo != b.activo) return a.activo ? -1 : 1;
+        // `aplanarTexto` y no `toLowerCase`: con el orden de puntos de código,
+        // «Álvaro» cae después de «Bernardo» porque la «á» está más allá de
+        // la «z». Es el mismo helper que usa el buscador del catálogo.
+        return aplanarTexto(a.datosPersona.nombreCompleto)
+            .compareTo(aplanarTexto(b.datosPersona.nombreCompleto));
+      });
+    return suyos;
+  }),
 );

@@ -4,10 +4,12 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../../backend/features/especializacion/modelo/especializacion.dart';
+import '../../../../core/resultado.dart';
 import '../../../share/share.dart';
 import '../../tecnicos/provider/tecnico_provider.dart';
 import '../provider/especializacion_provider.dart';
 import '../widgets/dialogo_especializacion.dart';
+import '../widgets/dialogo_tecnicos_especializacion.dart';
 
 /// Pestaña "Especializaciones" de Configuración: catálogo de áreas técnicas
 /// presentado como grilla de tarjetas, con creación, edición y eliminación.
@@ -42,18 +44,6 @@ class _EspecializacionesVistaState
     });
   }
 
-  void _mostrarError(String error) {
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text(
-          error,
-          style: TipografiaApp.sobrePrimario(TipografiaApp.cuerpo),
-        ),
-        backgroundColor: ColoresApp.statusDanger,
-      ),
-    );
-  }
-
   Future<void> _eliminar(Especializacion especializacion) async {
     final confirmado = await DialogoConfirmacion.mostrar(
       context,
@@ -62,11 +52,16 @@ class _EspecializacionesVistaState
     );
     if (confirmado != true || !mounted) return;
 
-    final error = await ref
+    final resultado = await ref
         .read(especializacionesProvider.notifier)
         .eliminar(especializacion.id);
-    if (!mounted || error == null) return;
-    _mostrarError(error);
+    if (!mounted) return;
+    switch (resultado) {
+      case Exito():
+        MensajeApp.exito(context, 'Especialización eliminada.');
+      case Fallo(:final mensaje):
+        MensajeApp.error(context, mensaje);
+    }
   }
 
   /// Cuenta cuántos técnicos tienen asignada cada especialización.
@@ -152,6 +147,12 @@ class _EspecializacionesVistaState
           icono: Icons.build_outlined,
           titulo: especializacion.nombre,
           subtitulo: total == 1 ? '1 técnico' : '$total técnicos',
+          // El conteo ya estaba; lo que faltaba era poder ver **cuáles**. Sin
+          // esto había que irse a Técnicos y leer la columna fila por fila.
+          alPresionar: () => DialogoTecnicosEspecializacion.mostrar(
+            context,
+            especializacion: especializacion,
+          ),
           acciones: Row(
             mainAxisSize: MainAxisSize.min,
             children: [

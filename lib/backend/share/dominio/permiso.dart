@@ -6,6 +6,7 @@ enum ModuloPermiso {
   inventario('Inventario'),
   categorias('Categorías'),
   proveedores('Proveedores'),
+  compras('Compras'),
   ordenes('Órdenes de servicio'),
   cotizaciones('Cotizaciones'),
   reservas('Reservas'),
@@ -87,6 +88,15 @@ enum Permiso {
       'Crear y editar proveedores', 'Dar de alta o cambiar un proveedor.'),
   proveedoresEliminar('PROVEEDORES_ELIMINAR', ModuloPermiso.proveedores,
       'Eliminar proveedores', 'Sacar un proveedor de la lista.'),
+
+  // Compras
+  comprasVer('COMPRAS_VER', ModuloPermiso.compras, 'Ver las compras',
+      'Consultar las remisiones del proveedor y lo que costó cada una.'),
+  comprasCrear('COMPRAS_CREAR', ModuloPermiso.compras, 'Registrar compras',
+      'Dar entrada a una remisión completa, con proveedor y costo.'),
+  comprasAnular('COMPRAS_ANULAR', ModuloPermiso.compras, 'Anular compras',
+      'Deshacer una remisión mal tecleada y sacar del inventario lo que '
+      'nunca llegó.'),
 
   // Órdenes de servicio
   ordenesVer('ORDENES_VER', ModuloPermiso.ordenes, 'Ver órdenes',

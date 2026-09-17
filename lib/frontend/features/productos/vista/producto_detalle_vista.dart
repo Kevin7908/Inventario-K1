@@ -3,13 +3,18 @@ import 'dart:io';
 import 'package:flutter/material.dart';
 
 import '../../../../core/formato.dart';
+import '../../../../core/iva_app.dart';
 
 import '../../../../backend/features/productos/modelo/producto.dart';
 import '../../../share/share.dart';
 import '../widgets/badget_estado_stock_widget.dart';
+import '../widgets/panel_compatibilidad.dart';
+import '../widgets/panel_proveedores_producto.dart';
 import '../../../../backend/share/dominio/permiso.dart';
 import '../../autenticacion/widgets/si_puede.dart';
 import '../../inventario/widgets/dialogo_entrada_compra.dart';
+import '../../bitacora/widgets/panel_historial_fila.dart';
+import '../../../../backend/features/bitacora/modelo/entrada_bitacora.dart';
 import '../../inventario/widgets/panel_movimientos_producto.dart';
 
 /// Ficha de un producto: imagen, datos de inventario y acciones.
@@ -18,9 +23,10 @@ import '../../inventario/widgets/panel_movimientos_producto.dart';
 /// contenido no cabe cómodamente en un modal y así se replica el flujo del
 /// diseño ("Volver a productos" → ficha → "Editar producto").
 ///
-/// [alVolver], [alEditar] y [alEliminar] son opcionales para poder reutilizar
-/// la misma ficha dentro de `DialogoDetalleProductoWidget`, que ya trae su
-/// propio botón de cerrar y no ofrece edición ni borrado. Si son `null`, se
+/// [alVolver], [alEditar], [alEliminar] y [alVerMovimientos] son opcionales
+/// para poder reutilizar la misma ficha dentro de
+/// `DialogoDetalleProductoWidget`, que ya trae su propio botón de cerrar, no
+/// ofrece edición ni borrado y no tiene a dónde navegar. Si son `null`, se
 /// ocultan esos controles.
 class ProductoDetalleVista extends StatelessWidget {
   const ProductoDetalleVista({
@@ -29,6 +35,7 @@ class ProductoDetalleVista extends StatelessWidget {
     this.alVolver,
     this.alEditar,
     this.alEliminar,
+    this.alVerMovimientos,
     this.padding = const EdgeInsets.fromLTRB(32, 24, 32, 40),
   });
 
@@ -36,6 +43,10 @@ class ProductoDetalleVista extends StatelessWidget {
   final VoidCallback? alVolver;
   final VoidCallback? alEditar;
   final VoidCallback? alEliminar;
+
+  /// Abre el libro mayor completo del repuesto. En `null` el panel de
+  /// movimientos no ofrece «Ver todos».
+  final VoidCallback? alVerMovimientos;
   final EdgeInsets padding;
 
   @override
@@ -60,7 +71,10 @@ class ProductoDetalleVista extends StatelessWidget {
                 return Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    _Galeria(rutaImagen: producto.imagenUrl),
+                    _ColumnaImagen(
+                      producto: producto,
+                      conAcciones: alEditar != null || alEliminar != null,
+                    ),
                     const SizedBox(height: 26),
                     _Ficha(producto: producto, alEditar: alEditar, alEliminar: alEliminar),
                   ],
@@ -71,7 +85,10 @@ class ProductoDetalleVista extends StatelessWidget {
                 children: [
                   Expanded(
                     flex: 4,
-                    child: _Galeria(rutaImagen: producto.imagenUrl),
+                    child: _ColumnaImagen(
+                      producto: producto,
+                      conAcciones: alEditar != null || alEliminar != null,
+                    ),
                   ),
                   const SizedBox(width: 26),
                   Expanded(
@@ -83,9 +100,56 @@ class ProductoDetalleVista extends StatelessWidget {
             },
           ),
           const SizedBox(height: 26),
-          _PanelesSecundarios(producto: producto),
+          _PanelesSecundarios(
+            producto: producto,
+            alVerMovimientos: alVerMovimientos,
+          ),
         ],
       ),
+    );
+  }
+}
+
+/// La columna izquierda: la foto y, debajo, la entrada sin papel.
+///
+/// El botón estaba metido entre los datos de inventario y «Editar producto»,
+/// donde se confundía con las acciones de la ficha. Dar entrada a mercancía no
+/// es editar el producto: es lo que se hace con la caja delante, y va pegado a
+/// la foto de lo que se está contando.
+class _ColumnaImagen extends StatelessWidget {
+  const _ColumnaImagen({required this.producto, required this.conAcciones});
+
+  final Producto producto;
+
+  /// En `false` —el vistazo rápido en diálogo— no se ofrece dar entrada: esa
+  /// ventana es de solo lectura.
+  final bool conAcciones;
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        _Galeria(rutaImagen: producto.imagenUrl),
+        if (conAcciones) ...[
+          const SizedBox(height: 14),
+          // Lo que llega **sin papel**: una devolución del mecánico, un
+          // sobrante. La remisión con proveedor y costo se registra desde
+          // Compras, porque su ficha es una pantalla entera y desde aquí no
+          // hay cómo llegar a ella.
+          SiPuede(
+            permiso: Permiso.inventarioEntrada,
+            child: BotonSecundario(
+              etiqueta: 'Entrada sin factura',
+              icono: Icons.add_box_outlined,
+              expandido: true,
+              alPresionar: () =>
+                  DialogoEntradaCompra.mostrar(context, producto: producto),
+            ),
+          ),
+        ],
+      ],
     );
   }
 }
@@ -191,33 +255,22 @@ class _Ficha extends StatelessWidget {
             BadgeEstadoStock(estado: producto.estadoStock),
           ],
         ),
-        if (producto.aplicaIva) ...[
+        // Con la tasa en 0 el renglón no se pinta: un «+ $0 de IVA» solo
+        // estorba en la ficha de un taller que no factura impuesto.
+        if (hayIva) ...[
           const SizedBox(height: 6),
           Text(
-            'Incluye ${formatearPrecio(producto.ivaDelPrecio)} de IVA',
+            '+ ${formatearPrecio(producto.ivaDelPrecio)} de $etiquetaIva  ·  '
+            '${formatearPrecio(producto.precioConIva)} con impuesto',
             style: TipografiaApp.caption,
           ),
         ],
         const SizedBox(height: 22),
         _GrillaDatos(producto: producto),
         const SizedBox(height: 22),
-        _Compatibilidad(descripcion: producto.descripcion),
+        PanelCompatibilidad(productoId: producto.id!),
         if (alEditar != null || alEliminar != null) ...[
           const SizedBox(height: 22),
-          // Dar entrada vive aquí además de en Movimientos: cuando llega la
-          // remisión, quien la recibe está mirando el producto, no el kardex.
-          // Es el mismo diálogo, con el producto ya elegido.
-          SiPuede(
-            permiso: Permiso.inventarioEntrada,
-            child: BotonSecundario(
-              etiqueta: 'Dar entrada',
-              icono: Icons.local_shipping_outlined,
-              expandido: true,
-              alPresionar: () =>
-                  DialogoEntradaCompra.mostrar(context, producto: producto),
-            ),
-          ),
-          const SizedBox(height: 12),
           Row(
             children: [
               if (alEditar != null)
@@ -318,67 +371,31 @@ class _GrillaDatos extends StatelessWidget {
   }
 }
 
-/// Bloque "Compatibilidad" del diseño.
-///
-/// El modelo `Producto` no tiene todavía un campo de motos compatibles, así
-/// que el bloque queda como marcador hasta que exista en el backend.
-class _Compatibilidad extends StatelessWidget {
-  const _Compatibilidad({required this.descripcion});
-
-  final String? descripcion;
-
-  @override
-  Widget build(BuildContext context) {
-    final texto = descripcion?.trim() ?? '';
-
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Text(
-          'Compatibilidad',
-          style: TipografiaApp.caption.copyWith(
-            fontSize: 13,
-            fontWeight: FontWeight.w600,
-          ),
-        ),
-        const SizedBox(height: 8),
-        if (texto.isEmpty)
-          Container(
-            width: double.infinity,
-            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
-            decoration: BoxDecoration(
-              color: ColoresApp.bgInput,
-              borderRadius: BorderRadius.circular(11),
-              border: Border.all(color: ColoresApp.borderFila),
-            ),
-            child: Text(
-              'Sin información de compatibilidad',
-              style: TipografiaApp.caption.copyWith(
-                color: ColoresApp.textDisabled,
-              ),
-            ),
-          )
-        else
-          Text(texto, style: TipografiaApp.caption.copyWith(fontSize: 13)),
-      ],
-    );
-  }
-}
-
 /// Paneles inferiores: proveedor y movimientos recientes.
 class _PanelesSecundarios extends StatelessWidget {
-  const _PanelesSecundarios({required this.producto});
+  const _PanelesSecundarios({required this.producto, this.alVerMovimientos});
 
   final Producto producto;
+  final VoidCallback? alVerMovimientos;
 
   @override
   Widget build(BuildContext context) {
     return LayoutBuilder(
       builder: (context, constraints) {
-        final proveedor = _PanelProveedor(producto: producto);
-        final movimientos = PanelMovimientosProducto(productoId: producto.id!);
+        final proveedor = PanelProveedoresProducto(productoId: producto.id!);
+        final movimientos = PanelMovimientosProducto(
+          productoId: producto.id!,
+          alVerTodos: alVerMovimientos,
+        );
+        // Los movimientos cuentan qué le pasó al stock; esto, quién tocó la
+        // ficha. Son preguntas distintas y por eso van en dos paneles: el
+        // precio de venta no deja movimiento, pero sí renglón de bitácora.
+        final historial = PanelHistorialFila(
+          entidad: EntidadAuditada.producto,
+          entidadId: producto.id!,
+        );
 
-        // En ventanas angostas los dos paneles se apilan.
+        // En ventanas angostas los paneles se apilan.
         if (constraints.maxWidth < 900) {
           return Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -386,71 +403,28 @@ class _PanelesSecundarios extends StatelessWidget {
               proveedor,
               const SizedBox(height: 22),
               movimientos,
+              const SizedBox(height: 22),
+              historial,
             ],
           );
         }
 
-        return Row(
-          crossAxisAlignment: CrossAxisAlignment.start,
+        return Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            Expanded(child: proveedor),
-            const SizedBox(width: 22),
-            Expanded(child: movimientos),
+            Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Expanded(child: proveedor),
+                const SizedBox(width: 22),
+                Expanded(child: movimientos),
+              ],
+            ),
+            const SizedBox(height: 22),
+            historial,
           ],
         );
       },
-    );
-  }
-}
-
-class _PanelProveedor extends StatelessWidget {
-  const _PanelProveedor({required this.producto});
-
-  final Producto producto;
-
-  @override
-  Widget build(BuildContext context) {
-    return PanelSeccion(
-      titulo: 'Proveedor',
-      child: Row(
-        children: [
-          Container(
-            width: 46,
-            height: 46,
-            decoration: BoxDecoration(
-              color: ColoresApp.statusInfoBg,
-              borderRadius: BorderRadius.circular(12),
-            ),
-            child: const Icon(
-              Icons.local_shipping_outlined,
-              color: ColoresApp.statusInfo,
-              size: 21,
-            ),
-          ),
-          const SizedBox(width: 14),
-          Expanded(
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  producto.proveedorNombre ?? 'Sin proveedor asignado',
-                  style: TipografiaApp.tituloTarjeta,
-                  maxLines: 2,
-                  overflow: TextOverflow.ellipsis,
-                ),
-                const SizedBox(height: 2),
-                Text(
-                  'Precio de compra: ${formatearPrecio(producto.precioCompra)}',
-                  style: TipografiaApp.caption.copyWith(
-                    color: ColoresApp.textMuted,
-                  ),
-                ),
-              ],
-            ),
-          ),
-        ],
-      ),
     );
   }
 }

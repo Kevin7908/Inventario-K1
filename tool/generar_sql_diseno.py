@@ -72,8 +72,25 @@ señor registrado dos veces tenía dos teléfonos que se desincronizaban solos."
    'usuario_permisos', 'especializaciones']),
 
  ('2. CATÁLOGO', """Lo que el taller vende y con qué lo mide. Los catálogos no se borran: llevan
-`activo` porque los documentos emitidos los referencian.""",
-  ['categorias', 'unidades_medida', 'productos', 'servicios']),
+`activo` porque los documentos emitidos los referencian.
+
+`productos.codigo_barras` es APARTE del sku: el sku lo inventa el taller con el
+prefijo de la categoría y siempre está; el código de barras viene impreso de
+fábrica y falta en todo lo que llega a granel. Por eso es nullable, y UNIQUE
+acepta varios NULL sin estorbar. Se guarda normalizado —sin espacios ni
+guiones— porque un lector puede mandar «7 702001 234567» y otro
+«7702001234567», y los dos tienen que dar en el mismo producto.
+
+producto_compatibilidades responde «¿esta pastilla le sirve a una Pulsar?»,
+que antes caía dentro de `descripcion` como texto libre. Una línea vale por una
+MARCA ENTERA o por un MODELO, nunca por las dos —el aceite sirve para cualquier
+Yamaha, la pastilla solo para la FZ—, y eso lo cierra un CHECK: obligar a
+listar los modelos uno por uno para el primer caso llenaría la tabla de filas
+que dicen lo mismo. Son dos columnas nulables y no el par
+referencia_tipo/referencia_id, por lo mismo que en movimientos_inventario: una
+FK polimórfica no la puede verificar la base.""",
+  ['categorias', 'unidades_medida', 'productos', 'producto_compatibilidades',
+   'servicios']),
 
  ('3. INVENTARIO', """El libro mayor del stock. `productos.stock_actual` es un CACHÉ de
 SUM(movimientos_inventario.cantidad): se guarda porque la app lo consulta cien
@@ -81,14 +98,64 @@ veces por pantalla, pero la verdad son los movimientos, y hay una consulta que
 comprueba que cuadran.
 
 La cantidad lleva SIGNO —positivo entra, negativo sale— para que reconstruir
-el stock sea un SUM y no un CASE de diez ramas. El origen son tres columnas
+el stock sea un SUM y no un CASE de diez ramas. El origen son CINCO columnas
 nulables con FK real en vez del típico par referencia_tipo/referencia_id: una
-FK polimórfica no la puede verificar la base.""",
-  ['movimientos_inventario']),
+FK polimórfica no la puede verificar la base. Un CHECK garantiza que como
+mucho una esté puesta; un ajuste manual las deja las cinco en NULL.
 
- ('4. TALLER', """La moto del cliente y su paso por el taller.""",
-  ['motos', 'ordenes_servicio', 'ordenes_tareas', 'ordenes_repuestos',
-   'ordenes_cargos']),
+`compras` es la remisión del proveedor: EL POS AL REVÉS. Existe porque el
+movimiento responde «¿cuántas pastillas entraron el martes?» y el taller
+pregunta además «¿cuánto costó el pedido completo que llegó el martes?» y «¿a
+cómo la compramos la vez pasada?». Sin cabecera no hay documento que abrir, ni
+número que citar, ni forma de saber que catorce entradas sueltas eran un solo
+pedido.
+
+`compra_detalles.costo_unitario` es un SNAPSHOT y ahí está el valor del
+módulo: es LO QUE DE VERDAD SE PAGÓ ese día. Si el costo viviera solo en
+`productos.precio_compra`, cada compra nueva borraría la anterior y el margen
+que muestra la app se calcularía contra un número que alguien tecleó una vez.
+Registrar una compra sí actualiza `precio_compra` al último costo, pero el
+histórico queda aquí.
+
+`compras.total` es caché de SUM(cantidad * costo_unitario), como el stock. El
+UNIQUE (proveedor_id, numero_factura) cierra el error de captura más caro del
+módulo —teclear dos veces la misma remisión mete el doble de mercancía—, y
+admite varios NULL para lo que llega sin papel.
+
+La remisión NACE EN BORRADOR y se teclea línea por línea, como una orden: cada
+línea mete su mercancía al inventario en el momento, porque anotarla ES
+recibirla. Lo que falta mientras tanto es que quien recibe diga «ya está
+todo», y eso es REGISTRADA: a partir de ahí se cierra a cambios —lo garantizan
+tres guardas— y cuenta como gasto del mes. Un borrador no cuenta como gasto ni
+como la última compra de sus productos, aunque su stock ya esté dentro.
+
+Una compra con algo dentro NO SE BORRA: se anula, y anular saca del inventario
+lo que había entrado. La única que se borra es la que no llegó a nada —borrador
+y sin una sola línea—, que es el cuadro que alguien abrió por error.
+
+`compra_detalles` no lleva usuario_id, por lo mismo que `venta_detalles`: la
+remisión se escribe entera en una transacción, así que el autor de cada línea
+es siempre el de la cabecera.""",
+  ['compras', 'compra_detalles', 'movimientos_inventario']),
+
+ ('4. TALLER', """La moto del cliente y su paso por el taller.
+
+La marca y el modelo son CATÁLOGO, no texto libre en `motos`: con texto entran
+«Yamaha», «yamaha» y «YAMAHA» como tres marcas y ningún informe puede
+cruzarlas. El cilindraje vive en `modelos_moto` y no en cada moto porque es del
+modelo, no del ejemplar: todas las Boxer CT100 son de 100 cc, y repetirlo por
+moto era el mismo dato una vez por cliente.
+
+`motos.modelo_id` es nullable y `marca_id` no: en el mostrador la marca siempre
+se sabe y el modelo exacto a veces no está catalogado todavía. Parar la
+atención al cliente para dar de alta un modelo sería peor que registrar la moto
+con lo que se sabe.
+
+Las líneas de las tres tablas hijas llevan su propio usuario_id: una orden pasa
+de un turno a otro, así que quien anota un repuesto no siempre es quien la
+abrió.""",
+  ['marcas_moto', 'modelos_moto', 'motos', 'ordenes_servicio',
+   'ordenes_tareas', 'ordenes_repuestos', 'ordenes_cargos']),
 
  ('5. DOCUMENTOS DE VENTA', """La factura es un documento contable: no se borra, se anula (ver las guardas
 del final). Sus líneas congelan descripción, precio y costo a propósito: si
@@ -111,7 +178,15 @@ Que la suma devuelta no pase de lo vendido NO CABE EN UN CHECK —necesita un
 agregado sobre las demás filas—: lo cierra una guarda, al final del archivo.
 
 devoluciones.total es caché de SUM(cantidad * precio_unitario) de sus líneas,
-como el stock y como monto_pagado.""",
+como el stock y como monto_pagado.
+
+reingresa_stock dice si la mercancía volvió al estante. En FALSE la devolución
+NO ESCRIBE MOVIMIENTO: la pieza llegó rota y se le reclama al proveedor, no se
+vuelve a vender —la plata se le devuelve al cliente igual—. El motivo lo
+propone (DEFECTUOSO y GARANTIA nacen apagados) pero no lo decide: quien recibe
+puede ver que la pieza está bien. Lo devuelto cuenta como devuelto en las dos:
+la unidad no está en el estante, pero tampoco en manos del cliente, así que
+anular después no la repone.""",
   ['devoluciones', 'devolucion_detalles']),
 
  ('7. COTIZACIONES Y RESERVAS', """La cotización no guarda `total` (es subtotal + iva, dos columnas de su misma
@@ -124,11 +199,30 @@ stock.""",
 
  ('8. CARTERA', """Lo que queda por cobrar. `monto_pagado` es caché de SUM(deudor_pagos.monto).
 
-La deuda NACE EN CUENTAS POR COBRAR, no en una factura. Hubo una columna
-venta_id que apuntaba a la venta que la originó; se quitó cuando el mostrador
-dejó de fiar —toda venta se cobra completa— y nadie volvió a escribirla. Si
-algún día se vuelve a fiar desde el POS, es una FK nueva, no una columna que
-llevaba años en NULL.
+La deuda nace en CUENTAS POR COBRAR o AL CERRAR UNA ORDEN A CRÉDITO. Hubo una
+columna venta_id que apuntaba a la venta que la originó; se quitó cuando el
+mostrador dejó de fiar —toda venta se cobra completa— y nadie volvió a
+escribirla. Si algún día se vuelve a fiar desde el POS, es una FK nueva, no una
+columna que llevaba años en NULL.
+
+`deudores.orden_id` sí se escribe, y ES LO QUE CIERRA UN DESCUADRE REAL DE
+INVENTARIO. Antes había que anotar el repuesto en la orden —que lo saca del
+estante— y otra vez en la deuda para que constara qué se fió: salía uno del
+taller y el inventario decía dos. Cerrar la orden a crédito copia sus líneas a
+la deuda SIN REGISTRAR UN SOLO MOVIMIENTO, y tres guardas cierran esas líneas a
+la edición a mano —editarlas movería stock por una salida que ya ocurrió—. El
+UNIQUE de la columna impide fiar dos veces la misma orden.
+
+Por eso `deudor_items.producto_id` es NULLABLE y manda `descripcion`: lo fiado
+no siempre es una pieza del catálogo. La mano de obra y los cargos sueltos de
+la orden se cobran igual y tienen que constar, o el total de la deuda no
+coincidiría con el de la orden. Y por eso NO HAY UNIQUE (deudor_id,
+producto_id): esa regla —«el mismo producto no abre dos líneas»— solo vale
+para lo que se anota a mano, y la sostiene el repositorio; una orden admite el
+mismo repuesto en dos renglones a precios distintos.
+
+`deudores.descuento` existe para que la rebaja de la orden viaje con ella:
+monto_total es SUM(líneas) − descuento.
 
 FIAR SACA LA MERCANCÍA DEL TALLER, y ahí está la diferencia con una reserva:
 lo apartado sigue en la bodega y cancelarlo lo devuelve; lo fiado se fue
@@ -169,9 +263,15 @@ rompen lo que la tabla existe para conservar (RESTRICT impediría el borrado,
 CASCADE se llevaría el renglón que lo cuenta). `descripcion` guarda el nombre
 de lo afectado como snapshot: es la parte legible que sobrevive al borrado.
 
-Es de SOLO ESCRITURA, con su guarda: una bitácora que se puede corregir no
-prueba nada, porque quien quisiera tapar algo empezaría por su propio
-renglón.""",
+NO SE EDITA, con su guarda: una bitácora que se puede corregir no prueba nada,
+porque quien quisiera tapar algo empezaría por su propio renglón.
+
+SÍ SE PODA, o crecería un renglón por cada alta y cada borrado para siempre,
+pero solo lo de más de DOS AÑOS: la guarda del borrado rechaza cualquier DELETE
+sobre un renglón más reciente, así que recortarla no sirve para tapar nada.
+Cuánto conserva el taller por encima de ese piso es configurable
+(`meses_bitacora`); el piso no, porque una garantía configurable no es una
+garantía. La poda deja su propio renglón.""",
   ['bitacora']),
 ]
 

@@ -128,7 +128,13 @@ class _FormularioMotoState extends State<FormularioMoto> {
         id: previa?.id ?? 0,
         clienteId: _dueno?.id ?? previa?.clienteId ?? 0,
         nombreCliente: _dueno?.nombreCompleto ?? previa?.nombreCliente,
+        // La marca y el modelo viajan como texto y los traduce a id el
+        // repositorio, que es quien normaliza y da de alta lo que falte
+        // (`REGLAS_BD.md` §2). `marcaId: 0` marca «todavía sin resolver»,
+        // igual que `id: 0` marca la moto nueva.
+        marcaId: previa?.marcaId ?? 0,
         marca: _marcaCtrl.text.trim(),
+        modeloId: previa?.modeloId,
         modelo: _modeloCtrl.text.trim(),
         placa: _opcional(_placaCtrl)?.toUpperCase(),
         anio: int.tryParse(_anioCtrl.text.trim()),

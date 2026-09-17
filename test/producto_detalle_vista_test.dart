@@ -4,10 +4,15 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:inventario_k1/backend/features/inventario/modelo/movimiento_inventario.dart';
 import 'package:inventario_k1/backend/features/productos/modelo/producto.dart';
+import 'package:inventario_k1/backend/features/productos/modelo/proveedor_de_producto.dart';
 import 'package:inventario_k1/backend/share/dominio/permiso.dart';
 import 'package:inventario_k1/frontend/features/autenticacion/provider/auth_providers.dart';
 import 'package:inventario_k1/frontend/features/inventario/provider/inventario_providers.dart';
+import 'package:inventario_k1/backend/features/productos/modelo/compatibilidad.dart';
+import 'package:inventario_k1/frontend/features/productos/provider/compatibilidades_provider.dart';
 import 'package:inventario_k1/frontend/features/productos/vista/producto_detalle_vista.dart';
+
+import 'package:inventario_k1/frontend/features/productos/provider/productos_provider.dart';
 
 import 'soporte/repositorio_inventario_falso.dart';
 
@@ -25,7 +30,6 @@ const _producto = Producto(
   stockActual: 12,
   stockMinimo: 4,
   ubicacionBodega: 'Estante A-3',
-  aplicaIva: true,
   activo: true,
 );
 
@@ -37,6 +41,8 @@ Future<void> _pumpFicha(
   Size tamano, {
   List<MovimientoInventario> movimientos = const [],
   Set<Permiso> permisos = const {},
+  List<ProveedorDeProducto> proveedores = const [],
+  List<Compatibilidad> compatibilidades = const [],
   /// La ficha solo pinta sus acciones cuando es la página completa. Dentro de
   /// `DialogoDetalleProductoWidget` no recibe callbacks y es de solo lectura.
   bool conAcciones = false,
@@ -52,6 +58,18 @@ Future<void> _pumpFicha(
           RepositorioInventarioFalso(movimientos: movimientos),
         ),
         permisosSesionProvider.overrideWith((ref) => Stream.value(permisos)),
+        // Un stream síncrono en vez de la consulta real: los streams de Drift
+        // no avanzan bajo el `fakeAsync` de `flutter_test` y dejan un timer
+        // pendiente al cerrarse. Lo que se prueba aquí es el layout; que la
+        // consulta traiga lo correcto lo cubre
+        // `repositorio_marcas_compatibilidad_test.dart`.
+        compatibilidadesProvider(_producto.id!)
+            .overrideWith((ref) => Stream.value(compatibilidades)),
+        // Lo mismo con los proveedores: la ficha los muestra desde que un
+        // repuesto puede tener varios, y su consulta la cubre
+        // `producto_proveedores_test.dart`.
+        proveedoresDeProductoProvider(_producto.id!)
+            .overrideWith((ref) => Stream.value(proveedores)),
       ],
       child: MaterialApp(
         home: Scaffold(
@@ -130,10 +148,14 @@ void main() {
     await _pumpFicha(tester, const Size(1400, 1200), conAcciones: true);
 
     expect(find.text('Editar producto'), findsOneWidget);
-    expect(find.text('Dar entrada'), findsNothing);
+    expect(find.text('Entrada sin factura'), findsNothing);
   });
 
-  testWidgets('con INVENTARIO_ENTRADA aparece el botón', (tester) async {
+  testWidgets('con INVENTARIO_ENTRADA aparece la entrada sin factura',
+      (tester) async {
+    // Aquí solo vive lo que llega **sin papel**. La remisión con proveedor y
+    // costo se registra desde Compras, porque su ficha es una pantalla entera
+    // y desde la del producto no hay cómo llegar a ella.
     await _pumpFicha(
       tester,
       const Size(1400, 1200),
@@ -141,6 +163,140 @@ void main() {
       permisos: {Permiso.inventarioEntrada},
     );
 
-    expect(find.text('Dar entrada'), findsOneWidget);
+    expect(find.text('Entrada sin factura'), findsOneWidget);
+  });
+
+  group('quién me lo vende', () {
+    // Sustituye a los dos bloques de antes —«Proveedor», que enseñaba uno
+    // solo, y «Última compra», que enseñaba una sola—: los dos respondían a
+    // medias la única pregunta que se hace mirando esto.
+
+    testWidgets('sin proveedores vinculados lo dice', (tester) async {
+      await _pumpFicha(tester, const Size(1400, 1200));
+
+      expect(find.text('Todavía no se le compra a nadie'), findsOneWidget);
+    });
+
+    testWidgets('lista a los dos, con el principal marcado', (tester) async {
+      await _pumpFicha(
+        tester,
+        const Size(1400, 1200),
+        proveedores: [
+          ProveedorDeProducto(
+            id: 1,
+            productoId: _producto.id!,
+            proveedorId: 4,
+            proveedorNombre: 'Repuestos JR',
+            ultimoCosto: 6500,
+            // Tres días y no doce: `formatearHaceCuanto` pasa a fecha
+            // exacta después de una semana, porque «hace 23 días» ya no le
+            // dice nada a nadie.
+            fechaUltimaCompra: DateTime.now().subtract(
+              const Duration(days: 3),
+            ),
+            esPrincipal: true,
+          ),
+          const ProveedorDeProducto(
+            id: 2,
+            productoId: 1,
+            proveedorId: 9,
+            proveedorNombre: 'Almacén Ana',
+            referenciaProveedor: 'A-778',
+          ),
+        ],
+      );
+
+      expect(find.text('Repuestos JR'), findsOneWidget);
+      expect(find.text('Almacén Ana'), findsOneWidget);
+      expect(find.textContaining('Principal'), findsOneWidget);
+      expect(find.textContaining(r'$6.500'), findsOneWidget);
+      expect(find.textContaining('hace 3 días'), findsOneWidget);
+      expect(find.textContaining('Ref. A-778'), findsOneWidget);
+    });
+
+    testWidgets('un costo en cero sin compras no se lee como regalado',
+        (tester) async {
+      await _pumpFicha(
+        tester,
+        const Size(1400, 1200),
+        proveedores: const [
+          ProveedorDeProducto(
+            id: 1,
+            productoId: 1,
+            proveedorId: 4,
+            proveedorNombre: 'Repuestos JR',
+          ),
+        ],
+      );
+
+      expect(
+        find.textContaining('Sin remisiones registradas todavía'),
+        findsOneWidget,
+      );
+    });
+  });
+
+  group('compatibilidad', () {
+    testWidgets('sin compatibilidades declaradas se ve el hueco',
+        (tester) async {
+      await _pumpFicha(tester, const Size(1400, 1000));
+
+      expect(find.text('Sin información de compatibilidad'), findsOneWidget);
+    });
+
+    testWidgets('la de marca se lee distinta de la de modelo', (tester) async {
+      // Es la diferencia que el panel existe para mostrar: una línea de marca
+      // vale por todas las motos de esa marca, la de modelo solo por una.
+      await _pumpFicha(
+        tester,
+        const Size(1400, 1000),
+        compatibilidades: const [
+          Compatibilidad(id: 1, productoId: 1, marcaId: 3, marca: 'Yamaha'),
+          Compatibilidad(
+            id: 2,
+            productoId: 1,
+            modeloId: 7,
+            marca: 'Bajaj',
+            modelo: 'Pulsar NS200',
+            cilindraje: 200,
+          ),
+        ],
+      );
+
+      expect(find.text('Yamaha (toda la marca)'), findsOneWidget);
+      expect(find.text('Bajaj Pulsar NS200 · 200 cc'), findsOneWidget);
+      expect(find.text('Sin información de compatibilidad'), findsNothing);
+    });
+
+    testWidgets('sin PRODUCTOS_EDITAR no se ofrece quitar ni agregar',
+        (tester) async {
+      // Esconder el botón es orden, no control: la compuerta que vale está en
+      // el repositorio (`CLAUDE.md` §7 bis) y la cubre su propio test.
+      await _pumpFicha(
+        tester,
+        const Size(1400, 1000),
+        compatibilidades: const [
+          Compatibilidad(id: 1, productoId: 1, marcaId: 3, marca: 'Yamaha'),
+        ],
+      );
+
+      expect(find.byTooltip('Quitar'), findsNothing);
+      expect(find.byTooltip('Agregar moto compatible'), findsNothing);
+    });
+
+    testWidgets('con PRODUCTOS_EDITAR aparecen los dos gestos',
+        (tester) async {
+      await _pumpFicha(
+        tester,
+        const Size(1400, 1000),
+        permisos: {Permiso.productosEditar},
+        compatibilidades: const [
+          Compatibilidad(id: 1, productoId: 1, marcaId: 3, marca: 'Yamaha'),
+        ],
+      );
+
+      expect(find.byTooltip('Quitar'), findsOneWidget);
+      expect(find.byTooltip('Agregar moto compatible'), findsOneWidget);
+    });
   });
 }

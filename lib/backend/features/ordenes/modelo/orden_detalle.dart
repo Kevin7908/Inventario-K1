@@ -13,6 +13,8 @@ class OrdenDetalle extends Equatable {
     required this.motoId,
     required this.motoDescripcion,
     required this.motoPlaca,
+    required this.motoMarcaId,
+    this.motoModeloId,
     required this.clienteId,
     required this.clienteNombre,
     required this.kilometrajeEntrada,
@@ -32,6 +34,11 @@ class OrdenDetalle extends Equatable {
   final int motoId;
   final String motoDescripcion;
   final String motoPlaca;
+
+  /// El catálogo detrás de la moto, para poder acotar la rejilla de repuestos
+  /// a lo que le sirve. El modelo puede faltar: hay motos sin él.
+  final int motoMarcaId;
+  final int? motoModeloId;
   final int clienteId;
   final String clienteNombre;
   final int kilometrajeEntrada;
@@ -58,13 +65,16 @@ class OrdenDetalle extends Equatable {
 
   int get subtotal => subtotalManoObra + subtotalRepuestos + subtotalCargos;
 
-  /// Lo que se cobra. Los precios ya traen el IVA dentro (`iva_app.dart`), así
-  /// que la rebaja sale directo de lo que paga el cliente y no hay nada que
-  /// sumar después.
-  int get total => subtotal - descuento;
+  /// La base gravable: las líneas menos la rebaja, todavía sin impuesto.
+  ///
+  /// El descuento se resta **antes** del IVA (ver `iva_app.dart`).
+  int get baseGravable => subtotal - descuento;
 
-  /// Cuánto del [total] es impuesto. Informativo: se extrae, no se suma.
-  int get iva => ivaIncluidoEn(total);
+  /// El impuesto que se le suma a la base. Con la tasa en 0 es 0.
+  int get iva => ivaSobre(baseGravable);
+
+  /// Lo que se cobra: la base más su IVA.
+  int get total => baseGravable + iva;
 
   @override
   List<Object?> get props => [
@@ -73,6 +83,8 @@ class OrdenDetalle extends Equatable {
         motoId,
         motoDescripcion,
         motoPlaca,
+        motoMarcaId,
+        motoModeloId,
         clienteId,
         clienteNombre,
         kilometrajeEntrada,

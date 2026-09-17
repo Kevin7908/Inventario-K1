@@ -190,36 +190,38 @@ class _Filtros extends ConsumerWidget {
   }
 }
 
-/// Cuántas ventas hay y cuánto suman las de la página.
+/// Cuántas ventas hay y cuánto suman **todas** las del filtro.
 class _Resumen extends ConsumerWidget {
   const _Resumen();
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final estado = ref.watch(historialVentasProvider).value;
-    if (estado == null) return const SizedBox.shrink();
-
-    // Solo lo visible, y la etiqueta lo dice: sumar todas las páginas pide su
-    // propia consulta con `SUM`, no recorrer una lista que no está entera.
-    //
-    // Va el **neto**: lo que se devolvió salió de la caja, y una cifra que no
-    // lo descuenta no sirve para cuadrarla.
-    final sumaPagina = estado.items
-        .where((v) => v.estadoPago != EstadoPago.anulada)
-        .fold<int>(0, (acumulado, v) => acumulado + v.totalNeto);
+    final resumen = ref.watch(
+      historialVentasProvider.select((s) => (
+            total: s.value?.total ?? 0,
+            suma: s.value?.sumaNeta ?? 0,
+            hayFiltro: s.value?.hayFiltro ?? false,
+            cargado: s.value != null,
+          )),
+    );
+    if (!resumen.cargado) return const SizedBox.shrink();
 
     return Row(
       children: [
         Text(
-          estado.total == 1 ? '1 venta' : '${estado.total} ventas',
+          resumen.total == 1 ? '1 venta' : '${resumen.total} ventas',
           style: TipografiaApp.caption.copyWith(color: ColoresApp.textMuted),
         ),
         const SizedBox(width: 12),
+        // El periodo entero, no la página: lo suma SQLite con el mismo
+        // `WHERE` del listado. Va neto y sin las anuladas —lo devuelto salió
+        // de la caja y lo anulado nunca entró—, que es la cifra con la que se
+        // cuadra el cajón.
         Text(
-          'En esta página: ${formatearPrecio(sumaPagina)}',
+          'En total: ${formatearPrecio(resumen.suma)}',
           style: TipografiaApp.caption.copyWith(color: ColoresApp.textMuted),
         ),
-        if (estado.hayFiltro) ...[
+        if (resumen.hayFiltro) ...[
           const SizedBox(width: 12),
           TextButton(
             onPressed: () =>

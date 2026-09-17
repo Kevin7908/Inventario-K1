@@ -4,6 +4,9 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../../core/resultado.dart';
 import '../../../share/share.dart';
+import '../../documentos/provider/documentos_providers.dart';
+import '../../documentos/traductores/venta_a_documento.dart';
+import '../../documentos/widgets/dialogo_vista_previa.dart';
 import '../provider/pos_providers.dart';
 import '../widgets/dialogo_cobro.dart';
 import '../widgets/panel_catalogo_pos.dart';
@@ -37,18 +40,54 @@ class _PuntoVentaVistaState extends ConsumerState<PuntoVentaVista> {
 
   Future<void> _cobrar() async {
     final total = ref.read(posProvider).total;
-    final metodoPago = await DialogoCobro.mostrar(context, total: total);
-    if (metodoPago == null || !mounted) return;
+    final cobro = await DialogoCobro.mostrar(context, total: total);
+    if (cobro == null || !mounted) return;
 
-    final resultado =
-        await ref.read(posProvider.notifier).cobrar(metodoPago: metodoPago);
+    final (:resultado, :ventaId) = await ref.read(posProvider.notifier).cobrar(
+          metodoPago: cobro.metodoPago,
+          vendedorId: cobro.vendedorId,
+        );
     if (!mounted) return;
 
     switch (resultado) {
       case Exito():
         _avisar('Venta cobrada. Quedó registrada en el historial.');
+        if (ventaId != null) await _imprimir(ventaId);
       case Fallo(:final mensaje):
         _avisar(mensaje, esError: true);
+    }
+  }
+
+  /// Levanta la factura recién emitida y abre la vista previa.
+  ///
+  /// Va **después** de avisar que la venta se cobró, y su fallo se reporta
+  /// aparte: la plata ya entró y el stock ya salió, así que un problema al
+  /// imprimir no puede parecer que la venta no se hizo. El historial siempre
+  /// permite volver a imprimirla.
+  Future<void> _imprimir(int ventaId) async {
+    try {
+      final venta =
+          await ref.read(repositorioVentasProvider).obtenerDetalle(ventaId);
+      final ajustes = await leerAjustesImpresion(
+        ref.read(repositorioConfiguracionProvider),
+      );
+      if (!mounted) return;
+
+      await DialogoVistaPrevia.mostrar(
+        context,
+        documento: documentoDeVenta(
+          venta: venta,
+          negocio: ajustes.negocio,
+          atendidoPor: venta.cajero,
+          vendedor: venta.vendedor,
+          nota: ajustes.notaFactura,
+        ),
+        formato: ajustes.formato,
+      );
+    } catch (e) {
+      if (!mounted) return;
+      _avisar('La venta quedó registrada, pero no se pudo abrir la factura: $e',
+          esError: true);
     }
   }
 

@@ -220,6 +220,7 @@ class RepositorioDevolucionesImpl
     required int ventaId,
     required MotivoDevolucion motivo,
     required List<LineaADevolver> lineas,
+    bool? reingresaStock,
     String? notas,
   }) async {
     // Quien puede anular la venta entera puede devolver una parte: es
@@ -233,6 +234,10 @@ class RepositorioDevolucionesImpl
         'No hay nada que devolver: elige al menos una línea.',
       );
     }
+
+    // Sin decisión explícita manda el motivo: quien llame desde un test o
+    // desde un flujo que no pregunte no tiene por qué acordarse de esto.
+    final repone = reingresaStock ?? motivo.reponeStockPorDefecto;
 
     try {
       return await _db.transaction(() async {
@@ -304,6 +309,7 @@ class RepositorioDevolucionesImpl
                 numero: numero,
                 ventaId: ventaId,
                 motivo: motivo.codigo,
+                reingresaStock: Value(repone),
                 total: total,
                 notas: Value(notas?.trim().isEmpty ?? true ? null : notas!.trim()),
                 usuarioId: autorId,
@@ -323,9 +329,11 @@ class RepositorioDevolucionesImpl
                 ),
               );
 
-          // Un servicio prestado no vuelve a ninguna estantería: se devuelve
-          // la plata y ya. Solo los productos mueven inventario.
-          if (linea.productoId != null) {
+          // Dos razones para no mover inventario, y son distintas: un
+          // servicio prestado no vuelve a ninguna estantería, y una pieza rota
+          // sí volvió al mostrador pero no al estante —se le reclama al
+          // proveedor—. En las dos se devuelve la plata igual.
+          if (repone && linea.productoId != null) {
             movimientos.add(
               SolicitudMovimiento.entrada(
                 productoId: linea.productoId!,
@@ -348,7 +356,8 @@ class RepositorioDevolucionesImpl
             accion: AccionAuditada.devolvio,
             entidadId: ventaId,
             descripcion: 'Venta ${venta.numeroFactura}',
-            detalle: '$numero — ${motivo.etiqueta}. Total: $total',
+            detalle: '$numero — ${motivo.etiqueta}. Total: $total'
+                '${repone ? '' : ' (no volvió al inventario)'}',
           ),
         );
 

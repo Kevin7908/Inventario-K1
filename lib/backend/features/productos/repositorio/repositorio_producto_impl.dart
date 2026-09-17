@@ -1,5 +1,6 @@
 import 'package:drift/drift.dart';
 
+import '../../../../core/formato.dart';
 import '../../../share/database/app_db.dart';
 import '../../../share/dominio/sesion_actual.dart';
 import '../../bitacora/modelo/entrada_bitacora.dart';
@@ -10,8 +11,11 @@ import '../../inventario/repositorio/repositorio_inventario.dart';
 import '../../inventario/repositorio/repositorio_inventario_impl.dart';
 import '../../../share/consecutivos/repositorio_consecutivos.dart';
 import '../../../share/utils/sku_utils.dart';
+import '../../../share/utils/texto_utils.dart';
 import '../mapper/producto_mapper.dart';
+import '../../../../core/resultado.dart';
 import '../modelo/producto.dart';
+import '../modelo/proveedor_de_producto.dart';
 import 'repositorio_producto.dart';
 import '../../../share/dominio/permiso.dart';
 
@@ -59,6 +63,13 @@ class RepositorioProductosImpl with FirmaDeSesion implements RepositorioProducto
 
   // Helper: JOIN base
 
+  /// El proveedor **principal**, que es lo que la rejilla y la ficha enseñan.
+  ///
+  /// Va por `producto_proveedores` y no por una columna de `productos`: un
+  /// repuesto se le compra a varios y la marca de principal vive con la
+  /// relación. El filtro `esPrincipal` va en la condición del JOIN y no en un
+  /// `WHERE`, porque en un `WHERE` convertiría el `LEFT` en `INNER` y dejaría
+  /// fuera los productos sin proveedor asignado.
   JoinedSelectStatement<HasResultSet, dynamic> _queryConJoin() {
     return _db.select(_db.tablaProducto).join([
       leftOuterJoin(
@@ -66,8 +77,14 @@ class RepositorioProductosImpl with FirmaDeSesion implements RepositorioProducto
         _db.tablaCategoria.id.equalsExp(_db.tablaProducto.categoriaId),
       ),
       leftOuterJoin(
+        _db.tablaProductoProveedor,
+        _db.tablaProductoProveedor.productoId.equalsExp(_db.tablaProducto.id) &
+            _db.tablaProductoProveedor.esPrincipal.equals(true),
+      ),
+      leftOuterJoin(
         _db.tablaProveedor,
-        _db.tablaProveedor.id.equalsExp(_db.tablaProducto.proveedorId),
+        _db.tablaProveedor.id
+            .equalsExp(_db.tablaProductoProveedor.proveedorId),
       ),
       // La razón social del proveedor vive en `personas`.
       leftOuterJoin(
@@ -87,41 +104,58 @@ class RepositorioProductosImpl with FirmaDeSesion implements RepositorioProducto
   // Streams reactivos
 
   @override
-  Stream<List<Producto>> observarTodos() =>
-      _queryConJoin().watch().map(_mapear);
+  Stream<List<Producto>> observarTodos() {
+    exigir(Permiso.productosVer);
+    return _queryConJoin().watch().map(_mapear);
+  }
 
   @override
-  Stream<List<Producto>> observarConStockBajo() =>
-      (_queryConJoin()
-            ..where(_db.tablaProducto.stockActual
-                .isSmallerOrEqual(_db.tablaProducto.stockMinimo)))
-          .watch()
-          .map(_mapear);
+  Stream<List<Producto>> observarConStockBajo() {
+    exigir(Permiso.productosVer);
+    return (_queryConJoin()
+          ..where(_db.tablaProducto.stockActual
+              .isSmallerOrEqual(_db.tablaProducto.stockMinimo)))
+        .watch()
+        .map(_mapear);
+  }
 
   // Consultas únicas
 
   @override
-  Future<List<Producto>> obtenerTodos() async =>
-      _mapear(await _queryConJoin().get());
+  Future<List<Producto>> obtenerTodos() async {
+    exigir(Permiso.productosVer);
+    return _mapear(await _queryConJoin().get());
+  }
 
   @override
+  /// Va por el JOIN y no por la fila pelada: desde que el proveedor vive en
+  /// `producto_proveedores`, leer solo `productos` devuelve un modelo sin
+  /// proveedor —y sin categoría ni unidad—, y quien pide un producto por id lo
+  /// pide para enseñarlo.
+  @override
   Future<Producto?> obtenerPorId(int id) async {
-    final fila = await (_db.select(_db.tablaProducto)
-          ..where((t) => t.id.equals(id)))
-        .getSingleOrNull();
-    return fila != null ? ProductoMapper.filaAModelo(fila) : null;
+    exigir(Permiso.productosVer);
+    final filas =
+        await (_queryConJoin()..where(_db.tablaProducto.id.equals(id))).get();
+    return filas.isEmpty
+        ? null
+        : ProductoMapper.filaJoinAModelo(filas.first, _db);
   }
 
   @override
   Future<Producto?> obtenerPorSku(String sku) async {
-    final fila = await (_db.select(_db.tablaProducto)
-          ..where((t) => t.sku.equals(sku)))
-        .getSingleOrNull();
-    return fila != null ? ProductoMapper.filaAModelo(fila) : null;
+    exigir(Permiso.productosVer);
+    final filas = await (_queryConJoin()
+          ..where(_db.tablaProducto.sku.equals(sku)))
+        .get();
+    return filas.isEmpty
+        ? null
+        : ProductoMapper.filaJoinAModelo(filas.first, _db);
   }
 
   @override
   Future<List<Producto>> buscarPorNombreOSku(String consulta) async {
+    exigir(Permiso.productosVer);
     final termino = '%$consulta%';
     return _mapear(
       await (_queryConJoin()
@@ -132,37 +166,54 @@ class RepositorioProductosImpl with FirmaDeSesion implements RepositorioProducto
   }
 
   @override
-  Future<List<Producto>> obtenerPorCategoria(int categoriaId) async =>
-      _mapear(
-        await (_queryConJoin()
-              ..where(_db.tablaProducto.categoriaId.equals(categoriaId)))
-            .get(),
-      );
+  Future<List<Producto>> obtenerPorCategoria(int categoriaId) async {
+    exigir(Permiso.productosVer);
+    return _mapear(
+      await (_queryConJoin()
+            ..where(_db.tablaProducto.categoriaId.equals(categoriaId)))
+          .get(),
+    );
+  }
+
+  /// Todo lo que ese proveedor le vende al taller, sea principal o no.
+  ///
+  /// El `WHERE` no puede ir sobre el JOIN del principal —ese trae solo la
+  /// fila marcada—, así que se resuelve con un `IN` sobre la tabla de
+  /// vínculos: un producto sale si ese proveedor está entre los suyos.
+  @override
+  Future<List<Producto>> obtenerPorProveedor(int proveedorId) async {
+    exigir(Permiso.productosVer);
+    final vinculados = _db.selectOnly(_db.tablaProductoProveedor)
+      ..addColumns([_db.tablaProductoProveedor.productoId])
+      ..where(_db.tablaProductoProveedor.proveedorId.equals(proveedorId));
+
+    return _mapear(
+      await (_queryConJoin()
+            ..where(_db.tablaProducto.id.isInQuery(vinculados)))
+          .get(),
+    );
+  }
 
   @override
-  Future<List<Producto>> obtenerPorProveedor(int proveedorId) async =>
-      _mapear(
-        await (_queryConJoin()
-              ..where(_db.tablaProducto.proveedorId.equals(proveedorId)))
-            .get(),
-      );
+  Future<List<Producto>> obtenerActivos() async {
+    exigir(Permiso.productosVer);
+    return _mapear(
+      await (_queryConJoin()
+            ..where(_db.tablaProducto.activo.equals(true)))
+          .get(),
+    );
+  }
 
   @override
-  Future<List<Producto>> obtenerActivos() async =>
-      _mapear(
-        await (_queryConJoin()
-              ..where(_db.tablaProducto.activo.equals(true)))
-            .get(),
-      );
-
-  @override
-  Future<List<Producto>> obtenerConStockBajo() async =>
-      _mapear(
-        await (_queryConJoin()
-              ..where(_db.tablaProducto.stockActual
-                  .isSmallerOrEqual(_db.tablaProducto.stockMinimo)))
-            .get(),
-      );
+  Future<List<Producto>> obtenerConStockBajo() async {
+    exigir(Permiso.productosVer);
+    return _mapear(
+      await (_queryConJoin()
+            ..where(_db.tablaProducto.stockActual
+                .isSmallerOrEqual(_db.tablaProducto.stockMinimo)))
+          .get(),
+    );
+  }
 
   // Escrituras
 
@@ -237,6 +288,11 @@ class RepositorioProductosImpl with FirmaDeSesion implements RepositorioProducto
         );
       }
 
+      // El proveedor del formulario es el **principal**, y ya no es una
+      // columna de `productos`: se escribe como vínculo, en esta misma
+      // transacción, para que un alta fallida no deje la relación suelta.
+      await _sincronizarPrincipal(id, producto.proveedorId);
+
       await _anotar(AccionAuditada.creo, id, _nombreDe(conSku));
 
       // No hay SELECT extra: el stream de Drift emite el dato completo.
@@ -276,13 +332,13 @@ class RepositorioProductosImpl with FirmaDeSesion implements RepositorioProducto
         );
       }
 
+      await _sincronizarPrincipal(producto.id!, producto.proveedorId);
+
       await _anotar(
         AccionAuditada.modifico,
         producto.id,
         _nombreDe(producto),
-        detalle: diferencia == 0
-            ? null
-            : 'Stock ajustado en ${diferencia > 0 ? '+' : ''}$diferencia',
+        detalle: _queCambio(antes, producto, diferencia),
       );
 
       // No hay SELECT extra: el stream emite el resultado actualizado.
@@ -343,10 +399,356 @@ class RepositorioProductosImpl with FirmaDeSesion implements RepositorioProducto
     });
   }
 
+  // Proveedores del producto
+
+  $TablaProductoProveedorTable get _vinculos => _db.tablaProductoProveedor;
+
+  /// Deja como principal al proveedor que trae el formulario.
+  ///
+  /// Es lo que traduce el único selector del formulario a la tabla de
+  /// vínculos: si el proveedor todavía no estaba entre los del repuesto, se
+  /// agrega; si venía en `null`, el producto se queda sin principal y **los
+  /// demás vínculos no se tocan**, que es lo que distingue «no tiene
+  /// preferido» de «no le compro a nadie».
+  ///
+  /// Va sin `exigir`: lo llaman `crear` y `actualizar`, que ya comprobaron su
+  /// permiso, y dentro de su misma transacción.
+  Future<void> _sincronizarPrincipal(int productoId, int? proveedorId) async {
+    await _apagarPrincipal(productoId);
+    if (proveedorId == null) return;
+
+    final existente = await (_db.select(_vinculos)
+          ..where((t) =>
+              t.productoId.equals(productoId) &
+              t.proveedorId.equals(proveedorId)))
+        .getSingleOrNull();
+
+    if (existente == null) {
+      await _db.into(_vinculos).insert(
+            TablaProductoProveedorCompanion.insert(
+              productoId: productoId,
+              proveedorId: proveedorId,
+              esPrincipal: const Value(true),
+            ),
+          );
+      return;
+    }
+
+    await (_db.update(_vinculos)..where((t) => t.id.equals(existente.id)))
+        .write(
+      TablaProductoProveedorCompanion(
+        esPrincipal: const Value(true),
+        actualizadoEn: Value(DateTime.now()),
+      ),
+    );
+  }
+
+  @override
+  Stream<List<ProveedorDeProducto>> observarProveedoresDe(int productoId) {
+    exigir(Permiso.productosVer);
+
+    // La razón social del proveedor vive en `personas`, no en `proveedores`:
+    // hacen falta los dos JOIN encadenados, como en el resto del proyecto.
+    final consulta = _db.select(_vinculos).join([
+      innerJoin(
+        _db.tablaProveedor,
+        _db.tablaProveedor.id.equalsExp(_vinculos.proveedorId),
+      ),
+      innerJoin(
+        _db.tablaPersona,
+        _db.tablaPersona.id.equalsExp(_db.tablaProveedor.personaId),
+      ),
+    ])
+      ..where(_vinculos.productoId.equals(productoId))
+      // El principal primero —es el que se propone al pedir— y el resto por
+      // nombre. `desc` sobre un booleano pone el `true` arriba.
+      ..orderBy([
+        OrderingTerm.desc(_vinculos.esPrincipal),
+        OrderingTerm.asc(_db.tablaPersona.nombres),
+      ]);
+
+    return consulta.watch().map(
+          (filas) => filas.map((fila) {
+            final vinculo = fila.readTable(_vinculos);
+            final persona = fila.readTable(_db.tablaPersona);
+            return ProveedorDeProducto(
+              id: vinculo.id,
+              productoId: vinculo.productoId,
+              proveedorId: vinculo.proveedorId,
+              proveedorNombre: persona.nombres,
+              proveedorTelefono: persona.telefono,
+              referenciaProveedor: vinculo.referenciaProveedor,
+              ultimoCosto: vinculo.ultimoCosto,
+              fechaUltimaCompra: vinculo.fechaUltimaCompra,
+              esPrincipal: vinculo.esPrincipal,
+            );
+          }).toList(),
+        );
+  }
+
+  @override
+  Future<Resultado> vincularProveedor({
+    required int productoId,
+    required int proveedorId,
+    String? referenciaProveedor,
+    bool esPrincipal = false,
+  }) async {
+    exigir(Permiso.productosEditar);
+
+    return _db.transaction(() async {
+      final proveedor = await (_db.select(_db.tablaProveedor)
+            ..where((t) => t.id.equals(proveedorId)))
+          .getSingleOrNull();
+      if (proveedor == null) {
+        return const Fallo(
+          MotivoFallo.validacion,
+          'Ese proveedor ya no está en el catálogo.',
+        );
+      }
+
+      // Se apaga el anterior **antes** de encender el nuevo: la guarda de la
+      // base rechaza dos principales a la vez, así que el orden no es un
+      // detalle de estilo.
+      if (esPrincipal) await _apagarPrincipal(productoId);
+
+      final existente = await (_db.select(_vinculos)
+            ..where((t) =>
+                t.productoId.equals(productoId) &
+                t.proveedorId.equals(proveedorId)))
+          .getSingleOrNull();
+
+      if (existente == null) {
+        await _db.into(_vinculos).insert(
+              TablaProductoProveedorCompanion.insert(
+                productoId: productoId,
+                proveedorId: proveedorId,
+                referenciaProveedor: Value(referenciaProveedor),
+                esPrincipal: Value(esPrincipal),
+              ),
+            );
+      } else {
+        await (_db.update(_vinculos)..where((t) => t.id.equals(existente.id)))
+            .write(
+          TablaProductoProveedorCompanion(
+            // La referencia solo se pisa si llega una: volver a marcar
+            // principal desde la ficha no puede borrar el código que alguien
+            // tecleó.
+            referenciaProveedor: referenciaProveedor == null
+                ? const Value.absent()
+                : Value(referenciaProveedor),
+            esPrincipal: Value(esPrincipal || existente.esPrincipal),
+            actualizadoEn: Value(DateTime.now()),
+          ),
+        );
+      }
+
+      await _anotarProveedor(
+        productoId,
+        'Proveedor vinculado: ${await _nombreProveedor(proveedorId)}',
+      );
+      return const Exito();
+    });
+  }
+
+  @override
+  Future<Resultado> desvincularProveedor({
+    required int productoId,
+    required int proveedorId,
+  }) async {
+    exigir(Permiso.productosEditar);
+
+    return _db.transaction(() async {
+      final borradas = await (_db.delete(_vinculos)
+            ..where((t) =>
+                t.productoId.equals(productoId) &
+                t.proveedorId.equals(proveedorId)))
+          .go();
+
+      if (borradas == 0) {
+        return const Fallo(
+          MotivoFallo.validacion,
+          'Ese proveedor ya no estaba en la lista.',
+        );
+      }
+
+      await _anotarProveedor(
+        productoId,
+        'Proveedor quitado: ${await _nombreProveedor(proveedorId)}',
+      );
+      return const Exito();
+    });
+  }
+
+  @override
+  Future<Resultado> fijarProveedorPrincipal({
+    required int productoId,
+    required int? proveedorId,
+  }) async {
+    exigir(Permiso.productosEditar);
+
+    return _db.transaction(() async {
+      await _apagarPrincipal(productoId);
+      if (proveedorId == null) {
+        await _anotarProveedor(productoId, 'Sin proveedor principal');
+        return const Exito();
+      }
+
+      final encendidas = await (_db.update(_vinculos)
+            ..where((t) =>
+                t.productoId.equals(productoId) &
+                t.proveedorId.equals(proveedorId)))
+          .write(
+        TablaProductoProveedorCompanion(
+          esPrincipal: const Value(true),
+          actualizadoEn: Value(DateTime.now()),
+        ),
+      );
+
+      if (encendidas == 0) {
+        return const Fallo(
+          MotivoFallo.validacion,
+          'Ese proveedor no está entre los del repuesto.',
+        );
+      }
+
+      await _anotarProveedor(
+        productoId,
+        'Proveedor principal: ${await _nombreProveedor(proveedorId)}',
+      );
+      return const Exito();
+    });
+  }
+
+  /// La razón social del proveedor, que vive en `personas`.
+  ///
+  /// La bitácora guarda el **nombre** y no el id, como snapshot de §1.2: es la
+  /// parte legible que sobrevive al borrado del proveedor.
+  Future<String> _nombreProveedor(int proveedorId) async {
+    final fila = await (_db.select(_db.tablaProveedor).join([
+      innerJoin(
+        _db.tablaPersona,
+        _db.tablaPersona.id.equalsExp(_db.tablaProveedor.personaId),
+      ),
+    ])
+          ..where(_db.tablaProveedor.id.equals(proveedorId)))
+        .getSingleOrNull();
+
+    return fila?.readTable(_db.tablaPersona).nombres ?? '#$proveedorId';
+  }
+
+  /// Deja al producto sin ningún principal marcado.
+  Future<void> _apagarPrincipal(int productoId) =>
+      (_db.update(_vinculos)
+            ..where((t) =>
+                t.productoId.equals(productoId) & t.esPrincipal.equals(true)))
+          .write(
+        TablaProductoProveedorCompanion(
+          esPrincipal: const Value(false),
+          actualizadoEn: Value(DateTime.now()),
+        ),
+      );
+
+  /// El renglón de bitácora de un cambio de proveedores.
+  ///
+  /// Se lee el producto para poder nombrarlo: «Ana modificó Pastilla de freno
+  /// (FRE-0012) · Proveedor principal: 4» dice algo; «modificó el producto 47»
+  /// no le sirve a nadie.
+  Future<void> _anotarProveedor(int productoId, String detalle) async {
+    final producto = await (_db.select(_db.tablaProducto)
+          ..where((t) => t.id.equals(productoId)))
+        .getSingleOrNull();
+
+    await _anotar(
+      AccionAuditada.modifico,
+      productoId,
+      producto == null
+          ? 'Producto #$productoId'
+          : '${producto.nombre} (${producto.sku})',
+      detalle: detalle,
+    );
+  }
+
   /// Cómo se lee un producto en la bitácora: nombre y SKU, que es lo que
   /// permite reconocerlo cuando la fila ya no existe.
   static String _nombreDe(Producto producto) =>
       '${producto.nombre} (${producto.sku})';
+
+  /// Qué cambió de verdad, campo por campo, para el renglón de la bitácora.
+  ///
+  /// Sin esto la ficha decía «Ana modificó Pastilla de freno» y nada más, que
+  /// es justo lo que no responde la pregunta con la que se abre ese panel: por
+  /// qué cambió el precio, quién movió el stock mínimo. La bitácora guarda el
+  /// **qué**, no un diff completo: los valores de antes y después de los tres
+  /// o cuatro campos que se tocaron, en una línea que se lee de un vistazo.
+  ///
+  /// Devuelve `null` si no cambió nada de lo que se vigila —guardar el
+  /// formulario sin tocar un campo no tiene por qué contar nada—, y entonces
+  /// el renglón queda con la fecha y el autor, como antes.
+  ///
+  /// El stock va aparte porque no se escribe en la columna: se registra como
+  /// movimiento (§7 de las reglas de base de datos) y aquí solo se nombra.
+  static String? _queCambio(
+    TablaProductoData? antes,
+    Producto ahora,
+    double diferenciaStock,
+  ) {
+    if (antes == null) return null;
+
+    final cambios = <String>[
+      ?_campo('Nombre', antes.nombre, ahora.nombre),
+      ?_campo('SKU', antes.sku, ahora.sku),
+      ?_precio('Precio de venta', antes.precioVenta, ahora.precioVenta),
+      ?_precio('Precio de compra', antes.precioCompra, ahora.precioCompra),
+      ?_precio(
+        'Precio de taller',
+        antes.precioVentaTaller,
+        ahora.precioVentaTaller,
+      ),
+      ?_campo(
+        'Stock mínimo',
+        _cantidad(antes.stockMinimo),
+        _cantidad(ahora.stockMinimo),
+      ),
+      ?_campo('Ubicación', antes.ubicacionBodega, ahora.ubicacionBodega),
+      ?_campo(
+        'Estado',
+        antes.activo ? 'activo' : 'inactivo',
+        ahora.activo ? 'activo' : 'inactivo',
+      ),
+      if (diferenciaStock != 0)
+        'Stock ajustado en ${diferenciaStock > 0 ? '+' : ''}'
+            '${_cantidad(diferenciaStock)}',
+    ];
+
+    return cambios.isEmpty ? null : cambios.join(' · ');
+  }
+
+  /// «Precio de venta: \$10.000 → \$12.000», o `null` si no se movió.
+  ///
+  /// El importe sale de `core/formato.dart`, que es el único sitio donde se
+  /// formatea dinero (`CLAUDE.md` §6). No rompe la regla de que el repositorio
+  /// no conozca Flutter: `core/` es Dart puro —lo mismo que `iva_app.dart`,
+  /// que este archivo ya usa— y lo que se escribe aquí no es una pantalla,
+  /// es el texto que queda guardado en la bitácora.
+  static String? _precio(String etiqueta, int? antes, int? ahora) => _campo(
+        etiqueta,
+        antes == null ? '' : formatearPrecio(antes),
+        ahora == null ? '' : formatearPrecio(ahora),
+      );
+
+  static String? _campo(String etiqueta, String? antes, String? ahora) {
+    final viejo = (antes ?? '').trim();
+    final nuevo = (ahora ?? '').trim();
+    if (viejo == nuevo) return null;
+    return '$etiqueta: ${viejo.isEmpty ? '—' : viejo} → '
+        '${nuevo.isEmpty ? '—' : nuevo}';
+  }
+
+  /// Una cantidad sin decimales de relleno: `12` y no `12.0`.
+  static String _cantidad(double valor) =>
+      valor.truncateToDouble() == valor
+          ? valor.toInt().toString()
+          : valor.toStringAsFixed(2);
 
   // Validaciones
 
@@ -374,6 +776,7 @@ class RepositorioProductosImpl with FirmaDeSesion implements RepositorioProducto
 
   @override
   Future<int> contarActivos() async {
+    exigir(Permiso.productosVer);
     final expr = _db.tablaProducto.id.count();
     final query = _db.selectOnly(_db.tablaProducto)
       ..where(_db.tablaProducto.activo.equals(true))
@@ -384,6 +787,7 @@ class RepositorioProductosImpl with FirmaDeSesion implements RepositorioProducto
 
   @override
   Future<int> contarConStockBajo() async {
+    exigir(Permiso.productosVer);
     final expr = _db.tablaProducto.id.count();
     final query = _db.selectOnly(_db.tablaProducto)
       ..where(_db.tablaProducto.stockActual
@@ -406,11 +810,31 @@ class RepositorioProductosImpl with FirmaDeSesion implements RepositorioProducto
 
     final texto = filtro.busqueda.trim();
     if (texto.isNotEmpty) {
-      final patron = '%${texto.toLowerCase()}%';
+      // El código de barras se compara **exacto y normalizado**, no con
+      // `LIKE`: lo que llega ahí lo escribió un lector, no una persona, y
+      // tiene que dar en el producto de una sola vez aunque el patrón traiga
+      // los espacios que el lector inserta. Va en `OR` con lo demás para que
+      // el mismo cuadro siga sirviendo para teclear un nombre.
+      final codigo = normalizarCodigoBarras(texto);
+
+      // **Todas las palabras tienen que aparecer, cada una donde sea.** Antes
+      // se buscaba la frase entera con un solo `LIKE`, así que «freno yamaha»
+      // no encontraba «Frenos Yamaha FZ»: nadie escribe las palabras en el
+      // orden exacto del catálogo.
+      Expression<bool> porPalabras = const Constant(true);
+      for (final palabra in _palabras(texto)) {
+        final patron = '%$palabra%';
+        porPalabras = porPalabras &
+            (_plano(p.nombre).like(patron) |
+                _plano(p.sku).like(patron) |
+                _plano(_db.tablaCategoria.nombre).like(patron));
+      }
+
       acumulado = acumulado &
-          (p.nombre.lower().like(patron) |
-              p.sku.lower().like(patron) |
-              _db.tablaCategoria.nombre.lower().like(patron));
+          (porPalabras |
+              (codigo == null
+                  ? const Constant(false)
+                  : p.codigoBarras.equals(codigo)));
     }
 
     final categoria = filtro.categoriaId;
@@ -422,7 +846,95 @@ class RepositorioProductosImpl with FirmaDeSesion implements RepositorioProducto
       acumulado = acumulado & p.activo.equals(true);
     }
 
+    final marcaMoto = filtro.compatibleConMarcaId;
+    if (marcaMoto != null) {
+      acumulado = acumulado & _compatibleCon(marcaMoto, filtro.compatibleConModeloId);
+    }
+
     return acumulado;
+  }
+
+  /// Las palabras de la búsqueda, en minúsculas, sin tildes y sin huecos.
+  ///
+  /// Partirla es lo que la vuelve utilizable: quien teclea «freno yamaha»
+  /// quiere lo que sea las dos cosas, y la frase literal solo acierta si la
+  /// escribió en el mismo orden en que está el catálogo.
+  static List<String> _palabras(String texto) => aplanarTexto(texto)
+      .split(RegExp(r'\s+'))
+      .where((palabra) => palabra.isNotEmpty)
+      .toList(growable: false);
+
+  /// La columna en minúsculas **y sin tildes**, para comparar contra el patrón
+  /// ya aplanado.
+  ///
+  /// Nadie teclea «Baterías» con la tilde, y sin esto «bateria» no encontraba
+  /// nada: `LIKE` de SQLite ignora las mayúsculas del ASCII y nada más. Se
+  /// resuelve con `replace` anidados en la propia consulta y no con una
+  /// columna normalizada aparte, que sería el mismo dato guardado dos veces
+  /// (`REGLAS_BD.md` §1.1). Sobre el catálogo de un taller —miles de filas—
+  /// cuesta lo mismo que el `LIKE`, que tampoco usa índice (§5).
+  static Expression<String> _plano(Expression<String> columna) {
+    var expresion = columna.lower();
+    tildes.forEach((conTilde, sinTilde) {
+      expresion = FunctionCallExpression('replace', [
+        expresion,
+        Constant(conTilde),
+        Constant(sinTilde),
+      ]);
+    });
+    return expresion;
+  }
+
+  /// Qué tan bien responde una fila a lo que se tecleó: 0 el nombre, 1 el
+  /// SKU, 2 lo demás —hoy, el nombre de su categoría—.
+  ///
+  /// Sin esto la búsqueda **parecía rota**: como el nombre de la categoría
+  /// también cuenta, escribir «freno» devolvía cientos de aceites cuya
+  /// categoría era «Frenos», y al ordenar por nombre las pastillas de freno
+  /// caían en la página nueve. Ordenar por relevancia se hace en SQL, con un
+  /// `CASE`, y no recortando en Dart (§5).
+  Expression<int> _relevancia(String texto) {
+    final palabras = _palabras(texto);
+    if (palabras.isEmpty) return const Constant(2);
+
+    Expression<bool> todasEn(Expression<String> columna) => palabras.fold(
+          const Constant(true),
+          (acumulado, palabra) => acumulado & _plano(columna).like('%$palabra%'),
+        );
+
+    return CaseWhenExpression<int>(
+      cases: [
+        CaseWhen(todasEn(_db.tablaProducto.nombre), then: const Constant(0)),
+        CaseWhen(todasEn(_db.tablaProducto.sku), then: const Constant(1)),
+      ],
+      orElse: const Constant(2),
+    );
+  }
+
+  /// «Este producto le sirve a esta moto», como condición de la misma consulta.
+  ///
+  /// Es un `EXISTS` correlacionado y no un `WHERE id IN (…)` con los ids
+  /// traídos desde Dart: el `IN` obligaría a resolver antes el conjunto entero
+  /// de productos compatibles y a meterlo en la consulta, que es traer filas
+  /// para descartarlas (`REGLAS_BD.md` §5) y además rompe con un catálogo
+  /// grande.
+  ///
+  /// Las dos condiciones van en `OR` porque la compatibilidad tiene dos
+  /// niveles: la línea de marca vale para toda la marca —el aceite de
+  /// cualquier Yamaha— y la de modelo solo para ese —la pastilla de la FZ—.
+  Expression<bool> _compatibleCon(int marcaId, int? modeloId) {
+    final compat = _db.tablaProductoCompatibilidad;
+    return existsQuery(
+      _db.selectOnly(compat)
+        ..addColumns([compat.id])
+        ..where(
+          compat.productoId.equalsExp(_db.tablaProducto.id) &
+              (compat.marcaId.equals(marcaId) |
+                  (modeloId == null
+                      ? const Constant(false)
+                      : compat.modeloId.equals(modeloId))),
+        ),
+    );
   }
 
   /// Traduce [FiltroProductos] a una expresión SQL reutilizable por la
@@ -450,11 +962,18 @@ class RepositorioProductosImpl with FirmaDeSesion implements RepositorioProducto
     required int pagina,
     required int tamano,
   }) {
+    exigir(Permiso.productosVer);
     final condicion = _condicion(filtro);
+    final texto = filtro.busqueda.trim();
 
     final consultaPagina = _queryConJoin()
       ..where(condicion)
-      ..orderBy([OrderingTerm.asc(_db.tablaProducto.nombre)])
+      // Con búsqueda manda la relevancia y el nombre desempata; sin ella, el
+      // catálogo se lee en orden alfabético.
+      ..orderBy([
+        if (texto.isNotEmpty) OrderingTerm.asc(_relevancia(texto)),
+        OrderingTerm.asc(_db.tablaProducto.nombre),
+      ])
       ..limit(tamano, offset: pagina * tamano);
 
     // El total va en su propia consulta: `limit` no debe afectarlo.
@@ -479,6 +998,7 @@ class RepositorioProductosImpl with FirmaDeSesion implements RepositorioProducto
 
   @override
   Stream<Map<int, int>> observarConteoPorCategoria() {
+    exigir(Permiso.productosVer);
     final cantidad = _db.tablaProducto.id.count();
     final consulta = _db.selectOnly(_db.tablaProducto)
       ..addColumns([_db.tablaProducto.categoriaId, cantidad])
@@ -495,18 +1015,24 @@ class RepositorioProductosImpl with FirmaDeSesion implements RepositorioProducto
     });
   }
 
+  /// Cuántos repuestos le compra el taller a cada proveedor.
+  ///
+  /// Cuenta **todos** los vínculos, no solo los principales: la tarjeta del
+  /// proveedor dice de cuántas piezas es una opción, que es lo que se quiere
+  /// saber al llamarlo. Sale de un `GROUP BY` sobre la tabla de vínculos, no
+  /// de recorrer el catálogo (`REGLAS_BD.md` §5).
   @override
   Stream<Map<int, int>> observarConteoPorProveedor() {
-    final cantidad = _db.tablaProducto.id.count();
-    final consulta = _db.selectOnly(_db.tablaProducto)
-      ..addColumns([_db.tablaProducto.proveedorId, cantidad])
-      ..where(_db.tablaProducto.proveedorId.isNotNull())
-      ..groupBy([_db.tablaProducto.proveedorId]);
+    exigir(Permiso.productosVer);
+    final cantidad = _db.tablaProductoProveedor.productoId.count();
+    final consulta = _db.selectOnly(_db.tablaProductoProveedor)
+      ..addColumns([_db.tablaProductoProveedor.proveedorId, cantidad])
+      ..groupBy([_db.tablaProductoProveedor.proveedorId]);
 
     return consulta.watch().map((filas) {
       final conteo = <int, int>{};
       for (final fila in filas) {
-        final id = fila.read(_db.tablaProducto.proveedorId);
+        final id = fila.read(_db.tablaProductoProveedor.proveedorId);
         if (id != null) conteo[id] = fila.read(cantidad) ?? 0;
       }
       return conteo;
@@ -516,6 +1042,7 @@ class RepositorioProductosImpl with FirmaDeSesion implements RepositorioProducto
   @override
   Stream<({int total, int enStock, int stockBajo, int sinStock})>
       observarResumen({FiltroProductos filtro = const FiltroProductos()}) {
+    exigir(Permiso.productosVer);
     final p = _db.tablaProducto;
     final total = p.id.count();
 

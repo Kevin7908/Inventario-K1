@@ -7,7 +7,6 @@ import '../../../../backend/features/categorias/modelo/categoria.dart';
 import '../../../../backend/features/productos/modelo/producto.dart';
 import '../../../../backend/features/proveedores/modelo/proveedor.dart';
 import '../../../../backend/features/unidades_medida/modelo/unidad_medida.dart';
-import '../../../../core/iva_app.dart';
 import '../../../../core/resultado.dart';
 import '../../../../core/validaciones.dart';
 import '../../../share/share.dart';
@@ -56,6 +55,7 @@ class _FormularioProductoState extends ConsumerState<FormularioProducto> {
   bool _guardando = false;
 
   late final TextEditingController _skuCtrl;
+  late final TextEditingController _codigoBarrasCtrl;
   late final TextEditingController _nombreCtrl;
   late final TextEditingController _descripcionCtrl;
   late final TextEditingController _precioCompraCtrl;
@@ -69,7 +69,6 @@ class _FormularioProductoState extends ConsumerState<FormularioProducto> {
   Proveedor? _proveedor;
   UnidadMedida? _unidad;
   String? _imagenRuta;
-  bool _aplicaIva = false;
   bool _activo = true;
 
   @override
@@ -80,6 +79,7 @@ class _FormularioProductoState extends ConsumerState<FormularioProducto> {
     String texto(num? v) => v == null ? '' : v.toStringAsFixed(0);
 
     _skuCtrl = TextEditingController(text: p?.sku ?? '');
+    _codigoBarrasCtrl = TextEditingController(text: p?.codigoBarras ?? '');
     _nombreCtrl = TextEditingController(text: p?.nombre ?? '');
     _descripcionCtrl = TextEditingController(text: p?.descripcion ?? '');
     _precioCompraCtrl = TextEditingController(text: texto(p?.precioCompra));
@@ -90,7 +90,6 @@ class _FormularioProductoState extends ConsumerState<FormularioProducto> {
     _ubicacionCtrl = TextEditingController(text: p?.ubicacionBodega ?? '');
 
     _imagenRuta = p?.imagenUrl;
-    _aplicaIva = p?.aplicaIva ?? false;
     _activo = p?.activo ?? true;
 
     if (p != null) {
@@ -142,6 +141,7 @@ class _FormularioProductoState extends ConsumerState<FormularioProducto> {
   @override
   void dispose() {
     _skuCtrl.dispose();
+    _codigoBarrasCtrl.dispose();
     _nombreCtrl.dispose();
     _descripcionCtrl.dispose();
     _precioCompraCtrl.dispose();
@@ -210,6 +210,11 @@ class _FormularioProductoState extends ConsumerState<FormularioProducto> {
       // serie, dentro de su transacción. Mandar el previsualizado haría que
       // dos altas seguidas de la misma categoría compartieran SKU.
       sku: widget.esEdicion ? _skuCtrl.text.trim() : '',
+      // Vacío es «sin código», no la cadena vacía: el `UNIQUE` de la columna
+      // admite varios NULL, pero solo un ''. El repositorio lo normaliza.
+      codigoBarras: _codigoBarrasCtrl.text.trim().isEmpty
+          ? null
+          : _codigoBarrasCtrl.text.trim(),
       nombre: _nombreCtrl.text.trim(),
       descripcion: descripcion.isEmpty ? null : descripcion,
       categoriaId: _categoria?.id,
@@ -225,7 +230,6 @@ class _FormularioProductoState extends ConsumerState<FormularioProducto> {
       stockMinimo: _aDouble(_stockMinimoCtrl),
       ubicacionBodega: ubicacion.isEmpty ? null : ubicacion,
       imagenUrl: _imagenRuta,
-      aplicaIva: _aplicaIva,
       activo: _activo,
     );
 
@@ -318,6 +322,15 @@ class _FormularioProductoState extends ConsumerState<FormularioProducto> {
                 soloLectura: true,
               ),
             ],
+          ),
+          const SizedBox(height: 16),
+          // El del empaque, aparte del SKU: aquel lo arma la app, este viene
+          // impreso y sirve para buscar pasando el lector en el mostrador.
+          CampoTexto(
+            etiqueta: 'Código de barras (opcional)',
+            controlador: _codigoBarrasCtrl,
+            placeholder: 'Pasa el lector o tecléalo',
+            monoespaciado: true,
           ),
           const SizedBox(height: 16),
           FilaCampos(
@@ -430,19 +443,12 @@ class _FormularioProductoState extends ConsumerState<FormularioProducto> {
             ],
           ),
           const SizedBox(height: 16),
+          // Sin interruptor de IVA: la tasa del negocio es una sola y se
+          // configura en Configuración. Marcarlo por producto dejaba dos
+          // artículos idénticos facturando distinto según cómo se creó cada
+          // uno, que es el problema que `iva_app.dart` existe para evitar.
           Row(
             children: [
-              Expanded(
-                child: InterruptorCampo(
-                  etiqueta: 'Aplica IVA',
-                  detalle: _aplicaIva
-                      ? 'El precio ya incluye ${(kIva * 100).toStringAsFixed(0)}% de IVA'
-                      : 'Precio sin IVA',
-                  valor: _aplicaIva,
-                  alCambiar: (v) => setState(() => _aplicaIva = v),
-                ),
-              ),
-              const SizedBox(width: 16),
               Expanded(
                 child: InterruptorCampo(
                   etiqueta: 'Producto activo',

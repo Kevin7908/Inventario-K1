@@ -80,7 +80,14 @@ abstract interface class RepositorioOrdenes {
     String? observaciones,
   });
 
-  // Actualiza estado, kilometraje, moto y/o diagnóstico.
+  /// Actualiza estado, kilometraje, moto y/o diagnóstico.
+  ///
+  /// Es también el autoguardado de la cabecera, así que **solo el cambio de
+  /// estado deja renglón en la bitácora**: anotar cada pasada llenaría la
+  /// tabla de renglones por teclear el diagnóstico. Cerrar y anular sí tienen
+  /// que constar —`ordenes_servicio.usuario_id` solo dice quién la abrió—, y
+  /// pasar a `anulada` además devuelve los repuestos al inventario, en esta
+  /// misma transacción.
   Future<OrdenResumen> actualizar({
     required int id,
     required EstadoOrden estado,

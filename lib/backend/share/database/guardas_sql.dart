@@ -123,6 +123,85 @@ const List<String> guardasSql = [
   END;
   ''',
 
+  // ── Una compra con algo dentro no se borra ──────────────────────────────
+  //
+  // Mismo argumento que la factura, del otro lado del mostrador: la remisión
+  // explica entradas de inventario. Borrarla dejaría mercancía en el stock sin
+  // documento que diga de dónde salió. Se anula, y anular saca lo que había
+  // entrado.
+  //
+  // El `WHEN` deja pasar un solo caso: el **borrador sin una sola línea**. Ese
+  // no explica ningún movimiento —no llegó a recibir nada— y es el que se abre
+  // por error; obligar a anularlo llenaría el listado de remisiones vacías.
+  '''
+  CREATE TRIGGER IF NOT EXISTS guarda_compras_sin_borrado
+  BEFORE DELETE ON compras
+  FOR EACH ROW
+  WHEN OLD.estado <> 'BORRADOR'
+    OR EXISTS (SELECT 1 FROM compra_detalles WHERE compra_id = OLD.id)
+  BEGIN
+    SELECT RAISE(ABORT,
+      'Una compra con mercancía dentro no se borra: anúlala.');
+  END;
+  ''',
+
+  // ── Una compra anulada está cerrada ─────────────────────────────────────
+  //
+  // Se permite llegar a `ANULADA`; salir de ahí o retocar el total, no. Sin
+  // esto, desanular una remisión metería su mercancía dos veces.
+  '''
+  CREATE TRIGGER IF NOT EXISTS guarda_compras_anuladas_inmutables
+  BEFORE UPDATE ON compras
+  FOR EACH ROW
+  WHEN OLD.estado = 'ANULADA'
+  BEGIN
+    SELECT RAISE(ABORT,
+      'Una compra anulada no se modifica.');
+  END;
+  ''',
+
+  // ── Solo un borrador admite líneas ──────────────────────────────────────
+  //
+  // Marcar la remisión como terminada es lo que la cierra: a partir de ahí sus
+  // líneas explican entradas de inventario ya archivadas, y una anulada además
+  // ya devolvió su mercancía. Tocarlas movería stock por algo que no está
+  // pasando.
+  //
+  // Tres triggers y no uno porque SQLite no admite `FOR EACH ROW` sobre varias
+  // operaciones a la vez, igual que en `venta_detalles`.
+  '''
+  CREATE TRIGGER IF NOT EXISTS guarda_compra_detalles_sin_alta
+  BEFORE INSERT ON compra_detalles
+  FOR EACH ROW
+  WHEN (SELECT estado FROM compras WHERE id = NEW.compra_id) <> 'BORRADOR'
+  BEGIN
+    SELECT RAISE(ABORT,
+      'La compra ya está cerrada: no admite más líneas.');
+  END;
+  ''',
+
+  '''
+  CREATE TRIGGER IF NOT EXISTS guarda_compra_detalles_sin_edicion
+  BEFORE UPDATE ON compra_detalles
+  FOR EACH ROW
+  WHEN (SELECT estado FROM compras WHERE id = OLD.compra_id) <> 'BORRADOR'
+  BEGIN
+    SELECT RAISE(ABORT,
+      'La compra ya está cerrada: sus líneas no se editan.');
+  END;
+  ''',
+
+  '''
+  CREATE TRIGGER IF NOT EXISTS guarda_compra_detalles_sin_borrado
+  BEFORE DELETE ON compra_detalles
+  FOR EACH ROW
+  WHEN (SELECT estado FROM compras WHERE id = OLD.compra_id) <> 'BORRADOR'
+  BEGIN
+    SELECT RAISE(ABORT,
+      'La compra ya está cerrada: sus líneas no se borran.');
+  END;
+  ''',
+
   // ── Una orden cerrada ya no recibe trabajo ──────────────────────────────
   //
   // Entregada la moto o anulada la orden, agregarle un repuesto descontaría
@@ -220,6 +299,77 @@ const List<String> guardasSql = [
   END;
   ''',
 
+  // ── La deuda que copia una orden no se retoca a mano ─────────────────────
+  //
+  // Es la guarda que cierra el descuento doble de inventario. El caso era
+  // este: se anotaba el repuesto en la orden —y salía del estante—, el
+  // cliente pedía fiado, y en Cuentas por cobrar se anotaba otra vez el mismo
+  // repuesto para que constara. Salía uno del taller y el inventario decía
+  // dos.
+  //
+  // Cerrar la orden a crédito copia sus líneas a la deuda **sin volver a
+  // tocar el stock**, y estas tres guardas impiden que después alguien le
+  // agregue, cambie o quite una línea a mano: esas sí moverían inventario, y
+  // sobre una salida que ya ocurrió. Lo que haya que corregir se corrige en
+  // la orden, que es donde de verdad está.
+  //
+  // Un aviso no habría servido: mientras se pueda anotar en los dos sitios,
+  // alguien lo va a hacer.
+  //
+  // **Por qué el `INSERT` también:** el cierre a crédito inserta sus líneas
+  // *antes* de escribir `deudores.orden_id`, todo dentro de la misma
+  // transacción. Cuando el enlace queda puesto, la deuda ya está completa y
+  // esta guarda la sella.
+  '''
+  CREATE TRIGGER IF NOT EXISTS guarda_deuda_de_orden_sin_alta
+  BEFORE INSERT ON deudor_items
+  FOR EACH ROW
+  WHEN (SELECT orden_id FROM deudores WHERE id = NEW.deudor_id) IS NOT NULL
+  BEGIN
+    SELECT RAISE(ABORT,
+      'Esta deuda es la orden cerrada a crédito: sus líneas se corrigen en la orden.');
+  END;
+  ''',
+
+  '''
+  CREATE TRIGGER IF NOT EXISTS guarda_deuda_de_orden_sin_edicion
+  BEFORE UPDATE ON deudor_items
+  FOR EACH ROW
+  WHEN (SELECT orden_id FROM deudores WHERE id = OLD.deudor_id) IS NOT NULL
+  BEGIN
+    SELECT RAISE(ABORT,
+      'Esta deuda es la orden cerrada a crédito: sus líneas se corrigen en la orden.');
+  END;
+  ''',
+
+  '''
+  CREATE TRIGGER IF NOT EXISTS guarda_deuda_de_orden_sin_borrado
+  BEFORE DELETE ON deudor_items
+  FOR EACH ROW
+  WHEN (SELECT orden_id FROM deudores WHERE id = OLD.deudor_id) IS NOT NULL
+  BEGIN
+    SELECT RAISE(ABORT,
+      'Esta deuda es la orden cerrada a crédito: sus líneas se corrigen en la orden.');
+  END;
+  ''',
+
+  // ── El enlace con la orden se pone una vez y no se mueve ─────────────────
+  //
+  // Sin esto, la guarda de arriba se saltaría en dos pasos: bastaría con
+  // poner `orden_id` en NULL, retocar las líneas y volver a enlazarla. Y
+  // desenlazar una deuda de su orden dejaría además los repuestos de la orden
+  // cobrados dos veces si alguien la cierra a crédito otra vez.
+  '''
+  CREATE TRIGGER IF NOT EXISTS guarda_deuda_orden_inmutable
+  BEFORE UPDATE ON deudores
+  FOR EACH ROW
+  WHEN OLD.orden_id IS NOT NULL AND NEW.orden_id IS NOT OLD.orden_id
+  BEGIN
+    SELECT RAISE(ABORT,
+      'La deuda nació de una orden: ese enlace no se cambia.');
+  END;
+  ''',
+
   // ── La bitácora es de solo escritura ────────────────────────────────────
   //
   // Mismo argumento que el libro mayor del inventario, y más fuerte: una
@@ -236,13 +386,73 @@ const List<String> guardasSql = [
   END;
   ''',
 
+  // ── Y lo reciente no se borra ───────────────────────────────────────────
+  //
+  // La bitácora **sí se poda**, o crecería para siempre; lo que no se puede
+  // es que la poda sirva para tapar algo. El `WHEN` es el tope duro: dos años
+  // de renglones que ningún `DELETE` toca, ni el de la app ni el de alguien
+  // con el `.sqlite` abierto en un visor.
+  //
+  // Los dos años están **quemados aquí a propósito**. Un trigger no puede
+  // leer la tabla `configuracion` sin volverse otra cosa que una garantía, y
+  // una garantía configurable no lo es. Lo que el taller elige es cuánto
+  // ofrece podar la pantalla —`ClaveConfiguracion.mesesBitacora`—, siempre
+  // por encima de este piso.
+  //
+  // El `CAST(strftime(...) AS INTEGER)` no es adorno: Drift guarda las fechas
+  // como segundos de época, un entero, y `datetime('now', …)` devuelve texto.
+  // Comparar entero con texto en SQLite no da error —da `false` siempre—, así
+  // que sin el CAST esta guarda estaría puesta y no protegería nada.
   '''
   CREATE TRIGGER IF NOT EXISTS guarda_bitacora_sin_borrado
   BEFORE DELETE ON bitacora
   FOR EACH ROW
+  WHEN OLD.creado_en > CAST(strftime('%s', 'now', '-2 years') AS INTEGER)
   BEGIN
     SELECT RAISE(ABORT,
-      'La bitácora no se borra.');
+      'La bitácora de los últimos dos años no se borra.');
+  END;
+  ''',
+
+  // ── Un producto tiene como mucho un proveedor principal ─────────────────
+  //
+  // El principal es el que se propone al pedir y el que sale en la rejilla,
+  // así que con dos marcados la app tendría que elegir uno —y elegiría el que
+  // devolviera primero la consulta, que cambia sin avisar—.
+  //
+  // El repositorio ya apaga el anterior antes de encender el nuevo; esto es
+  // la red por si un método futuro se olvida. Va como guarda y no como índice
+  // único parcial porque `@TableIndex` de Drift no admite `WHERE`, y un
+  // índice único sobre `producto_id` a secas prohibiría el segundo proveedor,
+  // que es justo lo que esta tabla existe para permitir.
+  //
+  // Son dos triggers, uno por operación: SQLite no tiene un `BEFORE INSERT OR
+  // UPDATE` que valga para las dos.
+  '''
+  CREATE TRIGGER IF NOT EXISTS guarda_un_solo_proveedor_principal_insert
+  BEFORE INSERT ON producto_proveedores
+  FOR EACH ROW
+  WHEN NEW.es_principal = 1
+   AND EXISTS (SELECT 1 FROM producto_proveedores
+               WHERE producto_id = NEW.producto_id AND es_principal = 1)
+  BEGIN
+    SELECT RAISE(ABORT,
+      'El producto ya tiene un proveedor principal: quita el anterior primero.');
+  END;
+  ''',
+
+  '''
+  CREATE TRIGGER IF NOT EXISTS guarda_un_solo_proveedor_principal_update
+  BEFORE UPDATE ON producto_proveedores
+  FOR EACH ROW
+  WHEN NEW.es_principal = 1
+   AND EXISTS (SELECT 1 FROM producto_proveedores
+               WHERE producto_id = NEW.producto_id
+                 AND es_principal = 1
+                 AND id <> NEW.id)
+  BEGIN
+    SELECT RAISE(ABORT,
+      'El producto ya tiene un proveedor principal: quita el anterior primero.');
   END;
   ''',
 ];

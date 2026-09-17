@@ -30,3 +30,18 @@ final lineasDevolviblesProvider =
   (ref, ventaId) =>
       ref.watch(repositorioDevolucionesProvider).lineasDevolvibles(ventaId),
 );
+
+/// Las devoluciones de una venta, con sus líneas y su autor.
+///
+/// Es un `Stream` y no un `Future` porque el diálogo de detalle puede quedar
+/// abierto mientras se recibe otra devolución desde la misma pantalla: la
+/// lista tiene que enterarse.
+///
+/// `autoDispose` porque solo lo mira ese diálogo, y `family` porque la
+/// respuesta es distinta para cada factura.
+final devolucionesDeVentaProvider =
+    StreamProvider.autoDispose.family<List<Devolucion>, int>(
+  name: 'devolucionesDeVentaProvider',
+  (ref, ventaId) =>
+      ref.watch(repositorioDevolucionesProvider).observarPorVenta(ventaId),
+);

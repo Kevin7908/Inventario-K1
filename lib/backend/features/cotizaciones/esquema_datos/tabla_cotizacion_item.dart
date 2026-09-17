@@ -1,5 +1,6 @@
 import 'package:drift/drift.dart';
 
+import '../../autenticacion/esquema_datos/tabla_usuario.dart';
 import '../../productos/esquema_datos/tabla_producto.dart';
 import '../../servicios/esquema_datos/tabla_servicio.dart';
 import 'tabla_cotizacion.dart';
@@ -19,6 +20,8 @@ import 'tabla_cotizacion.dart';
 /// El modelo `CotizacionItem` sigue exponiendo un solo `referenciaId`, que es
 /// como se lee bien desde la vista; el mapper elige la columna según el tipo.
 @TableIndex(name: 'idx_cotizacion_items_cotizacion', columns: {#cotizacionId})
+// Cubre el WHERE usuarioId = ? de «qué anotó esta cuenta».
+@TableIndex(name: 'idx_cotizacion_items_usuario', columns: {#usuarioId})
 class TablaCotizacionItem extends Table {
   @override
   String get tableName => 'cotizacion_items';
@@ -41,6 +44,19 @@ class TablaCotizacionItem extends Table {
   IntColumn get servicioId => integer()
       .nullable()
       .references(TablaServicio, #id, onDelete: KeyAction.restrict)();
+
+  /// Quién anotó **esta línea**, que no siempre es quien abrió el documento:
+  /// el editor guarda solo y el documento puede pasar de un turno a otro
+  /// (`REGLAS_BD.md` §7.0).
+  ///
+  /// `NOT NULL` y sin valor por defecto **a propósito**: así el
+  /// `Companion.insert` que genera Drift lo exige como parámetro, y un método
+  /// de escritura nuevo que se olvide del autor no compila. La garantía la da
+  /// el compilador, no la disciplina.
+  ///
+  /// `restrict`: la cuenta que anotó algo no se borra mientras eso exista.
+  IntColumn get usuarioId => integer()
+      .references(TablaUsuario, #id, onDelete: KeyAction.restrict)();
 
   /// Nombre congelado: si mañana renombran el repuesto, la cotización impresa
   /// sigue diciendo lo que decía.

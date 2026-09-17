@@ -23,7 +23,7 @@ void main() {
     db = baseEnMemoria();
     sesion = await sesionDePrueba(db);
     motos = RepositorioMotosImpl(db, sesion);
-    configuracion = RepositorioConfiguracionImpl(db);
+    configuracion = RepositorioConfiguracionImpl(db, sesion);
     taller = await sembrarTaller(db);
   });
 
@@ -50,8 +50,7 @@ void main() {
         () => db.into(db.tablaMoto).insert(
               TablaMotoCompanion.insert(
                 clienteId: taller.clienteId,
-                marca: 'Yamaha',
-                modelo: 'FZ',
+                marcaId: taller.marcaId,
                 placa: const Value('KMN12C'),
               ),
             ),
@@ -64,8 +63,7 @@ void main() {
         () => db.into(db.tablaMoto).insert(
               TablaMotoCompanion.insert(
                 clienteId: taller.clienteId,
-                marca: 'Yamaha',
-                modelo: 'FZ',
+                marcaId: taller.marcaId,
                 anio: const Value(12),
               ),
             ),
@@ -74,13 +72,27 @@ void main() {
     });
 
     test('un cilindraje de cero se rechaza', () async {
+      // El cilindraje se mudó a `modelos_moto`: es del modelo, no del
+      // ejemplar. El CHECK se mudó con él.
+      expect(
+        () => db.into(db.tablaModeloMoto).insert(
+              TablaModeloMotoCompanion.insert(
+                marcaId: taller.marcaId,
+                nombre: 'Otro',
+                cilindraje: const Value(0),
+              ),
+            ),
+        throwsA(isA<Exception>()),
+      );
+    });
+
+    test('una moto no puede apuntar a una marca que no existe', () async {
+      // La FK es la que lo impide, y solo con `PRAGMA foreign_keys = ON`.
       expect(
         () => db.into(db.tablaMoto).insert(
               TablaMotoCompanion.insert(
                 clienteId: taller.clienteId,
-                marca: 'Yamaha',
-                modelo: 'FZ',
-                cilindraje: const Value(0),
+                marcaId: 9999,
               ),
             ),
         throwsA(isA<Exception>()),
@@ -152,7 +164,8 @@ void main() {
 
   group('configuración', () {
     test('una clave sin configurar devuelve su valor por defecto', () async {
-      expect(await configuracion.leer(ClaveConfiguracion.moneda), 'COP');
+      expect(await configuracion.leer(ClaveConfiguracion.formatoImpresion),
+          'CARTA');
       expect(await configuracion.leer(ClaveConfiguracion.nit), '');
     });
 
@@ -177,7 +190,7 @@ void main() {
 
       expect(valores.keys.toSet(), ClaveConfiguracion.values.toSet());
       expect(valores[ClaveConfiguracion.ciudad], 'Medellín');
-      expect(valores[ClaveConfiguracion.moneda], 'COP');
+      expect(valores[ClaveConfiguracion.formatoImpresion], 'CARTA');
     });
   });
 }

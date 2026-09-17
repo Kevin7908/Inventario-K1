@@ -5,6 +5,10 @@ import 'package:inventario_k1/backend/share/database/app_db.dart';
 import '../../inventario/modelo/movimiento_inventario.dart';
 import '../../inventario/repositorio/repositorio_inventario.dart';
 import '../../inventario/repositorio/repositorio_inventario_impl.dart';
+import '../../pos/enum/enum_ventas.dart';
+import '../../pos/modelo/linea_venta_documento.dart';
+import '../../pos/repositorio/repositorio_ventas.dart';
+import '../../pos/repositorio/repositorio_ventas_impl.dart';
 import '../../../share/consecutivos/documento_consecutivo.dart';
 import '../../../share/consecutivos/repositorio_consecutivos.dart';
 import '../enum/enum_ordenes.dart';
@@ -26,8 +30,10 @@ class RepositorioOrdenesImpl with FirmaDeSesion implements RepositorioOrdenes {
   @override
   final SesionActual? sesion;
 
-  late final RepositorioBitacora _bitacora =
-      RepositorioBitacoraImpl(_db, sesion);
+  late final RepositorioBitacora _bitacora = RepositorioBitacoraImpl(
+    _db,
+    sesion,
+  );
 
   /// Deja el renglón de la bitácora, **dentro** de la transacción del cambio.
   Future<void> _anotar(
@@ -35,22 +41,23 @@ class RepositorioOrdenesImpl with FirmaDeSesion implements RepositorioOrdenes {
     int? id,
     String descripcion, {
     String? detalle,
-  }) =>
-      _bitacora.anotar(
-        Anotacion(
-          entidad: EntidadAuditada.orden,
-          accion: accion,
-          entidadId: id,
-          descripcion: descripcion,
-          detalle: detalle,
-        ),
-      );
-
+  }) => _bitacora.anotar(
+    Anotacion(
+      entidad: EntidadAuditada.orden,
+      accion: accion,
+      entidadId: id,
+      descripcion: descripcion,
+      detalle: detalle,
+    ),
+  );
 
   final AppDb _db;
 
   /// Agregar o quitar un repuesto mueve stock, y eso solo se hace por aquí.
-  late final RepositorioInventario _inventario = RepositorioInventarioImpl(_db, sesion);
+  late final RepositorioInventario _inventario = RepositorioInventarioImpl(
+    _db,
+    sesion,
+  );
 
   // Getters para acceso rápido a tablas
   $TablaOrdenesServicioTable get _tablaOrdenes => _db.tablaOrdenesServicio;
@@ -60,8 +67,15 @@ class RepositorioOrdenesImpl with FirmaDeSesion implements RepositorioOrdenes {
 
   /// El número de orden sale de la tabla `consecutivos`, dentro de la misma
   /// transacción que la crea (§7.1).
-  late final RepositorioConsecutivos _consecutivos =
-      RepositorioConsecutivos(_db);
+  /// Entregar una orden la mete en el historial de ventas. Se construye aquí
+  /// y no se recibe por el constructor por lo mismo que `_inventario`: es una
+  /// pieza del backend sobre la misma base y la misma sesión, no una
+  /// dependencia que un test necesite sustituir.
+  late final RepositorioVentas _ventas = RepositorioVentasImpl(_db, sesion);
+
+  late final RepositorioConsecutivos _consecutivos = RepositorioConsecutivos(
+    _db,
+  );
 
   // El `FROM` y sus tres JOIN, aparte para que la consulta de la página y la
   // del `COUNT` filtren sobre exactamente las mismas filas. Si se separaran,
@@ -69,9 +83,15 @@ class RepositorioOrdenesImpl with FirmaDeSesion implements RepositorioOrdenes {
   //
   // El nombre del cliente sale de `personas`: la tabla `clientes` solo guarda
   // lo propio del rol.
+  //
+  // La marca y el modelo son catálogo desde que dejaron de ser texto en
+  // `motos`: `marcas_moto` entra con `JOIN` porque la FK es `NOT NULL`, y
+  // `modelos_moto` con `LEFT JOIN` porque puede faltar.
   static const _sqlFromResumen = '''
     FROM ordenes_servicio os
-    JOIN motos    m  ON m.id  = os.moto_id
+    JOIN motos       m  ON m.id  = os.moto_id
+    JOIN marcas_moto ma ON ma.id = m.marca_id
+    LEFT JOIN modelos_moto md ON md.id = m.modelo_id
     JOIN clientes c  ON c.id  = os.cliente_id
     JOIN personas pe ON pe.id = c.persona_id
   ''';
@@ -81,10 +101,12 @@ class RepositorioOrdenesImpl with FirmaDeSesion implements RepositorioOrdenes {
   // filas y las sumas salen infladas (dos tareas x tres repuestos = cada
   // importe contado seis veces). Traerlos abriendo cada orden sería el N+1
   // que prohíbe §5.
-  static const _sqlSelectResumen = '''
+  static const _sqlSelectResumen =
+      '''
     SELECT
       os.*,
-      m.marca, m.modelo, m.anio, m.placa,
+      ma.nombre AS marca, md.nombre AS modelo, m.anio, m.placa,
+      m.marca_id, m.modelo_id,
       (pe.nombres || ' ' || COALESCE(pe.apellidos, '')) AS cliente_nombre,
       (SELECT COALESCE(SUM(ot.precio_pactado), 0)
          FROM ordenes_tareas ot WHERE ot.orden_id = os.id) AS sub_mano_obra,
@@ -100,24 +122,30 @@ class RepositorioOrdenesImpl with FirmaDeSesion implements RepositorioOrdenes {
          JOIN personas tpe ON tpe.id = tec.persona_id
         WHERE ot.orden_id = os.id
         ORDER BY ot.id LIMIT 1) AS tecnico_nombre
-  ''' '$_sqlFromResumen';
+  '''
+      '$_sqlFromResumen';
 
   /// Las tablas que hay que vigilar para que el stream del listado se entere
   /// de un cambio. Si falta una, la lista se queda desactualizada en silencio
   /// (§5): las tres hijas están porque los subtotales salen de ellas.
   Set<ResultSetImplementation<dynamic, dynamic>> get _fuentesResumen => {
-        _tablaOrdenes,
-        _tablaTareas,
-        _tablaRepuestos,
-        _tablaCargos,
-        _db.tablaMoto,
-        _db.tablaCliente,
-        _db.tablaPersona,
-        _db.tablaTecnico,
-      };
+    _tablaOrdenes,
+    _tablaTareas,
+    _tablaRepuestos,
+    _tablaCargos,
+    _db.tablaMoto,
+    // Si faltaran, renombrar una marca no volvería a emitir y el listado se
+    // quedaría con el nombre viejo hasta reabrir la pantalla.
+    _db.tablaMarcaMoto,
+    _db.tablaModeloMoto,
+    _db.tablaCliente,
+    _db.tablaPersona,
+    _db.tablaTecnico,
+  };
 
   @override
   Stream<List<OrdenResumen>> observarTodas() {
+    exigir(Permiso.ordenesVer);
     return _db
         .customSelect(
           '$_sqlSelectResumen ORDER BY os.id DESC',
@@ -156,7 +184,7 @@ class RepositorioOrdenesImpl with FirmaDeSesion implements RepositorioOrdenes {
       condiciones.add('''(
         LOWER(os.numero) LIKE ?
         OR LOWER(pe.nombres || ' ' || COALESCE(pe.apellidos, '')) LIKE ?
-        OR LOWER(m.marca || ' ' || m.modelo || ' ' ||
+        OR LOWER(ma.nombre || ' ' || COALESCE(md.nombre, '') || ' ' ||
                  COALESCE(CAST(m.anio AS TEXT), '')) LIKE ?
         OR LOWER(COALESCE(m.placa, '')) LIKE ?
       )''');
@@ -178,6 +206,7 @@ class RepositorioOrdenesImpl with FirmaDeSesion implements RepositorioOrdenes {
     required int pagina,
     required int tamano,
   }) {
+    exigir(Permiso.ordenesVer);
     final donde = _whereListado(filtro);
 
     final consultaPagina = _db.customSelect(
@@ -210,6 +239,7 @@ class RepositorioOrdenesImpl with FirmaDeSesion implements RepositorioOrdenes {
 
   @override
   Future<List<OrdenResumen>> obtenerTodas() async {
+    exigir(Permiso.ordenesVer);
     final rows = await _db
         .customSelect('$_sqlSelectResumen ORDER BY os.id DESC')
         .get();
@@ -232,6 +262,7 @@ class RepositorioOrdenesImpl with FirmaDeSesion implements RepositorioOrdenes {
 
   @override
   Future<OrdenDetalle> obtenerDetalle(int id) async {
+    exigir(Permiso.ordenesVer);
     // Cabecera (Usamos customSelect para traer datos de moto/cliente)
     final cabeceraRow = await _db
         .customSelect(
@@ -299,7 +330,9 @@ class RepositorioOrdenesImpl with FirmaDeSesion implements RepositorioOrdenes {
     // El número se pide dentro de la transacción que inserta la orden: si el
     // `INSERT` falla, el consecutivo se devuelve y la serie sigue sin huecos.
     return _db.transaction(() async {
-      final id = await _db.into(_tablaOrdenes).insert(
+      final id = await _db
+          .into(_tablaOrdenes)
+          .insert(
             OrdenMapper.aCompanionNuevo(
               usuarioId: autorId,
               numero: await _consecutivos.siguiente(DocumentoConsecutivo.orden),
@@ -333,9 +366,9 @@ class RepositorioOrdenesImpl with FirmaDeSesion implements RepositorioOrdenes {
     // devuelve, y va en la misma transacción que el cambio de estado: si la
     // devolución falla, la orden no se queda anulada con el stock sin volver.
     await _db.transaction(() async {
-      final antes = await (_db.select(_tablaOrdenes)
-            ..where((t) => t.id.equals(id)))
-          .getSingleOrNull();
+      final antes = await (_db.select(
+        _tablaOrdenes,
+      )..where((t) => t.id.equals(id))).getSingleOrNull();
       if (antes == null) {
         throw Exception('No se pudo actualizar la orden #$id.');
       }
@@ -365,6 +398,32 @@ class RepositorioOrdenesImpl with FirmaDeSesion implements RepositorioOrdenes {
       if (updatedCount == 0) {
         throw Exception('No se pudo actualizar la orden #$id.');
       }
+
+      // Solo el **cambio de estado** deja renglón. `actualizar` es también el
+      // autoguardado de la cabecera —diagnóstico y observaciones—, así que
+      // anotarlo entero llenaría la bitácora de renglones por teclear.
+      //
+      // Cerrar y anular sí tienen que constar: son los dos gestos que le
+      // ponen precio a la orden y le devuelven o le quitan la mercancía, y
+      // `ordenes_servicio.usuario_id` solo dice quién la abrió.
+      final estadoAntes = EstadoOrden.desdeTexto(antes.estado);
+      if (estadoAntes != estado) {
+        await _anotar(
+          estado == EstadoOrden.anulada
+              ? AccionAuditada.anulo
+              : AccionAuditada.modifico,
+          id,
+          'Orden ${antes.numero}',
+          detalle: 'Estado: ${estadoAntes.etiqueta} → ${estado.etiqueta}',
+        );
+      }
+
+      // Entregar es cobrar: ahí es donde la orden entra al historial de
+      // ventas. Va en esta misma transacción para que una factura fallida no
+      // deje la orden entregada sin su venta.
+      if (estado == EstadoOrden.entregada && estadoAntes != estado) {
+        await _facturarEntrega(id);
+      }
     });
 
     // Propagar cambio de cliente a la factura vinculada (si existe)
@@ -379,14 +438,97 @@ class RepositorioOrdenesImpl with FirmaDeSesion implements RepositorioOrdenes {
     return _obtenerResumenPorId(id);
   }
 
+  /// Escribe la factura de la orden recién entregada.
+  ///
+  /// **La orden fiada no pasa por aquí.** Cerrarla a crédito ya movió la plata
+  /// a una deuda, y esa deuda escribirá su propia factura al saldarse:
+  /// facturar las dos cobraría dos veces el mismo trabajo en el cuadre del
+  /// día. Por eso lo primero que se mira es si hay una `deudores.orden_id`
+  /// apuntando aquí.
+  ///
+  /// Tampoco factura una orden vacía —no habría qué cobrar— ni una que ya
+  /// tenga su venta: de eso último se encarga además el `UNIQUE` de
+  /// `ventas.orden_id`.
+  ///
+  /// El método de pago va en efectivo: la orden no guarda con qué se pagó, y
+  /// el mostrador de un taller cobra en efectivo salvo aviso. Es el dato que
+  /// pediría un `DialogoCobro` propio para la entrega, y está anotado como
+  /// deuda técnica.
+  Future<void> _facturarEntrega(int ordenId) async {
+    final fiada = await (_db.select(_db.tablaDeudor)
+          ..where((t) => t.ordenId.equals(ordenId))
+          ..limit(1))
+        .getSingleOrNull();
+    if (fiada != null) return;
+
+    final detalle = await obtenerDetalle(ordenId);
+    final lineas = [
+      for (final tarea in detalle.tareas)
+        LineaVentaDocumento(
+          descripcion: tarea.servicioNombre,
+          cantidad: 1,
+          precioUnitario: tarea.precioPactado,
+          tipoItem: TipoItem.servicio,
+          servicioId: tarea.servicioId,
+          tecnicoId: tarea.tecnicoId,
+        ),
+      for (final repuesto in detalle.repuestos)
+        LineaVentaDocumento(
+          descripcion: repuesto.productoNombre,
+          cantidad: repuesto.cantidad,
+          precioUnitario: repuesto.precioUnitario,
+          productoId: repuesto.productoId,
+          costoUnitario: repuesto.costoUnitario,
+        ),
+      // Los cargos sueltos van como servicio sin catálogo detrás: no tienen
+      // producto ni `servicio_id`, y el `CHECK` de `venta_detalles` acepta un
+      // servicio sin id pero no un producto sin él.
+      for (final cargo in detalle.cargos)
+        LineaVentaDocumento(
+          descripcion: cargo.descripcion,
+          cantidad: 1,
+          precioUnitario: cargo.precio,
+          tipoItem: TipoItem.servicio,
+        ),
+    ];
+    if (lineas.isEmpty) return;
+
+    await _ventas.registrarVentaDeDocumento(
+      tipo: TipoVenta.servicio,
+      ordenId: ordenId,
+      clienteId: detalle.clienteId,
+      metodoPago: MetodoPago.efectivo,
+      lineas: lineas,
+      subtotal: detalle.subtotal,
+      descuento: detalle.descuento,
+      iva: detalle.iva,
+    );
+  }
+
   @override
   Future<void> eliminar(int id) async {
     exigir(Permiso.ordenesEliminar);
     await _db.transaction(() async {
       // El número se lee antes: después la orden ya no está para decirlo.
-      final antes = await (_db.select(_tablaOrdenes)
-            ..where((t) => t.id.equals(id)))
+      final antes = await (_db.select(
+        _tablaOrdenes,
+      )..where((t) => t.id.equals(id))).getSingleOrNull();
+
+      // Una orden que se fió no se borra: la `restrict` de `deudores.orden_id`
+      // lo impediría igual, pero con un error de SQLite que no se le puede
+      // enseñar a nadie. Y borrarla dejaría la deuda cobrando líneas que ya no
+      // se pueden mirar en ninguna parte.
+      final deuda = await (_db.select(_db.tablaDeudor)
+            ..where((t) => t.ordenId.equals(id))
+            ..limit(1))
           .getSingleOrNull();
+      if (deuda != null) {
+        throw Exception(
+          'La orden ${antes?.numero ?? '#$id'} se fió en la deuda '
+          '${deuda.numero}: elimina primero la deuda si de verdad hay que '
+          'borrarla.',
+        );
+      }
 
       final deleted = await (_db.delete(
         _tablaOrdenes,
@@ -415,6 +557,7 @@ class RepositorioOrdenesImpl with FirmaDeSesion implements RepositorioOrdenes {
         .into(_tablaTareas)
         .insert(
           OrdenMapper.tareaCompanionNuevo(
+            usuarioId: autorId,
             ordenId: ordenId,
             servicioId: servicioId,
             tecnicoId: tecnicoId,
@@ -445,11 +588,17 @@ class RepositorioOrdenesImpl with FirmaDeSesion implements RepositorioOrdenes {
   }) async {
     await (_db.update(_tablaTareas)..where((t) => t.id.equals(tareaId))).write(
       TablaOrdenesTareaCompanion(
-        servicioId:   servicioId   != null ? Value(servicioId)   : const Value.absent(),
-        tecnicoId:    tecnicoId    != null ? Value(tecnicoId)    : const Value.absent(),
-        precioPactado: precioPactado != null ? Value(precioPactado) : const Value.absent(),
-        notas:        notas        != null ? Value(notas)        : const Value.absent(),
-        completado:   completado   != null ? Value(completado)   : const Value.absent(),
+        servicioId: servicioId != null
+            ? Value(servicioId)
+            : const Value.absent(),
+        tecnicoId: tecnicoId != null ? Value(tecnicoId) : const Value.absent(),
+        precioPactado: precioPactado != null
+            ? Value(precioPactado)
+            : const Value.absent(),
+        notas: notas != null ? Value(notas) : const Value.absent(),
+        completado: completado != null
+            ? Value(completado)
+            : const Value.absent(),
       ),
     );
     // Bajar el precio pactado baja el subtotal, y la rebaja que antes cabía
@@ -460,9 +609,9 @@ class RepositorioOrdenesImpl with FirmaDeSesion implements RepositorioOrdenes {
   @override
   Future<void> eliminarTarea(int tareaId) async {
     await _db.transaction(() async {
-      final actual = await (_db.select(_tablaTareas)
-            ..where((t) => t.id.equals(tareaId)))
-          .getSingleOrNull();
+      final actual = await (_db.select(
+        _tablaTareas,
+      )..where((t) => t.id.equals(tareaId))).getSingleOrNull();
       if (actual == null) return;
 
       await (_db.delete(_tablaTareas)..where((t) => t.id.equals(tareaId))).go();
@@ -486,14 +635,17 @@ class RepositorioOrdenesImpl with FirmaDeSesion implements RepositorioOrdenes {
     return _db.transaction(() async {
       await _verificarStock(productoId, cantidad);
 
-      await _db.into(_tablaRepuestos).insert(
-        OrdenMapper.repuestoCompanionNuevo(
-          ordenId: ordenId,
-          productoId: productoId,
-          cantidad: cantidad,
-          precioUnitario: precioUnitario,
-        ),
-      );
+      await _db
+          .into(_tablaRepuestos)
+          .insert(
+            OrdenMapper.repuestoCompanionNuevo(
+              usuarioId: autorId,
+              ordenId: ordenId,
+              productoId: productoId,
+              cantidad: cantidad,
+              precioUnitario: precioUnitario,
+            ),
+          );
 
       // Agregar sube el subtotal, así que la rebaja no puede dejar de caber:
       // no hace falta reajustarla.
@@ -545,9 +697,9 @@ class RepositorioOrdenesImpl with FirmaDeSesion implements RepositorioOrdenes {
     int? precioUnitario,
   }) {
     return _db.transaction(() async {
-      final current = await (_db.select(_tablaRepuestos)
-            ..where((t) => t.id.equals(repuestoId)))
-          .getSingleOrNull();
+      final current = await (_db.select(
+        _tablaRepuestos,
+      )..where((t) => t.id.equals(repuestoId))).getSingleOrNull();
       if (current == null) return;
 
       final cantidadNueva = cantidad ?? current.cantidad;
@@ -571,10 +723,11 @@ class RepositorioOrdenesImpl with FirmaDeSesion implements RepositorioOrdenes {
         );
       }
 
-      await (_db.update(_tablaRepuestos)..where((t) => t.id.equals(repuestoId)))
-          .write(
+      await (_db.update(
+        _tablaRepuestos,
+      )..where((t) => t.id.equals(repuestoId))).write(
         TablaOrdenesRepuestoCompanion(
-          cantidad:       Value(cantidadNueva),
+          cantidad: Value(cantidadNueva),
           precioUnitario: Value(precioUnitario ?? current.precioUnitario),
         ),
       );
@@ -584,14 +737,14 @@ class RepositorioOrdenesImpl with FirmaDeSesion implements RepositorioOrdenes {
   @override
   Future<void> eliminarRepuesto(int repuestoId) {
     return _db.transaction(() async {
-      final current = await (_db.select(_tablaRepuestos)
-            ..where((t) => t.id.equals(repuestoId)))
-          .getSingleOrNull();
+      final current = await (_db.select(
+        _tablaRepuestos,
+      )..where((t) => t.id.equals(repuestoId))).getSingleOrNull();
       if (current == null) return;
 
-      await (_db.delete(_tablaRepuestos)
-            ..where((t) => t.id.equals(repuestoId)))
-          .go();
+      await (_db.delete(
+        _tablaRepuestos,
+      )..where((t) => t.id.equals(repuestoId))).go();
 
       // La línea existía, así que su pieza había salido: quitarla la devuelve.
       await _inventario.registrar(
@@ -612,6 +765,7 @@ class RepositorioOrdenesImpl with FirmaDeSesion implements RepositorioOrdenes {
 
   @override
   Stream<Map<int, int>> observarConteoTareasPorTecnico() {
+    exigir(Permiso.ordenesVer);
     final ordenesDistintas = _tablaTareas.ordenId.count(distinct: true);
     final consulta = _db.selectOnly(_tablaTareas)
       ..addColumns([_tablaTareas.tecnicoId, ordenesDistintas])
@@ -635,8 +789,9 @@ class RepositorioOrdenesImpl with FirmaDeSesion implements RepositorioOrdenes {
     // El recorte va contra el subtotal real de las tres tablas hijas. Sin
     // esto el total quedaría en negativo y ningún `CHECK` lo atajaría: el
     // subtotal de una orden no es una columna.
-    final fila = await _db.customSelect(
-      '''
+    final fila = await _db
+        .customSelect(
+          '''
       SELECT
         (SELECT COALESCE(SUM(precio_pactado), 0)
            FROM ordenes_tareas WHERE orden_id = ?) +
@@ -645,12 +800,13 @@ class RepositorioOrdenesImpl with FirmaDeSesion implements RepositorioOrdenes {
         (SELECT COALESCE(SUM(precio), 0)
            FROM ordenes_cargos WHERE orden_id = ?) AS sub
       ''',
-      variables: [
-        Variable.withInt(id),
-        Variable.withInt(id),
-        Variable.withInt(id),
-      ],
-    ).getSingle();
+          variables: [
+            Variable.withInt(id),
+            Variable.withInt(id),
+            Variable.withInt(id),
+          ],
+        )
+        .getSingle();
 
     final subtotal = (fila.data['sub'] as num? ?? 0).round();
     final recortado = valor < 0 ? 0 : (valor > subtotal ? subtotal : valor);
@@ -666,29 +822,33 @@ class RepositorioOrdenesImpl with FirmaDeSesion implements RepositorioOrdenes {
 
   @override
   Stream<ResumenOrdenes> observarResumen() {
+    exigir(Permiso.ordenesVer);
     // Un `COUNT` con `filter` por estado, todo en una pasada. "En proceso" es
     // ABIERTA y "pendientes" LISTA —la moto ya está lista pero no se ha
     // entregado—, que es lo que separan las tarjetas del diseño.
     final t = _tablaOrdenes;
     final total = t.id.count();
-    final enProceso =
-        t.id.count(filter: t.estado.equals(EstadoOrden.abierta.aTexto));
-    final pendientes =
-        t.id.count(filter: t.estado.equals(EstadoOrden.lista.aTexto));
-    final completadas =
-        t.id.count(filter: t.estado.equals(EstadoOrden.entregada.aTexto));
+    final enProceso = t.id.count(
+      filter: t.estado.equals(EstadoOrden.abierta.aTexto),
+    );
+    final pendientes = t.id.count(
+      filter: t.estado.equals(EstadoOrden.lista.aTexto),
+    );
+    final completadas = t.id.count(
+      filter: t.estado.equals(EstadoOrden.entregada.aTexto),
+    );
 
     final consulta = _db.selectOnly(t)
       ..addColumns([total, enProceso, pendientes, completadas]);
 
     return consulta.watchSingleOrNull().map(
-          (fila) => (
-            total: fila?.read(total) ?? 0,
-            enProceso: fila?.read(enProceso) ?? 0,
-            pendientes: fila?.read(pendientes) ?? 0,
-            completadas: fila?.read(completadas) ?? 0,
-          ),
-        );
+      (fila) => (
+        total: fila?.read(total) ?? 0,
+        enProceso: fila?.read(enProceso) ?? 0,
+        pendientes: fila?.read(pendientes) ?? 0,
+        completadas: fila?.read(completadas) ?? 0,
+      ),
+    );
   }
 
   // Cargos
@@ -705,8 +865,11 @@ class RepositorioOrdenesImpl with FirmaDeSesion implements RepositorioOrdenes {
     if (limpia.isEmpty) {
       throw Exception('El cargo necesita una descripción.');
     }
-    await _db.into(_tablaCargos).insert(
+    await _db
+        .into(_tablaCargos)
+        .insert(
           OrdenMapper.cargoCompanionNuevo(
+            usuarioId: autorId,
             ordenId: ordenId,
             descripcion: limpia,
             precio: precio,
@@ -723,18 +886,21 @@ class RepositorioOrdenesImpl with FirmaDeSesion implements RepositorioOrdenes {
     // Cambiar el precio de un cargo puede dejar el descuento por encima del
     // nuevo subtotal, así que las dos escrituras van juntas.
     await _db.transaction(() async {
-      final actual = await (_db.select(_tablaCargos)
-            ..where((t) => t.id.equals(cargoId)))
-          .getSingleOrNull();
+      final actual = await (_db.select(
+        _tablaCargos,
+      )..where((t) => t.id.equals(cargoId))).getSingleOrNull();
       if (actual == null) return;
 
-      await (_db.update(_tablaCargos)..where((t) => t.id.equals(cargoId)))
-          .write(TablaOrdenesCargoCompanion(
-        descripcion: descripcion != null
-            ? Value(descripcion.trim())
-            : const Value.absent(),
-        precio: precio != null ? Value(precio) : const Value.absent(),
-      ));
+      await (_db.update(
+        _tablaCargos,
+      )..where((t) => t.id.equals(cargoId))).write(
+        TablaOrdenesCargoCompanion(
+          descripcion: descripcion != null
+              ? Value(descripcion.trim())
+              : const Value.absent(),
+          precio: precio != null ? Value(precio) : const Value.absent(),
+        ),
+      );
 
       await _reajustarDescuento(actual.ordenId);
     });
@@ -743,9 +909,9 @@ class RepositorioOrdenesImpl with FirmaDeSesion implements RepositorioOrdenes {
   @override
   Future<void> eliminarCargo(int cargoId) async {
     await _db.transaction(() async {
-      final actual = await (_db.select(_tablaCargos)
-            ..where((t) => t.id.equals(cargoId)))
-          .getSingleOrNull();
+      final actual = await (_db.select(
+        _tablaCargos,
+      )..where((t) => t.id.equals(cargoId))).getSingleOrNull();
       if (actual == null) return;
 
       await (_db.delete(_tablaCargos)..where((t) => t.id.equals(cargoId))).go();
@@ -758,9 +924,9 @@ class RepositorioOrdenesImpl with FirmaDeSesion implements RepositorioOrdenes {
   /// Hace falta cada vez que una línea desaparece o baja de precio: la rebaja
   /// que antes cabía puede dejar de caber, y aquí no hay `CHECK` que lo avise.
   Future<void> _reajustarDescuentoDeTarea(int tareaId) async {
-    final tarea = await (_db.select(_tablaTareas)
-          ..where((t) => t.id.equals(tareaId)))
-        .getSingleOrNull();
+    final tarea = await (_db.select(
+      _tablaTareas,
+    )..where((t) => t.id.equals(tareaId))).getSingleOrNull();
     if (tarea != null) await _reajustarDescuento(tarea.ordenId);
   }
 
@@ -770,9 +936,9 @@ class RepositorioOrdenesImpl with FirmaDeSesion implements RepositorioOrdenes {
   /// línea: dos líneas del mismo repuesto son dos salidas pero una sola
   /// devolución, y así el movimiento de vuelta se lee igual que la orden.
   Future<void> _devolverInventario(int ordenId) async {
-    final lineas = await (_db.select(_tablaRepuestos)
-          ..where((t) => t.ordenId.equals(ordenId)))
-        .get();
+    final lineas = await (_db.select(
+      _tablaRepuestos,
+    )..where((t) => t.ordenId.equals(ordenId))).get();
     if (lineas.isEmpty) return;
 
     final porProducto = <int, double>{};
@@ -794,9 +960,9 @@ class RepositorioOrdenesImpl with FirmaDeSesion implements RepositorioOrdenes {
   }
 
   Future<void> _reajustarDescuento(int ordenId) async {
-    final orden = await (_db.select(_tablaOrdenes)
-          ..where((t) => t.id.equals(ordenId)))
-        .getSingleOrNull();
+    final orden = await (_db.select(
+      _tablaOrdenes,
+    )..where((t) => t.id.equals(ordenId))).getSingleOrNull();
     if (orden == null || orden.descuento == 0) return;
     await fijarDescuento(id: ordenId, valor: orden.descuento);
   }

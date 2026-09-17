@@ -52,6 +52,9 @@ Moto _moto({
     Moto(
       id: id,
       clienteId: clienteId,
+      // `marcaId: 0` = todavía sin resolver: el repositorio traduce el nombre
+      // a id contra el catálogo y da de alta lo que falte.
+      marcaId: 0,
       marca: marca,
       modelo: modelo,
       placa: placa,

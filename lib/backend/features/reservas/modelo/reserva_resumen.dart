@@ -12,6 +12,7 @@ class ReservaResumen {
     this.cotizacionId,
     required this.estado,
     required this.totalReserva,
+    this.iva = 0,
     required this.pagadoAcumulado,
     required this.creadoEn,
     this.fechaLimite,
@@ -26,11 +27,20 @@ class ReservaResumen {
   final String? placaMoto;
   final int? cotizacionId;
   final EstadoReserva estado;
+  /// Lo pactado, **con el impuesto ya sumado**.
   final int totalReserva;
+
+  /// Cuánto de [totalReserva] es IVA, con la tasa del día en que se apartó.
+  final int iva;
+
   final int pagadoAcumulado;
   final DateTime creadoEn;
   /// Hasta cuándo se guarda la mercancía, a medianoche. `null` = sin plazo.
   final DateTime? fechaLimite;
+
+  /// La base gravable: lo pactado menos su impuesto. Es lo que suman las
+  /// líneas, y lo que el impreso pinta como subtotal.
+  int get baseGravable => totalReserva - iva;
 
   int get saldo => (totalReserva - pagadoAcumulado).clamp(0, totalReserva);
 

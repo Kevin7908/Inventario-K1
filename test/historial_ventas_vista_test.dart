@@ -12,6 +12,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:inventario_k1/backend/features/pos/enum/enum_ventas.dart';
+import 'package:inventario_k1/backend/features/pos/modelo/linea_venta_documento.dart';
 import 'package:inventario_k1/backend/features/pos/modelo/linea_venta_mostrador.dart';
 import 'package:inventario_k1/backend/features/pos/modelo/venta_detalle.dart';
 import 'package:inventario_k1/backend/features/pos/modelo/venta_resumen.dart';
@@ -70,19 +71,50 @@ class _VentasFalsas implements RepositorioVentas {
   @override
   Stream<List<VentaResumen>> observarTodas() => Stream.value(ventas);
 
+  /// Los ids cuyo detalle se pidió. El diálogo tiene su propio test
+  /// (`detalle_venta_devoluciones_test.dart`); aquí solo importa que la fila
+  /// sepa abrirlo.
+  final List<int> detallesPedidos = [];
+
   @override
-  Future<VentaDetalle> obtenerDetalle(int id) =>
-      throw UnimplementedError('la pantalla no abre el detalle');
+  Future<VentaDetalle> obtenerDetalle(int id) {
+    detallesPedidos.add(id);
+    throw UnimplementedError('el contenido del diálogo se prueba aparte');
+  }
 
   @override
   Future<VentaResumen> registrarVentaMostrador({
     required List<LineaVentaMostrador> lineas,
     required MetodoPago metodoPago,
     int? clienteId,
+    int? vendedorId,
     int iva = 0,
     int descuento = 0,
   }) =>
       throw UnimplementedError('la pantalla no vende');
+
+  @override
+  Future<VentaResumen> registrarVentaDeDocumento({
+    required TipoVenta tipo,
+    required List<LineaVentaDocumento> lineas,
+    required MetodoPago metodoPago,
+    int? clienteId,
+    int? ordenId,
+    int? deudorId,
+    int? reservaId,
+    required int subtotal,
+    int descuento = 0,
+    int iva = 0,
+  }) =>
+      throw UnimplementedError('la pantalla no factura documentos');
+
+  @override
+  Future<VentaResumen?> ventaDeDocumento({
+    int? ordenId,
+    int? deudorId,
+    int? reservaId,
+  }) async =>
+      null;
 
   /// Los ids que se mandaron anular. La pantalla no debe llamar sin que el
   /// usuario confirme.
@@ -203,7 +235,7 @@ void main() {
       expect(find.byTooltip('Anular la venta entera'), findsOneWidget);
     });
 
-    testWidgets('una factura anulada ya no ofrece nada', (tester) async {
+    testWidgets('una factura anulada ya no ofrece deshacerse', (tester) async {
       await _montar(
         tester,
         _VentasFalsas(ventas: [_venta(estado: EstadoPago.anulada)]),
@@ -212,6 +244,10 @@ void main() {
 
       expect(find.byTooltip('Recibir una devolución'), findsNothing);
       expect(find.byTooltip('Anular la venta entera'), findsNothing);
+      // Pero mirarla y reimprimirla sí: el documento anulado es justo el que
+      // a veces hay que enseñar.
+      expect(find.byTooltip('Ver qué se vendió y qué volvió'), findsOneWidget);
+      expect(find.byTooltip('Imprimir la factura'), findsOneWidget);
     });
 
     testWidgets('anular pide confirmación antes de tocar la base',
@@ -230,6 +266,21 @@ void main() {
       await tester.pumpAndSettle();
 
       expect(ventas.anuladas, [1]);
+    });
+
+    testWidgets('ver el detalle no pide POS_ANULAR', (tester) async {
+      // Mirar qué se cobró y qué volvió no deshace nada, así que lo puede
+      // hacer cualquiera que entre al historial.
+      final ventas = _VentasFalsas(ventas: [_venta()]);
+      await _montar(tester, ventas);
+
+      final boton = find.byTooltip('Ver qué se vendió y qué volvió');
+      expect(boton, findsOneWidget);
+
+      await tester.tap(boton);
+      await tester.pump();
+
+      expect(ventas.detallesPedidos, [1]);
     });
 
     testWidgets('lo devuelto se ve bajo el total, sin cambiarlo',
